@@ -36,11 +36,13 @@ def process_chunk(chunk, clip, sr, threshold, previous_chunk):
     peak_times = (peaks + 1) / sr
 
     prev_seconds = len(previous_chunk)/sr
+    new_seconds = len(chunk)/sr
     print(f"prev_seconds: {prev_seconds}")
+    print(f"new_seconds: {new_seconds}")
     #print(f"peak_times: {peak_times}")
 
-    # filter out those from previous chunk
-    peak_times_final = [peak_time for peak_time in peak_times if peak_time > prev_seconds]
+    # look back just in case missed something
+    peak_times_final = [peak_time - prev_seconds for peak_time in peak_times]
 
     return peak_times_final, correlation
 
@@ -83,7 +85,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
             break
         # Convert bytes to numpy array
         chunk = np.frombuffer(in_bytes, dtype="int16")
-        #sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
+        sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
         #exit(1)
@@ -92,9 +94,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
         peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk)
         if len(peak_times):
             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
-            #print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
+            #print(f"Found occurrences at: {peak_times} seconds, chunk {i}")
             all_peak_times.extend(peak_times_from_beginning)
-            all_correlation.extend(correlation)
+            #all_correlation.extend(correlation)
         
         # Update previous_chunk to current chunk
         previous_chunk = chunk
