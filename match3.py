@@ -37,7 +37,7 @@ def process_chunk(chunk, clip, sr, threshold, previous_chunk):
 
     prev_seconds = len(previous_chunk)/sr
     print(f"prev_seconds: {prev_seconds}")
-    print(f"peak_times: {peak_times}")
+    #print(f"peak_times: {peak_times}")
 
     # filter out those from previous chunk
     peak_times_final = [peak_time for peak_time in peak_times if peak_time > prev_seconds]
@@ -56,9 +56,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
     # Initialize parameters
     threshold = 0.8  # Threshold for distinguishing peaks
     previous_chunk = np.zeros(0)  # Buffer to maintain continuity between chunks
-    print("previous_chunk")
-    print(previous_chunk)
-    print(len(previous_chunk))
+    #print("previous_chunk")
+    #print(previous_chunk)
+    #print(len(previous_chunk))
     all_peak_times = []
     all_correlation = []
 
@@ -83,7 +83,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
             break
         # Convert bytes to numpy array
         chunk = np.frombuffer(in_bytes, dtype="int16")
-        sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
+        #sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
         #exit(1)
@@ -92,7 +92,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
         peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk)
         if len(peak_times):
             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
-            print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
+            #print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
             all_peak_times.extend(peak_times_from_beginning)
             all_correlation.extend(correlation)
         
@@ -105,97 +105,97 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
     return all_peak_times, all_correlation
 
 
-def find_clip_in_audio_in_chunks2(clip_path, full_audio_path, chunk_duration=10):
-    target_sample_rate = 16000
+# def find_clip_in_audio_in_chunks2(clip_path, full_audio_path, chunk_duration=10):
+#     target_sample_rate = 16000
 
-    # Load the audio clip
-    clip, sr_clip = load_audio_file(clip_path, sr=target_sample_rate)
+#     # Load the audio clip
+#     clip, sr_clip = load_audio_file(clip_path, sr=target_sample_rate)
 
-    # Check if sampling rates match, resample if necessary
-    if sr_clip != target_sample_rate:
-        raise "mismatch"
+#     # Check if sampling rates match, resample if necessary
+#     if sr_clip != target_sample_rate:
+#         raise "mismatch"
 
-    # Write the audio data to a new WAV file
-    sf.write("./tmp/test.wav", clip, target_sample_rate)
+#     # Write the audio data to a new WAV file
+#     sf.write("./tmp/test.wav", clip, target_sample_rate)
 
-    # Normalize the clip
-    clip = clip / np.max(np.abs(clip))
+#     # Normalize the clip
+#     clip = clip / np.max(np.abs(clip))
 
-    # Initialize parameters
-    threshold = 0.8  # Threshold for distinguishing peaks
-    previous_chunk = np.zeros_like(clip)  # Buffer to maintain continuity between chunks
+#     # Initialize parameters
+#     threshold = 0.8  # Threshold for distinguishing peaks
+#     previous_chunk = np.zeros_like(clip)  # Buffer to maintain continuity between chunks
     
-    all_peak_times = []
-    all_correlation = []
+#     all_peak_times = []
+#     all_correlation = []
 
-    # Create ffmpeg process
-    process = (
-        ffmpeg
-        .input(full_audio_path)
-        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate)
-        .run_async(pipe_stdout=True)
-    )
+#     # Create ffmpeg process
+#     process = (
+#         ffmpeg
+#         .input(full_audio_path)
+#         .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate)
+#         .run_async(pipe_stdout=True)
+#     )
 
-    # for streaming
-    seconds_per_chunk = 10
-    #frame_length = (seconds_per_chunk * target_sample_rate)
-    #chunk_size=frame_length
+#     # for streaming
+#     seconds_per_chunk = 10
+#     #frame_length = (seconds_per_chunk * target_sample_rate)
+#     #chunk_size=frame_length
 
-    # Calculate samples per interval
-    samples_per_interval = int(target_sample_rate * seconds_per_chunk * 2) # times two because it is 2 bytes per sample
+#     # Calculate samples per interval
+#     samples_per_interval = int(target_sample_rate * seconds_per_chunk * 2) # times two because it is 2 bytes per sample
 
-    chunk_size=4096
-    # Process audio in intervals
-    buffer = []
+#     chunk_size=4096
+#     # Process audio in intervals
+#     buffer = []
 
-    i = 0
+#     i = 0
 
-    frame_length = (2048 * sr_clip)
+#     frame_length = (2048 * sr_clip)
 
-    while True:
-        in_bytes = process.stdout.read(frame_length)
-        if not in_bytes:
-            break
-        buffer.append(np.frombuffer(in_bytes, dtype="int16"))
+#     while True:
+#         in_bytes = process.stdout.read(frame_length)
+#         if not in_bytes:
+#             break
+#         buffer.append(np.frombuffer(in_bytes, dtype="int16"))
         
-        if len(buffer) * chunk_size >= samples_per_interval:
-            audio_data = np.concatenate(buffer)
-            # Process 10-second interval audio data with Librosa
-            # Write the audio data to a new WAV file
-            sf.write(f"./tmp/sound{i}.wav", audio_data, target_sample_rate)
+#         if len(buffer) * chunk_size >= samples_per_interval:
+#             audio_data = np.concatenate(buffer)
+#             # Process 10-second interval audio data with Librosa
+#             # Write the audio data to a new WAV file
+#             #sf.write(f"./tmp/sound{i}.wav", audio_data, target_sample_rate)
 
-            #exit(0)    
-            peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
-            if len(peak_times):
-                peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
-                print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
-                all_peak_times.extend(peak_times_from_beginning)
-                all_correlation.extend(correlation)
+#             #exit(0)    
+#             peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
+#             if len(peak_times):
+#                 peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
+#                 print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
+#                 all_peak_times.extend(peak_times_from_beginning)
+#                 all_correlation.extend(correlation)
 
-            # Update previous_chunk to current chunk
-            previous_chunk = audio_data
-            i = i + 1
-            # Clear buffer for next interval
-            buffer = []
+#             # Update previous_chunk to current chunk
+#             previous_chunk = audio_data
+#             i = i + 1
+#             # Clear buffer for next interval
+#             buffer = []
 
-    # Process remaining audio (if any)
-    if buffer:
-        audio_data = np.concatenate(buffer)
-        # ... your Librosa processing here ...
-        peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
-        if len(peak_times):
-            peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
-            print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
-            all_peak_times.extend(peak_times_from_beginning)
-            all_correlation.extend(correlation)
+#     # Process remaining audio (if any)
+#     if buffer:
+#         audio_data = np.concatenate(buffer)
+#         # ... your Librosa processing here ...
+#         peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
+#         if len(peak_times):
+#             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
+#             print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
+#             all_peak_times.extend(peak_times_from_beginning)
+#             all_correlation.extend(correlation)
         
-        # Update previous_chunk to current chunk
-        previous_chunk = audio_data
-        i = i + 1
+#         # Update previous_chunk to current chunk
+#         previous_chunk = audio_data
+#         i = i + 1
 
-    process.wait()
+#     process.wait()
 
-    return all_peak_times, all_correlation
+#     return all_peak_times, all_correlation
 
 
 
@@ -220,13 +220,13 @@ def main():
     #    #print(f"Offset: {offset}s" )
     
 
-    # Optional: plot the correlation graph to visualize
-    plt.figure(figsize=(10, 4))
-    plt.plot(correlation)
-    plt.title('Cross-correlation between the audio clip and full track')
-    plt.xlabel('Lag')
-    plt.ylabel('Correlation coefficient')
-    plt.savefig('./tmp/cross_correlation2.png')
+    # # Optional: plot the correlation graph to visualize
+    # plt.figure(figsize=(10, 4))
+    # plt.plot(correlation)
+    # plt.title('Cross-correlation between the audio clip and full track')
+    # plt.xlabel('Lag')
+    # plt.ylabel('Correlation coefficient')
+    # plt.savefig('./tmp/cross_correlation2.png')
 
 if __name__ == '__main__':
     main()
