@@ -10,7 +10,7 @@ def find_offset(audio_file, pattern_file, window):
     y_audio, sr_audio = librosa.load(audio_file, sr=None)
     y_pattern, _ = librosa.load(pattern_file, sr=sr_audio)
 
-    c = signal.correlate(y_audio, y_pattern[:sr_audio*window], mode='valid', method='fft')
+    c = signal.correlate(y_audio[:sr_audio*window], y_pattern, mode='valid', method='fft')
     peak = np.argmax(c)
     offset = round(peak / sr_audio, 2)
 
@@ -46,7 +46,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of a target audio')
+    parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
 
     #matched_time_stamps = recognize_sound_pattern(args.audio_file, args.pattern_file)
