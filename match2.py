@@ -6,6 +6,10 @@ from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
 
+'''
+use librosa with example of chunking
+'''
+
 def load_audio_file(file_path, sr=None):
     return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
@@ -27,6 +31,7 @@ def process_chunk(chunk, clip, sr, threshold, previous_chunk):
 
     return peak_times, correlation
 
+# only works for wav files
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
     # Load the audio clip
     clip, sr_clip = load_audio_file(clip_path)
@@ -36,7 +41,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
 
     # Initialize parameters
     threshold = 0.8  # Threshold for distinguishing peaks
-    previous_chunk = np.zeros_like(clip)  # Buffer to maintain continuity between chunks
+    previous_chunk = np.zeros(0)  # Buffer to maintain continuity between chunks
     
     all_peak_times = []
     all_correlation = []
@@ -99,7 +104,7 @@ def main():
 
 
     # Find clip occurrences in the full audio
-    peak_times, correlation = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file)
+    peak_times, correlation = find_clip_in_audio(args.pattern_file, args.audio_file)
 
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
