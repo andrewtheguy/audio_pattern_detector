@@ -1,5 +1,7 @@
 import argparse
+import copy
 import datetime
+import time
 import librosa
 import numpy as np
 from scipy.signal import correlate
@@ -19,10 +21,21 @@ use ffmpeg steaming, which supports more format for streaming
 def load_audio_file(file_path, sr=None):
     return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
-def process_chunk(chunk, clip, sr, threshold, previous_chunk):
-    # Concatenate previous chunk for continuity in processing
-    audio_section = np.concatenate((previous_chunk, chunk))
-    
+
+
+# sliding_window: for previous_chunk in seconds from end
+# index: for debugging by saving a file for audio_section
+def process_chunk(chunk, clip, sr, threshold, previous_chunk,sliding_window,index):
+    if(previous_chunk is not None):
+        # Concatenate previous chunk for continuity in processing
+        #prev_seconds = len(previous_chunk)/sr
+        prev_seconds = sliding_window
+        audio_section = np.concatenate((previous_chunk[(-sliding_window*sr):], chunk))
+    else:
+        prev_seconds = 0
+        audio_section = chunk
+
+    sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
     
@@ -31,11 +44,18 @@ def process_chunk(chunk, clip, sr, threshold, previous_chunk):
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
 
+    # Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(10, 4))
+    plt.plot(correlation)
+    plt.title('Cross-correlation between the audio clip and full track')
+    plt.xlabel('Lag')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'./tmp/cross_correlation{index}.png')
+
     # Detect if there are peaks exceeding the threshold
     peaks = np.where(correlation > threshold)[0]
-    peak_times = (peaks + 1) / sr
+    peak_times = peaks / sr
 
-    prev_seconds = len(previous_chunk)/sr
     new_seconds = len(chunk)/sr
     print(f"prev_seconds: {prev_seconds}")
     print(f"new_seconds: {new_seconds}")
@@ -56,8 +76,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
     clip = clip / np.max(np.abs(clip))
 
     # Initialize parameters
-    threshold = 0.8  # Threshold for distinguishing peaks
-    previous_chunk = np.zeros(0)  # Buffer to maintain continuity between chunks
+    threshold = 0.999  # Threshold for distinguishing peaks
+    previous_chunk = None  # Buffer to maintain continuity between chunks
     #print("previous_chunk")
     #print(previous_chunk)
     #print(len(previous_chunk))
@@ -73,10 +93,11 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
     )
 
     seconds_per_chunk = 60
+    sliding_window = 10
 
     # for streaming
-    frame_length = (seconds_per_chunk * sr_clip) * 2  # times two because it is 2 bytes per sample
-    chunk_size=frame_length
+    frame_length = (seconds_per_chunk * sr_clip)
+    chunk_size=frame_length * 2   # times two because it is 2 bytes per sample
     i = 0
     # Process audio in chunks
     while True:
@@ -85,13 +106,13 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
             break
         # Convert bytes to numpy array
         chunk = np.frombuffer(in_bytes, dtype="int16")
-        sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
+        sf.write(f"./tmp/sound{i}.wav", copy.deepcopy(chunk), target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
         #exit(1)
         # Process audio data with Librosa (e.g., feature extraction)
         # ... your Librosa processing here ...
-        peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk)
+        peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk,sliding_window,i)
         if len(peak_times):
             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
             #print(f"Found occurrences at: {peak_times} seconds, chunk {i}")
@@ -118,7 +139,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
 #         raise "mismatch"
 
 #     # Write the audio data to a new WAV file
-#     sf.write("./tmp/test.wav", clip, target_sample_rate)
+#     sf.write("./tmp/test.wav", copy.deepcopy(clip), target_sample_rate)
 
 #     # Normalize the clip
 #     clip = clip / np.max(np.abs(clip))
@@ -164,7 +185,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
 #             audio_data = np.concatenate(buffer)
 #             # Process 10-second interval audio data with Librosa
 #             # Write the audio data to a new WAV file
-#             #sf.write(f"./tmp/sound{i}.wav", audio_data, target_sample_rate)
+#             #sf.write(f"./tmp/sound{i}.wav", copy.deepcopy(audio_data), target_sample_rate)
 
 #             #exit(0)    
 #             peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
