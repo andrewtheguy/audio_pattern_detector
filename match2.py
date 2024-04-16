@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import librosa
 import numpy as np
 from scipy.signal import correlate
@@ -45,9 +46,14 @@ def main():
     # Find clip occurrences in the full audio
     peak_times, correlation = find_clip_in_audio(args.pattern_file, args.audio_file)
 
-    peak_times_clean = list(dict.fromkeys([math.ceil(peak) for peak in peak_times]))
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
-    print("Clip occurs at the following times (in seconds):", peak_times_clean)
+    #print("Clip occurs at the following times (in seconds):", peak_times_clean)
+
+    for offset in peak_times_clean:
+        print(f"Clip occurs at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
+    #    #print(f"Offset: {offset}s" )
+    
 
     # Optional: plot the correlation graph to visualize
     plt.figure(figsize=(10, 4))
