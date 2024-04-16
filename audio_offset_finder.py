@@ -11,12 +11,18 @@ def find_offset(audio_file, pattern_file, window):
     y_pattern, _ = librosa.load(pattern_file, sr=sr_audio)
 
     c = signal.correlate(y_audio[:sr_audio*window], y_pattern, mode='valid', method='fft')
+    fig, ax = plt.subplots()
+    ax.plot(c)
+    fig.savefig("./tmp/cross-correlation1.png")
+
     peak = np.argmax(c)
     offset = round(peak / sr_audio, 2)
 
-    fig, ax = plt.subplots()
-    ax.plot(c)
-    fig.savefig("./tmp/cross-correlation.png")
+    #ind = np.argpartition(c, -400)[-400:]
+    #offsets = [round(peak / sr_audio, 2) for peak in ind]
+
+    #peaks,_ = signal.find_peaks(c)
+    #offsets = [round(peak / sr_audio, 2) for peak in peaks]
 
     return offset
 
@@ -50,13 +56,15 @@ def main():
     args = parser.parse_args()
 
     #matched_time_stamps = recognize_sound_pattern(args.audio_file, args.pattern_file)
-
-    #print("Sound pattern found at the following time stamps:")
-    #for time_stamp in matched_time_stamps:
-    #    print(f"{str(datetime.timedelta(seconds=time_stamp))} seconds")
+    
     offset = find_offset(args.audio_file, args.pattern_file, args.window)
-    print(f"Offset: {offset}s" )
     print(f"ts: {str(datetime.timedelta(seconds=offset))}" )
+    
+    #offsets = find_offset(args.audio_file, args.pattern_file, args.window)
+    #for offset in offsets:
+    #    print(f"ts: {str(datetime.timedelta(seconds=offset))}" )
+    #    #print(f"Offset: {offset}s" )
+    
 
 if __name__ == '__main__':
     main()
