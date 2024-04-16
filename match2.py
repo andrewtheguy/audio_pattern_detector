@@ -6,6 +6,66 @@ from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
 
+'''
+use librosa with example of chunking
+'''
+
+def load_audio_file(file_path, sr=None):
+    return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
+
+def process_chunk(chunk, clip, sr, threshold, previous_chunk):
+    # Concatenate previous chunk for continuity in processing
+    audio_section = np.concatenate((previous_chunk, chunk))
+    
+    # Normalize the current chunk
+    audio_section = audio_section / np.max(np.abs(audio_section))
+    
+    # Cross-correlate and normalize correlation
+    correlation = correlate(audio_section, clip, mode='valid')
+    correlation = np.abs(correlation)
+    correlation /= np.max(correlation)
+
+    # Detect if there are peaks exceeding the threshold
+    peaks = np.where(correlation > threshold)[0]
+    peak_times = (peaks + 1) / sr
+
+    return peak_times, correlation
+
+# only works for wav files
+def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
+    # Load the audio clip
+    clip, sr_clip = load_audio_file(clip_path)
+
+    # Normalize the clip
+    clip = clip / np.max(np.abs(clip))
+
+    # Initialize parameters
+    threshold = 0.8  # Threshold for distinguishing peaks
+    previous_chunk = np.zeros(0)  # Buffer to maintain continuity between chunks
+    
+    all_peak_times = []
+    all_correlation = []
+
+    # Set the frame parameters to be equivalent to the librosa defaults
+    # in the file's native sampling rate
+    frame_length = (2048 * sr_clip)
+    hop_length = (512 * sr_clip)
+
+    # Stream over the full audio in chunks
+    for i, chunk in enumerate(librosa.stream(full_audio_path, block_length=chunk_duration, frame_length=frame_length, hop_length=hop_length)):
+        peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk)
+        
+        if len(peak_times):
+            print(f"Found occurrences at: {peak_times + i * chunk_duration} seconds in chunk {i+1}")
+            all_peak_times.extend(peak_times)
+            all_correlation.extend(correlation)
+        
+        # Update previous_chunk to current chunk
+        previous_chunk = chunk
+
+    return all_peak_times, all_correlation
+
+
 def find_clip_in_audio(clip_path, full_audio_path):
     # Load the audio clip and the full audio
     clip, sr_clip = librosa.load(clip_path, sr=None)
