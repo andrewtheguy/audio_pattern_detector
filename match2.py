@@ -2,6 +2,7 @@ import argparse
 import librosa
 import numpy as np
 from scipy.signal import correlate
+import math
 import matplotlib.pyplot as plt
 
 def find_clip_in_audio(clip_path, full_audio_path):
@@ -23,9 +24,9 @@ def find_clip_in_audio(clip_path, full_audio_path):
     correlation /= np.max(correlation)  # Normalize correlation
     
     # Find points where the correlation is high
-    threshold = 1  # Threshold for peak detection, you may need to adjust this
-    #peaks = np.where(correlation > threshold)[0]
-    peaks = np.where(correlation >= threshold)[0]
+    threshold = 0.8  # Threshold for peak detection, you may need to adjust this
+    peaks = np.where(correlation > threshold)[0]
+    #peaks = np.where(correlation >= threshold)[0]
     
     # Convert peak indices to times
     peak_times = (peaks - len(clip) + 1) / sr_audio
@@ -44,7 +45,9 @@ def main():
     # Find clip occurrences in the full audio
     peak_times, correlation = find_clip_in_audio(args.pattern_file, args.audio_file)
 
-    print("Clip occurs at the following times (in seconds):", peak_times)
+    peak_times_clean = list(dict.fromkeys([math.ceil(peak) for peak in peak_times]))
+
+    print("Clip occurs at the following times (in seconds):", peak_times_clean)
 
     # Optional: plot the correlation graph to visualize
     plt.figure(figsize=(10, 4))
