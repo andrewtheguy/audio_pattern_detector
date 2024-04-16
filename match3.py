@@ -6,6 +6,10 @@ from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
 
+import ffmpeg
+import librosa
+#import pyaudio
+
 def load_audio_file(file_path, sr=None):
     return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
@@ -28,8 +32,10 @@ def process_chunk(chunk, clip, sr, threshold, previous_chunk):
     return peak_times, correlation
 
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
+    target_sample_rate = 16000
+
     # Load the audio clip
-    clip, sr_clip = load_audio_file(clip_path)
+    clip, sr_clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
 
     # Normalize the clip
     clip = clip / np.max(np.abs(clip))
@@ -41,53 +47,41 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
     all_peak_times = []
     all_correlation = []
 
-    # Set the frame parameters to be equivalent to the librosa defaults
-    # in the file's native sampling rate
-    frame_length = (2048 * sr_clip)
-    hop_length = (512 * sr_clip)
+    # Create ffmpeg process
+    process = (
+        ffmpeg
+        .input(full_audio_path)
+        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate)
+        .run_async(pipe_stdout=True)
+    )
 
-    # Stream over the full audio in chunks
-    for i, chunk in enumerate(librosa.stream(full_audio_path, block_length=chunk_duration, frame_length=frame_length, hop_length=hop_length)):
+    # for streaming
+    frame_length = (2048 * sr_clip)
+    chunk_size=frame_length
+
+    # Process audio in chunks
+    while True:
+        in_bytes = process.stdout.read(chunk_size)
+        if not in_bytes:
+            break
+        # Convert bytes to numpy array
+        chunk = np.frombuffer(in_bytes, dtype="int16")
+        # Process audio data with Librosa (e.g., feature extraction)
+        # ... your Librosa processing here ...
         peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk)
-        
         if len(peak_times):
-            print(f"Found occurrences at: {peak_times + i * chunk_duration} seconds in chunk {i+1}")
+            print(f"Found occurrences at: {peak_times} seconds")
             all_peak_times.extend(peak_times)
             all_correlation.extend(correlation)
         
         # Update previous_chunk to current chunk
         previous_chunk = chunk
 
+    process.wait()
+
     return all_peak_times, all_correlation
 
 
-def find_clip_in_audio(clip_path, full_audio_path):
-    # Load the audio clip and the full audio
-    clip, sr_clip = librosa.load(clip_path, sr=None)
-    audio, sr_audio = librosa.load(full_audio_path, sr=None)
-    
-    # Check if sampling rates match, resample if necessary
-    if sr_clip != sr_audio:
-        clip = librosa.resample(clip, orig_sr=sr_clip, target_sr=sr_audio)
-    
-    # Normalizing the audio files may help with cross-correlation
-    clip = clip / np.max(np.abs(clip))
-    audio = audio / np.max(np.abs(audio))
-    
-    # Cross-correlate the full audio with the clip
-    correlation = correlate(audio, clip, mode='full')
-    correlation = np.abs(correlation)
-    correlation /= np.max(correlation)  # Normalize correlation
-    
-    # Find points where the correlation is high
-    threshold = 0.8  # Threshold for peak detection, you may need to adjust this
-    peaks = np.where(correlation > threshold)[0]
-    #peaks = np.where(correlation >= threshold)[0]
-    
-    # Convert peak indices to times
-    peak_times = (peaks - len(clip) + 1) / sr_audio
-    
-    return peak_times, correlation
 
 
 def main():
