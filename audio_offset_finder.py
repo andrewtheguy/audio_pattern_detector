@@ -16,7 +16,7 @@ def find_offset(within_file, find_file, window):
 
     fig, ax = plt.subplots()
     ax.plot(c)
-    fig.savefig("cross-correlation.png")
+    fig.savefig("./tmp/cross-correlation.png")
 
     return offset
 
