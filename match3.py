@@ -147,7 +147,7 @@ def correlation_method(clip,audio,sr):
 # sliding_window: for previous_chunk in seconds from end
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
-def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,norm,method="correlation"):
+def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,method="correlation"):
     clip_length = len(clip)
     new_seconds = len(chunk)/sr
     # Concatenate previous chunk for continuity in processing
@@ -168,12 +168,10 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     print(f"subtract_seconds: {subtract_seconds}")
     print(f"new_seconds: {new_seconds}")    
 
-
-    #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
 
-    sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
+    #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
@@ -197,11 +195,11 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     # Load the audio clip
     clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
 
-    norm=np.max(np.abs(clip))
+    #norm=np.max(np.abs(clip))
     # Normalize the clip
     #clip = clip / np.max(np.abs(clip))
 
-    sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
+    #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
 
     # Initialize parameters
 
@@ -219,8 +217,23 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         .run_async(pipe_stdout=True)
     )
 
-    seconds_per_chunk = 200
+    seconds_per_chunk = 30
     sliding_window = 10
+    
+    clip_seconds = int(len(clip)/target_sample_rate)
+    
+    if(sliding_window<=clip_seconds):
+        # need to extend the sliding window to overlap the clip
+        sliding_window = clip_seconds
+        print(f"adjusted sliding_window to {sliding_window}")
+    #print(sliding_window)
+
+    if(seconds_per_chunk < sliding_window+10):
+        seconds_per_chunk = sliding_window+10
+        print(f"adjusted seconds_per_chunk to {seconds_per_chunk}")
+    #print(seconds_per_chunk)
+
+    #exit(1)
 
     # for streaming
     frame_length = (seconds_per_chunk * target_sample_rate)
@@ -242,7 +255,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         peak_times = process_chunk(chunk=chunk, clip=clip, sr=target_sample_rate, 
                                                 previous_chunk=previous_chunk,
                                                 sliding_window=sliding_window,index=i,
-                                                seconds_per_chunk=seconds_per_chunk, method=method,norm=norm)
+                                                seconds_per_chunk=seconds_per_chunk, method=method)
         if len(peak_times):
             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
             #print(f"Found occurrences at: {peak_times} seconds, chunk {i}")
