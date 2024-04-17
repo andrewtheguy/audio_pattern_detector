@@ -150,16 +150,19 @@ def correlation_method(clip,audio,sr):
     #print("index_max",index_max)
 
     # Detect if there are peaks exceeding the threshold
-    peaks = []
+    #peaks = []
 
-    for i,col in enumerate(correlation):
-        if i >= len(correlation)-len(clip) - 1:
-            #print("skipping placeholder peak",i)
-            continue
-        if col >= threshold:
-            peaks.append(i)
+    # for i,col in enumerate(correlation):
+    #     if i >= len(correlation)-len(clip) - 1:
+    #         #print("skipping placeholder peak",i)
+    #         continue
+    #     if col >= threshold:
+    #         peaks.append(i)
+
+    peaks = np.where(correlation > threshold)[0]
 
     peak_times = np.array(peaks) / sr
+    #print(peak_times)
     method_count=method_count+1
     return peak_times
 
@@ -204,8 +207,15 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
-    #print(peak_times)
-    
+
+    peak_times2 = []
+    for t in peak_times:
+        if t >= (len(audio_section)-len(clip) - 1) / sr:
+            print("skipping placeholder peak",t)
+            continue
+        peak_times2.append(t)
+
+    peak_times = peak_times2
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
     peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
     
@@ -215,7 +225,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     return peak_times_final
 
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
-    target_sample_rate = 16000
+    target_sample_rate = 8000
 
     # Load the audio clip
     clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
