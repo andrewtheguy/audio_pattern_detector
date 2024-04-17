@@ -3,6 +3,7 @@ import argparse
 from collections import deque
 import datetime
 import hashlib
+import json
 import os
 import tempfile
 
@@ -128,7 +129,11 @@ def scrape():
         print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
     #    #print(f"Offset: {offset}s" )
     pair = process(news_report_peak_times, program_intro_peak_times)
+    ts = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
     print(pair)
+    print(ts)
+    with open(f'{input_file}.json','w') as f:
+        f.write(json.dumps(ts, indent=4))
     splits=[]
     
     basename,extension = os.path.splitext(os.path.basename(input_file))
