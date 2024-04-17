@@ -38,7 +38,7 @@ def load_audio_file(file_path, sr=None):
 
 # sample rate needs to be the same for both or bugs will happen
 def chroma_method(clip,audio,sr):
-
+    global method_count
     # Extract features from the audio clip and the pattern
     audio_features = librosa.feature.chroma_cqt(y=audio, sr=sr)
     pattern_features = librosa.feature.chroma_cqt(y=clip, sr=sr)
@@ -58,16 +58,17 @@ def chroma_method(clip,audio,sr):
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method(clip,audio,sr):
     global method_count
+
     # Extract features from the audio clip and the pattern
-    audio_features = librosa.feature.melspectrogram(y=audio, sr=sr)
-    pattern_features = librosa.feature.melspectrogram(y=clip, sr=sr)
+    audio_features = librosa.feature.mfcc(y=audio, sr=sr)
+    pattern_features = librosa.feature.mfcc(y=clip, sr=sr)
 
     # Compute the similarity matrix between the audio features and the pattern features
     similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
     
     # Find the indices of the maximum similarity values
     indices = np.argmax(similarity_matrix, axis=1)
-
+    
     # Get the corresponding time stamps of the matched patterns
     time_stamps = librosa.frames_to_time(indices, sr=sr)
     method_count = method_count + 1
@@ -205,6 +206,8 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
     elif method == "mfcc":
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
+    elif method == "chroma_method":
+        peak_times = chroma_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
 
@@ -312,7 +315,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    parser.add_argument('--method', metavar='method', type=str, help='correlation,mfcc',default="correlation")
+    parser.add_argument('--method', metavar='method', type=str, help='method',default="correlation")
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     #print(args.method)
