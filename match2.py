@@ -27,7 +27,7 @@ def process_chunk(chunk, clip, sr, threshold, previous_chunk):
 
     # Detect if there are peaks exceeding the threshold
     peaks = np.where(correlation > threshold)[0]
-    peak_times = (peaks + 1) / sr
+    peak_times = (peaks) / sr
 
     return peak_times, correlation
 
@@ -48,16 +48,16 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, chunk_duration=10):
 
     # Set the frame parameters to be equivalent to the librosa defaults
     # in the file's native sampling rate
-    frame_length = (2048 * sr_clip)
-    hop_length = (512 * sr_clip)
+    frame_length = (60 * sr_clip)
+    hop_length = (30 * sr_clip)
 
     # Stream over the full audio in chunks
     for i, chunk in enumerate(librosa.stream(full_audio_path, block_length=chunk_duration, frame_length=frame_length, hop_length=hop_length)):
         peak_times, correlation = process_chunk(chunk, clip, sr_clip, threshold, previous_chunk)
         
         if len(peak_times):
-            print(f"Found occurrences at: {peak_times + i * chunk_duration} seconds in chunk {i+1}")
-            all_peak_times.extend(peak_times)
+            print(f"Found occurrences in chunk {i+1}")
+            all_peak_times.extend([peak_time + i * chunk_duration for peak_time in peak_times])
             all_correlation.extend(correlation)
         
         # Update previous_chunk to current chunk
@@ -104,7 +104,7 @@ def main():
 
 
     # Find clip occurrences in the full audio
-    peak_times, correlation = find_clip_in_audio(args.pattern_file, args.audio_file)
+    peak_times, correlation = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file)
 
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
