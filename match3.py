@@ -21,7 +21,17 @@ use ffmpeg steaming, which supports more format for streaming
 '''
 
 def load_audio_file(file_path, sr=None):
-    return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
+    # Create ffmpeg process
+    process = (
+        ffmpeg
+        .input(file_path)
+        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=sr, loglevel="quiet")
+        .run_async(pipe_stdout=True)
+    )
+    data = process.stdout.read()
+    process.wait()
+    return np.frombuffer(data, dtype="int16")
+    #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
 
 def cross_similarity_method(clip,audio,sr):
@@ -93,11 +103,13 @@ def correlation_method(clip,audio,sr):
     global method_count
     threshold = 0.9  # Threshold for distinguishing peaks
     # Cross-correlate and normalize correlation
-    correlation = correlate(audio, clip, mode='full',method='direct')
+    correlation = correlate(audio, clip, mode='valid')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
     print("correlation")
     print(len(correlation))
+    print(len(audio))
+    correlation=correlation[:-len(clip)]
 
     # Optional: plot the correlation graph to visualize
     plt.figure(figsize=(10, 4))
@@ -119,6 +131,9 @@ def correlation_method(clip,audio,sr):
     peaks = []
 
     for i,col in enumerate(correlation):
+        if i >= len(correlation)-len(clip) - 1:
+            #print("skipping placeholder peak",i)
+            continue
         if col >= threshold:
             peaks.append(i)
             #print("peak",col)
@@ -132,28 +147,30 @@ def correlation_method(clip,audio,sr):
 # sliding_window: for previous_chunk in seconds from end
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
-def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,method="correlation"):
-    clip_length = len(clip)
+def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,norm,method="correlation"):
+    #clip_length = len(clip)
     new_seconds = len(chunk)/sr
     # Concatenate previous chunk for continuity in processing
     if(previous_chunk is not None):
         if(new_seconds < seconds_per_chunk): # too small
             subtract_seconds = -(new_seconds-(sliding_window+seconds_per_chunk))
-            audio_section = np.concatenate((previous_chunk, chunk))[(-(sliding_window+seconds_per_chunk)*sr):]    
+            audio_section = np.concatenate((previous_chunk, chunk,clip))[(-(sliding_window+seconds_per_chunk)*sr):]    
         else:
             subtract_seconds = sliding_window
-            audio_section = np.concatenate((previous_chunk[(-sliding_window*sr):], chunk))
+            audio_section = np.concatenate((previous_chunk[(-sliding_window*sr):], chunk,clip))
     else:
         subtract_seconds = 0
-        audio_section = chunk
+        audio_section = np.concatenate((chunk,clip))
 
 
     print(f"subtract_seconds: {subtract_seconds}")
     print(f"new_seconds: {new_seconds}")    
 
+
     #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
+
     sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
@@ -164,7 +181,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         peak_times = cross_similarity_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
-
+    print(peak_times)
     # look back just in case missed something
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
     #for item in correlation:
@@ -176,10 +193,11 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     target_sample_rate = 16000
 
     # Load the audio clip
-    clip, sr_clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
+    clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
 
+    norm=np.max(np.abs(clip))
     # Normalize the clip
-    clip = clip / np.max(np.abs(clip))
+    #clip = clip / np.max(np.abs(clip))
 
     sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
 
@@ -199,11 +217,11 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         .run_async(pipe_stdout=True)
     )
 
-    seconds_per_chunk = 900
+    seconds_per_chunk = 60
     sliding_window = 10
 
     # for streaming
-    frame_length = (seconds_per_chunk * sr_clip)
+    frame_length = (seconds_per_chunk * target_sample_rate)
     chunk_size=frame_length * 2   # times two because it is 2 bytes per sample
     i = 0
     # Process audio in chunks
@@ -219,10 +237,10 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         #exit(1)
         # Process audio data with Librosa (e.g., feature extraction)
         # ... your Librosa processing here ...
-        peak_times = process_chunk(chunk=chunk, clip=clip, sr=sr_clip, 
+        peak_times = process_chunk(chunk=chunk, clip=clip, sr=target_sample_rate, 
                                                 previous_chunk=previous_chunk,
                                                 sliding_window=sliding_window,index=i,
-                                                seconds_per_chunk=seconds_per_chunk, method=method)
+                                                seconds_per_chunk=seconds_per_chunk, method=method,norm=norm)
         if len(peak_times):
             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
             #print(f"Found occurrences at: {peak_times} seconds, chunk {i}")
