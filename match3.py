@@ -254,8 +254,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         print(f"adjusted sliding_window to {sliding_window}")
     #print(sliding_window)
 
-    if(seconds_per_chunk < sliding_window+10):
-        seconds_per_chunk = sliding_window+10
+    if(seconds_per_chunk < sliding_window*2):
+        seconds_per_chunk = sliding_window*10
         print(f"adjusted seconds_per_chunk to {seconds_per_chunk}")
     #print(seconds_per_chunk)
 
