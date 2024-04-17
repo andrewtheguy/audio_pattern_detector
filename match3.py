@@ -210,14 +210,15 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
 
     peak_times2 = []
     for t in peak_times:
-        if t >= (len(audio_section)-len(clip) - 1) / sr:
+        if t >= 0 and t >= (len(audio_section)-len(clip) - 1) / sr:
+            #skip the placeholder clip at the end
             print("skipping placeholder peak",t)
             continue
         peak_times2.append(t)
 
     peak_times = peak_times2
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
-    peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
+    #peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
     
     #for item in correlation:
     #    if item > threshold:
