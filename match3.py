@@ -172,7 +172,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
 
-    sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
+    #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
@@ -226,9 +226,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     
     clip_seconds = int(len(clip)/target_sample_rate)
     
-    if(sliding_window<=clip_seconds):
+    if(sliding_window<clip_seconds+5):
         # need to extend the sliding window to overlap the clip
-        sliding_window = clip_seconds
+        sliding_window = clip_seconds+5
         print(f"adjusted sliding_window to {sliding_window}")
     #print(sliding_window)
 
