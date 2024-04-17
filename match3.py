@@ -56,7 +56,7 @@ def chroma_method(clip,audio,sr):
 
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method(clip,audio,sr):
-
+    global method_count
     # Extract features from the audio clip and the pattern
     audio_features = librosa.feature.melspectrogram(y=audio, sr=sr)
     pattern_features = librosa.feature.melspectrogram(y=clip, sr=sr)
@@ -72,66 +72,66 @@ def mfcc_method(clip,audio,sr):
     method_count = method_count + 1
     return time_stamps
 
-    global method_count
+    # global method_count
 
-    frame = len(clip)
-    hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
+    # frame = len(clip)
+    # hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
 
-    # Extract MFCC features
-    clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
-    audio_mfcc = librosa.feature.mfcc(y=audio, sr=sr, hop_length=hop_length)
-
-
-    distances = []
-    for i in range(audio_mfcc.shape[1] - clip_mfcc.shape[1] + 1):
-        dist = np.linalg.norm(clip_mfcc - audio_mfcc[:, i:i+clip_mfcc.shape[1]])
-        distances.append(dist)
-
-    # Find minimum distance and its index
-    match_index = np.argmin(distances)
-    min_distance = distances[match_index]
-
-    # # Optional: plot the two MFCC sequences
-    # plt.figure(figsize=(10, 4))
-    # plt.subplot(1, 2, 1)
-    # plt.title('Main Audio MFCC')
-    # plt.imshow(audio_mfcc.T, aspect='auto', origin='lower')
-    # plt.subplot(1, 2, 2)
-    # plt.title('Pattern Audio MFCC')
-    # plt.imshow(clip_mfcc.T, aspect='auto', origin='lower')
-    # plt.tight_layout()
-    # plt.savefig(f'./tmp/MFCC.png')
-    # plt.close()
-
-    #distances_ratio = [dist / min_distance for dist in distances]
-
-    # Optional: plot the correlation graph to visualize
-    plt.figure(figsize=(20,8))
-    plt.plot(distances)
-    plt.title('distances')
-    plt.xlabel('index')
-    plt.ylabel('distance')
-    plt.savefig(f'./tmp/mfcc{method_count}.png')
-
-    distances_selected = np.where(distances / min_distance <= 1.05)[0]
+    # # Extract MFCC features
+    # clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
+    # audio_mfcc = librosa.feature.mfcc(y=audio, sr=sr, hop_length=hop_length)
 
 
-    # Convert match index to timestamp
-    match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
+    # distances = []
+    # for i in range(audio_mfcc.shape[1] - clip_mfcc.shape[1] + 1):
+    #     dist = np.linalg.norm(clip_mfcc - audio_mfcc[:, i:i+clip_mfcc.shape[1]])
+    #     distances.append(dist)
 
-    method_count = method_count + 1
-    return match_times
+    # # Find minimum distance and its index
+    # match_index = np.argmin(distances)
+    # min_distance = distances[match_index]
+
+    # # # Optional: plot the two MFCC sequences
+    # # plt.figure(figsize=(10, 4))
+    # # plt.subplot(1, 2, 1)
+    # # plt.title('Main Audio MFCC')
+    # # plt.imshow(audio_mfcc.T, aspect='auto', origin='lower')
+    # # plt.subplot(1, 2, 2)
+    # # plt.title('Pattern Audio MFCC')
+    # # plt.imshow(clip_mfcc.T, aspect='auto', origin='lower')
+    # # plt.tight_layout()
+    # # plt.savefig(f'./tmp/MFCC.png')
+    # # plt.close()
+
+    # #distances_ratio = [dist / min_distance for dist in distances]
+
+    # # Optional: plot the correlation graph to visualize
+    # plt.figure(figsize=(20,8))
+    # plt.plot(distances)
+    # plt.title('distances')
+    # plt.xlabel('index')
+    # plt.ylabel('distance')
+    # plt.savefig(f'./tmp/mfcc{method_count}.png')
+
+    # distances_selected = np.where(distances / min_distance <= 1.05)[0]
+
+
+    # # Convert match index to timestamp
+    # match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
+
+    # method_count = method_count + 1
+    # return match_times
 
 def correlation_method(clip,audio,sr):
     global method_count
-    threshold = 0.4  # Threshold for distinguishing peaks, need to be smaller for larger clips
+    threshold = 0.8  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
-    print("correlation")
-    print(len(correlation))
-    print(len(audio))
+    #print("correlation")
+    #print(len(correlation))
+    #print(len(audio))
     correlation=correlation[:-len(clip)]
 
     # Optional: plot the correlation graph to visualize
@@ -145,10 +145,8 @@ def correlation_method(clip,audio,sr):
 
     peak_max = np.max(correlation)
     index_max = np.argmax(correlation)
-    print("peak_max",peak_max)
-    #print("peak_before",correlation[index_max-sr])
-    #print("peak_after",correlation[index_max+sr])
-    print("index_max",index_max)
+    #print("peak_max",peak_max)
+    #print("index_max",index_max)
 
     # Detect if there are peaks exceeding the threshold
     peaks = []
@@ -159,9 +157,6 @@ def correlation_method(clip,audio,sr):
             continue
         if col >= threshold:
             peaks.append(i)
-            #print("peak",col)
-            #print("peak_before",correlation[i-sr])
-            #print("peak_after",correlation[i+sr])
 
     peak_times = np.array(peaks) / sr
     method_count=method_count+1
@@ -195,14 +190,15 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
 
+    # Normalize clip
+    clip = clip / np.max(np.abs(clip))
+
     #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
     elif method == "mfcc":
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
-    elif method == "cross_similarity_method":
-        peak_times = cross_similarity_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
     print(peak_times)
@@ -298,106 +294,12 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     return all_peak_times
 
 
-# def find_clip_in_audio_in_chunks2(clip_path, full_audio_path, chunk_duration=10):
-#     target_sample_rate = 16000
-
-#     # Load the audio clip
-#     clip, sr_clip = load_audio_file(clip_path, sr=target_sample_rate)
-
-#     # Check if sampling rates match, resample if necessary
-#     if sr_clip != target_sample_rate:
-#         raise "mismatch"
-
-#     # Write the audio data to a new WAV file
-#     sf.write("./tmp/test.wav", copy.deepcopy(clip), target_sample_rate)
-
-#     # Normalize the clip
-#     clip = clip / np.max(np.abs(clip))
-
-#     # Initialize parameters
-#     threshold = 0.8  # Threshold for distinguishing peaks
-#     previous_chunk = np.zeros_like(clip)  # Buffer to maintain continuity between chunks
-    
-#     all_peak_times = []
-#     all_correlation = []
-
-#     # Create ffmpeg process
-#     process = (
-#         ffmpeg
-#         .input(full_audio_path)
-#         .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate)
-#         .run_async(pipe_stdout=True)
-#     )
-
-#     # for streaming
-#     seconds_per_chunk = 10
-#     #frame_length = (seconds_per_chunk * target_sample_rate)
-#     #chunk_size=frame_length
-
-#     # Calculate samples per interval
-#     samples_per_interval = int(target_sample_rate * seconds_per_chunk * 2) # times two because it is 2 bytes per sample
-
-#     chunk_size=4096
-#     # Process audio in intervals
-#     buffer = []
-
-#     i = 0
-
-#     frame_length = (2048 * sr_clip)
-
-#     while True:
-#         in_bytes = process.stdout.read(frame_length)
-#         if not in_bytes:
-#             break
-#         buffer.append(np.frombuffer(in_bytes, dtype="int16"))
-        
-#         if len(buffer) * chunk_size >= samples_per_interval:
-#             audio_data = np.concatenate(buffer)
-#             # Process 10-second interval audio data with Librosa
-#             # Write the audio data to a new WAV file
-#             #sf.write(f"./tmp/sound{i}.wav", copy.deepcopy(audio_data), target_sample_rate)
-
-#             #exit(0)    
-#             peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
-#             if len(peak_times):
-#                 peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
-#                 print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
-#                 all_peak_times.extend(peak_times_from_beginning)
-#                 all_correlation.extend(correlation)
-
-#             # Update previous_chunk to current chunk
-#             previous_chunk = audio_data
-#             i = i + 1
-#             # Clear buffer for next interval
-#             buffer = []
-
-#     # Process remaining audio (if any)
-#     if buffer:
-#         audio_data = np.concatenate(buffer)
-#         # ... your Librosa processing here ...
-#         peak_times, correlation = process_chunk(audio_data, clip, target_sample_rate, threshold, previous_chunk)
-#         if len(peak_times):
-#             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
-#             print(f"Found occurrences at: {peak_times_from_beginning} seconds, chunk {i}")
-#             all_peak_times.extend(peak_times_from_beginning)
-#             all_correlation.extend(correlation)
-        
-#         # Update previous_chunk to current chunk
-#         previous_chunk = audio_data
-#         i = i + 1
-
-#     process.wait()
-
-#     return all_peak_times, all_correlation
-
-
-
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    parser.add_argument('--method', metavar='method', type=str, help='correlation,mfcc,melspectrogram',default="correlation")
+    parser.add_argument('--method', metavar='method', type=str, help='correlation,mfcc',default="correlation")
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     #print(args.method)

@@ -27,7 +27,25 @@ def find_offset(audio_file, pattern_file, window):
 
     return offset
 
+def recognize_sound_pattern_chroma(audio_file, pattern_file):
+    # Load the audio clip and the pattern audio
+    audio, sr = librosa.load(audio_file)
+    pattern, _ = librosa.load(pattern_file)
 
+    # Extract features from the audio clip and the pattern
+    audio_features = librosa.feature.chroma_cqt(y=audio, sr=sr)
+    pattern_features = librosa.feature.chroma_cqt(y=pattern, sr=sr)
+
+    # Compute the similarity matrix between the audio features and the pattern features
+    similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
+    #pdb.set_trace()
+    # Find the indices of the maximum similarity values
+    indices = np.argmax(similarity_matrix, axis=1)
+
+    # Get the corresponding time stamps of the matched patterns
+    time_stamps = librosa.frames_to_time(indices, sr=sr)
+
+    return time_stamps
 
 def recognize_sound_pattern(audio_file, pattern_file):
     # Load the audio clip and the pattern audio
@@ -40,7 +58,7 @@ def recognize_sound_pattern(audio_file, pattern_file):
 
     # Compute the similarity matrix between the audio features and the pattern features
     similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
-    pdb.set_trace()
+    #pdb.set_trace()
     # Find the indices of the maximum similarity values
     indices = np.argmax(similarity_matrix, axis=1)
 
@@ -56,7 +74,7 @@ def main():
     parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
 
-    matched_time_stamps = recognize_sound_pattern(args.audio_file, args.pattern_file)
+    matched_time_stamps = recognize_sound_pattern_chroma(args.audio_file, args.pattern_file)
     print(f"ts1: {matched_time_stamps}" )
     
     #offset = find_offset(args.audio_file, args.pattern_file, args.window)
