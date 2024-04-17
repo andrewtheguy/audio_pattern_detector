@@ -242,8 +242,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         .run_async(pipe_stdout=True)
     )
 
-    seconds_per_chunk = 30
-    sliding_window = 10
+    seconds_per_chunk = 60
+    sliding_window = 5
     
     clip_seconds = int(len(clip)/target_sample_rate)
     
@@ -262,7 +262,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
     # for streaming
     frame_length = (seconds_per_chunk * target_sample_rate)
-    chunk_size=frame_length * 2   # times two because it is 2 bytes per sample
+    chunk_size=frame_length * 2   # times two because it is 2 bytes per sample (int16)
     i = 0
     # Process audio in chunks
     while True:
@@ -316,9 +316,9 @@ def main():
         cur = freq.get(i, 0)
         freq[i] = cur + 1
 
-    print(freq)
+    #print(freq)
 
-    print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
+    #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
 
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
