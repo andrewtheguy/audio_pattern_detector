@@ -2,6 +2,7 @@
 import argparse
 from collections import deque
 import datetime
+import hashlib
 import os
 import tempfile
 
@@ -82,6 +83,14 @@ def concatenate_audio(input_files, output_file,tmpdir):
             .output(output_file, c='copy').run()
     )
 
+def md5file(file):
+    with open(file, "rb") as f:
+        file_hash = hashlib.md5()
+        while chunk := f.read(8192):
+            file_hash.update(chunk)
+    return file_hash.hexdigest()
+
+
 def scrape():
     parser = argparse.ArgumentParser()
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
@@ -89,12 +98,25 @@ def scrape():
     args = parser.parse_args()
     #print(args.method)
 
+    input_file = args.audio_file
+    
+    # _,extension = os.path.splitext(input_file)
+    # dir = os.path.dirname(input_file)
+    # basename = os.path.basename(input_file)
+    
+    # print(extension)
+    # print(dir)
+    # print(basename)
+    #exit(1)
+
+    #md5=md5file(input_file)  # to get a printable str instead of bytes
+
     # Find clip occurrences in the full audio
-    news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', args.audio_file, method="correlation")
+    news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
     print(news_report_peak_times)
 
     # Find clip occurrences in the full audio
-    program_intro_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk1clip.wav', args.audio_file, method="correlation")
+    program_intro_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk1clip.wav', input_file, method="correlation")
     print(program_intro_peak_times)
 
     for offset in news_report_peak_times:
@@ -107,12 +129,15 @@ def scrape():
     pair = process(news_report_peak_times, program_intro_peak_times)
     print(pair)
     splits=[]
-    input_file = args.audio_file
-    base, extension = os.path.splitext(input_file)
+    
+    _,extension = os.path.splitext(input_file)
+    dir = os.path.dirname(input_file)
+    basename = os.path.basename(input_file)
+    print(basename)
     with tempfile.TemporaryDirectory() as tmpdir:
     #path = os.path.join(tmp, 'something')
         for i,p in enumerate(pair):
-            new_filename = os.path.join(tmpdir,f"{base}_{i+1}{extension}")
+            new_filename = os.path.join(tmpdir,f"{basename}_{i+1}{extension}")
             print(new_filename)
             output_file = new_filename
             start_time = p[0]
@@ -120,7 +145,7 @@ def scrape():
             split_audio(input_file, output_file, start_time, end_time)
             splits.append(output_file)
         #fdsfsd
-        concatenate_audio(splits, f"{base}_trimmed{extension}",tmpdir)
+        concatenate_audio(splits, os.path.abspath(os.path.join(f"{dir}",f"{basename}_trimmed{extension}")),tmpdir)
 
     
 if __name__ == '__main__':
