@@ -136,13 +136,13 @@ def correlation_method(clip,audio,sr):
     correlation=correlation[:-len(clip)]
 
     # Optional: plot the correlation graph to visualize
-    plt.figure(figsize=(10, 4))
-    plt.plot(correlation)
-    plt.title('Cross-correlation between the audio clip and full track')
-    plt.xlabel('Lag')
-    plt.ylabel('Correlation coefficient')
-    plt.savefig(f'./tmp/cross_correlation{method_count}.png')
-    plt.close()
+    # plt.figure(figsize=(10, 4))
+    # plt.plot(correlation)
+    # plt.title('Cross-correlation between the audio clip and full track')
+    # plt.xlabel('Lag')
+    # plt.ylabel('Correlation coefficient')
+    # plt.savefig(f'./tmp/cross_correlation{method_count}.png')
+    # plt.close()
 
     peak_max = np.max(correlation)
     index_max = np.argmax(correlation)
@@ -171,7 +171,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     new_seconds = len(chunk)/sr
     # Concatenate previous chunk for continuity in processing
     if(previous_chunk is not None):
-        print("prev",len(previous_chunk)/sr)
+        #print("prev",len(previous_chunk)/sr)
         if(new_seconds < seconds_per_chunk): # too small
             # no need for sliding window since it is the last piece
             subtract_seconds = -(new_seconds-(seconds_per_chunk))
@@ -185,8 +185,8 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         audio_section = np.concatenate((chunk,np.array([])))
 
 
-    print(f"subtract_seconds: {subtract_seconds}")
-    print(f"new_seconds: {new_seconds}")    
+    #print(f"subtract_seconds: {subtract_seconds}")
+    #print(f"new_seconds: {new_seconds}")    
 
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
@@ -204,8 +204,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
-    print(peak_times)
-    # look back just in case missed something
+    #print(peak_times)
     
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
     peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
