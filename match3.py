@@ -138,17 +138,17 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # Concatenate previous chunk for continuity in processing
     if(previous_chunk is not None):
         if(new_seconds < seconds_per_chunk): # too small
-            prev_seconds = len(previous_chunk)/sr
+            subtract_seconds = -(new_seconds-(sliding_window+seconds_per_chunk))
             audio_section = np.concatenate((previous_chunk, chunk))[(-(sliding_window+seconds_per_chunk)*sr):]    
         else:
-            prev_seconds = sliding_window
+            subtract_seconds = sliding_window
             audio_section = np.concatenate((previous_chunk[(-sliding_window*sr):], chunk))
     else:
-        prev_seconds = 0
+        subtract_seconds = 0
         audio_section = chunk
 
 
-    print(f"prev_seconds: {prev_seconds}")
+    print(f"subtract_seconds: {subtract_seconds}")
     print(f"new_seconds: {new_seconds}")    
 
     #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
@@ -166,7 +166,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         raise "unknown method"
 
     # look back just in case missed something
-    peak_times_final = [peak_time - prev_seconds for peak_time in peak_times]
+    peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
     #for item in correlation:
     #    if item > threshold:
     #        print(item)
@@ -199,8 +199,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         .run_async(pipe_stdout=True)
     )
 
-    seconds_per_chunk = 1024
-    sliding_window = 60
+    seconds_per_chunk = 900
+    sliding_window = 10
 
     # for streaming
     frame_length = (seconds_per_chunk * sr_clip)
