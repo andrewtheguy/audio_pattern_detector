@@ -1,4 +1,5 @@
 import argparse
+from collections import deque
 import copy
 import datetime
 import pdb
@@ -243,8 +244,24 @@ def cleanup_peak_times(peak_times):
 
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
+    peak_times_clean2 = deque(peak_times_clean)
+
+    peak_times_final = []
+
+    prevItem = None
+    while peak_times_clean2:
+        item = peak_times_clean2.popleft()
+        if(prevItem is None):
+            peak_times_final.append(item)
+            prevItem = item
+        elif item - prevItem < 10: # skip those less 10 seconds in between like beep, beep, beep
+            prevItem = item
+        else:
+            peak_times_final.append(item)
+            prevItem = item
+
     #print("Clip occurs at the following times (in seconds):", peak_times_clean)
-    return peak_times_clean
+    return peak_times_final
 
 
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
@@ -334,13 +351,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    parser.add_argument('--method', metavar='method', type=str, help='method',default="correlation")
+    parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default="correlation")
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     #print(args.method)
 
     # Find clip occurrences in the full audio
-    peak_times = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file, method=args.method)
+    peak_times = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file, method=args.match_method)
+    print(peak_times)
 
     for offset in peak_times:
         print(f"Clip occurs at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
