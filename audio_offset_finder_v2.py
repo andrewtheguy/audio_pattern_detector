@@ -260,8 +260,8 @@ def cleanup_peak_times(peak_times):
             peak_times_final.append(item)
             prevItem = item
 
-    #print("Clip occurs at the following times (in seconds):", peak_times_clean)
-    return peak_times_final
+    #short before return
+    return sorted(peak_times_final)
 
 
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
