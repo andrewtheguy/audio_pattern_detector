@@ -14,7 +14,7 @@ from audio_offset_finder_v2 import find_clip_in_audio_in_chunks
 # still WIP
 def process(news_report,intro):
     pair = []
-    placehold_for_max = 9999999
+    placehold_for_max = None
     # will bug out if one not followed by another, i.e. intro followed by intro or news followed
     # by news
     #news_report = deque([40,90,300])
@@ -96,6 +96,10 @@ def md5file(file):
             file_hash.update(chunk)
     return file_hash.hexdigest()
 
+def get_sec(time_str):
+    """Get seconds from time."""
+    h, m, s = time_str.split(':')
+    return int(h) * 3600 + int(m) * 60 + int(s)
 
 def scrape():
     parser = argparse.ArgumentParser()
@@ -113,27 +117,37 @@ def scrape():
 
     #md5=md5file(input_file)  # to get a printable str instead of bytes
 
-    # Find clip occurrences in the full audio
-    news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
-    print(news_report_peak_times)
+    tsformatted = None
 
-    # Find clip occurrences in the full audio
-    program_intro_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk1clip.wav', input_file, method="correlation")
-    print(program_intro_peak_times)
+    jsonfile = f'{input_file}.json'
+    if os.path.exists(jsonfile):
+        tsformatted=json.load(open(jsonfile))
 
-    for offset in news_report_peak_times:
-        print(f"Clip news_report_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
-    #    print(f"Offset: {offset}s" )
-    
-    for offset in program_intro_peak_times:
-        print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
-    #    #print(f"Offset: {offset}s" )
-    pair = process(news_report_peak_times, program_intro_peak_times)
-    ts = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
+    if not tsformatted:
+
+        # Find clip occurrences in the full audio
+        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
+        print(news_report_peak_times)
+
+        # Find clip occurrences in the full audio
+        program_intro_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk1clip.wav', input_file, method="correlation")
+        print(program_intro_peak_times)
+
+        for offset in news_report_peak_times:
+            print(f"Clip news_report_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
+        #    print(f"Offset: {offset}s" )
+        
+        for offset in program_intro_peak_times:
+            print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
+        #    #print(f"Offset: {offset}s" )
+        pair = process(news_report_peak_times, program_intro_peak_times)
+        tsformatted = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
+    else:
+        pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     print(pair)
-    print(ts)
-    with open(f'{input_file}.json','w') as f:
-        f.write(json.dumps(ts, indent=4))
+    print(tsformatted)
+    with open(jsonfile,'w') as f:
+        f.write(json.dumps(tsformatted, indent=4))
     splits=[]
     
     basename,extension = os.path.splitext(os.path.basename(input_file))
