@@ -135,7 +135,7 @@ def mfcc_method(clip,audio,sr):
     plt.ylabel('distance')
     plt.savefig(f'./tmp/mfcc{method_count}.png')
 
-    distances_selected = np.where(distances / min_distance <= 1.0)[0]
+    distances_selected = np.where(distances / min_distance <= 1.05)[0]
 
 
     # Convert match index to timestamp
@@ -145,30 +145,33 @@ def mfcc_method(clip,audio,sr):
     return match_times
 
 def correlation_method(clip,audio,sr):
-    threshold = 0.9  # Threshold for distinguishing peaks
+    global method_count
+    threshold = 0.99  # Threshold for distinguishing peaks
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full',method='direct')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
 
-    # # Optional: plot the correlation graph to visualize
-    # plt.figure(figsize=(10, 4))
-    # plt.plot(correlation)
-    # plt.title('Cross-correlation between the audio clip and full track')
-    # plt.xlabel('Lag')
-    # plt.ylabel('Correlation coefficient')
-    # plt.savefig(f'./tmp/cross_correlation{index}.png')
-    # plt.close()
+    # Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(10, 4))
+    plt.plot(correlation)
+    plt.title('Cross-correlation between the audio clip and full track')
+    plt.xlabel('Lag')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'./tmp/cross_correlation{method_count}.png')
+    plt.close()
 
     # Detect if there are peaks exceeding the threshold
     peaks = np.where(correlation >= threshold)[0]
     peak_times = peaks / sr
+    method_count=method_count+1
     return peak_times
 
 # sliding_window: for previous_chunk in seconds from end
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
 def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,method="correlation"):
+    clip_length = len(clip)
     new_seconds = len(chunk)/sr
     # Concatenate previous chunk for continuity in processing
     if(previous_chunk is not None):
@@ -182,13 +185,14 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         prev_seconds = 0
         audio_section = chunk
 
+
     print(f"prev_seconds: {prev_seconds}")
     print(f"new_seconds: {new_seconds}")    
 
     #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
-    
+    sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
@@ -215,7 +219,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     # Normalize the clip
     clip = clip / np.max(np.abs(clip))
 
-    #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
+    sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
 
     # Initialize parameters
 
