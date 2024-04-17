@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import pdb
 
 import librosa
 import numpy as np
@@ -39,7 +40,7 @@ def recognize_sound_pattern(audio_file, pattern_file):
 
     # Compute the similarity matrix between the audio features and the pattern features
     similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
-
+    pdb.set_trace()
     # Find the indices of the maximum similarity values
     indices = np.argmax(similarity_matrix, axis=1)
 
@@ -55,10 +56,11 @@ def main():
     parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
 
-    #matched_time_stamps = recognize_sound_pattern(args.audio_file, args.pattern_file)
+    matched_time_stamps = recognize_sound_pattern(args.audio_file, args.pattern_file)
+    print(f"ts1: {matched_time_stamps}" )
     
-    offset = find_offset(args.audio_file, args.pattern_file, args.window)
-    print(f"ts: {str(datetime.timedelta(seconds=offset))}" )
+    #offset = find_offset(args.audio_file, args.pattern_file, args.window)
+    #print(f"ts2: {str(datetime.timedelta(seconds=offset))}" )
     
     #offsets = find_offset(args.audio_file, args.pattern_file, args.window)
     #for offset in offsets:
@@ -67,4 +69,5 @@ def main():
     
 
 if __name__ == '__main__':
+    #pdb.set_trace()
     main()
