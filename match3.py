@@ -228,6 +228,25 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     #        print(item)
     return peak_times_final
 
+def cleanup_peak_times(peak_times):
+
+    freq = {}
+
+    for peak in peak_times:
+        i = math.floor(peak)
+        cur = freq.get(i, 0)
+        freq[i] = cur + 1
+
+    #print(freq)
+
+    #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
+
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
+
+    #print("Clip occurs at the following times (in seconds):", peak_times_clean)
+    return peak_times_clean
+
+
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
     target_sample_rate = 8000
 
@@ -306,8 +325,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         i = i + 1
 
     process.wait()
-
-    return all_peak_times
+    peak_times_clean = cleanup_peak_times(all_peak_times)
+    return peak_times_clean
 
 
 
@@ -323,22 +342,7 @@ def main():
     # Find clip occurrences in the full audio
     peak_times = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file, method=args.method)
 
-    freq = {}
-
-    for peak in peak_times:
-        i = math.floor(peak)
-        cur = freq.get(i, 0)
-        freq[i] = cur + 1
-
-    #print(freq)
-
-    #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
-
-    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
-
-    #print("Clip occurs at the following times (in seconds):", peak_times_clean)
-
-    for offset in peak_times_clean:
+    for offset in peak_times:
         print(f"Clip occurs at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
     #    #print(f"Offset: {offset}s" )
     
