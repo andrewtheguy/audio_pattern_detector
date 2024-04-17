@@ -154,8 +154,9 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     if(previous_chunk is not None):
         print("prev",len(previous_chunk)/sr)
         if(new_seconds < seconds_per_chunk): # too small
-            subtract_seconds = -(new_seconds-(sliding_window+seconds_per_chunk))
-            audio_section_temp = np.concatenate((previous_chunk, chunk))[(-(sliding_window+seconds_per_chunk)*sr):]    
+            # no need for sliding window since it is the last piece
+            subtract_seconds = -(new_seconds-(seconds_per_chunk))
+            audio_section_temp = np.concatenate((previous_chunk, chunk))[(-(seconds_per_chunk)*sr):]    
             audio_section = np.concatenate((audio_section_temp,clip))
         else:
             subtract_seconds = sliding_window
@@ -171,7 +172,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
 
-    #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
+    sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
@@ -183,7 +184,10 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         raise "unknown method"
     print(peak_times)
     # look back just in case missed something
+    
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
+    peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
+    
     #for item in correlation:
     #    if item > threshold:
     #        print(item)
