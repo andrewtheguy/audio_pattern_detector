@@ -24,72 +24,17 @@ def load_audio_file(file_path, sr=None):
     return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
 
-def melspectrogram_method(clip,audio,sr):
+def cross_similarity_method(clip,audio,sr):
     global method_count
-    frame = len(clip)
-    hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
-    method = "euclidean"
-
-    # Extract Mel Spectrograms
-    clip_melspec = librosa.feature.melspectrogram(y=clip, sr=sr, hop_length=hop_length)
-    audio_melspec = librosa.feature.melspectrogram(y=audio, sr=sr, hop_length=hop_length)
-
-    # Amplitude to dB conversion
-    clip_melspec = librosa.power_to_db(clip_melspec)
-    audio_melspec = librosa.power_to_db(audio_melspec)
-
-    if method == "euclidean":
-        # Calculate Euclidean distance for each frame
-        distances = []
-        for i in range(audio_melspec.shape[1] - clip_melspec.shape[1] + 1):
-            dist = np.linalg.norm(clip_melspec - audio_melspec[:, i:i+clip_melspec.shape[1]])
-            distances.append(dist)
-        
-        # Optional: plot the correlation graph to visualize
-        plt.figure(figsize=(20,10))
-        plt.plot(distances)
-        plt.title('distances')
-        plt.xlabel('index')
-        plt.ylabel('distance')
-        plt.savefig(f'./tmp/melspectrogram_method{method_count}.png')
-
-        # Find minimum distance and its index
-        min_distance = min(distances)
-        max_distance = max(distances)
-        print("min_distance",min_distance)
-        print("max_distance",max_distance)
-        match_index = np.argmin(distances)
-        if match_index:
-            print("previous distance") 
-            print(distances[match_index-1]) 
-            print("end previous distance") 
-            print("next distance") 
-            print(distances[match_index+1]) 
-            print("endnext distance") 
-        
-        distances_selected = np.where(distances / min_distance <= 1.0)[0]
-
-
-        # Convert match index to timestamp
-        match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
-
-        method_count = method_count + 1
-        return match_times
-    # elif method == "dtw":
-    #     # Calculate DTW distance
-    #     d, wp = dtw(clip_melspec.T, audio_melspec.T, dist=lambda x, y: np.linalg.norm(x - y, ord=1))
-
-    #     # Get the ending frame of the match in the larger audio
-    #     match_index = wp[-1, 1] - clip_melspec.shape[1] + 1
-
-    else:
-        raise ValueError("Invalid method. Choose 'euclidean' or 'dtw'")
-
-    # Convert match index to timestamp
-    
-    #match_time = (match_index * hop_length) / sr2  
-
-    #return match_time, min_distance if method == "euclidean" else d.distance
+    hop_length = 1024
+    chroma_ref = librosa.feature.chroma_cqt(y=clip, sr=sr, hop_length=hop_length)
+    chroma_comp = librosa.feature.chroma_cqt(y=audio, sr=sr, hop_length=hop_length)
+    # Use time-delay embedding to get a cleaner recurrence matrix
+    x_ref = librosa.feature.stack_memory(chroma_ref, n_steps=10, delay=3)
+    x_comp = librosa.feature.stack_memory(chroma_comp, n_steps=10, delay=3)
+    xsim = librosa.segment.cross_similarity(x_comp, x_ref)
+    print(xsim)
+    return xsim
 
 
 # sample rate needs to be the same for both or bugs will happen
@@ -146,11 +91,13 @@ def mfcc_method(clip,audio,sr):
 
 def correlation_method(clip,audio,sr):
     global method_count
-    threshold = 0.99  # Threshold for distinguishing peaks
+    threshold = 0.9  # Threshold for distinguishing peaks
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full',method='direct')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
+    print("correlation")
+    print(len(correlation))
 
     # Optional: plot the correlation graph to visualize
     plt.figure(figsize=(10, 4))
@@ -161,9 +108,24 @@ def correlation_method(clip,audio,sr):
     plt.savefig(f'./tmp/cross_correlation{method_count}.png')
     plt.close()
 
+    peak_max = np.max(correlation)
+    index_max = np.argmax(correlation)
+    #print("peak_max",peak_max)
+    #print("peak_before",correlation[index_max-sr])
+    #print("peak_after",correlation[index_max+sr])
+    #print("index_max",index_max)
+
     # Detect if there are peaks exceeding the threshold
-    peaks = np.where(correlation >= threshold)[0]
-    peak_times = peaks / sr
+    peaks = []
+
+    for i,col in enumerate(correlation):
+        if col >= threshold:
+            peaks.append(i)
+            #print("peak",col)
+            #print("peak_before",correlation[i-sr])
+            #print("peak_after",correlation[i+sr])
+
+    peak_times = np.array(peaks) / sr
     method_count=method_count+1
     return peak_times
 
@@ -198,8 +160,8 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
     elif method == "mfcc":
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
-    elif method == "melspectrogram":
-        peak_times = melspectrogram_method(clip, audio=audio_section, sr=sr)
+    elif method == "cross_similarity_method":
+        peak_times = cross_similarity_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
 
@@ -237,7 +199,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         .run_async(pipe_stdout=True)
     )
 
-    seconds_per_chunk = 60
+    seconds_per_chunk = 1024
     sliding_window = 60
 
     # for streaming
@@ -383,6 +345,17 @@ def main():
     # Find clip occurrences in the full audio
     peak_times = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file, method=args.method)
 
+    freq = {}
+
+    for peak in peak_times:
+        i = math.floor(peak)
+        cur = freq.get(i, 0)
+        freq[i] = cur + 1
+
+    print(freq)
+
+    print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
+
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
     #print("Clip occurs at the following times (in seconds):", peak_times_clean)
@@ -392,13 +365,6 @@ def main():
     #    #print(f"Offset: {offset}s" )
     
 
-    # # Optional: plot the correlation graph to visualize
-    # plt.figure(figsize=(10, 4))
-    # plt.plot(correlation)
-    # plt.title('Cross-correlation between the audio clip and full track')
-    # plt.xlabel('Lag')
-    # plt.ylabel('Correlation coefficient')
-    # plt.savefig('./tmp/cross_correlation2.png')
 
 if __name__ == '__main__':
     main()

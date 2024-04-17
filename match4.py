@@ -2,13 +2,13 @@ import librosa
 import numpy as np
 from scipy.signal import correlate
 import matplotlib.pyplot as plt
-import dtw
+from dtw import dtw
 
 target_sr=16000
 
 def match_audio_mal(clip_path, audio_path):
     hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
-    method = "euclidean"
+    method = "dtw"
 
     # Load audio files and extract MFCCs (similar to previous example)
     # ...
@@ -118,7 +118,7 @@ def match_audio_euclidean(clip_path, audio_path):
 def main():
     # Load and process both audio files
     main_audio_path = './tmp/audio_section2.wav'
-    pattern_audio_path = './tmp/inputs/rthk_beep.wav'
+    pattern_audio_path = './audio_clips/rthk_beep.wav'
     #match_times, min_distance = match_audio_euclidean(pattern_audio_path, main_audio_path)
     #print(match_times,min_distance)
     match_times, min_distance = match_audio_mal(pattern_audio_path, main_audio_path)
