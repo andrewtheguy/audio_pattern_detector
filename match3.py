@@ -212,7 +212,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     for t in peak_times:
         if t >= 0 and t >= (len(audio_section)-len(clip) - 1) / sr:
             #skip the placeholder clip at the end
-            print("skipping placeholder peak",t)
+            #print("skipping placeholder peak",t)
             continue
         peak_times2.append(t)
 
