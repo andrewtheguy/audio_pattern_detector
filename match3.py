@@ -101,7 +101,7 @@ def mfcc_method(clip,audio,sr):
 
 def correlation_method(clip,audio,sr):
     global method_count
-    threshold = 0.9  # Threshold for distinguishing peaks
+    threshold = 0.4  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='valid')
     correlation = np.abs(correlation)
@@ -122,10 +122,10 @@ def correlation_method(clip,audio,sr):
 
     peak_max = np.max(correlation)
     index_max = np.argmax(correlation)
-    #print("peak_max",peak_max)
+    print("peak_max",peak_max)
     #print("peak_before",correlation[index_max-sr])
     #print("peak_after",correlation[index_max+sr])
-    #print("index_max",index_max)
+    print("index_max",index_max)
 
     # Detect if there are peaks exceeding the threshold
     peaks = []
@@ -148,13 +148,15 @@ def correlation_method(clip,audio,sr):
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
 def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,norm,method="correlation"):
-    #clip_length = len(clip)
+    clip_length = len(clip)
     new_seconds = len(chunk)/sr
     # Concatenate previous chunk for continuity in processing
     if(previous_chunk is not None):
+        print("prev",len(previous_chunk)/sr)
         if(new_seconds < seconds_per_chunk): # too small
             subtract_seconds = -(new_seconds-(sliding_window+seconds_per_chunk))
-            audio_section = np.concatenate((previous_chunk, chunk,clip))[(-(sliding_window+seconds_per_chunk)*sr):]    
+            audio_section_temp = np.concatenate((previous_chunk, chunk))[(-(sliding_window+seconds_per_chunk)*sr):]    
+            audio_section = np.concatenate((audio_section_temp,clip))
         else:
             subtract_seconds = sliding_window
             audio_section = np.concatenate((previous_chunk[(-sliding_window*sr):], chunk,clip))
@@ -217,7 +219,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         .run_async(pipe_stdout=True)
     )
 
-    seconds_per_chunk = 60
+    seconds_per_chunk = 200
     sliding_window = 10
 
     # for streaming
