@@ -37,10 +37,10 @@ def process(news_report,intro):
 
     cur = 0
 
-    # intro first, fake news report happening the same time
+    # intro first, fake news report happening at the beginning
     if(intro[0] == minimum):
         if(news_report[0]>minimum):
-            news_report.appendleft(minimum)
+            news_report.appendleft(0)
     
     
     if(len(news_report)>len(intro)): # news report at the end, pad intro
@@ -52,8 +52,13 @@ def process(news_report,intro):
     print(intro)
     min_len = min(len(news_report), len(intro))
     print(min_len)
+    print('---')
+    print(news_report)
+    print(intro)
+    print('---')
     for i in range(min_len):
-        if(news_report[i] == intro[i]): # happening the same time, skipping
+        if(news_report[i] == intro[i] or cur == news_report[i]): # happening the same time, skipping
+            cur = intro[i]
             continue
         pair.append([cur, news_report[i]]) 
         cur = intro[i]
@@ -80,7 +85,7 @@ def concatenate_audio(input_files, output_file,tmpdir):
     (
         ffmpeg
             .input(list_file, format='concat', safe=0)
-            .output(output_file, c='copy').run()
+            .output(output_file, c='copy').overwrite_output().run()
     )
 
 def md5file(file):
@@ -99,10 +104,6 @@ def scrape():
     #print(args.method)
 
     input_file = args.audio_file
-    
-    # _,extension = os.path.splitext(input_file)
-    # dir = os.path.dirname(input_file)
-    # basename = os.path.basename(input_file)
     
     # print(extension)
     # print(dir)
@@ -130,9 +131,8 @@ def scrape():
     print(pair)
     splits=[]
     
-    _,extension = os.path.splitext(input_file)
+    basename,extension = os.path.splitext(os.path.basename(input_file))
     dir = os.path.dirname(input_file)
-    basename = os.path.basename(input_file)
     print(basename)
     with tempfile.TemporaryDirectory() as tmpdir:
     #path = os.path.join(tmp, 'something')
