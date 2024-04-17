@@ -8,7 +8,7 @@ librosa = "*"
 numpy = "*"
 matplotlib = "*"
 ffmpeg-python = "*"
-dtw-python = "*"
+dtw = "*"
 
 [dev-packages]
 
