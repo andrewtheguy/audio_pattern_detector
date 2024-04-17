@@ -196,7 +196,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
 
     audio_section = np.concatenate((audio_section,clip))
 
-    sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
+    #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr)
