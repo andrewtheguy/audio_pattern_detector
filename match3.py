@@ -34,21 +34,44 @@ def load_audio_file(file_path, sr=None):
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
 
-def cross_similarity_method(clip,audio,sr):
-    global method_count
-    hop_length = 1024
-    chroma_ref = librosa.feature.chroma_cqt(y=clip, sr=sr, hop_length=hop_length)
-    chroma_comp = librosa.feature.chroma_cqt(y=audio, sr=sr, hop_length=hop_length)
-    # Use time-delay embedding to get a cleaner recurrence matrix
-    x_ref = librosa.feature.stack_memory(chroma_ref, n_steps=10, delay=3)
-    x_comp = librosa.feature.stack_memory(chroma_comp, n_steps=10, delay=3)
-    xsim = librosa.segment.cross_similarity(x_comp, x_ref)
-    print(xsim)
-    return xsim
+
+# sample rate needs to be the same for both or bugs will happen
+def chroma_method(clip,audio,sr):
+
+    # Extract features from the audio clip and the pattern
+    audio_features = librosa.feature.chroma_cqt(y=audio, sr=sr)
+    pattern_features = librosa.feature.chroma_cqt(y=clip, sr=sr)
+
+    # Compute the similarity matrix between the audio features and the pattern features
+    similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
+    
+    # Find the indices of the maximum similarity values
+    indices = np.argmax(similarity_matrix, axis=1)
+
+    # Get the corresponding time stamps of the matched patterns
+    time_stamps = librosa.frames_to_time(indices, sr=sr)
+    method_count = method_count + 1
+    return time_stamps
 
 
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method(clip,audio,sr):
+
+    # Extract features from the audio clip and the pattern
+    audio_features = librosa.feature.melspectrogram(y=audio, sr=sr)
+    pattern_features = librosa.feature.melspectrogram(y=clip, sr=sr)
+
+    # Compute the similarity matrix between the audio features and the pattern features
+    similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
+    
+    # Find the indices of the maximum similarity values
+    indices = np.argmax(similarity_matrix, axis=1)
+
+    # Get the corresponding time stamps of the matched patterns
+    time_stamps = librosa.frames_to_time(indices, sr=sr)
+    method_count = method_count + 1
+    return time_stamps
+
     global method_count
 
     frame = len(clip)
@@ -103,7 +126,7 @@ def correlation_method(clip,audio,sr):
     global method_count
     threshold = 0.4  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
-    correlation = correlate(audio, clip, mode='valid')
+    correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
     print("correlation")
