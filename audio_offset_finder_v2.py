@@ -197,7 +197,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     #print(f"subtract_seconds: {subtract_seconds}")
     #print(f"new_seconds: {new_seconds}")    
 
-    audio_section = audio_section / np.max(np.abs(audio_section))
+    #audio_section = audio_section / np.max(np.abs(audio_section))
     # peak normalize audio to -1 dB
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
@@ -212,7 +212,6 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     #clip = pyln.normalize.peak(clip, -1.0)
     #sf.write(f"./tmp/clipbefore.wav", copy.deepcopy(clip), sr)
 
-    clip = clip / np.max(np.abs(clip))
     clip_second = clip_length / sr
 
     #sf.write(f"./tmp/clipbefore2.wav", copy.deepcopy(clip), sr)
@@ -228,6 +227,8 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # loudness normalize audio to -12 dB LUFS
     clip = pyln.normalize.loudness(clip, loudness, -12.0)
     #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), sr)
+    
+    # needed for correlation method
     audio_section = np.concatenate((audio_section,clip))
 
     os.makedirs("./tmp/audio", exist_ok=True)
@@ -303,9 +304,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     # Load the audio clip
     clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
 
-    #norm=np.max(np.abs(clip))
-    # Normalize the clip
-    #clip = clip / np.max(np.abs(clip))
+    # convert to float
+    clip = clip / np.max(np.abs(clip))
 
     #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
 
@@ -354,6 +354,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
             break
         # Convert bytes to numpy array
         chunk = np.frombuffer(in_bytes, dtype="int16")
+        # convert to float 
+        chunk = chunk / np.max(np.abs(chunk))
         #sf.write(f"./tmp/sound{i}.wav", copy.deepcopy(chunk), target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
