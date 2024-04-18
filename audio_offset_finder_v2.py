@@ -264,7 +264,7 @@ def cleanup_peak_times(peak_times):
     return sorted(peak_times_final)
 
 
-def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
+def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",cleanup=True):
     target_sample_rate = 8000
 
     # Load the audio clip
@@ -342,6 +342,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         i = i + 1
 
     process.wait()
-    peak_times_clean = cleanup_peak_times(all_peak_times)
-    return peak_times_clean
+    if cleanup:
+        peak_times_clean = cleanup_peak_times(all_peak_times)
+        return peak_times_clean
+    else:
+        return all_peak_times
 
