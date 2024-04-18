@@ -160,8 +160,7 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     #print("correlation")
     #print(len(correlation))
     #print(len(audio))
-    correlation=correlation[:-len(clip)]
-
+    
     os.makedirs("./tmp/graph", exist_ok=True)
     #Optional: plot the correlation graph to visualize
     plt.figure(figsize=(10, 4))
@@ -171,6 +170,7 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     plt.ylabel('Correlation coefficient')
     plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.png')
     plt.close()
+
 
     peak_max = np.max(correlation)
     index_max = np.argmax(correlation)
