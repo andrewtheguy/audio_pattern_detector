@@ -12,7 +12,7 @@ import tempfile
 import ffmpeg
 import pytz
 
-from audio_offset_finder_v2 import cleanup_peak_times, find_clip_in_audio_in_chunks
+from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
 
 introclips={
     "happydaily":["rthk1clip.wav"],
@@ -207,11 +207,15 @@ def command():
     parser = argparse.ArgumentParser()
     parser.add_argument('action')     
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
+    parser.add_argument('--pattern-file', metavar='audio file', type=str, help='pattern file to convert sample')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     if(args.action == 'scrape'):
         input_file = args.audio_file
         scrape(input_file)
+    elif(args.action == 'convert'):
+        input_file = args.pattern_file
+        convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
         date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
         #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")

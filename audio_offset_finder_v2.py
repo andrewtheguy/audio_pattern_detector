@@ -26,6 +26,8 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 use ffmpeg steaming, which supports more format for streaming
 '''
 
+target_sample_rate = 8000
+
 def load_audio_file(file_path, sr=None):
     # Create ffmpeg process
     process = (
@@ -201,38 +203,32 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # peak normalize audio to -1 dB
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
-    # normalize loudness
-    # # measure the loudness first 
-    # meter = pyln.Meter(sr) # create BS.1770 meter
-    # loudness = meter.integrated_loudness(audio_section)
+    #normalize loudness
+    # measure the loudness first 
+    meter = pyln.Meter(sr) # create BS.1770 meter
+    loudness = meter.integrated_loudness(audio_section)
 
-    # # loudness normalize audio to -12 dB LUFS
-    # audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
-
-    # peak normalize audio to -1 dB
-    #clip = pyln.normalize.peak(clip, -1.0)
-    #sf.write(f"./tmp/clipbefore.wav", copy.deepcopy(clip), sr)
+    # loudness normalize audio to -12 dB LUFS
+    audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
 
     clip_second = clip_length / sr
 
-    #sf.write(f"./tmp/clipbefore2.wav", copy.deepcopy(clip), sr)
 
     # normalize loudness
-    # if(clip_second < 0.5):
-    #     meter = pyln.Meter(sr, block_size=clip_second)
-    # else:
-    #     meter = pyln.Meter(sr) # create BS.1770 meter
-    # loudness = meter.integrated_loudness(clip)
+    if(clip_second < 0.5):
+        meter = pyln.Meter(sr, block_size=clip_second)
+    else:
+        meter = pyln.Meter(sr) # create BS.1770 meter
+    loudness = meter.integrated_loudness(clip)
 
-    # # loudness normalize audio to -12 dB LUFS
-    # clip = pyln.normalize.loudness(clip, loudness, -12.0)
-    #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), sr)
+    # loudness normalize audio to -12 dB LUFS
+    clip = pyln.normalize.loudness(clip, loudness, -12.0)
     
     # needed for correlation method
     audio_section = np.concatenate((audio_section,clip))
 
     os.makedirs("./tmp/audio", exist_ok=True)
-    sf.write(f"./tmp/audio/section_{clip_name}_{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.wav", copy.deepcopy(audio_section), sr)
+    sf.write(f"./tmp/audio/section_{clip_name}_{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.wav", audio_section, sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr,index=index,seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
@@ -300,7 +296,7 @@ def cleanup_peak_times(peak_times):
 
     return peak_times_final
 
-def convert_audio_to_float(audio):
+def convert_audio_arr_to_float(audio):
     # Convert buffer to float32 using NumPy                                                                                 
     audio_as_np_int16 = np.frombuffer(audio, dtype=np.int16)
     audio_as_np_float32 = audio_as_np_int16.astype(np.float32)
@@ -310,23 +306,34 @@ def convert_audio_to_float(audio):
     audio_normalised = audio_as_np_float32 / max_int16
     return audio_normalised
 
-def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",cleanup=True):
-    target_sample_rate = 8000
+def convert_audio_to_clip_format(audio_path, output_path):
 
     # Load the audio clip
-    clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
+    clip = load_audio_file(audio_path,sr=target_sample_rate)
+
+    # convert to float
+    clip = convert_audio_arr_to_float(clip)
+
+    sf.write(output_path,clip, target_sample_rate)
+
+def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",cleanup=True):
+
+    # Load the audio clip
+    clip = load_audio_file(clip_path,sr=target_sample_rate)
 
 
     # convert to float
-    clip = convert_audio_to_float(clip)
+    clip = convert_audio_arr_to_float(clip)
 
     #print(clip)
 
-    #zeroes = np.zeros(int(0.5 * target_sample_rate))
+    #zeroes = np.zeros(int(1 * target_sample_rate))
 
     #clip = np.concatenate((zeroes,clip,zeroes))
 
-    sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
+    #clip = clip / 3
+
+    sf.write(f"./tmp/clip.wav", clip, target_sample_rate)
 
 
     # Initialize parameters
@@ -375,8 +382,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         # Convert bytes to numpy array
         chunk = np.frombuffer(in_bytes, dtype="int16")
         # convert to float 
-        chunk = convert_audio_to_float(chunk)
-        #sf.write(f"./tmp/sound{i}.wav", copy.deepcopy(chunk), target_sample_rate)
+        chunk = convert_audio_arr_to_float(chunk)
+        #sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
         #exit(1)
