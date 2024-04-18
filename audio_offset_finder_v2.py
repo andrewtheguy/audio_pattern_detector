@@ -204,6 +204,10 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
     normalize = True
+    # if normalize:
+    #     audio_section = audio_section / np.max(np.abs(audio_section))
+    #     clip = clip / np.max(np.abs(clip))
+        
 
     if normalize:
         #normalize loudness
