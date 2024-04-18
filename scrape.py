@@ -193,7 +193,7 @@ def scrape(input_file):
     with tempfile.TemporaryDirectory() as tmpdir:
     #path = os.path.join(tmp, 'something')
         for i,p in enumerate(pair):
-            new_filename = os.path.join(tmpdir,f"{basename}_{i+1}{extension}")
+            new_filename = os.path.join(tmpdir,f"{i+1}{extension}")
             print(new_filename)
             output_file = new_filename
             start_time = p[0]
