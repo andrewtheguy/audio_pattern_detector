@@ -59,7 +59,6 @@ def process(news_report,intro):
     
     minimum = min(news_report[0], intro[0])
 
-    cur = 0
 
     # intro first, fake news report happening at the beginning
     if(intro[0] == minimum):
@@ -80,13 +79,24 @@ def process(news_report,intro):
     print(news_report)
     print(intro)
     print('---')
+    
+    cur = 0
     for i in range(min_len):
-        if(news_report[i] == intro[i] or cur == news_report[i]): # happening the same time, skipping
+        news_report_second_pad=3
+        news_report_ts = news_report[i]
+        #if(cur > 0):
+
+        if(news_report_ts == intro[i] or cur == news_report_ts): # happening the same time, skipping
             cur = intro[i]
             continue
-        pair.append([cur, news_report[i]]) 
+
+        # pad two seconds to news report
+        next_intro = intro[i+1] if len(intro) > i+1 else None
+        if next_intro and news_report_ts + news_report_second_pad <= next_intro:
+            news_report_ts = news_report_ts + news_report_second_pad
+            
+        pair.append([cur, news_report_ts]) 
         cur = intro[i]
-        #pair.append([news_report[i], intro[i]]) 
 
     return pair
 
