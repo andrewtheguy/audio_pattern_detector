@@ -127,7 +127,7 @@ def mfcc_method(clip,audio,sr):
 
 def correlation_method(clip,audio,sr):
     global method_count
-    threshold = 0.8  # Threshold for distinguishing peaks, need to be smaller for larger clips
+    threshold = 0.4  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
@@ -137,7 +137,7 @@ def correlation_method(clip,audio,sr):
     #print(len(audio))
     correlation=correlation[:-len(clip)]
 
-    # Optional: plot the correlation graph to visualize
+    # #Optional: plot the correlation graph to visualize
     # plt.figure(figsize=(10, 4))
     # plt.plot(correlation)
     # plt.title('Cross-correlation between the audio clip and full track')
@@ -248,13 +248,17 @@ def cleanup_peak_times(peak_times):
 
     peak_times_final = []
 
+    # skip those less than 10 seconds in between like beep, beep, beep
+    skip_second_between = 10
+
     prevItem = None
     while peak_times_clean2:
         item = peak_times_clean2.popleft()
         if(prevItem is None):
             peak_times_final.append(item)
             prevItem = item
-        elif item - prevItem < 10: # skip those less 10 seconds in between like beep, beep, beep
+        elif item - prevItem < skip_second_between:
+            print(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
             prevItem = item
         else:
             peak_times_final.append(item)

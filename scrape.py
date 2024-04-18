@@ -15,7 +15,7 @@ from audio_offset_finder_v2 import cleanup_peak_times, find_clip_in_audio_in_chu
 
 introclips={
     "happydaily":["rthk1clip.wav"],
-    "morningsuite":["rthk2morning.wav","rthk2theme.wav"],
+    "morningsuite":["morningsuitetheme.wav"],
 }
 
 def download(url,target_file):
