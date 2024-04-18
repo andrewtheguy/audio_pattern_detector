@@ -10,6 +10,7 @@ import string
 import tempfile
 
 import ffmpeg
+import pytz
 
 from audio_offset_finder_v2 import cleanup_peak_times, find_clip_in_audio_in_chunks
 
@@ -202,8 +203,9 @@ def command():
         input_file = args.audio_file
         scrape(input_file)
     elif(args.action == 'download'):
-        download("https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/20240417.m4a/index_0_a.m3u8",
-                 os.path.abspath("./tmp/morningsuite20240417.m4a"))
+        date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
+        download(f"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
+                 os.path.abspath(F"./tmp/morningsuite{date}.m4a"))
     else:
         raise NotImplementedError(f"action {args.action} not implemented")
 
