@@ -23,13 +23,13 @@ def download(url,target_file):
     if(os.path.exists(target_file)):
         print("file {target_file} already exists,skipping")
         return
-    print('downloading')
+    print(f'downloading {target_file}')
     with tempfile.TemporaryDirectory() as tmpdir:
         basename,extension = os.path.splitext(os.path.basename(target_file))
     
         tmp_file = os.path.join(tmpdir,f"download{extension}")
         (
-        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="quiet")
+        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="error")
               .run()
         )
         shutil.move(tmp_file,target_file)
@@ -213,9 +213,15 @@ def command():
         input_file = args.audio_file
         scrape(input_file)
     elif(args.action == 'download'):
-        date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
+        date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
+        #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
+        download(f"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+                        os.path.abspath(f"./tmp/happydaily{date}.m4a"))
+        download(f"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
+                        os.path.abspath(f"./tmp/healthpedia{date}.m4a"))
         download(f"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
-                 os.path.abspath(F"./tmp/morningsuite{date}.m4a"))
+                        os.path.abspath(f"./tmp/morningsuite{date}.m4a"))
+        
     else:
         raise NotImplementedError(f"action {args.action} not implemented")
 
