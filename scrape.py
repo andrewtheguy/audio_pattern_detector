@@ -82,7 +82,7 @@ def process(news_report,intro):
     
     cur = 0
     for i in range(min_len):
-        news_report_second_pad=3
+        news_report_second_pad=4
         news_report_ts = news_report[i]
         #if(cur > 0):
 
