@@ -273,9 +273,12 @@ def cleanup_peak_times(peak_times):
 
     #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
 
+    print('before consolidate',peak_times)
+
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
     peak_times_clean2 = deque(sorted(peak_times_clean))
+    print('before remove close',peak_times_clean2)
 
     peak_times_final = []
 
@@ -304,10 +307,18 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     # Load the audio clip
     clip = load_audio_file(clip_path,sr=target_sample_rate) # 16k
 
+
     # convert to float
     clip = clip / np.max(np.abs(clip))
 
+    #print(clip)
+
+    #zeroes = np.zeros(int(0.5 * target_sample_rate))
+
+    #clip = np.concatenate((zeroes,clip,zeroes))
+
     #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
+
 
     # Initialize parameters
 
