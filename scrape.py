@@ -6,16 +6,23 @@ import hashlib
 import json
 import os
 import shutil
+import string
 import tempfile
 
 import ffmpeg
 
-from audio_offset_finder_v2 import find_clip_in_audio_in_chunks
+from audio_offset_finder_v2 import cleanup_peak_times, find_clip_in_audio_in_chunks
+
+introclips={
+    "happydaily":["rthk1clip.wav"],
+    "morningsuite":["rthk2morning.wav","rthk2theme.wav"],
+}
 
 def download(url,target_file):
     if(os.path.exists(target_file)):
         print("file {target_file} already exists,skipping")
         return
+    print('downloading')
     with tempfile.TemporaryDirectory() as tmpdir:
         basename,extension = os.path.splitext(os.path.basename(target_file))
     
@@ -25,6 +32,7 @@ def download(url,target_file):
               .run()
         )
         shutil.move(tmp_file,target_file)
+    print('downloaded')    
 
 def process(news_report,intro):
     pair = []
@@ -121,7 +129,9 @@ def scrape(input_file):
     # print(dir)
     # print(basename)
     #exit(1)
-
+    basename,extension = os.path.splitext(os.path.basename(input_file))
+    dir = os.path.dirname(input_file)
+    print(basename)
     #md5=md5file(input_file)  # to get a printable str instead of bytes
 
     tsformatted = None
@@ -136,8 +146,17 @@ def scrape(input_file):
         news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
         print(news_report_peak_times)
 
-        # Find clip occurrences in the full audio
-        program_intro_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk1clip.wav', input_file, method="correlation")
+        if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
+            clips = introclips["happydaily"]
+        elif any(basename.startswith(prefix) for prefix in ["morningsuite"]):
+            clips = introclips["morningsuite"]
+        else:
+            raise NotImplementedError(f"not supported {basename}")
+        program_intro_peak_times=[]
+        for c in clips:
+            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation",cleanup=False)
+            program_intro_peak_times.extend(intros)
+        program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         print(program_intro_peak_times)
 
         for offset in news_report_peak_times:
@@ -157,9 +176,6 @@ def scrape(input_file):
         f.write(json.dumps(tsformatted, indent=4))
     splits=[]
     
-    basename,extension = os.path.splitext(os.path.basename(input_file))
-    dir = os.path.dirname(input_file)
-    print(basename)
     with tempfile.TemporaryDirectory() as tmpdir:
     #path = os.path.join(tmp, 'something')
         for i,p in enumerate(pair):
@@ -183,7 +199,8 @@ def command():
         input_file = args.audio_file
         scrape(input_file)
     elif(args.action == 'download'):
-        download("https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/20240417.m4a/index_0_a.m3u8",os.path.abspath("./morningsuite20240417.m4a"))
+        download("https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/20240417.m4a/index_0_a.m3u8",
+                 os.path.abspath("./tmp/morningsuite20240417.m4a"))
     else:
         raise NotImplementedError(f"action {args.action} not implemented")
 
