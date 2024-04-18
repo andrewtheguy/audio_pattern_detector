@@ -15,7 +15,7 @@ from audio_offset_finder_v2 import cleanup_peak_times, find_clip_in_audio_in_chu
 
 introclips={
     "happydaily":["rthk1clip.wav"],
-    "morningsuite":["morningsuitetheme.wav"],
+    "morningsuite":["morningsuitethememalevoice.wav","morningsuitethemefemalevoice.wav"],
 }
 
 def download(url,target_file):
@@ -154,10 +154,13 @@ def scrape(input_file):
             raise NotImplementedError(f"not supported {basename}")
         program_intro_peak_times=[]
         for c in clips:
+            print(f"Finding {c}")
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation",cleanup=False)
+            print("intros",[str(datetime.timedelta(seconds=t)) for t in intros],"---")
             program_intro_peak_times.extend(intros)
         program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         print(program_intro_peak_times)
+        #print("program_intro_peak_times",[str(datetime.timedelta(seconds=t)) for t in program_intro_peak_times],"---")
 
         for offset in news_report_peak_times:
             print(f"Clip news_report_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )

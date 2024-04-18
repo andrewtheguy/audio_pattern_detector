@@ -13,10 +13,13 @@ import matplotlib.pyplot as plt
 import ffmpeg
 import librosa
 import soundfile as sf
-
+import pyloudnorm as pyln
 #import pyaudio
 
-method_count = 0
+import warnings
+
+#ignore possible clipping
+warnings.filterwarnings('ignore', module='pyloudnorm')
 
 '''
 use ffmpeg steaming, which supports more format for streaming
@@ -125,9 +128,9 @@ def mfcc_method(clip,audio,sr):
     # method_count = method_count + 1
     # return match_times
 
-def correlation_method(clip,audio,sr):
+def correlation_method(clip,audio,sr,index,seconds_per_chunk):
     global method_count
-    threshold = 0.4  # Threshold for distinguishing peaks, need to be smaller for larger clips
+    threshold = 0.8  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
@@ -143,7 +146,7 @@ def correlation_method(clip,audio,sr):
     # plt.title('Cross-correlation between the audio clip and full track')
     # plt.xlabel('Lag')
     # plt.ylabel('Correlation coefficient')
-    # plt.savefig(f'./tmp/cross_correlation{method_count}.png')
+    # plt.savefig(f'./tmp/cross_correlation_{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.png')
     # plt.close()
 
     peak_max = np.max(correlation)
@@ -164,8 +167,7 @@ def correlation_method(clip,audio,sr):
     peaks = np.where(correlation > threshold)[0]
 
     peak_times = np.array(peaks) / sr
-    #print(peak_times)
-    method_count=method_count+1
+
     return peak_times
 
 # sliding_window: for previous_chunk in seconds from end
@@ -193,18 +195,36 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     #print(f"subtract_seconds: {subtract_seconds}")
     #print(f"new_seconds: {new_seconds}")    
 
-    # Normalize the current chunk
     audio_section = audio_section / np.max(np.abs(audio_section))
+    # peak normalize audio to -1 dB
+    #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
-    # Normalize clip
+    # measure the loudness first 
+    meter = pyln.Meter(sr) # create BS.1770 meter
+    loudness = meter.integrated_loudness(audio_section)
+
+    # loudness normalize audio to -12 dB LUFS
+    audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
+
+    # peak normalize audio to -1 dB
+    #clip = pyln.normalize.peak(clip, -1.0)
+
+
     clip = clip / np.max(np.abs(clip))
+    if(clip_length / sr > 1): # Normalize clip more than 1 second
+        # measure the loudness first 
+        meter = pyln.Meter(sr) # create BS.1770 meter
+        loudness = meter.integrated_loudness(clip)
+
+        # loudness normalize audio to -12 dB LUFS
+        clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
     audio_section = np.concatenate((audio_section,clip))
 
-    #sf.write(f"./tmp/audio_section{index}.wav", copy.deepcopy(audio_section), sr)
+    sf.write(f"./tmp/audio_section{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.wav", copy.deepcopy(audio_section), sr)
 
     if method == "correlation":
-        peak_times = correlation_method(clip, audio=audio_section, sr=sr)
+        peak_times = correlation_method(clip, audio=audio_section, sr=sr,index=index,seconds_per_chunk=seconds_per_chunk)
     elif method == "mfcc":
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
     elif method == "chroma_method":
@@ -231,12 +251,12 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
 
 def cleanup_peak_times(peak_times):
 
-    freq = {}
+    # freq = {}
 
-    for peak in peak_times:
-        i = math.floor(peak)
-        cur = freq.get(i, 0)
-        freq[i] = cur + 1
+    # for peak in peak_times:
+    #     i = math.floor(peak)
+    #     cur = freq.get(i, 0)
+    #     freq[i] = cur + 1
 
     #print(freq)
 
@@ -244,7 +264,7 @@ def cleanup_peak_times(peak_times):
 
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
-    peak_times_clean2 = deque(peak_times_clean)
+    peak_times_clean2 = deque(sorted(peak_times_clean))
 
     peak_times_final = []
 
@@ -264,8 +284,7 @@ def cleanup_peak_times(peak_times):
             peak_times_final.append(item)
             prevItem = item
 
-    #short before return
-    return sorted(peak_times_final)
+    return peak_times_final
 
 
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",cleanup=True):

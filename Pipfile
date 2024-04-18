@@ -9,6 +9,8 @@ numpy = "*"
 matplotlib = "*"
 ffmpeg-python = "*"
 dtw = "*"
+pydub = "*"
+pyloudnorm = "*"
 
 [dev-packages]
 
