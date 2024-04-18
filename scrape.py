@@ -35,6 +35,7 @@ def download(url,target_file):
         shutil.move(tmp_file,target_file)
     print('downloaded')    
 
+#returns none if no need to trim
 def process(news_report,intro):
     pair = []
     placehold_for_max = None
@@ -49,9 +50,7 @@ def process(news_report,intro):
     #intro = deque([1056, 2661, 4463])
     # no news report
     if(len(news_report)==0):
-        pair.append([0, placehold_for_max]) 
-        #raise NotImplementedError("not handling it yet")
-        return pair
+        return None
     
     if(len(intro)==0): # has news report but no intro
         raise NotImplementedError("not handling it yet")
