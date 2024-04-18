@@ -5,13 +5,27 @@ import datetime
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 
 import ffmpeg
 
 from audio_offset_finder_v2 import find_clip_in_audio_in_chunks
 
-# still WIP
+def download(url,target_file):
+    if(os.path.exists(target_file)):
+        print("file {target_file} already exists,skipping")
+        return
+    with tempfile.TemporaryDirectory() as tmpdir:
+        basename,extension = os.path.splitext(os.path.basename(target_file))
+    
+        tmp_file = os.path.join(tmpdir,f"download{extension}")
+        (
+        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="quiet")
+              .run()
+        )
+        shutil.move(tmp_file,target_file)
+
 def process(news_report,intro):
     pair = []
     placehold_for_max = None
@@ -101,14 +115,7 @@ def get_sec(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
-def scrape():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
-    args = parser.parse_args()
-    #print(args.method)
-
-    input_file = args.audio_file
+def scrape(input_file):
     
     # print(extension)
     # print(dir)
@@ -166,9 +173,24 @@ def scrape():
         #fdsfsd
         concatenate_audio(splits, os.path.abspath(os.path.join(f"{dir}",f"{basename}_trimmed{extension}")),tmpdir)
 
+def command():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('action')     
+    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
+    #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
+    args = parser.parse_args()
+    if(args.action == 'scrape'):
+        input_file = args.audio_file
+        scrape(input_file)
+    elif(args.action == 'download'):
+        download("https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/20240417.m4a/index_0_a.m3u8",os.path.abspath("./morningsuite20240417.m4a"))
+    else:
+        raise NotImplementedError(f"action {args.action} not implemented")
+
+
     
 if __name__ == '__main__':
     #pair=[]
     #process(pair)
     #print(pair)
-    scrape()
+    command()
