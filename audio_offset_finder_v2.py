@@ -18,6 +18,8 @@ import pyloudnorm as pyln
 #import pyaudio
 
 import warnings
+from scipy.io import wavfile
+from scipy.signal import stft, istft
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
@@ -41,7 +43,23 @@ def load_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
+def reduce_noise_spectral_subtraction(data, window_size=2048, overlap=0.5):
+  """
+  Reduces noise using spectral subtraction.
+  """
+  # Calculate STFT
+  f, t, Zxx = stft(data, window='hann', nperseg=window_size, noverlap=int(window_size * overlap))
 
+  # Estimate noise floor
+  noise_floor = np.mean(np.abs(Zxx), axis=1, keepdims=True)
+
+  # Subtract noise floor from magnitude spectrum
+  Zxx_denoised = np.abs(Zxx) - noise_floor
+  Zxx_denoised = np.clip(Zxx_denoised, a_min=0, a_max=None)
+
+  # Reconstruct audio from denoised STFT
+  _, data_denoised = istft(Zxx_denoised * np.exp(1j * np.angle(Zxx)), window='hann', nperseg=window_size, noverlap=int(window_size * overlap))
+  return data_denoised
 
 # sample rate needs to be the same for both or bugs will happen
 def chroma_method(clip,audio,sr):
@@ -196,6 +214,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         subtract_seconds = 0
         audio_section = np.concatenate((chunk,np.array([])))
 
+    #audio_section = reduce_noise_spectral_subtraction(audio_section)
 
     #print(f"subtract_seconds: {subtract_seconds}")
     #print(f"new_seconds: {new_seconds}")    
@@ -232,8 +251,8 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         # loudness normalize audio to -12 dB LUFS
         clip = pyln.normalize.loudness(clip, loudness, -12.0)
         
-        # needed for correlation method
-        audio_section = np.concatenate((audio_section,clip))
+    # needed for correlation method
+    audio_section = np.concatenate((audio_section,clip))
 
     os.makedirs("./tmp/audio", exist_ok=True)
     sf.write(f"./tmp/audio/section_{clip_name}_{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.wav", audio_section, sr)
