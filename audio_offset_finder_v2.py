@@ -45,7 +45,7 @@ def load_audio_file(file_path, sr=None):
 
 # sample rate needs to be the same for both or bugs will happen
 def chroma_method(clip,audio,sr):
-    global method_count
+    #global method_count
     # Extract features from the audio clip and the pattern
     audio_features = librosa.feature.chroma_cqt(y=audio, sr=sr)
     pattern_features = librosa.feature.chroma_cqt(y=clip, sr=sr)
@@ -58,13 +58,12 @@ def chroma_method(clip,audio,sr):
 
     # Get the corresponding time stamps of the matched patterns
     time_stamps = librosa.frames_to_time(indices, sr=sr)
-    method_count = method_count + 1
+    #method_count = method_count + 1
     return time_stamps
 
 
 # sample rate needs to be the same for both or bugs will happen
-def mfcc_method(clip,audio,sr):
-    global method_count
+def mfcc_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
 
     # Extract features from the audio clip and the pattern
     audio_features = librosa.feature.mfcc(y=audio, sr=sr)
@@ -78,58 +77,60 @@ def mfcc_method(clip,audio,sr):
     
     # Get the corresponding time stamps of the matched patterns
     time_stamps = librosa.frames_to_time(indices, sr=sr)
-    method_count = method_count + 1
+    
     return time_stamps
 
-    # global method_count
+# sample rate needs to be the same for both or bugs will happen
+def mfcc_method2(clip,audio,sr,index,seconds_per_chunk,clip_name):
 
-    # frame = len(clip)
-    # hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
+    frame = len(clip)
+    hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
 
-    # # Extract MFCC features
-    # clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
-    # audio_mfcc = librosa.feature.mfcc(y=audio, sr=sr, hop_length=hop_length)
-
-
-    # distances = []
-    # for i in range(audio_mfcc.shape[1] - clip_mfcc.shape[1] + 1):
-    #     dist = np.linalg.norm(clip_mfcc - audio_mfcc[:, i:i+clip_mfcc.shape[1]])
-    #     distances.append(dist)
-
-    # # Find minimum distance and its index
-    # match_index = np.argmin(distances)
-    # min_distance = distances[match_index]
-
-    # # # Optional: plot the two MFCC sequences
-    # # plt.figure(figsize=(10, 4))
-    # # plt.subplot(1, 2, 1)
-    # # plt.title('Main Audio MFCC')
-    # # plt.imshow(audio_mfcc.T, aspect='auto', origin='lower')
-    # # plt.subplot(1, 2, 2)
-    # # plt.title('Pattern Audio MFCC')
-    # # plt.imshow(clip_mfcc.T, aspect='auto', origin='lower')
-    # # plt.tight_layout()
-    # # plt.savefig(f'./tmp/MFCC.png')
-    # # plt.close()
-
-    # #distances_ratio = [dist / min_distance for dist in distances]
-
-    # # Optional: plot the correlation graph to visualize
-    # plt.figure(figsize=(20,8))
-    # plt.plot(distances)
-    # plt.title('distances')
-    # plt.xlabel('index')
-    # plt.ylabel('distance')
-    # plt.savefig(f'./tmp/mfcc{method_count}.png')
-
-    # distances_selected = np.where(distances / min_distance <= 1.05)[0]
+    # Extract MFCC features
+    clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
+    audio_mfcc = librosa.feature.mfcc(y=audio, sr=sr, hop_length=hop_length)
 
 
-    # # Convert match index to timestamp
-    # match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
+    distances = []
+    for i in range(audio_mfcc.shape[1] - clip_mfcc.shape[1] + 1):
+        dist = np.linalg.norm(clip_mfcc - audio_mfcc[:, i:i+clip_mfcc.shape[1]])
+        distances.append(dist)
 
-    # method_count = method_count + 1
-    # return match_times
+    # Find minimum distance and its index
+    match_index = np.argmin(distances)
+    min_distance = distances[match_index]
+
+    # # Optional: plot the two MFCC sequences
+    # plt.figure(figsize=(10, 4))
+    # plt.subplot(1, 2, 1)
+    # plt.title('Main Audio MFCC')
+    # plt.imshow(audio_mfcc.T, aspect='auto', origin='lower')
+    # plt.subplot(1, 2, 2)
+    # plt.title('Pattern Audio MFCC')
+    # plt.imshow(clip_mfcc.T, aspect='auto', origin='lower')
+    # plt.tight_layout()
+    # plt.savefig(f'./tmp/MFCC.png')
+    # plt.close()
+
+    #distances_ratio = [dist / min_distance for dist in distances]
+
+    os.makedirs("./tmp/graph/mfcc", exist_ok=True)
+    #Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(20,8))
+    plt.plot(distances)
+    plt.title('Cross-correlation between the audio clip and full track')
+    plt.xlabel('Lag')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'./tmp/graph/mfcc/distance_{clip_name}_{index}_{str(datetime.timedelta(seconds=index*seconds_per_chunk))}.png')
+    plt.close()
+
+    distances_selected = np.where(distances / min_distance <= 1.05)[0]
+
+
+    # Convert match index to timestamp
+    match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
+
+    return match_times
 
 def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     global method_count
@@ -240,7 +241,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr,index=index,seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     elif method == "mfcc":
-        peak_times = mfcc_method(clip, audio=audio_section, sr=sr)
+        peak_times = mfcc_method(clip, audio=audio_section, sr=sr,index=index,seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     elif method == "chroma_method":
         peak_times = chroma_method(clip, audio=audio_section, sr=sr)
     else:
