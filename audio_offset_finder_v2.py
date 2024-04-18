@@ -201,12 +201,13 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     # peak normalize audio to -1 dB
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
-    # measure the loudness first 
-    meter = pyln.Meter(sr) # create BS.1770 meter
-    loudness = meter.integrated_loudness(audio_section)
+    # normalize loudness
+    # # measure the loudness first 
+    # meter = pyln.Meter(sr) # create BS.1770 meter
+    # loudness = meter.integrated_loudness(audio_section)
 
-    # loudness normalize audio to -12 dB LUFS
-    audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
+    # # loudness normalize audio to -12 dB LUFS
+    # audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
 
     # peak normalize audio to -1 dB
     #clip = pyln.normalize.peak(clip, -1.0)
@@ -216,16 +217,15 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
 
     #sf.write(f"./tmp/clipbefore2.wav", copy.deepcopy(clip), sr)
 
-    # measure the loudness first 
-    
-    if(clip_second < 0.5):
-        meter = pyln.Meter(sr, block_size=clip_second)
-    else:
-        meter = pyln.Meter(sr) # create BS.1770 meter
-    loudness = meter.integrated_loudness(clip)
+    # normalize loudness
+    # if(clip_second < 0.5):
+    #     meter = pyln.Meter(sr, block_size=clip_second)
+    # else:
+    #     meter = pyln.Meter(sr) # create BS.1770 meter
+    # loudness = meter.integrated_loudness(clip)
 
-    # loudness normalize audio to -12 dB LUFS
-    clip = pyln.normalize.loudness(clip, loudness, -12.0)
+    # # loudness normalize audio to -12 dB LUFS
+    # clip = pyln.normalize.loudness(clip, loudness, -12.0)
     #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), sr)
     
     # needed for correlation method
