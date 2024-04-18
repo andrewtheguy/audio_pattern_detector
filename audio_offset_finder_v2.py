@@ -31,7 +31,7 @@ def load_audio_file(file_path, sr=None):
     process = (
         ffmpeg
         .input(file_path)
-        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=sr, loglevel="quiet")
+        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=sr, loglevel="error")
         .run_async(pipe_stdout=True)
     )
     data = process.stdout.read()
@@ -332,7 +332,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     process = (
         ffmpeg
         .input(full_audio_path)
-        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate, loglevel="quiet")
+        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate, loglevel="error")
         .run_async(pipe_stdout=True)
     )
 
