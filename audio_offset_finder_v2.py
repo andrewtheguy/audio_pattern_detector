@@ -31,7 +31,7 @@ def load_audio_file(file_path, sr=None):
     process = (
         ffmpeg
         .input(file_path)
-        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=sr, loglevel="error")
+        .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=sr, loglevel="error")
         .run_async(pipe_stdout=True)
     )
     data = process.stdout.read()
@@ -300,6 +300,15 @@ def cleanup_peak_times(peak_times):
 
     return peak_times_final
 
+def convert_audio_to_float(audio):
+    # Convert buffer to float32 using NumPy                                                                                 
+    audio_as_np_int16 = np.frombuffer(audio, dtype=np.int16)
+    audio_as_np_float32 = audio_as_np_int16.astype(np.float32)
+
+    # Normalise float32 array so that values are between -1.0 and +1.0                                                      
+    max_int16 = 2**15
+    audio_normalised = audio_as_np_float32 / max_int16
+    return audio_normalised
 
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",cleanup=True):
     target_sample_rate = 8000
@@ -309,7 +318,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
 
     # convert to float
-    clip = clip / np.max(np.abs(clip))
+    clip = convert_audio_to_float(clip)
 
     #print(clip)
 
@@ -317,7 +326,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
     #clip = np.concatenate((zeroes,clip,zeroes))
 
-    #sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
+    sf.write(f"./tmp/clip.wav", copy.deepcopy(clip), target_sample_rate)
 
 
     # Initialize parameters
@@ -332,7 +341,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     process = (
         ffmpeg
         .input(full_audio_path)
-        .output('pipe:', format='wav', acodec='pcm_s16le', ac=1, ar=target_sample_rate, loglevel="error")
+        .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=target_sample_rate, loglevel="error")
         .run_async(pipe_stdout=True)
     )
 
@@ -366,7 +375,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         # Convert bytes to numpy array
         chunk = np.frombuffer(in_bytes, dtype="int16")
         # convert to float 
-        chunk = chunk / np.max(np.abs(chunk))
+        chunk = convert_audio_to_float(chunk)
         #sf.write(f"./tmp/sound{i}.wav", copy.deepcopy(chunk), target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
