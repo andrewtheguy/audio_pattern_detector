@@ -21,6 +21,19 @@ introclips={
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav"],
 }
 
+pairs={
+    "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+    "healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
+    "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
+}
+
+schedule={
+    "happydaily":{"begin": 10,"end":12},
+    "healthpedia":{"begin": 13,"end":15},
+    "morningsuite":{"begin": 6,"end":10},
+}
+
+
 def download(url,target_file):
     if(os.path.exists(target_file)):
         print(f"file {target_file} already exists,skipping")
@@ -281,19 +294,23 @@ def scrape(input_file):
             splits.append(file_segment)
         concatenate_audio(splits, output_file,tmpdir)
 
-pairs={
-    "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-    #"healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
-    "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
-}
+def is_time_after(current_time,hour):
+  target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
+  return current_time > target_time
 
 def download_and_scrape():
     
     #date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
-    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
+    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
+    date_str=date.strftime("%Y%m%d")
     for key, urltemplate in pairs.items():
-        dest_file = os.path.abspath(f"./tmp/{key}{date}.m4a")
-        download(urltemplate.format(date=date),dest_file)
+        print(key)
+        end_time = schedule[key]["end"]
+        if not is_time_after(date.time(),end_time+1):
+            print(f"skipping {key} because it is not yet 1 hour from {end_time}")
+            continue
+        dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
+        download(urltemplate.format(date=date_str),dest_file)
         scrape(dest_file)
 
 def command():
