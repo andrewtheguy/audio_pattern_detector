@@ -289,8 +289,8 @@ pairs={
 
 def download_and_scrape():
     
-    date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
-    #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
+    #date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
+    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
     for key, urltemplate in pairs.items():
         dest_file = os.path.abspath(f"./tmp/{key}{date}.m4a")
         download(urltemplate.format(date=date),dest_file)
