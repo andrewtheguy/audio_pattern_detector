@@ -71,11 +71,6 @@ def process(news_report,intro,total_time):
         # no need to trim
         return [[cur_intro, total_time]]
     
-    if(len(intro)==0 and len(news_report)==1): # has one news report but no intro, trim everything after news report
-        #maybe do the same thing above and no need to trim
-        raise ValueError("not supporting one news report without intro in case the intro got missed and then the content after that are trimmed")
-        #return [[cur_intro, news_report[0]]]
-    
     pair=[]
 
 
@@ -95,8 +90,9 @@ def process(news_report,intro,total_time):
                      pair.append([cur_intro, total_time])
                  news_report_followed_by_intro=True    
                  break
-        #if not news_report_followed_by_intro and len(intro)>0:
-        #    raise NotImplementedError("not handling news report not followed by intro yet unless it is the end")
+        # unlkely to be an issue if news report is 10 seconds from the end w/o intro
+        if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
+            raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end")
     print("before padding",pair)
     news_report_second_pad=4
     for i,arr in enumerate(pair):
