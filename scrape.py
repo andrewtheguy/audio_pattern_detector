@@ -72,6 +72,7 @@ def process(news_report,intro,total_time):
         return [[cur_intro, total_time]]
     
     if(len(intro)==0 and len(news_report)==1): # has one news report but no intro, trim everything after news report
+        #maybe do the same thing above and no need to trim
         raise ValueError("not supporting one news report without intro in case the intro got missed and then the content after that are trimmed")
         #return [[cur_intro, news_report[0]]]
     
