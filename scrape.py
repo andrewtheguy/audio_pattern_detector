@@ -13,6 +13,7 @@ import tempfile
 import ffmpeg
 import pytz
 import requests
+from webdav4.client import Client
 
 from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
 
@@ -220,6 +221,20 @@ def concatenate_audio(input_files, output_file,tmpdir):
             .output(output_file, c='copy').overwrite_output().run()
     )
 
+def upload_file(file,dest_path,skip_if_exists=False):
+    client = Client("http://10.22.33.20:9080", auth=("andrew", "qwertasdfg"))
+    
+    if(skip_if_exists and client.exists(dest_path)):
+        print(f"file {dest_path} already exists,skipping")
+        return
+
+    dir=os.path.dirname(dest_path)
+    if not client.exists(dir):
+        client.mkdir(dir)
+    print(f"uploading {file} to {dest_path}")
+#    client.mkdir(dir)
+    client.upload_file(file,dest_path,overwrite=True)
+
 def md5file(file):
     with open(file, "rb") as f:
         file_hash = hashlib.md5()
@@ -317,6 +332,7 @@ def scrape(input_file):
             split_audio(input_file, file_segment, start_time, end_time, total_time)
             splits.append(file_segment)
         concatenate_audio(splits, output_file,tmpdir)
+        upload_file(output_file,f"/rthk/trimmed/{os.path.basename(output_file)}",skip_if_exists=True)
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
@@ -339,6 +355,7 @@ def download_and_scrape():
             continue
         dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
         download(url,dest_file)
+        upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
         scrape(dest_file)
 
 def command():
@@ -364,6 +381,7 @@ def command():
     
 if __name__ == '__main__':
     #print(url_ok("https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/20240417.m4a/index_0_a.m3u8"))
+    #upload_file("./tmp/happydaily20240418.m4a.json","/test3/out.pcm",skip_if_exists=False)
     #exit(1)
     #pair=[]
     #process(pair)
