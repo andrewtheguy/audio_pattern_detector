@@ -12,6 +12,7 @@ import tempfile
 
 import ffmpeg
 import pytz
+import requests
 
 from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
 
@@ -33,6 +34,17 @@ schedule={
     "morningsuite":{"begin": 6,"end":10},
 }
 
+def url_ok(url):
+ 
+ 
+    r = requests.get(url, stream=True)
+
+    if r.ok:
+        #content = next(r.iter_content(10))
+        return True
+    else:
+        print(f"HTTP Error {r.status_code} - {r.reason}")
+        return False
 
 def download(url,target_file):
     if(os.path.exists(target_file)):
@@ -73,6 +85,20 @@ def process(news_report,intro,total_time):
     
     pair=[]
 
+    # pair_cutout = []
+    # prev_news_report = None
+    # while(len(news_report)>0):
+    #     cur_news_report = news_report.popleft()
+    #     next_news_report = news_report[0] if len(news_report)>0 else None
+    #     #if prev_news_report is not None:
+    #     while(len(intro)>0):
+    #         cur_intro = intro.popleft()
+    #         if prev_news_report is not None:
+    #             if(cur_intro < cur_news_report):
+    #                 raise ValueError(f"cur_intro {cur_intro} needs to be >= cur_news_report {cur_news_report}")
+    #             elif(cur_intro > cur_news_report):
+    #                 pair_cutout.append([cur_news_report, cur_intro])
+    #     prev_news_report = cur_news_report
 
     news_report_followed_by_intro = True
     while(len(news_report)>0):
@@ -302,13 +328,17 @@ def download_and_scrape():
     date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
     date_str=date.strftime("%Y%m%d")
     for key, urltemplate in pairs.items():
+        url = urltemplate.format(date=date_str)
         print(key)
         end_time = schedule[key]["end"]
-        if not is_time_after(date.time(),end_time+1):
-            print(f"skipping {key} because it is not yet 1 hour from {end_time}")
+        if not is_time_after(date.time(),end_time):
+            print(f"skipping {key} because it is not yet from {end_time}")
+            continue
+        elif not url_ok(url):
+            print(f"skipping {key} because url {url} is not ok")
             continue
         dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
-        download(urltemplate.format(date=date_str),dest_file)
+        download(url,dest_file)
         scrape(dest_file)
 
 def command():
@@ -333,6 +363,8 @@ def command():
 
     
 if __name__ == '__main__':
+    #print(url_ok("https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/20240417.m4a/index_0_a.m3u8"))
+    #exit(1)
     #pair=[]
     #process(pair)
     #print(pair)
