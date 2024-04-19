@@ -190,7 +190,7 @@ def scrape(input_file):
     splits=[]
 
     output_dir= os.path.abspath(os.path.join(f"{dir}","trimmed"))
-    output_file= os.path.abspath(output_dir,f"{basename}_trimmed{extension}")
+    output_file= os.path.join(output_dir,f"{basename}_trimmed{extension}")
 
     if os.path.exists(output_file):
         print(f"file {output_file} already exists,skipping")
