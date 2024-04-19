@@ -4,6 +4,7 @@ from collections import deque
 import datetime
 import hashlib
 import json
+import math
 import os
 import shutil
 import string
@@ -16,12 +17,13 @@ from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_for
 
 introclips={
     "happydaily":["happydailyfemaleintro.wav"],
+    "healthpedia":["healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav"],
 }
 
 def download(url,target_file):
     if(os.path.exists(target_file)):
-        print("file {target_file} already exists,skipping")
+        print(f"file {target_file} already exists,skipping")
         return
     print(f'downloading {url}')
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -35,10 +37,11 @@ def download(url,target_file):
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')    
 
-#returns none if no need to trim
-def process(news_report,intro):
+# total_time is needed to set end time
+# if it ends with intro instead of news report
+def process(news_report,intro,total_time):
     pair = []
-    placehold_for_max = None
+    # will bug out if not sorted
     # will bug out if one not followed by another, i.e. intro followed by intro or news followed
     # by news
     #news_report = deque([40,90,300])
@@ -46,62 +49,117 @@ def process(news_report,intro):
     news_report=deque(news_report)
     intro=deque(intro)
 
+    cur_intro = 0
+
     #news_report = deque([598, 2398, 3958, 5758])
     #intro = deque([1056, 2661, 4463])
     # no news report
     if(len(news_report)==0):
-        return None
+        # no need to trim
+        return [cur_intro, total_time]
     
-    if(len(intro)==0): # has news report but no intro
-        raise NotImplementedError("not handling it yet")
-        #return
+    if(len(intro)==0): # has news report but no intro, trim everything after news report
+        return [cur_intro, news_report[0]]
     
-    minimum = min(news_report[0], intro[0])
+    pair=[]
 
 
-    # intro first, fake news report happening at the beginning
-    if(intro[0] == minimum):
-        if(news_report[0]>minimum):
-            news_report.appendleft(0)
-    
-    
-    if(len(news_report)>len(intro)): # news report at the end, pad intro
-        intro.append(placehold_for_max)
-
-    if len(news_report)!=len(intro):
-        raise ValueError("not the same length")
-    print(news_report)
-    print(intro)
-    min_len = min(len(news_report), len(intro))
-    print(min_len)
-    print('---')
-    print(news_report)
-    print(intro)
-    print('---')
-    
-    cur = 0
-    for i in range(min_len):
-        news_report_second_pad=4
-        news_report_ts = news_report[i]
-        #if(cur > 0):
-
-        if(news_report_ts == intro[i] or cur == news_report_ts): # happening the same time, skipping
-            cur = intro[i]
-            continue
-
-        # pad two seconds to news report
-        next_intro = intro[i+1] if len(intro) > i+1 else None
-        if next_intro and news_report_ts + news_report_second_pad <= next_intro:
-            news_report_ts = news_report_ts + news_report_second_pad
-            
-        pair.append([cur, news_report_ts]) 
-        cur = intro[i]
+    #pair.append([cur_intro, cur_news_report])
+    while(len(news_report)>0):
+        cur_news_report = news_report.popleft()
+        pair.append([cur_intro, cur_news_report])
+        # get first intro after news report
+        while(len(intro)>0):
+             cur_intro = intro.popleft()
+             if cur_intro > cur_news_report:
+                 # ends with intro but no news report
+                 if len(news_report)==0:
+                     pair.append([cur_intro, total_time])
+                 break
+        #if not news_report_followed_by_intro and len(intro)>0:
+        #    raise NotImplementedError("not handling news report not followed by intro yet unless it is the end")
+    print("before padding",pair)
+    news_report_second_pad=4
+    for i,arr in enumerate(pair):
+        cur_intro = arr[0]
+        cur_news_report = arr[1]
+        if(i+1>=len(pair)):
+            next_intro = None
+        else:
+            next_intro = pair[i+1][0]
+        # pad news_report_second_pad seconds to news report
+        if(next_intro is None or cur_news_report + news_report_second_pad <= next_intro):
+            arr[1] = cur_news_report + news_report_second_pad
+    print("after padding",pair)
 
     return pair
 
-        
+# #returns none if no need to trim
+# def process(news_report,intro):
+#     pair = []
+#     placehold_for_max = None
+#     # will bug out if one not followed by another, i.e. intro followed by intro or news followed
+#     # by news
+#     #news_report = deque([40,90,300])
+#     #intro =       deque([60,200,400])
+#     news_report=deque(news_report)
+#     intro=deque(intro)
 
-def split_audio(input_file, output_file, start_time, end_time):
+#     #news_report = deque([598, 2398, 3958, 5758])
+#     #intro = deque([1056, 2661, 4463])
+#     # no news report
+#     if(len(news_report)==0):
+#         raise NotImplementedError("not handling it yet")
+#         #return None
+    
+#     if(len(intro)==0): # has news report but no intro
+#         raise NotImplementedError("not handling it yet")
+#         #return
+    
+#     minimum = min(news_report[0], intro[0])
+
+
+#     # intro first, fake news report happening at the beginning
+#     if(intro[0] == minimum):
+#         if(news_report[0]>minimum):
+#             news_report.appendleft(0)
+    
+    
+#     if(len(news_report)>len(intro)): # news report at the end, pad intro
+#         intro.append(placehold_for_max)
+
+#     if len(news_report)!=len(intro):
+#         raise ValueError("not the same length")
+#     print(news_report)
+#     print(intro)
+#     min_len = min(len(news_report), len(intro))
+#     print(min_len)
+#     print('---')
+#     print(news_report)
+#     print(intro)
+#     print('---')
+    
+#     cur = 0
+#     for i in range(min_len):
+#         news_report_second_pad=4
+#         news_report_ts = news_report[i]
+#         #if(cur > 0):
+
+#         if(news_report_ts == intro[i] or cur == news_report_ts): # happening the same time, skipping
+#             cur = intro[i]
+#             continue
+
+#         # pad two seconds to news report
+#         next_intro = intro[i+1] if len(intro) > i+1 else None
+#         if next_intro and news_report_ts + news_report_second_pad <= next_intro:
+#             news_report_ts = news_report_ts + news_report_second_pad
+            
+#         pair.append([cur, news_report_ts]) 
+#         cur = intro[i]
+
+#     return pair
+
+def split_audio(input_file, output_file, start_time, end_time,total_time):
     #print( (str(datetime.timedelta(seconds=start_time)), str(datetime.timedelta(seconds=end_time))) )
     #return
     (
@@ -133,6 +191,11 @@ def get_sec(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
+def get_sec_from_str(time_str):
+    """Get seconds from time."""
+    h, m, s = time_str.split(':')
+    return int(h) * 3600 + int(m) * 60 + int(s)
+
 def scrape(input_file):
     
     # print(extension)
@@ -150,14 +213,19 @@ def scrape(input_file):
     if os.path.exists(jsonfile):
         tsformatted=json.load(open(jsonfile))
 
+    total_time = math.ceil(float(ffmpeg.probe(input_file)["format"]["duration"]))
+    print("total_time",total_time,"---")
+    #exit(1)
     if not tsformatted:
-
         # Find clip occurrences in the full audio
         news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
         print(news_report_peak_times)
 
-        if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
+        #if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
+        if any(basename.startswith(prefix) for prefix in ["happydaily"]):
             clips = introclips["happydaily"]
+        elif any(basename.startswith(prefix) for prefix in ["healthpedia"]):
+            clips = introclips["healthpedia"]
         elif any(basename.startswith(prefix) for prefix in ["morningsuite"]):
             clips = introclips["morningsuite"]
         else:
@@ -179,7 +247,7 @@ def scrape(input_file):
         for offset in program_intro_peak_times:
             print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
         #    #print(f"Offset: {offset}s" )
-        pair = process(news_report_peak_times, program_intro_peak_times)
+        pair = process(news_report_peak_times, program_intro_peak_times,total_time)
         tsformatted = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
@@ -192,9 +260,9 @@ def scrape(input_file):
     output_dir= os.path.abspath(os.path.join(f"{dir}","trimmed"))
     output_file= os.path.join(output_dir,f"{basename}_trimmed{extension}")
 
-    if os.path.exists(output_file):
-        print(f"file {output_file} already exists,skipping")
-        return
+    # if os.path.exists(output_file):
+    #     print(f"file {output_file} already exists,skipping")
+    #     return
     
     os.makedirs(output_dir, exist_ok=True)
 
@@ -204,14 +272,14 @@ def scrape(input_file):
             file_segment = os.path.join(tmpdir,f"{i+1}{extension}")
             start_time = p[0]
             end_time = p[1]
-            split_audio(input_file, file_segment, start_time, end_time)
+            split_audio(input_file, file_segment, start_time, end_time, total_time)
             splits.append(file_segment)
         concatenate_audio(splits, output_file,tmpdir)
 
 pairs={
     "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-    "healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
-    "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
+    #"healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
+    "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
 }
 
 def download_and_scrape():
