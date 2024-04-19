@@ -56,16 +56,19 @@ def process(news_report,intro,total_time):
     # no news report
     if(len(news_report)==0):
         # no need to trim
-        return [cur_intro, total_time]
+        return [[cur_intro, total_time]]
     
-    if(len(intro)==0): # has news report but no intro, trim everything after news report
-        return [cur_intro, news_report[0]]
+    if(len(intro)==0 and len(news_report)==1): # has one news report but no intro, trim everything after news report
+        return [[cur_intro, news_report[0]]]
     
     pair=[]
 
 
-    #pair.append([cur_intro, cur_news_report])
+    news_report_followed_by_intro = True
     while(len(news_report)>0):
+        if(not news_report_followed_by_intro):
+           raise ValueError("cannot have news report followed by news report")
+        news_report_followed_by_intro=False
         cur_news_report = news_report.popleft()
         pair.append([cur_intro, cur_news_report])
         # get first intro after news report
@@ -75,6 +78,7 @@ def process(news_report,intro,total_time):
                  # ends with intro but no news report
                  if len(news_report)==0:
                      pair.append([cur_intro, total_time])
+                 news_report_followed_by_intro=True    
                  break
         #if not news_report_followed_by_intro and len(intro)>0:
         #    raise NotImplementedError("not handling news report not followed by intro yet unless it is the end")
@@ -248,6 +252,7 @@ def scrape(input_file):
             print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
         #    #print(f"Offset: {offset}s" )
         pair = process(news_report_peak_times, program_intro_peak_times,total_time)
+        print("pair",pair)
         tsformatted = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
