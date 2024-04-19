@@ -15,7 +15,7 @@ import pytz
 from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
 
 introclips={
-    "happydaily":["rthk1clip.wav"],
+    "happydaily":["happydailyfemaleintro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav"],
 }
 
@@ -23,7 +23,7 @@ def download(url,target_file):
     if(os.path.exists(target_file)):
         print("file {target_file} already exists,skipping")
         return
-    print(f'downloading {target_file}')
+    print(f'downloading {url}')
     with tempfile.TemporaryDirectory() as tmpdir:
         basename,extension = os.path.splitext(os.path.basename(target_file))
     
@@ -33,7 +33,7 @@ def download(url,target_file):
               .run()
         )
         shutil.move(tmp_file,target_file)
-    print('downloaded')    
+    print(f'downloaded to {target_file}')    
 
 #returns none if no need to trim
 def process(news_report,intro):
@@ -188,19 +188,40 @@ def scrape(input_file):
     with open(jsonfile,'w') as f:
         f.write(json.dumps(tsformatted, indent=4))
     splits=[]
+
+    output_dir= os.path.abspath(os.path.join(f"{dir}","trimmed"))
+    output_file= os.path.abspath(output_dir,f"{basename}_trimmed{extension}")
+
+    if os.path.exists(output_file):
+        print(f"file {output_file} already exists,skipping")
+        return
     
+    os.makedirs(output_dir, exist_ok=True)
+
     with tempfile.TemporaryDirectory() as tmpdir:
     #path = os.path.join(tmp, 'something')
         for i,p in enumerate(pair):
-            new_filename = os.path.join(tmpdir,f"{i+1}{extension}")
-            print(new_filename)
-            output_file = new_filename
+            file_segment = os.path.join(tmpdir,f"{i+1}{extension}")
             start_time = p[0]
             end_time = p[1]
-            split_audio(input_file, output_file, start_time, end_time)
-            splits.append(output_file)
-        #fdsfsd
-        concatenate_audio(splits, os.path.abspath(os.path.join(f"{dir}",f"{basename}_trimmed{extension}")),tmpdir)
+            split_audio(input_file, file_segment, start_time, end_time)
+            splits.append(file_segment)
+        concatenate_audio(splits, output_file,tmpdir)
+
+pairs={
+    "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+    "healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
+    "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
+}
+
+def download_and_scrape():
+    
+    date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
+    #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
+    for key, urltemplate in pairs.items():
+        dest_file = os.path.abspath(f"./tmp/{key}{date}.m4a")
+        download(urltemplate.format(date=date),dest_file)
+        scrape(dest_file)
 
 def command():
     parser = argparse.ArgumentParser()
@@ -216,14 +237,7 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
-        #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')).strftime("%Y%m%d")
-        download(f"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-                        os.path.abspath(f"./tmp/happydaily{date}.m4a"))
-        download(f"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
-                        os.path.abspath(f"./tmp/healthpedia{date}.m4a"))
-        download(f"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
-                        os.path.abspath(f"./tmp/morningsuite{date}.m4a"))
+        download_and_scrape()
         
     else:
         raise NotImplementedError(f"action {args.action} not implemented")
