@@ -92,7 +92,7 @@ def process(news_report,intro,total_time):
                  break
         # unlkely to be an issue if news report is 10 seconds from the end w/o intro
         if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
-            raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end")
+            raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro")
     print("before padding",pair)
     news_report_second_pad=4
     for i,arr in enumerate(pair):
