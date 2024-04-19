@@ -152,7 +152,7 @@ def mfcc_method2(clip,audio,sr,index,seconds_per_chunk,clip_name):
 
 def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     global method_count
-    threshold = 0.8  # Threshold for distinguishing peaks, need to be smaller for larger clips
+    threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
@@ -397,6 +397,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
     #exit(1)
 
+    audio_size = 0
+
     # for streaming
     frame_length = (seconds_per_chunk * target_sample_rate)
     chunk_size=frame_length * 2   # times two because it is 2 bytes per sample (int16)
@@ -410,6 +412,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         chunk = np.frombuffer(in_bytes, dtype="int16")
         # convert to float 
         chunk = convert_audio_arr_to_float(chunk)
+
+        audio_size += len(chunk)
+
         #sf.write(f"./tmp/sound{i}.wav", chunk, target_sample_rate)
         #print("chunk....")
         #print(len(chunk))
@@ -432,6 +437,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         i = i + 1
 
     process.wait()
+    total_time = audio_size / target_sample_rate
     if cleanup:
         peak_times_clean = cleanup_peak_times(all_peak_times)
         return peak_times_clean
