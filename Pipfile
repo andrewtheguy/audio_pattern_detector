@@ -11,6 +11,7 @@ ffmpeg-python = "*"
 dtw = "*"
 pydub = "*"
 pyloudnorm = "*"
+requests = "*"
 
 [dev-packages]
 
