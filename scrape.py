@@ -111,8 +111,14 @@ def process(news_report,intro,total_time):
              if cur_intro > cur_news_report:
                  # ends with intro but no news report
                  if len(news_report)==0:
-                     pair.append([cur_intro, total_time])
-                 news_report_followed_by_intro=True    
+                    pair.append([cur_intro, total_time])
+
+                 if(len(news_report)>0 and cur_intro > news_report[0]):
+                    # intro greater than two news reports, which means it is news report followed by news report
+                    # will cause start time to be greater than end time for the next time range to be added
+                    news_report_followed_by_intro=False
+                 else:    
+                    news_report_followed_by_intro=True    
                  break
         # prevent missing something in the middle     
         # unlkely to happen if news report is 10 seconds from the end w/o intro
