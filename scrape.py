@@ -19,7 +19,7 @@ from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_for
 
 introclips={
     "happydaily":["happydailyfemaleintro.wav"],
-    "healthpedia":["healthpedia_intro.wav"],
+    "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
 }
 
@@ -84,22 +84,16 @@ def process(news_report,intro,total_time):
         # no need to trim
         return [[cur_intro, total_time]]
     
+    # intro starts before news report,
+    # shift cur_intro from 0 to the first intro
+    # if it is less than 10 minutes,
+    # it is very unlikely to miss a news report
+    # within the first 10 minutes and at the same time
+    # the program has already started before 10 minutes
+    if(len(intro) > 0 and intro[0] <= 10*60 and intro[0] < news_report[0]):
+        cur_intro = intro.popleft()
+    
     pair=[]
-
-    # pair_cutout = []
-    # prev_news_report = None
-    # while(len(news_report)>0):
-    #     cur_news_report = news_report.popleft()
-    #     next_news_report = news_report[0] if len(news_report)>0 else None
-    #     #if prev_news_report is not None:
-    #     while(len(intro)>0):
-    #         cur_intro = intro.popleft()
-    #         if prev_news_report is not None:
-    #             if(cur_intro < cur_news_report):
-    #                 raise ValueError(f"cur_intro {cur_intro} needs to be >= cur_news_report {cur_news_report}")
-    #             elif(cur_intro > cur_news_report):
-    #                 pair_cutout.append([cur_news_report, cur_intro])
-    #     prev_news_report = cur_news_report
 
     news_report_followed_by_intro = True
     while(len(news_report)>0):
@@ -117,11 +111,14 @@ def process(news_report,intro,total_time):
                      pair.append([cur_intro, total_time])
                  news_report_followed_by_intro=True    
                  break
-        # unlkely to be an issue if news report is 10 seconds from the end w/o intro
+        # prevent missing something in the middle     
+        # unlkely to happen if news report is 10 seconds from the end w/o intro
         if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
+            print("cur_news_report",cur_news_report,"total_time",total_time)
             raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro")
     print("before padding",pair)
-    news_report_second_pad=4
+    # did count down and the beeps are about 6 seconds
+    news_report_second_pad=6
     for i,arr in enumerate(pair):
         cur_intro = arr[0]
         cur_news_report = arr[1]
