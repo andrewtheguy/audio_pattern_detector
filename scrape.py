@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import string
 import tempfile
@@ -259,6 +260,19 @@ def get_sec_from_str(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
+# for testprefix20220414 it will return testprefix, and for testagain220220414 will return testagain2, not testagain
+def extract_prefix(text):
+  """Extracts the string before a date in YYYYMMDD format.
+
+  Args:
+    text: The input string.
+
+  Returns:
+    The extracted prefix, or None if no date is found.
+  """
+  match = re.match(r"(.*?)(?=\d{8})", text)
+  return match.group(1) if match else None
+
 def scrape(input_file):
     
     # print(extension)
@@ -341,7 +355,13 @@ def scrape(input_file):
             split_audio(input_file, file_segment, start_time, end_time, total_time)
             splits.append(file_segment)
         concatenate_audio(splits, output_file,tmpdir)
-        upload_file(output_file,f"/rthk/trimmed/{os.path.basename(output_file)}",skip_if_exists=True)
+        filename=os.path.basename(output_file)
+        print(filename)
+        dirname = extract_prefix(filename)
+        print(dirname)
+        dirname = '' if dirname is None else dirname
+        path = f"/rthk/trimmed/{dirname}/{filename}"
+        upload_file(output_file,path,skip_if_exists=True)
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
