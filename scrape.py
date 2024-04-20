@@ -9,6 +9,7 @@ import os
 import shutil
 import string
 import tempfile
+import traceback
 
 import ffmpeg
 import pytz
@@ -370,6 +371,7 @@ def download_and_scrape(download_only=False):
             scrape(dest_file)
         except Exception as e:
             print(f"error happened when processing for {key}",e)
+            print(traceback.format_exc())
             continue
 
 def command():
