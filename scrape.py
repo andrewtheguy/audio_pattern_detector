@@ -21,20 +21,21 @@ introclips={
     "happydaily":["happydailyfemaleintro.wav"],
     "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
+    "KnowledgeCo":["rthk1theme.wav","healthpedia_intro.wav"],
 }
 
 pairs={
     "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
     "healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
     "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
-    "knowledgeco":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
+    "KnowledgeCo":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
 }
 
 schedule={
     "happydaily":{"begin": 10,"end":12},
     "healthpedia":{"begin": 13,"end":15},
     "morningsuite":{"begin": 6,"end":10},
-    "knowledgeco":{"begin": 6,"end":10},
+    "KnowledgeCo":{"begin": 6,"end":10},
 }
 
 def url_ok(url):
