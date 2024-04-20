@@ -27,12 +27,14 @@ pairs={
     "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
     "healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
     "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
+    "knowledgeco":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
 }
 
 schedule={
     "happydaily":{"begin": 10,"end":12},
     "healthpedia":{"begin": 13,"end":15},
     "morningsuite":{"begin": 6,"end":10},
+    "knowledgeco":{"begin": 6,"end":10},
 }
 
 def url_ok(url):
@@ -335,7 +337,7 @@ def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
   return current_time > target_time
 
-def download_and_scrape():
+def download_and_scrape(download_only=False):
     
     #date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
     date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
@@ -351,9 +353,15 @@ def download_and_scrape():
             print(f"skipping {key} because url {url} is not ok")
             continue
         dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
-        download(url,dest_file)
-        upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
-        scrape(dest_file)
+        try:
+            download(url,dest_file)
+            upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
+            if(download_only):
+                continue
+            scrape(dest_file)
+        except Exception as e:
+            print(f"error happened when processing for {key}",e)
+            continue
 
 def command():
     parser = argparse.ArgumentParser()
@@ -369,8 +377,9 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
+        download_and_scrape(download_only=True)
+    elif(args.action == 'download_and_scrape'):
         download_and_scrape()
-        
     else:
         raise NotImplementedError(f"action {args.action} not implemented")
 
