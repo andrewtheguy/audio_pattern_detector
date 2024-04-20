@@ -21,7 +21,7 @@ introclips={
     "happydaily":["happydailyfemaleintro.wav"],
     "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
-    "KnowledgeCo":["rthk1theme.wav","healthpedia_intro.wav"],
+    "KnowledgeCo":["rthk2theme.wav","knowledgecointro.wav"],
 }
 
 pairs={
@@ -284,6 +284,8 @@ def scrape(input_file):
             clips = introclips["healthpedia"]
         elif any(basename.startswith(prefix) for prefix in ["morningsuite"]):
             clips = introclips["morningsuite"]
+        elif any(basename.startswith(prefix) for prefix in ["KnowledgeCo"]):
+            clips = introclips["KnowledgeCo"]
         else:
             raise NotImplementedError(f"not supported {basename}")
         program_intro_peak_times=[]
@@ -382,7 +384,7 @@ def command():
     elif(args.action == 'download_and_scrape'):
         download_and_scrape()
     else:
-        raise NotImplementedError(f"action {args.action} not implemented")
+        raise ValueError(f"unknown action {args.action}")
 
 
     
