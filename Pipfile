@@ -14,6 +14,7 @@ pyloudnorm = "*"
 requests = "*"
 webdavclient3 = "*"
 webdav4 = "*"
+paramiko = "*"
 
 [dev-packages]
 
