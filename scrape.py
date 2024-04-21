@@ -13,6 +13,7 @@ import tempfile
 import traceback
 
 import ffmpeg
+import paramiko
 import pytz
 import requests
 from webdav4.client import Client
@@ -230,18 +231,26 @@ def concatenate_audio(input_files, output_file,tmpdir):
     )
 
 def upload_file(file,dest_path,skip_if_exists=False):
-    client = Client("http://10.22.33.20:9080", auth=("andrew", "qwertasdfg"))
-    
-    if(skip_if_exists and client.exists(dest_path)):
-        print(f"webdav: file {dest_path} already exists,skipping")
-        return
+    # create ssh client 
+    with paramiko.SSHClient() as ssh_client:
+        # remote server credentials
+        host = "10.22.33.20"
+        username = "andrew"
+        password = "qwertasdfg"
+        port = '2022'
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
 
-    dir=os.path.dirname(dest_path)
-    if not client.exists(dir):
-        client.mkdir(dir)
-    print(f"uploading {file} to {dest_path}")
-#    client.mkdir(dir)
-    client.upload_file(file,dest_path,overwrite=True)
+        # create an SFTP client object
+        with ssh_client.open_sftp() as sftp:
+            dir=os.path.dirname(dest_path)
+            sftp.mkdir(dir)
+            #if not client.exists(dir):
+            #    client.mkdir(dir)
+            #print(f"uploading {file} to {dest_path}")
+            attributes = sftp.put(file,dest_path)
+
+    #client.upload_file(file,dest_path,overwrite=True)
 
 def md5file(file):
     with open(file, "rb") as f:
@@ -418,9 +427,9 @@ def command():
     
 if __name__ == '__main__':
     #print(url_ok("https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/20240417.m4a/index_0_a.m3u8"))
-    #upload_file("./tmp/happydaily20240418.m4a.json","/test3/out.pcm",skip_if_exists=False)
+    upload_file("./tmp/out.pcm","/test3/out.pcm",skip_if_exists=False)
     #exit(1)
     #pair=[]
     #process(pair)
     #print(pair)
-    command()
+    #command()
