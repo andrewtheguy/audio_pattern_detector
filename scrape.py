@@ -21,7 +21,7 @@ from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_for
 from upload_utils import upload_file
 
 introclips={
-    "happydaily":["happydailyfemaleintro.wav"],
+    "happydaily":["happydailyfemaleintro.wav","happydailyfemale2.wav"],
     "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
     "KnowledgeCo":["rthk2theme.wav","knowledgecointro.wav"],
