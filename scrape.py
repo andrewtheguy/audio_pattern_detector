@@ -230,7 +230,8 @@ def concatenate_audio(input_files, output_file,tmpdir):
 
     basename,extension = os.path.splitext(os.path.basename(output_file))
 
-    album,title = extract_prefix(basename)
+    album,date_str = extract_prefix(basename)
+    title=basename
 
     # add artist, album and title metadata, can't think of better way than json dumps to escape
     # no need to oversolve it for now for quotes and equal signs
