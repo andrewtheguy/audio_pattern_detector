@@ -224,10 +224,23 @@ def concatenate_audio(input_files, output_file,tmpdir):
         for file_name in input_files:
             print(f"file {file_name}",file=f)
 
+    artist="rthk"
+    #title="tit'le"
+    #album='al"bum'
+
+    basename,extension = os.path.splitext(os.path.basename(output_file))
+
+    album,title = extract_prefix(basename)
+
+    # add artist, album and title metadata, can't think of better way than json dumps to escape
+    # no need to oversolve it for now for quotes and equal signs
+    metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
+    metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
+
     (
         ffmpeg
             .input(list_file, format='concat', safe=0)
-            .output(output_file, c='copy').overwrite_output().run()
+            .output(output_file, c='copy', **metadata_dict).overwrite_output().run()
     )
 
 
@@ -248,18 +261,9 @@ def get_sec_from_str(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
-# for testprefix20220414 it will return testprefix, and for testagain220220414 will return testagain2, not testagain
 def extract_prefix(text):
-  """Extracts the string before a date in YYYYMMDD format.
-
-  Args:
-    text: The input string.
-
-  Returns:
-    The extracted prefix, or None if no date is found.
-  """
-  match = re.match(r"(.*?)(?=\d{8})", text)
-  return match.group(1) if match else None
+  match = re.match(r"(.*\d{8,})", text)
+  return (match.group(1)[:-8],match.group(1)[-8:]) if match else (None,None)
 
 def scrape(input_file):
     
@@ -345,7 +349,7 @@ def scrape(input_file):
         concatenate_audio(splits, output_file,tmpdir)
         filename=os.path.basename(output_file)
         print(filename)
-        dirname = extract_prefix(filename)
+        dirname,date_str = extract_prefix(filename)
         print(dirname)
         dirname = '' if dirname is None else dirname
         path = f"/rthk/trimmed/{dirname}/{filename}"
