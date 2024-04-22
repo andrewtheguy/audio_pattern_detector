@@ -16,10 +16,9 @@ import ffmpeg
 import paramiko
 import pytz
 import requests
-from webdav4.client import Client
 
 from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
-from sftp_utils import create_remote_dir_recursively
+from upload_utils import upload_file
 
 introclips={
     "happydaily":["happydailyfemaleintro.wav"],
@@ -231,32 +230,6 @@ def concatenate_audio(input_files, output_file,tmpdir):
             .output(output_file, c='copy').overwrite_output().run()
     )
 
-def upload_file(file,dest_path,skip_if_exists=False):
-    # create ssh client 
-    with paramiko.SSHClient() as ssh_client:
-        # remote server credentials
-        host = "10.22.33.20"
-        username = "andrew"
-        password = "qwertasdfg"
-        port = '2022'
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
-
-        # create an SFTP client object
-        with ssh_client.open_sftp() as sftp:
-            if skip_if_exists:
-                try:
-                    sftp.stat(dest_path)
-                    print(f'file {dest_path} already exists,skipping')
-                    return
-                except IOError:
-                    print(f"file {dest_path} doesn't exist, uploading")
-                    #return
-            print(f"uploading {file} to {dest_path}")
-            create_remote_dir_recursively(sftp_client=sftp, remote_dir=os.path.dirname(dest_path))
-            sftp.put(file,dest_path)
-
-    #client.upload_file(file,dest_path,overwrite=True)
 
 def md5file(file):
     with open(file, "rb") as f:
@@ -434,10 +407,10 @@ def command():
 if __name__ == '__main__':
     #print(url_ok("https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/20240417.m4a/index_0_a.m3u8"))
     
-    upload_file("./tmp/out.pcm","/test4/nada/outchafa4.pcm",skip_if_exists=True)
+    #upload_file("./tmp/out.pcm","/test5/5.pcm",skip_if_exists=True)
     
     #exit(1)
     #pair=[]
     #process(pair)
     #print(pair)
-    #command()
+    command()

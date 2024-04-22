@@ -26,6 +26,7 @@
 
 import os
 import paramiko
+from webdav4.client import Client
 
 def create_remote_dir_recursively(sftp_client, remote_dir):
     """
@@ -50,3 +51,44 @@ def create_remote_dir_recursively(sftp_client, remote_dir):
             sftp_client.stat(current_dir)
         except IOError:
             sftp_client.mkdir(current_dir)
+
+
+def upload_file(file,dest_path,skip_if_exists=False):
+    # create ssh client 
+    with paramiko.SSHClient() as ssh_client:
+        # remote server credentials
+        host = "10.22.33.20"
+        username = "andrew"
+        password = "qwertasdfg"
+        port = '2022'
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
+
+        # create an SFTP client object
+        with ssh_client.open_sftp() as sftp:
+            if skip_if_exists:
+                try:
+                    sftp.stat(dest_path)
+                    print(f'file {dest_path} already exists,skipping')
+                    return
+                except IOError:
+                    print(f"file {dest_path} doesn't exist, uploading")
+                    #return
+            print(f"uploading {file} to {dest_path}")
+            create_remote_dir_recursively(sftp_client=sftp, remote_dir=os.path.dirname(dest_path))
+            sftp.put(file,dest_path)
+
+
+def upload_file_with_webdav(file,dest_path,skip_if_exists=False):
+    client = Client("http://10.22.33.20:9080", auth=("andrew", "qwertasdfg"))
+    
+    if(skip_if_exists and client.exists(dest_path)):
+        print(f"webdav: file {dest_path} already exists,skipping")
+        return
+
+    dir=os.path.dirname(dest_path)
+    if not client.exists(dir):
+        client.mkdir(dir)
+    print(f"uploading {file} to {dest_path}")
+#    client.mkdir(dir)
+    client.upload_file(file,dest_path,overwrite=True)
