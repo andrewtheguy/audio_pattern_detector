@@ -1,0 +1,2 @@
+class TimeSequenceError(ValueError):
+    pass

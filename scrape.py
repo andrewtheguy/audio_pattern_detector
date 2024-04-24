@@ -18,6 +18,7 @@ import pytz
 import requests
 
 from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
+from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 
 introclips={
@@ -69,10 +70,44 @@ def download(url,target_file):
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')    
 
+def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
+    #sanity check
+    if(len(result) == 0):
+        raise ValueError("result cannot be empty")
+    
+    for r in result:
+        if(len(r) != 2):
+            raise ValueError(f"each element in result must have 2 elements, got {r}")
+        cur_start_time = r[0]
+        cur_end_time = r[1]
+        if(cur_start_time > cur_end_time):
+            raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
+        # program should last at least 7 minutes between half an hour interval news reports
+        # TODO: still need to account for 1 hour interval news report at night time
+        if not skip_reasonable_time_sequence_check:
+            if(cur_end_time - cur_start_time < 7*60):
+                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} is less than 15 minutes")
+    
+    for i in range(1,len(result)):
+        cur = result[i]
+        cur_start_time = cur[0]
+        prev = result[i-1]
+        prev_end_time = prev[1]
+        gap = cur_start_time - prev_end_time
+        if(gap < 0):
+            raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
+        # news report and commercial time should not be 15 minutes or longer
+        elif(not skip_reasonable_time_sequence_check and gap >= 15*60):
+            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 15 minutes or longer")
+        
+    return result
+
 # total_time is needed to set end time
 # if it ends with intro instead of news report
 # did a count down and the beep intro for news report is about 6 seconds
-def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
+# skip_reasonable_time_sequence_check: skip sanity checks related to unreasonable duration or gaps, mainly for testing
+# otherwise will have to rewrite lots of tests if the parameters changed
+def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,skip_reasonable_time_sequence_check=False):
     pair = []
     # will bug out if not sorted
     #news_report = deque([40,90,300])
@@ -149,7 +184,13 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
     #print("after padding",pair)
 
     # remove start = end
-    result = list(filter(lambda x: (x[0] != x[1]), pair))  
+    result = list(filter(lambda x: (x[0] != x[1]), pair)) 
+
+    #required sanity check
+    if(len(result) == 0):
+        raise ValueError("result cannot be empty")
+    
+    timestamp_sanity_check(result,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check)
 
     return result
 

@@ -1,7 +1,9 @@
-from scrape import process_timestamps
+from scrape import process_timestamps, timestamp_sanity_check
 
 import unittest
 import numpy as np
+
+from time_sequence_error import TimeSequenceError
 
 def minutes_to_seconds(minutes):
     return minutes*60
@@ -13,7 +15,7 @@ def hours_to_seconds(hours):
 class TestProcessTimestamps(unittest.TestCase):
     
     def process(self,news_report,intro):
-        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=0)
+        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=0,skip_reasonable_time_sequence_check=True)
 
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
@@ -233,7 +235,7 @@ class TestProcessTimestamps(unittest.TestCase):
 class TestProcessTimestampsWithPadding(unittest.TestCase):
     
     def process(self,news_report,intro):
-        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad)
+        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad,skip_reasonable_time_sequence_check=True)
 
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
@@ -272,7 +274,65 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
                                         [minutes_to_seconds(11)+2,minutes_to_seconds(13)+self.news_report_second_pad],
                                         [minutes_to_seconds(15),self.total_time_1],
                                       ])
+
+
+class TestDurationAndGaps(unittest.TestCase):
+    
+    def check(self,result):
+        return timestamp_sanity_check(result,skip_reasonable_time_sequence_check=False)
+
+    def test_empty_array(self):
+        with self.assertRaises(ValueError):
+            result = self.check([])
+
+    def test_empty_2d(self):
+        with self.assertRaises(ValueError):
+            result = self.check([[]])
+
+    def test_valid(self):
+        try:
+            result = self.check([[1,minutes_to_seconds(18)]])
+        except Exception as e:  
+            self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
         
+    def test_1_value(self):
+        with self.assertRaises(ValueError):
+            result = self.check([[1]])
+
+    def test_3_values(self):
+        with self.assertRaises(ValueError):
+            result = self.check([[1,2,3]])
+
+    def test_valid(self):
+        try:
+            result = self.check([[1,minutes_to_seconds(18)]])
+        except Exception as e:  
+            self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
+
+    def test_too_short(self):
+        with self.assertRaises(TimeSequenceError):
+            result = self.check([[1,minutes_to_seconds(6)]])
+
+    def test_gap_normal(self):
+        try:
+            result = self.check([[1,minutes_to_seconds(20)],[minutes_to_seconds(25),minutes_to_seconds(50)]])
+        except TimeSequenceError as e:  
+            self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
+
+    def test_allow_continuous(self):
+        try:
+            result = self.check([[1,minutes_to_seconds(20)],[minutes_to_seconds(20),minutes_to_seconds(50)]])
+        except Exception as e:  
+            self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
+
+    def test_gap_too_large(self):
+        with self.assertRaises(TimeSequenceError):
+            result = self.check([[1,minutes_to_seconds(20)],[minutes_to_seconds(50),minutes_to_seconds(60)]])
+
+    def test_disallow_flip_over(self):
+        with self.assertRaises(ValueError):
+            result = self.check([[1,minutes_to_seconds(20)],[minutes_to_seconds(19),minutes_to_seconds(60)]])
+
 
 if __name__ == '__main__':
     unittest.main()
