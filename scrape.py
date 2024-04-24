@@ -22,7 +22,7 @@ from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 
 introclips={
-    "happydaily":["happydailyfemaleintro.wav","happydailyfemale2.wav"],
+    "happydaily":["rthk1theme.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
     "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
     "KnowledgeCo":["rthk2theme.wav","knowledgecointro.wav"],
