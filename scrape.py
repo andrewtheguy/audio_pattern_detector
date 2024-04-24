@@ -71,15 +71,14 @@ def download(url,target_file):
 
 # total_time is needed to set end time
 # if it ends with intro instead of news report
-def process(news_report,intro,total_time):
+# did a count down and the beep intro for news report is about 6 seconds
+def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
     pair = []
     # will bug out if not sorted
-    # will bug out if one not followed by another, i.e. intro followed by intro or news followed
-    # by news
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_report=deque(news_report)
-    intro=deque(intro)
+    news_report=deque(sorted(news_report))
+    intro=deque(sorted(intro))
 
     cur_intro = 0
 
@@ -129,8 +128,6 @@ def process(news_report,intro,total_time):
             print("cur_news_report",cur_news_report,"total_time",total_time)
             raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro")
     print("before padding",pair)
-    # did count down and the beeps are about 6 seconds
-    news_report_second_pad=6
     for i,arr in enumerate(pair):
         cur_intro = arr[0]
         cur_news_report = arr[1]
@@ -144,71 +141,6 @@ def process(news_report,intro,total_time):
     print("after padding",pair)
 
     return pair
-
-# #returns none if no need to trim
-# def process(news_report,intro):
-#     pair = []
-#     placehold_for_max = None
-#     # will bug out if one not followed by another, i.e. intro followed by intro or news followed
-#     # by news
-#     #news_report = deque([40,90,300])
-#     #intro =       deque([60,200,400])
-#     news_report=deque(news_report)
-#     intro=deque(intro)
-
-#     #news_report = deque([598, 2398, 3958, 5758])
-#     #intro = deque([1056, 2661, 4463])
-#     # no news report
-#     if(len(news_report)==0):
-#         raise NotImplementedError("not handling it yet")
-#         #return None
-    
-#     if(len(intro)==0): # has news report but no intro
-#         raise NotImplementedError("not handling it yet")
-#         #return
-    
-#     minimum = min(news_report[0], intro[0])
-
-
-#     # intro first, fake news report happening at the beginning
-#     if(intro[0] == minimum):
-#         if(news_report[0]>minimum):
-#             news_report.appendleft(0)
-    
-    
-#     if(len(news_report)>len(intro)): # news report at the end, pad intro
-#         intro.append(placehold_for_max)
-
-#     if len(news_report)!=len(intro):
-#         raise ValueError("not the same length")
-#     print(news_report)
-#     print(intro)
-#     min_len = min(len(news_report), len(intro))
-#     print(min_len)
-#     print('---')
-#     print(news_report)
-#     print(intro)
-#     print('---')
-    
-#     cur = 0
-#     for i in range(min_len):
-#         news_report_second_pad=4
-#         news_report_ts = news_report[i]
-#         #if(cur > 0):
-
-#         if(news_report_ts == intro[i] or cur == news_report_ts): # happening the same time, skipping
-#             cur = intro[i]
-#             continue
-
-#         # pad two seconds to news report
-#         next_intro = intro[i+1] if len(intro) > i+1 else None
-#         if next_intro and news_report_ts + news_report_second_pad <= next_intro:
-#             news_report_ts = news_report_ts + news_report_second_pad
-            
-#         pair.append([cur, news_report_ts]) 
-#         cur = intro[i]
-
-#     return pair
 
 def split_audio(input_file, output_file, start_time, end_time,total_time):
     #print( (str(datetime.timedelta(seconds=start_time)), str(datetime.timedelta(seconds=end_time))) )
@@ -319,7 +251,7 @@ def scrape(input_file):
         for offset in program_intro_peak_times:
             print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
         #    #print(f"Offset: {offset}s" )
-        pair = process(news_report_peak_times, program_intro_peak_times,total_time)
+        pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
         print("pair",pair)
         tsformatted = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
     else:
