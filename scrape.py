@@ -82,11 +82,11 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
         cur_end_time = r[1]
         if(cur_start_time > cur_end_time):
             raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
-        # program should last at least 15 minutes between half an hour interval news reports
-        # TODO: still need to account for 15 hour interval news report at night time
+        # program should last at least 7 minutes between half an hour interval news reports
+        # TODO: still need to account for 1 hour interval news report at night time
         if not skip_reasonable_time_sequence_check:
-            if(cur_end_time - cur_start_time < 15*60):
-                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than 15 minutes")
+            if(cur_end_time - cur_start_time < 7*60):
+                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than 7 minutes")
     
     for i in range(1,len(result)):
         cur = result[i]
