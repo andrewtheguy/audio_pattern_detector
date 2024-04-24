@@ -206,5 +206,24 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(19),self.total_time_1],
                                        ])
 
+
+    def test_out_of_order(self):
+        result = self.process(news_report=[minutes_to_seconds(20),minutes_to_seconds(9)]
+                                    ,intro=[minutes_to_seconds(10),minutes_to_seconds(3),minutes_to_seconds(27)])
+        np.testing.assert_array_equal(result,
+                                      [[minutes_to_seconds(3),minutes_to_seconds(9)],
+                                       [minutes_to_seconds(10),minutes_to_seconds(20)],
+                                       [minutes_to_seconds(27),self.total_time_1],
+                                       ])
+
+        result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(17)]
+                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),
+                                            minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])
+        np.testing.assert_array_equal(result,
+                                      [[minutes_to_seconds(2),minutes_to_seconds(9)],
+                                       [minutes_to_seconds(11),minutes_to_seconds(17)],
+                                       [minutes_to_seconds(19),self.total_time_1],
+                                       ])
+
 if __name__ == '__main__':
     unittest.main()
