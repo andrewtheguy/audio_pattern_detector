@@ -206,6 +206,10 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(19),self.total_time_1],
                                        ])
 
+    def test_middle_same(self):
+        with self.assertRaises(NotImplementedError):
+            result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
+                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
     def test_out_of_order(self):
         result = self.process(news_report=[minutes_to_seconds(20),minutes_to_seconds(9)]
@@ -224,6 +228,51 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(11),minutes_to_seconds(17)],
                                        [minutes_to_seconds(19),self.total_time_1],
                                        ])
+
+
+class TestProcessTimestampsWithPadding(unittest.TestCase):
+    
+    def process(self,news_report,intro):
+        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad)
+
+    def setUp(self):
+        self.total_time_1=minutes_to_seconds(120)
+        self.news_report_second_pad=10
+
+    def test_zero_everything(self):
+        result = self.process(news_report=[],intro=[])
+        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+
+    def test_zero_news_report(self):
+        result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(11)])
+        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(9)])
+        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(12)])
+        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+
+    def test_no_overlap(self):
+        result = self.process(news_report=[minutes_to_seconds(11)]
+                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(13)])
+        np.testing.assert_array_equal(result,
+                                      [[minutes_to_seconds(8),minutes_to_seconds(11)+self.news_report_second_pad],
+                                        [minutes_to_seconds(13),self.total_time_1],
+                                      ])
+        
+    def test_middle_same(self):
+        with self.assertRaises(NotImplementedError):
+            result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
+                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
+
+    def test_overlap(self):
+        result = self.process(news_report=[minutes_to_seconds(11),minutes_to_seconds(13)]
+                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(11)+2,minutes_to_seconds(15)])
+        np.testing.assert_array_equal(result,
+                                      [[minutes_to_seconds(8),minutes_to_seconds(11)],
+                                        [minutes_to_seconds(11)+2,minutes_to_seconds(13)+self.news_report_second_pad],
+                                        [minutes_to_seconds(15),self.total_time_1],
+                                      ])
+        
 
 if __name__ == '__main__':
     unittest.main()

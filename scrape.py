@@ -133,9 +133,9 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
         # prevent missing something in the middle     
         # unlkely to happen if news report is 10 seconds from the end w/o intro
         if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
-            print("cur_news_report",cur_news_report,"total_time",total_time)
+            #print("cur_news_report",cur_news_report,"total_time",total_time)
             raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro")
-    print("before padding",pair)
+    #print("before padding",pair)
     for i,arr in enumerate(pair):
         cur_intro = arr[0]
         cur_news_report = arr[1]
@@ -144,9 +144,9 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
         else:
             next_intro = pair[i+1][0]
         # pad news_report_second_pad seconds to news report
-        if(next_intro is None or cur_news_report + news_report_second_pad <= next_intro):
+        if((next_intro is None or cur_news_report + news_report_second_pad <= next_intro) and cur_news_report < total_time):
             arr[1] = cur_news_report + news_report_second_pad
-    print("after padding",pair)
+    #print("after padding",pair)
 
     # remove start = end
     result = list(filter(lambda x: (x[0] != x[1]), pair))  
