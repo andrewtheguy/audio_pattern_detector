@@ -22,7 +22,7 @@ from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 
 introclips={
-    "happydaily":["rthk1theme.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
+    "happydaily":["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
     "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
     "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
     "KnowledgeCo":["rthk2theme.wav","knowledgecointro.wav"],
@@ -71,7 +71,7 @@ def download(url,target_file):
     print(f'downloaded to {target_file}')    
 
 def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
-    #sanity check
+    print(result)
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
     
@@ -82,11 +82,11 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
         cur_end_time = r[1]
         if(cur_start_time > cur_end_time):
             raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
-        # program should last at least 7 minutes between half an hour interval news reports
-        # TODO: still need to account for 1 hour interval news report at night time
+        # program should last at least 15 minutes between half an hour interval news reports
+        # TODO: still need to account for 15 hour interval news report at night time
         if not skip_reasonable_time_sequence_check:
-            if(cur_end_time - cur_start_time < 7*60):
-                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} is less than 15 minutes")
+            if(cur_end_time - cur_start_time < 15*60):
+                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than 15 minutes")
     
     for i in range(1,len(result)):
         cur = result[i]
@@ -169,7 +169,7 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
         # unlkely to happen if news report is 10 seconds from the end w/o intro
         if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
             #print("cur_news_report",cur_news_report,"total_time",total_time)
-            raise NotImplementedError("not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro")
+            raise NotImplementedError(f"not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro, cur_news_report {cur_news_report}")
     #print("before padding",pair)
     for i,arr in enumerate(pair):
         cur_intro = arr[0]
@@ -178,8 +178,8 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
             next_intro = None
         else:
             next_intro = pair[i+1][0]
-        # pad news_report_second_pad seconds to news report
-        if((next_intro is None or cur_news_report + news_report_second_pad <= next_intro) and cur_news_report < total_time):
+        # pad news_report_second_pad seconds to news report if it is larger then news_report_second_pad
+        if((next_intro is None or (cur_news_report + news_report_second_pad <= next_intro and cur_news_report>news_report_second_pad)) and cur_news_report < total_time):
             arr[1] = cur_news_report + news_report_second_pad
     #print("after padding",pair)
 
