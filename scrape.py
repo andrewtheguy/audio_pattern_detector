@@ -17,7 +17,7 @@ import paramiko
 import pytz
 import requests
 
-from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks
+from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks
 from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 
@@ -109,6 +109,14 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
 # otherwise will have to rewrite lots of tests if the parameters changed
 def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,skip_reasonable_time_sequence_check=False):
     pair = []
+
+    if len(news_report) != len(set(news_report)):
+       raise ValueError("news report has duplicates, clean up duplicates first")   
+
+    if len(intro) != len(set(intro)):
+       raise ValueError("intro has duplicates, clean up duplicates first")   
+
+
     # will bug out if not sorted
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
@@ -169,7 +177,7 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
         # unlkely to happen if news report is 10 seconds from the end w/o intro
         if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
             #print("cur_news_report",cur_news_report,"total_time",total_time)
-            raise NotImplementedError(f"not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro, cur_news_report {cur_news_report}")
+            raise NotImplementedError(f"not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro, cur_news_report {cur_news_report}, cur_intro: {cur_intro}")
     #print("before padding",pair)
     for i,arr in enumerate(pair):
         cur_intro = arr[0]
@@ -292,9 +300,11 @@ def scrape(input_file):
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation",cleanup=False)
             print("intros",[str(datetime.timedelta(seconds=t)) for t in intros],"---")
             program_intro_peak_times.extend(intros)
-        program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
+        #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
+        # deduplicate
+        program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
         print(program_intro_peak_times)
-        #print("program_intro_peak_times",[str(datetime.timedelta(seconds=t)) for t in program_intro_peak_times],"---")
+        print("program_intro_peak_times",[str(datetime.timedelta(seconds=t)) for t in program_intro_peak_times],"---")
 
         for offset in news_report_peak_times:
             print(f"Clip news_report_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
