@@ -275,6 +275,34 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
                                         [minutes_to_seconds(15),self.total_time_1],
                                       ])
 
+    def test_news_report_beginning(self):
+        result = self.process(news_report=[minutes_to_seconds(0),minutes_to_seconds(13)]
+                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(15)])
+        np.testing.assert_array_equal(result,
+                                      [[minutes_to_seconds(8),minutes_to_seconds(13)+self.news_report_second_pad],
+                                        [minutes_to_seconds(15),self.total_time_1],
+                                      ])
+        
+    def test_news_report_beginning_same_as_padding(self):
+        result = self.process(news_report=[self.news_report_second_pad,minutes_to_seconds(30)]
+                                    ,intro=[minutes_to_seconds(20),minutes_to_seconds(40)])
+        np.testing.assert_array_equal(result,
+                                      [
+                                          [minutes_to_seconds(0),self.news_report_second_pad],
+                                          [minutes_to_seconds(20),minutes_to_seconds(30)+self.news_report_second_pad],
+                                        [minutes_to_seconds(40),self.total_time_1],
+                                      ])
+        
+    def test_intro_earlier(self):
+        result = self.process(news_report=[self.news_report_second_pad,minutes_to_seconds(30)]
+                                    ,intro=[self.news_report_second_pad-2,minutes_to_seconds(20),minutes_to_seconds(40)])
+        np.testing.assert_array_equal(result,
+                                      [
+                                          [self.news_report_second_pad-2,self.news_report_second_pad],
+                                          [minutes_to_seconds(20),minutes_to_seconds(30)+self.news_report_second_pad],
+                                        [minutes_to_seconds(40),self.total_time_1],
+                                      ])
+
 
 class TestDurationAndGaps(unittest.TestCase):
     
