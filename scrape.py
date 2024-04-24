@@ -96,9 +96,9 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
         gap = cur_start_time - prev_end_time
         if(gap < 0):
             raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
-        # news report and commercial time should not be 15 minutes or longer
-        elif(not skip_reasonable_time_sequence_check and gap >= 15*60):
-            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 15 minutes or longer")
+        # news report and commercial time should not be 10 minutes or longer
+        elif(not skip_reasonable_time_sequence_check and gap >= 10*60):
+            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 10 minutes or longer")
         
     return result
 
