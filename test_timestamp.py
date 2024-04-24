@@ -213,6 +213,20 @@ class TestProcessTimestamps(unittest.TestCase):
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
+    def test_duplicates(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(17),minutes_to_seconds(17)]
+                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),
+                                                minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])
+        the_exception = cm.exception
+        self.assertIn("news report has duplicates",str(the_exception))
+        with self.assertRaises(ValueError) as cm:
+            result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(17)]
+                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),
+                                                minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])
+        the_exception = cm.exception
+        self.assertIn("intro has duplicates",str(the_exception))
+
     def test_out_of_order(self):
         result = self.process(news_report=[minutes_to_seconds(20),minutes_to_seconds(9)]
                                     ,intro=[minutes_to_seconds(10),minutes_to_seconds(3),minutes_to_seconds(27)])

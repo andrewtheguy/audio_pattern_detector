@@ -28,6 +28,11 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 use ffmpeg steaming, which supports more format for streaming
 '''
 
+
+news_report_black_list_ts = {
+    "morningsuite20240424":[5342],
+}
+
 target_sample_rate = 8000
 
 def load_audio_file(file_path, sr=None):
@@ -298,6 +303,7 @@ def cleanup_peak_times(peak_times):
 
     print('before consolidate',peak_times)
 
+    # deduplicate
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
     peak_times_clean2 = deque(sorted(peak_times_clean))
@@ -360,7 +366,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
     #clip = clip / 3
 
-    sf.write(f"./tmp/clip.wav", clip, target_sample_rate)
+    #sf.write(f"./tmp/clip.wav", clip, target_sample_rate)
 
 
     # Initialize parameters
@@ -437,10 +443,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         i = i + 1
 
     process.wait()
-    total_time = audio_size / target_sample_rate
-    if cleanup:
-        peak_times_clean = cleanup_peak_times(all_peak_times)
-        return peak_times_clean
-    else:
-        return all_peak_times
-
+    audio_name,_ = os.path.splitext(os.path.basename(full_audio_path))
+    peak_times_clean = cleanup_peak_times(all_peak_times)
+    exclude_ts = news_report_black_list_ts.get(audio_name,None)
+    if exclude_ts:
+        peak_times_clean = [time for time in peak_times_clean if time not in exclude_ts]
+    return peak_times_clean
