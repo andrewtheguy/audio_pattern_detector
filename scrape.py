@@ -80,6 +80,10 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
     news_report=deque(sorted(news_report))
     intro=deque(sorted(intro))
 
+    for i in intro:
+        if i > total_time:
+            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+
     cur_intro = 0
 
     #news_report = deque([598, 2398, 3958, 5758])
@@ -97,7 +101,9 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
     # the program has already started before 10 minutes
     if(len(intro) > 0 and intro[0] <= 10*60 and intro[0] < news_report[0]):
         cur_intro = intro.popleft()
-    
+    if(cur_intro > total_time):
+        raise ValueError("intro overflow, is greater than total time {total_time}")
+
     pair=[]
 
     news_report_followed_by_intro = True
@@ -106,6 +112,8 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
            raise ValueError("cannot have news report followed by news report")
         news_report_followed_by_intro=False
         cur_news_report = news_report.popleft()
+        if(cur_intro > total_time):
+            raise ValueError("intro overflow, is greater than total time {total_time}")
         pair.append([cur_intro, cur_news_report])
         # get first intro after news report
         while(len(intro)>0):
@@ -140,7 +148,10 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6):
             arr[1] = cur_news_report + news_report_second_pad
     print("after padding",pair)
 
-    return pair
+    # remove start = end
+    result = list(filter(lambda x: (x[0] != x[1]), pair))  
+
+    return result
 
 def split_audio(input_file, output_file, start_time, end_time,total_time):
     #print( (str(datetime.timedelta(seconds=start_time)), str(datetime.timedelta(seconds=end_time))) )
