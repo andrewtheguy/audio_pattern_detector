@@ -375,7 +375,9 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
     seconds_per_chunk = 60
     sliding_window = 5
     
-    clip_seconds = int(len(clip)/target_sample_rate)
+    clips_length_milis=len(clip)/target_sample_rate
+
+    clip_seconds = int(clips_length_milis)
     
     if(sliding_window<clip_seconds+5):
         # need to extend the sliding window to overlap the clip
@@ -424,7 +426,8 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
             if unwind_clip_ts:
                 peak_times_from_beginning_new=[]
                 for time in peak_times_from_beginning:
-                    new_time = time - clip_seconds
+                    new_time = time - clips_length_milis
+                    #print(new_time)
                     if new_time >= 0:
                         peak_times_from_beginning_new.append(new_time)
                     else:
