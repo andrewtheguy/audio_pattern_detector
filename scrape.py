@@ -79,10 +79,16 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
     for r in result:
         if(len(r) != 2):
             raise ValueError(f"each element in result must have 2 elements, got {r}")
+        
         cur_start_time = r[0]
         cur_end_time = r[1]
+
+        if(cur_start_time < 0):
+            raise ValueError(f"start time {cur_start_time} is less than 0")
+        
         if(cur_start_time > cur_end_time):
             raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
+        
         # program should last at least 5 minutes between half an hour interval news reports
         # TODO: still need to account for 1 hour interval news report at night time
         if not skip_reasonable_time_sequence_check:

@@ -353,7 +353,7 @@ class TestDurationAndGaps(unittest.TestCase):
 
     def test_too_short(self):
         with self.assertRaises(TimeSequenceError):
-            result = self.check([[1,minutes_to_seconds(6)]])
+            result = self.check([[1,minutes_to_seconds(1)]])
 
     def test_gap_normal(self):
         try:
@@ -375,6 +375,13 @@ class TestDurationAndGaps(unittest.TestCase):
         with self.assertRaises(ValueError):
             result = self.check([[1,minutes_to_seconds(20)],[minutes_to_seconds(19),minutes_to_seconds(60)]])
 
+    def test_disallow_negative(self):
+        with self.assertRaises(ValueError):
+            result = self.check([[-1,minutes_to_seconds(20)],[minutes_to_seconds(25),minutes_to_seconds(50)]])
+
+    def test_disallow_overlap(self):
+        with self.assertRaises(ValueError):
+            result = self.check([[1,minutes_to_seconds(20)],[minutes_to_seconds(19),minutes_to_seconds(50)]])
 
 if __name__ == '__main__':
     unittest.main()

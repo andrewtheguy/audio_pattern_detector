@@ -49,23 +49,6 @@ def load_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
-def reduce_noise_spectral_subtraction(data, window_size=2048, overlap=0.5):
-  """
-  Reduces noise using spectral subtraction.
-  """
-  # Calculate STFT
-  f, t, Zxx = stft(data, window='hann', nperseg=window_size, noverlap=int(window_size * overlap))
-
-  # Estimate noise floor
-  noise_floor = np.mean(np.abs(Zxx), axis=1, keepdims=True)
-
-  # Subtract noise floor from magnitude spectrum
-  Zxx_denoised = np.abs(Zxx) - noise_floor
-  Zxx_denoised = np.clip(Zxx_denoised, a_min=0, a_max=None)
-
-  # Reconstruct audio from denoised STFT
-  _, data_denoised = istft(Zxx_denoised * np.exp(1j * np.angle(Zxx)), window='hann', nperseg=window_size, noverlap=int(window_size * overlap))
-  return data_denoised
 
 # sample rate needs to be the same for both or bugs will happen
 def chroma_method(clip,audio,sr):
@@ -167,15 +150,15 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     #print(len(correlation))
     #print(len(audio))
     
-    os.makedirs("./tmp/graph", exist_ok=True)
-    #Optional: plot the correlation graph to visualize
-    plt.figure(figsize=(10, 4))
-    plt.plot(correlation)
-    plt.title('Cross-correlation between the audio clip and full track')
-    plt.xlabel('Lag')
-    plt.ylabel('Correlation coefficient')
-    plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{utils.second_to_time(seconds=index*seconds_per_chunk)}.png')
-    plt.close()
+    # os.makedirs("./tmp/graph", exist_ok=True)
+    # #Optional: plot the correlation graph to visualize
+    # plt.figure(figsize=(10, 4))
+    # plt.plot(correlation)
+    # plt.title('Cross-correlation between the audio clip and full track')
+    # plt.xlabel('Lag')
+    # plt.ylabel('Correlation coefficient')
+    # plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{utils.second_to_time(seconds=index*seconds_per_chunk)}.png')
+    # plt.close()
 
 
     peak_max = np.max(correlation)
@@ -350,7 +333,7 @@ def convert_audio_to_clip_format(audio_path, output_path):
 
     sf.write(output_path,clip, target_sample_rate)
 
-def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",cleanup=True):
+def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",unwind_clip=True):
 
     # Load the audio clip
     clip = load_audio_file(clip_path,sr=target_sample_rate)
