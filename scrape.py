@@ -203,12 +203,14 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
 
     return result
 
-def split_audio(input_file, output_file, start_time, end_time,total_time):
-    #print( (utils.second_to_time(seconds=start_time)), utils.second_to_time(seconds=end_time))) )
-    #return
+def split_audio(input_file, output_file, start_time, end_time,total_time,artist,album,title):
+
+    metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
+    metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
+
     (
     ffmpeg.input(input_file, ss=utils.second_to_time(seconds=start_time), to=utils.second_to_time(seconds=end_time))
-            .output(output_file,acodec='copy',vcodec='copy').overwrite_output().run()
+            .output(output_file,acodec='copy',vcodec='copy', loglevel="error", **metadata_dict).overwrite_output().run()
     )
 
 def concatenate_audio(input_files, output_file,tmpdir):
@@ -218,23 +220,20 @@ def concatenate_audio(input_files, output_file,tmpdir):
             print(f"file {file_name}",file=f)
 
     artist="rthk"
-    #title="tit'le"
-    #album='al"bum'
 
     basename,extension = os.path.splitext(os.path.basename(output_file))
 
     album,date_str = extract_prefix(basename)
     title=basename
 
-    # add artist, album and title metadata, can't think of better way than json dumps to escape
-    # no need to oversolve it for now for quotes and equal signs
+    # add artist, album and title metadata
     metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
     metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
 
     (
         ffmpeg
             .input(list_file, format='concat', safe=0)
-            .output(output_file, c='copy', **metadata_dict).overwrite_output().run()
+            .output(output_file, c='copy', loglevel="error", **metadata_dict).overwrite_output().run()
     )
 
 
@@ -315,12 +314,12 @@ def scrape(input_file):
             print(f"Clip program_intro_peak_times at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
         #    #print(f"Offset: {offset}s" )
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
-        print("pair",pair)
+        #print("pair",pair)
         tsformatted = [[utils.second_to_time(seconds=t) for t in sublist] for sublist in pair]
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
-    print(pair)
-    print(tsformatted)
+    #print(pair)
+    print("tsformatted",tsformatted)
     with open(jsonfile,'w') as f:
         f.write(json.dumps(tsformatted, indent=4))
     splits=[]
@@ -335,27 +334,30 @@ def scrape(input_file):
     os.makedirs(output_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        filename=os.path.basename(output_file)
+        dirname,date_str = extract_prefix(filename)
+        dirname = '' if dirname is None else dirname
         for i,p in enumerate(pair):
             start_time = p[0]
             end_time = p[1]
-            file_segment = os.path.join(tmpdir,f"{i+1}{extension}")
-            split_audio(input_file, file_segment, start_time, end_time, total_time)
+            path1=utils.second_to_time(seconds=start_time).replace(':','_')
+            path2=utils.second_to_time(seconds=end_time).replace(':','_')
+            title=f"{path1}-{path2}"
+            filename=f"{title}{extension}"
+            file_segment = os.path.join(tmpdir,filename)
+            split_audio(input_file, file_segment, start_time, end_time, total_time,artist=dirname,album=date_str,title=title)
             splits.append({"file_path": file_segment,
                            "start_time": start_time,
                            "end_time": end_time,})
         concatenate_audio([item["file_path"] for item in splits], output_file,tmpdir)
-        filename=os.path.basename(output_file)
-        dirname,date_str = extract_prefix(filename)
-        dirname = '' if dirname is None else dirname
         path_trimmed = f"/rthk/trimmed/{dirname}/{filename}"
         upload_file(output_file,path_trimmed,skip_if_exists=True)
         # upload segments
         for item in splits:
             dirname_segment = f"/rthk/segments/{dirname}/{date_str}"
-            path1=utils.second_to_time(seconds=item['start_time']).replace(':','_')
-            path2=utils.second_to_time(seconds=item['end_time']).replace(':','_')
-            filename=f"{dirname_segment}/{path1}-{path2}{extension}"
-            upload_file(item["file_path"],filename,skip_if_exists=True)
+            filename=os.path.basename(item["file_path"])
+            upload_path=f"{dirname_segment}/{filename}"
+            upload_file(item["file_path"],upload_path,skip_if_exists=True)
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
