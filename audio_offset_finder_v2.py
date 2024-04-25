@@ -285,13 +285,13 @@ def cleanup_peak_times(peak_times):
 
     #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
 
-    print('before consolidate',peak_times)
+    #print('before consolidate',peak_times)
 
     # deduplicate
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
     peak_times_clean2 = deque(sorted(peak_times_clean))
-    print('before remove close',peak_times_clean2)
+    #print('before remove close',peak_times_clean2)
 
     peak_times_final = []
 
@@ -333,7 +333,10 @@ def convert_audio_to_clip_format(audio_path, output_path):
 
     sf.write(output_path,clip, target_sample_rate)
 
-def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation",unwind_clip=True):
+# unwind_clip_ts for starting timestamps like intro
+# could cause issues with small overlap when intro is followed right by news report
+def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
+    unwind_clip_ts = True
 
     # Load the audio clip
     clip = load_audio_file(clip_path,sr=target_sample_rate)
@@ -418,6 +421,15 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
                                                 seconds_per_chunk=seconds_per_chunk, method=method)
         if len(peak_times):
             peak_times_from_beginning = [time + (i*seconds_per_chunk) for time in peak_times]
+            if unwind_clip_ts:
+                peak_times_from_beginning_new=[]
+                for time in peak_times_from_beginning:
+                    new_time = time - clip_seconds
+                    if new_time >= 0:
+                        peak_times_from_beginning_new.append(new_time)
+                    else:
+                        peak_times_from_beginning_new.append(time)
+                peak_times_from_beginning = peak_times_from_beginning_new
             #print(f"Found occurrences at: {peak_times} seconds, chunk {i}")
             all_peak_times.extend(peak_times_from_beginning)
             #all_correlation.extend(correlation)
