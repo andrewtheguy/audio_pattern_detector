@@ -83,11 +83,11 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
         cur_end_time = r[1]
         if(cur_start_time > cur_end_time):
             raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
-        # program should last at least 7 minutes between half an hour interval news reports
+        # program should last at least 5 minutes between half an hour interval news reports
         # TODO: still need to account for 1 hour interval news report at night time
         if not skip_reasonable_time_sequence_check:
-            if(cur_end_time - cur_start_time < 7*60):
-                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than 7 minutes")
+            if(cur_end_time - cur_start_time < 5*60):
+                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than 5 minutes")
     
     for i in range(1,len(result)):
         cur = result[i]
@@ -365,8 +365,8 @@ def is_time_after(current_time,hour):
 
 def download_and_scrape(download_only=False):
     
-    date = datetime.datetime.now(pytz.timezone('America/Los_Angeles'))
-    #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
+    #date = datetime.datetime.now(pytz.timezone('America/Los_Angeles'))
+    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
     date_str=date.strftime("%Y%m%d")
     for key, urltemplate in pairs.items():
         url = urltemplate.format(date=date_str)
