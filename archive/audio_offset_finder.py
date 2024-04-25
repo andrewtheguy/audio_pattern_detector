@@ -78,11 +78,11 @@ def main():
     print(f"ts1: {matched_time_stamps}" )
     
     #offset = find_offset(args.audio_file, args.pattern_file, args.window)
-    #print(f"ts2: {str(datetime.timedelta(seconds=offset))}" )
+    #print(f"ts2: {utils.second_to_time(seconds=offset))}" )
     
     #offsets = find_offset(args.audio_file, args.pattern_file, args.window)
     #for offset in offsets:
-    #    print(f"ts: {str(datetime.timedelta(seconds=offset))}" )
+    #    print(f"ts: {utils.second_to_time(seconds=offset))}" )
     #    #print(f"Offset: {offset}s" )
     
 

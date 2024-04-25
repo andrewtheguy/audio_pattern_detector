@@ -29,7 +29,7 @@ def main():
     print(peak_times)
 
     for offset in peak_times:
-        print(f"Clip occurs at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
+        print(f"Clip occurs at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
     #    #print(f"Offset: {offset}s" )
     
 

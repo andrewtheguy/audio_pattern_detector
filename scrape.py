@@ -20,6 +20,7 @@ import requests
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks
 from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
+import utils
 
 introclips={
     "happydaily":["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
@@ -203,10 +204,10 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
     return result
 
 def split_audio(input_file, output_file, start_time, end_time,total_time):
-    #print( (str(datetime.timedelta(seconds=start_time)), str(datetime.timedelta(seconds=end_time))) )
+    #print( (utils.second_to_time(seconds=start_time)), utils.second_to_time(seconds=end_time))) )
     #return
     (
-    ffmpeg.input(input_file, ss=str(datetime.timedelta(seconds=start_time)), to=str(datetime.timedelta(seconds=end_time)))
+    ffmpeg.input(input_file, ss=utils.second_to_time(seconds=start_time), to=utils.second_to_time(seconds=end_time))
             .output(output_file,acodec='copy',vcodec='copy').overwrite_output().run()
     )
 
@@ -298,24 +299,24 @@ def scrape(input_file):
         for c in clips:
             print(f"Finding {c}")
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation",cleanup=False)
-            print("intros",[str(datetime.timedelta(seconds=t)) for t in intros],"---")
+            print("intros",[utils.second_to_time(seconds=t) for t in intros],"---")
             program_intro_peak_times.extend(intros)
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         # deduplicate
         program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
         print(program_intro_peak_times)
-        print("program_intro_peak_times",[str(datetime.timedelta(seconds=t)) for t in program_intro_peak_times],"---")
+        print("program_intro_peak_times",[utils.second_to_time(seconds=t) for t in program_intro_peak_times],"---")
 
         for offset in news_report_peak_times:
-            print(f"Clip news_report_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
+            print(f"Clip news_report_peak_times at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
         #    print(f"Offset: {offset}s" )
         
         for offset in program_intro_peak_times:
-            print(f"Clip program_intro_peak_times at the following times (in seconds): {str(datetime.timedelta(seconds=offset))}" )
+            print(f"Clip program_intro_peak_times at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
         #    #print(f"Offset: {offset}s" )
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
         print("pair",pair)
-        tsformatted = [[str(datetime.timedelta(seconds=t)) for t in sublist] for sublist in pair]
+        tsformatted = [[utils.second_to_time(seconds=t) for t in sublist] for sublist in pair]
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     print(pair)
@@ -351,8 +352,8 @@ def scrape(input_file):
         # upload segments
         for item in splits:
             dirname_segment = f"/rthk/segments/{dirname}/{date_str}"
-            path1=str(datetime.timedelta(seconds=item['start_time'])).replace(':','_')
-            path2=str(datetime.timedelta(seconds=item['end_time'])).replace(':','_')
+            path1=utils.second_to_time(seconds=item['start_time']).replace(':','_')
+            path2=utils.second_to_time(seconds=item['end_time']).replace(':','_')
             filename=f"{dirname_segment}/{path1}-{path2}{extension}"
             upload_file(item["file_path"],filename,skip_if_exists=True)
 
