@@ -96,9 +96,9 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
         gap = cur_start_time - prev_end_time
         if(gap < 0):
             raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
-        # news report and commercial time should not be 10 minutes or longer
-        elif(not skip_reasonable_time_sequence_check and gap >= 10*60):
-            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 10 minutes or longer")
+        # news report and commercial time should not be 15 minutes or longer
+        elif(not skip_reasonable_time_sequence_check and gap >= 15*60):
+            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 15 minutes or longer")
         
     return result
 
@@ -334,21 +334,27 @@ def scrape(input_file):
     os.makedirs(output_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-    #path = os.path.join(tmp, 'something')
         for i,p in enumerate(pair):
-            file_segment = os.path.join(tmpdir,f"{i+1}{extension}")
             start_time = p[0]
             end_time = p[1]
+            file_segment = os.path.join(tmpdir,f"{i+1}{extension}")
             split_audio(input_file, file_segment, start_time, end_time, total_time)
-            splits.append(file_segment)
-        concatenate_audio(splits, output_file,tmpdir)
+            splits.append({"file_path": file_segment,
+                           "start_time": start_time,
+                           "end_time": end_time,})
+        concatenate_audio([item["file_path"] for item in splits], output_file,tmpdir)
         filename=os.path.basename(output_file)
-        print(filename)
         dirname,date_str = extract_prefix(filename)
-        print(dirname)
         dirname = '' if dirname is None else dirname
-        path = f"/rthk/trimmed/{dirname}/{filename}"
-        upload_file(output_file,path,skip_if_exists=True)
+        path_trimmed = f"/rthk/trimmed/{dirname}/{filename}"
+        upload_file(output_file,path_trimmed,skip_if_exists=True)
+        # upload segments
+        for item in splits:
+            dirname_segment = f"/rthk/segments/{dirname}/{date_str}"
+            path1=str(datetime.timedelta(seconds=item['start_time'])).replace(':','_')
+            path2=str(datetime.timedelta(seconds=item['end_time'])).replace(':','_')
+            filename=f"{dirname_segment}/{path1}-{path2}{extension}"
+            upload_file(item["file_path"],filename,skip_if_exists=True)
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
@@ -356,8 +362,8 @@ def is_time_after(current_time,hour):
 
 def download_and_scrape(download_only=False):
     
-    #date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')).strftime("%Y%m%d")
-    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
+    date = datetime.datetime.now(pytz.timezone('America/Los_Angeles'))
+    #date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
     date_str=date.strftime("%Y%m%d")
     for key, urltemplate in pairs.items():
         url = urltemplate.format(date=date_str)
