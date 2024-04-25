@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import string
+import subprocess
 import tempfile
 import traceback
 
@@ -222,7 +223,8 @@ def split_audio(input_file, output_file, start_time, end_time,total_time,artist,
 def concatenate_audio(input_files, output_file,tmpdir):
     list_file = os.path.join(tmpdir, 'list.txt')
     with open(list_file,'w') as f:
-        for file_name in input_files:
+        for item in input_files:
+            file_name = item["file_path"]
             print(f"file {file_name}",file=f)
 
     artist="rthk"
@@ -233,14 +235,47 @@ def concatenate_audio(input_files, output_file,tmpdir):
     title=basename
 
     # add artist, album and title metadata
-    metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
-    metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
+    #metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
+    #metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
+    text = f"""
+;FFMETADATA1
+artist={artist}
+album={album}
+title={title}
+"""
+    start_time = 0
+    for i in range(len(input_files)):
+        duration = input_files[i]["end_time"]-input_files[i]["start_time"]
+        end_time=start_time+duration
+        path1=utils.second_to_time(seconds=start_time).replace(':','_')
+        path2=utils.second_to_time(seconds=end_time).replace(':','_')
+        title=f"{path1}-{path2}"
+        text += f"""
+;FFMETADATA1
+[CHAPTER]
+TIMEBASE=1/1
+START={start_time}
+END={end_time}
+title={title}
+"""
+        start_time = end_time
 
-    (
-        ffmpeg
-            .input(list_file, format='concat', safe=0)
-            .output(output_file, c='copy', loglevel="error", **metadata_dict).overwrite_output().run()
-    )
+    ffmetadatafile = os.path.join(tmpdir, 'ffmetadatafile.txt')
+    with open(ffmetadatafile, "w") as myfile:
+        myfile.write(text)
+
+    subprocess.run([
+        'ffmpeg', 
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', list_file,
+        '-f', 'ffmetadata',
+        '-i', ffmetadatafile,
+        '-map_metadata', '1',
+        '-codec', 'copy',
+        '-y',
+        output_file
+    ])
 
 
 def md5file(file):
@@ -355,7 +390,7 @@ def scrape(input_file):
             splits.append({"file_path": file_segment,
                            "start_time": start_time,
                            "end_time": end_time,})
-        concatenate_audio([item["file_path"] for item in splits], output_file,tmpdir)
+        concatenate_audio(splits, output_file,tmpdir)
         path_trimmed = f"/rthk/trimmed/{dirname}/{filename}"
         upload_file(output_file,path_trimmed,skip_if_exists=True)
         # upload segments
