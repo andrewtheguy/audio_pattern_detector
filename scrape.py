@@ -303,7 +303,7 @@ def scrape(input_file):
         program_intro_peak_times=[]
         for c in clips:
             print(f"Finding {c}")
-            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation",cleanup=False)
+            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation")
             print("intros",[utils.second_to_time(seconds=t) for t in intros],"---")
             program_intro_peak_times.extend(intros)
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
