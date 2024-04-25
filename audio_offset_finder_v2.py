@@ -426,8 +426,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
             if unwind_clip_ts:
                 peak_times_from_beginning_new=[]
                 for time in peak_times_from_beginning:
-                    new_time = time - clips_length_milis
-                    #print(new_time)
+                    new_time = time - clip_seconds
                     if new_time >= 0:
                         peak_times_from_beginning_new.append(new_time)
                     else:
