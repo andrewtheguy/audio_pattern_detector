@@ -9,8 +9,9 @@ import boto3
 from botocore.client import Config
 import botocore
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from scrape import extract_prefix, md5file
+from scrape import extract_prefix
 from dotenv import load_dotenv
+from andrew_utils import get_md5sum_file
 
 load_dotenv()  # take environment variables from .env.
 
@@ -166,7 +167,7 @@ def publish(folder):
         print(date)
         results.append({"cid":cid,"title":f"{prefix}{date}",
                         "date":date,
-                        "hash_md5":md5file(file),
+                        "hash_md5":get_md5sum_file(file),
                         "file_len":os.stat(file).st_size,
                         "file": file})
     results = sorted(results, key=lambda d: d['date'])   

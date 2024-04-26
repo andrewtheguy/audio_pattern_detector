@@ -20,6 +20,7 @@ paramiko = "*"
 pytz = "*"
 jinja2 = "^3.1.3"
 python-dotenv = "^1.0.1"
+andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
 
 [build-system]
 requires = ["poetry-core"]

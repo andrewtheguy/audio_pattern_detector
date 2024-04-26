@@ -20,7 +20,7 @@ import pyloudnorm as pyln
 import warnings
 from scipy.io import wavfile
 from scipy.signal import stft, istft
-import utils
+from andrew_utils import seconds_to_time
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
@@ -128,7 +128,7 @@ def mfcc_method2(clip,audio,sr,index,seconds_per_chunk,clip_name):
     plt.title('Cross-correlation between the audio clip and full track')
     plt.xlabel('Lag')
     plt.ylabel('Correlation coefficient')
-    plt.savefig(f'./tmp/graph/mfcc/distance_{clip_name}_{index}_{utils.second_to_time(seconds=index*seconds_per_chunk)}.png')
+    plt.savefig(f'./tmp/graph/mfcc/distance_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.png')
     plt.close()
 
     distances_selected = np.where(distances / min_distance <= 1.05)[0]
@@ -157,7 +157,7 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     # plt.title('Cross-correlation between the audio clip and full track')
     # plt.xlabel('Lag')
     # plt.ylabel('Correlation coefficient')
-    # plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{utils.second_to_time(seconds=index*seconds_per_chunk)}.png')
+    # plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.png')
     # plt.close()
 
 
@@ -244,7 +244,7 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     audio_section = np.concatenate((audio_section,clip))
 
     os.makedirs("./tmp/audio", exist_ok=True)
-    sf.write(f"./tmp/audio/section_{clip_name}_{index}_{utils.second_to_time(seconds=index*seconds_per_chunk)}.wav", audio_section, sr)
+    sf.write(f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.wav", audio_section, sr)
 
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr,index=index,seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)

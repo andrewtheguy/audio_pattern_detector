@@ -23,6 +23,8 @@ from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 import utils
 
+from andrew_utils import seconds_to_time
+
 introclips={
     "happydaily":["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
     "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
@@ -216,7 +218,7 @@ def split_audio(input_file, output_file, start_time, end_time,total_time,artist,
     metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
 
     (
-    ffmpeg.input(input_file, ss=utils.second_to_time(seconds=start_time), to=utils.second_to_time(seconds=end_time))
+    ffmpeg.input(input_file, ss=seconds_to_time(seconds=start_time,include_decimals=False), to=seconds_to_time(seconds=end_time,include_decimals=False))
             .output(output_file,acodec='copy',vcodec='copy', loglevel="error", **metadata_dict).overwrite_output().run()
     )
 
@@ -247,8 +249,8 @@ title={title}
     for i in range(len(input_files)):
         duration = input_files[i]["end_time"]-input_files[i]["start_time"]
         end_time=start_time+duration
-        path1=utils.second_to_time(seconds=start_time).replace(':','_')
-        path2=utils.second_to_time(seconds=end_time).replace(':','_')
+        path1=seconds_to_time(seconds=start_time,include_decimals=False).replace(':','_')
+        path2=seconds_to_time(seconds=end_time,include_decimals=False).replace(':','_')
         title=f"{path1}-{path2}"
         text += f"""
 ;FFMETADATA1
@@ -277,13 +279,6 @@ title={title}
         output_file
     ])
 
-
-def md5file(file):
-    with open(file, "rb") as f:
-        file_hash = hashlib.md5()
-        while chunk := f.read(8192):
-            file_hash.update(chunk)
-    return file_hash.hexdigest()
 
 def get_sec(time_str):
     """Get seconds from time."""
@@ -340,24 +335,24 @@ def scrape(input_file):
         for c in clips:
             print(f"Finding {c}")
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation")
-            print("intros",[utils.second_to_time(seconds=t) for t in intros],"---")
+            print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         # deduplicate
         program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
         print(program_intro_peak_times)
-        print("program_intro_peak_times",[utils.second_to_time(seconds=t) for t in program_intro_peak_times],"---")
+        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
 
         for offset in news_report_peak_times:
-            print(f"Clip news_report_peak_times at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
+            print(f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
         #    print(f"Offset: {offset}s" )
         
         for offset in program_intro_peak_times:
-            print(f"Clip program_intro_peak_times at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
+            print(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
         #    #print(f"Offset: {offset}s" )
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
         #print("pair",pair)
-        tsformatted = [[utils.second_to_time(seconds=t) for t in sublist] for sublist in pair]
+        tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     #print(pair)
@@ -382,8 +377,8 @@ def scrape(input_file):
         for i,p in enumerate(pair):
             start_time = p[0]
             end_time = p[1]
-            path1=utils.second_to_time(seconds=start_time).replace(':','_')
-            path2=utils.second_to_time(seconds=end_time).replace(':','_')
+            path1=seconds_to_time(seconds=start_time,include_decimals=False).replace(':','_')
+            path2=seconds_to_time(seconds=end_time,include_decimals=False).replace(':','_')
             title=f"{path1}-{path2}"
             filename=f"{title}{extension}"
             file_segment = os.path.join(tmpdir,filename)
