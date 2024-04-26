@@ -389,12 +389,14 @@ def scrape(input_file):
         concatenate_audio(splits, output_file,tmpdir)
         path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file,path_trimmed,skip_if_exists=True)
-        # upload segments
+        # save segments
         for item in splits:
-            dirname_segment = f"/rthk/segments/{dirname}/{date_str}"
-            filename=os.path.basename(item["file_path"])
-            upload_path=f"{dirname_segment}/{filename}"
-            upload_file(item["file_path"],upload_path,skip_if_exists=True)
+            dirname_segment = os.path.abspath(f"./tmp/segments/{dirname}/{date_str}")
+            os.makedirs(dirname_segment, exist_ok=True)
+            filename_segment=os.path.basename(item["file_path"])
+            save_path=f"{dirname_segment}/{filename_segment}"
+            shutil.move(item["file_path"],save_path)
+            #upload_file(item["file_path"],upload_path,skip_if_exists=True)
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
