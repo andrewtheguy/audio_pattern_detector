@@ -13,7 +13,7 @@ develop = false
 type = "git"
 url = "https://github.com/andrewtheguy/andrew_utils.git"
 reference = "main"
-resolved_reference = "ad6e0f94e4ee2574fd2b88bac69060ae12d3c401"
+resolved_reference = "8cdd79a4a3cbce0eb79bc8e384b1d60ba83189d6"
 
 [[package]]
 name = "audioread"
