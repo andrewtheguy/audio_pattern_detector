@@ -181,6 +181,7 @@ def extract_folder(path):
 
 
 def publish(folder):
+    folder = folder.rstrip('/')
     result_file = f"{folder}/results.json"
     results = []
     # only keep last 3
