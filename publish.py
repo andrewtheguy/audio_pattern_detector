@@ -17,6 +17,18 @@ load_dotenv()  # take environment variables from .env.
 
 base_endpoint = "https://podcasts.andrewtheguy.workers.dev"
 
+def get_existing_object_metadata(s3,bucket_name, key):
+    # check if key exists
+    try:
+        response = s3.head_object(Bucket=bucket_name, Key=key)
+        print(f"key exists, skip publishing")
+        return response
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            return None
+        else:
+            raise  # Re-raise other errors
+
 def publish_to_firebase(file,path):
  
     s3 = boto3.client('s3',
@@ -30,15 +42,10 @@ def publish_to_firebase(file,path):
     bucket_name = "podcasts"
 
     # check if key exists
-    try:
-        response = s3.head_object(Bucket=bucket_name, Key=path)
-        print(f"key exists, skip publishing")
+
+    response = get_existing_object_metadata(s3,bucket_name=bucket_name, key=path)
+    if response:
         return response['ResponseMetadata']['HTTPHeaders']['x-amz-meta-cid']
-    except botocore.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == '404':
-            key_exists=False
-        else:
-            raise  # Re-raise other errors
 
     with open(file, 'rb') as f:
         response = s3.put_object(Body=f, Bucket=bucket_name, Key=path)
@@ -176,7 +183,8 @@ def publish(folder):
     with open(result_file,"w") as f:
         json.dump(results,f)
     channel = dest_dir    
-    publish_podcast(folder,channel,results)
+    # only publish the last 3 episodes
+    publish_podcast(folder,channel,results[-3:])
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
