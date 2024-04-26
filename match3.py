@@ -14,6 +14,7 @@ import ffmpeg
 import librosa
 import soundfile as sf
 from audio_offset_finder_v2 import find_clip_in_audio_in_chunks
+from andrew_utils import seconds_to_time
 
 def main():
     parser = argparse.ArgumentParser()
@@ -29,7 +30,7 @@ def main():
     print(peak_times)
 
     for offset in peak_times:
-        print(f"Clip occurs at the following times (in seconds): {utils.second_to_time(seconds=offset)}" )
+        print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
     #    #print(f"Offset: {offset}s" )
     
 
