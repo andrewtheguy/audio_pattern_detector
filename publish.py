@@ -15,6 +15,8 @@ from andrew_utils import get_md5sum_file
 
 load_dotenv()  # take environment variables from .env.
 
+base_endpoint = "https://podcasts.andrewtheguy.workers.dev"
+
 def publish_to_firebase(file,path):
  
     s3 = boto3.client('s3',
@@ -65,7 +67,7 @@ def upload_cloudflare(data):
       'Authorization': f'Bearer {bearer_token}',
       'Content-Type': 'application/json'  # Set Content-Type for JSON data
   }
-  url="https://podcasts.andrewtheguy.workers.dev/upload"
+  url=f"{base_endpoint}/upload"
   response = requests.post(url, headers=headers, json=data)
   print(response.text)
   response.raise_for_status()
@@ -134,7 +136,7 @@ def publish_podcast(folder,title,inputs):
     remote_name = f"{title_clean}_{suffix}"
     data = {"key":remote_name,"xml":feed}
     upload_cloudflare(data)
-    print(f"uploaded feed to cloudflare as /feeds/{remote_name}.xml")
+    print(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
 
 def extract_folder(path):
   """
