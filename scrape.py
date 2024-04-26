@@ -295,6 +295,7 @@ def get_sec_from_str(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
+# return a tuple of prefix and date
 def extract_prefix(text):
   match = re.match(r"(.*\d{8,})", text)
   return (match.group(1)[:-8],match.group(1)[-8:]) if match else (None,None)
