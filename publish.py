@@ -188,7 +188,9 @@ def publish(folder):
     m4a_files = sorted(glob.glob(os.path.join(folder,"*.m4a")))[-3:]
     if len(m4a_files)==0:
         raise ValueError("no m4a files found")
-    dest_dir = os.path.basename(args.folder)
+    dest_dir = extract_folder(folder)
+    if len(dest_dir)==0:
+        raise ValueError("folder name is empty")
     for file in m4a_files:
         cid = publish_to_firebase(file,f"{dest_dir}/{os.path.basename(file)}")
         prefix,date=extract_prefix(os.path.basename(file))
