@@ -17,6 +17,15 @@ load_dotenv()  # take environment variables from .env.
 
 base_endpoint = "https://podcasts.andrewtheguy.workers.dev"
 
+bucket_name = "podcasts"
+
+s3 = boto3.client('s3',
+    endpoint_url='https://s3.filebase.com',
+    aws_access_key_id=os.environ['FIREBASE_ACCESS_KEY'],
+    aws_secret_access_key=os.environ['FIREBASE_SECRET_ACCESS_KEY'],
+    region_name='us-east-1',
+    config=boto3.session.Config(signature_version='s3v4'))
+
 def get_existing_object_metadata(s3,bucket_name, key):
     # check if key exists
     try:
@@ -30,16 +39,6 @@ def get_existing_object_metadata(s3,bucket_name, key):
             raise  # Re-raise other errors
 
 def publish_to_firebase(file,path):
- 
-    s3 = boto3.client('s3',
-        endpoint_url='https://s3.filebase.com',
-        aws_access_key_id=os.environ['FIREBASE_ACCESS_KEY'],
-        aws_secret_access_key=os.environ['FIREBASE_SECRET_ACCESS_KEY'],
-        region_name='us-east-1',
-        config=boto3.session.Config(signature_version='s3v4'))
-        
-  
-    bucket_name = "podcasts"
 
     # check if key exists
 
@@ -80,7 +79,7 @@ def upload_cloudflare(data):
   response.raise_for_status()
   return response
 
-def publish_podcast(folder,title,inputs):
+def publish_podcast(folder,title,inputs,dest_dir):
 
     last_build_date = None
     episodes = []
@@ -90,7 +89,7 @@ def publish_podcast(folder,title,inputs):
         #print('date',date)
 
 
-        filename = os.path.split(os.path.basename(obj['file']))[-1]
+        filename = os.path.basename(obj['file'])
         ext=os.path.splitext(filename)[-1]
         if ext.lower()=='.m4a':
             file_type = 'audio/m4a'
@@ -145,6 +144,25 @@ def publish_podcast(folder,title,inputs):
     upload_cloudflare(data)
     print(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
 
+    paginator = s3.get_paginator('list_objects_v2')
+
+    file_del = []
+    files_keep = [os.path.basename(obj['file']) for obj in inputs]
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=dest_dir):
+        if "Contents" in page:
+            for object_info in page["Contents"]:
+                file_name = object_info["Key"]
+                if file_name.endswith("/"):  # Filter out folders
+                    continue
+                check,_,f = file_name.rpartition('/')
+                f=None if len(check)==0 else f
+                if f not in files_keep:
+                    file_del.append(file_name)
+
+    for key in file_del:
+        print(f"deleting {key}")
+        s3.delete_object(Bucket=bucket_name, Key=key)
+
 def extract_folder(path):
   """
   Extracts folder from the given path, regardless of trailing slashes.
@@ -165,7 +183,8 @@ def extract_folder(path):
 def publish(folder):
     result_file = f"{folder}/results.json"
     results = []
-    m4a_files = glob.glob(os.path.join(folder,"*.m4a"))
+    # only keep last 3
+    m4a_files = sorted(glob.glob(os.path.join(folder,"*.m4a")))[-3:]
     if len(m4a_files)==0:
         raise ValueError("no m4a files found")
     dest_dir = os.path.basename(args.folder)
@@ -184,7 +203,7 @@ def publish(folder):
         json.dump(results,f)
     channel = dest_dir    
     # only publish the last 3 episodes
-    publish_podcast(folder,channel,results[-3:])
+    publish_podcast(folder,channel,results,dest_dir)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
