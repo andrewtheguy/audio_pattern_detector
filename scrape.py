@@ -376,8 +376,8 @@ def scrape(input_file):
     os.makedirs(output_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        filename=os.path.basename(output_file)
-        dirname,date_str = extract_prefix(filename)
+        filename_trimmed=os.path.basename(output_file)
+        dirname,date_str = extract_prefix(filename_trimmed)
         dirname = '' if dirname is None else dirname
         for i,p in enumerate(pair):
             start_time = p[0]
@@ -392,7 +392,7 @@ def scrape(input_file):
                            "start_time": start_time,
                            "end_time": end_time,})
         concatenate_audio(splits, output_file,tmpdir)
-        path_trimmed = f"/rthk/trimmed/{dirname}/{filename}"
+        path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file,path_trimmed,skip_if_exists=True)
         # upload segments
         for item in splits:
