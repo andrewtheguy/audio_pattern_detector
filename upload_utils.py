@@ -24,9 +24,11 @@
 #         to_create /= parts.popleft()
 #         create_sftp_dir(sftp, str(to_create))
 
+import logging
 import os
 import paramiko
 from webdav4.client import Client
+logger = logging.getLogger(__name__)
 
 def create_remote_dir_recursively(sftp_client, remote_dir):
     """
@@ -69,12 +71,12 @@ def upload_file(file,dest_path,skip_if_exists=False):
             if skip_if_exists:
                 try:
                     sftp.stat(dest_path)
-                    print(f'file {dest_path} already exists,skipping')
+                    logger.info(f'file {dest_path} already exists,skipping')
                     return
                 except IOError:
-                    print(f"file {dest_path} doesn't exist, uploading")
+                    logger.info(f"file {dest_path} doesn't exist, uploading")
                     #return
-            print(f"uploading {file} to {dest_path}")
+            logger.info(f"uploading {file} to {dest_path}")
             create_remote_dir_recursively(sftp_client=sftp, remote_dir=os.path.dirname(dest_path))
             sftp.put(file,dest_path)
 
@@ -83,12 +85,12 @@ def upload_file_with_webdav(file,dest_path,skip_if_exists=False):
     client = Client("http://10.22.33.20:9080", auth=("andrew", "qwertasdfg"))
     
     if(skip_if_exists and client.exists(dest_path)):
-        print(f"webdav: file {dest_path} already exists,skipping")
+        logger.info(f"webdav: file {dest_path} already exists,skipping")
         return
 
     dir=os.path.dirname(dest_path)
     if not client.exists(dir):
         client.mkdir(dir)
-    print(f"uploading {file} to {dest_path}")
+    logger.info(f"uploading {file} to {dest_path}")
 #    client.mkdir(dir)
     client.upload_file(file,dest_path,overwrite=True)

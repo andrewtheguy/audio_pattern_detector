@@ -2,6 +2,7 @@ import argparse
 from collections import deque
 import copy
 import datetime
+import logging
 import os
 import pdb
 import time
@@ -22,6 +23,8 @@ from scipy.io import wavfile
 from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 
+logger = logging.getLogger(__name__)
+
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
@@ -31,7 +34,8 @@ use ffmpeg steaming, which supports more format for streaming
 
 
 news_report_black_list_ts = {
-    "morningsuite20240424":[5342],
+    "morningsuite20240424":[5342], # fake one
+    "KnowledgeCo20240427":[4157], # false positive
 }
 
 target_sample_rate = 8000
@@ -146,35 +150,20 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
-    #print("correlation")
-    #print(len(correlation))
-    #print(len(audio))
     
-    # os.makedirs("./tmp/graph", exist_ok=True)
-    # #Optional: plot the correlation graph to visualize
-    # plt.figure(figsize=(10, 4))
-    # plt.plot(correlation)
-    # plt.title('Cross-correlation between the audio clip and full track')
-    # plt.xlabel('Lag')
-    # plt.ylabel('Correlation coefficient')
-    # plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.png')
-    # plt.close()
+    os.makedirs("./tmp/graph", exist_ok=True)
+    #Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(10, 4))
+    plt.plot(correlation)
+    plt.title('Cross-correlation between the audio clip and full track')
+    plt.xlabel('Lag')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.png')
+    plt.close()
 
 
     peak_max = np.max(correlation)
     index_max = np.argmax(correlation)
-    #print("peak_max",peak_max)
-    #print("index_max",index_max)
-
-    # Detect if there are peaks exceeding the threshold
-    #peaks = []
-
-    # for i,col in enumerate(correlation):
-    #     if i >= len(correlation)-len(clip) - 1:
-    #         #print("skipping placeholder peak",i)
-    #         continue
-    #     if col >= threshold:
-    #         peaks.append(i)
 
     peaks = np.where(correlation > threshold)[0]
 
@@ -190,7 +179,6 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     new_seconds = len(chunk)/sr
     # Concatenate previous chunk for continuity in processing
     if(previous_chunk is not None):
-        #print("prev",len(previous_chunk)/sr)
         if(new_seconds < seconds_per_chunk): # too small
             # no need for sliding window since it is the last piece
             subtract_seconds = -(new_seconds-(seconds_per_chunk))
@@ -205,8 +193,6 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
 
     #audio_section = reduce_noise_spectral_subtraction(audio_section)
 
-    #print(f"subtract_seconds: {subtract_seconds}")
-    #print(f"new_seconds: {new_seconds}")    
 
     #audio_section = audio_section / np.max(np.abs(audio_section))
     # peak normalize audio to -1 dB
@@ -259,7 +245,6 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     for t in peak_times:
         if t >= 0 and t >= (len(audio_section)-clip_length - 1) / sr:
             #skip the placeholder clip at the end
-            #print("skipping placeholder peak",t)
             continue
         peak_times2.append(t)
 
