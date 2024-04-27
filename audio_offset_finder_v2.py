@@ -2,6 +2,7 @@ import argparse
 from collections import deque
 import copy
 import datetime
+import json
 import logging
 import os
 import pdb
@@ -23,6 +24,7 @@ from scipy.io import wavfile
 from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
+from scipy.signal import find_peaks
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +208,11 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
     plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
     plt.close()
 
+    peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
+    os.makedirs(peak_dir, exist_ok=True)
+    peaks, properties = find_peaks(correlation,height=0.7)
+        
+    print(json.dumps(peaks.tolist(),indent=2),file=open(f'{peak_dir}/{index}_{section_ts}.txt','w'))
 
     outliers = compute_mod_z_score(correlation)
     
