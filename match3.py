@@ -13,14 +13,14 @@ import matplotlib.pyplot as plt
 import ffmpeg
 import librosa
 import soundfile as sf
-from audio_offset_finder_v2 import find_clip_in_audio_in_chunks
+from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD
 from andrew_utils import seconds_to_time
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default="correlation")
+    parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default=DEFAULT_METHOD)
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     #print(args.method)

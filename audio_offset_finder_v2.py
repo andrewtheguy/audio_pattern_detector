@@ -31,9 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-'''
-use ffmpeg steaming, which supports more format for streaming
-'''
+DEFAULT_METHOD="correlation"
 
 target_sample_rate = 8000
 

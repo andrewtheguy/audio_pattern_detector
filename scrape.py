@@ -20,7 +20,7 @@ import paramiko
 import pytz
 import requests
 
-from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks
+from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
 from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 import utils
@@ -350,7 +350,7 @@ def scrape(input_file):
             raise NotImplementedError(f"not supported {basename}")
         
         # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file)
+        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file,method=DEFAULT_METHOD)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
@@ -366,7 +366,7 @@ def scrape(input_file):
         program_intro_peak_times_debug=[]
         for c in clips:
             #print(f"Finding {c}")
-            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file)
+            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD)
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
             program_intro_peak_times_debug.append({c:[intros,[seconds_to_time(seconds=t,include_decimals=False) for t in intros]]})
