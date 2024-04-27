@@ -327,8 +327,9 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
 
     samples_skip_end = 0
     # needed for correlation method
-    audio_section = np.concatenate((audio_section, clip))
-    samples_skip_end = clip_length
+    if method == "correlation":
+        audio_section = np.concatenate((audio_section, clip))
+        samples_skip_end = clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
     sf.write(
@@ -338,13 +339,16 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     if method == "correlation":
         peak_times = correlation_method(clip, audio=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
+    elif method == "advanced_correlation":
+        peak_times = advanced_correlation_method(clip, audio=audio_section, sr=sr, index=index,
+                                        seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     elif method == "mfcc":
         peak_times = mfcc_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
                                  clip_name=clip_name)
     elif method == "chroma_method":
         peak_times = chroma_method(clip, audio=audio_section, sr=sr)
     else:
-        raise "unknown method"
+        raise ValueError("unknown method")
 
     peak_times2 = []
     for t in peak_times:
@@ -534,16 +538,17 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
     process.wait()
 
-    # #Optional: plot the correlation graph to visualize
-    # graph_dir = f"./tmp/graph/max_score_{clip_name}"
-    # os.makedirs(graph_dir, exist_ok=True)
-    # plt.figure(figsize=(10, 4))
-    # plt.plot(max_test)
-    # plt.title('max outliers between the audio clip and full track')
-    # plt.xlabel('outliers')
-    # plt.ylabel('Correlation coefficient')
-    # plt.savefig(f'{graph_dir}/{clip_name}.png')
-    # plt.close()
+    if(method == "advanced_correlation_method"):
+        #Optional: plot the correlation graph to visualize
+        graph_dir = f"./tmp/graph/max_score_{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
+        plt.figure(figsize=(10, 4))
+        plt.plot(max_test)
+        plt.title('max outliers between the audio clip and full track')
+        plt.xlabel('outliers')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(f'{graph_dir}/{clip_name}.png')
+        plt.close()
 
     peak_times_clean = cleanup_peak_times(all_peak_times)
     return peak_times_clean
