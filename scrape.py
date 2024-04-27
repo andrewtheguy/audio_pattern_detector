@@ -442,6 +442,7 @@ def download_and_scrape(days_ago,download_only=False):
             continue
         elif not url_ok(url):
             logger.warning(f"skipping {key} because url {url} is not ok")
+            print(f"skipping {key} because url {url} is not ok")
             continue
         dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
         try:
