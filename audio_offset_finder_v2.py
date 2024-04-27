@@ -538,7 +538,7 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
 
     process.wait()
 
-    if(method == "advanced_correlation_method"):
+    if(method == "advanced_correlation"):
         #Optional: plot the correlation graph to visualize
         graph_dir = f"./tmp/graph/max_score_{clip_name}"
         os.makedirs(graph_dir, exist_ok=True)
