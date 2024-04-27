@@ -194,6 +194,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
+    # -1 to exclude the max
     correlation /= np.max(correlation) - 1
 
     #correlation = downsample(int(sr/10),correlation)
