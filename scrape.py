@@ -228,6 +228,7 @@ def concatenate_audio(input_files, output_file,tmpdir):
     with open(list_file,'w') as f:
         for item in input_files:
             file_name = item["file_path"]
+            print(f"file {file_name}",file=f)
 
     artist="rthk"
 
