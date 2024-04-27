@@ -319,7 +319,7 @@ def scrape(input_file):
     #exit(1)
     if not tsformatted:
         # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
+        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep2.wav', input_file, method="correlation")
         print("news_report_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times],"---")
 
         #if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
