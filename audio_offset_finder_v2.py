@@ -22,6 +22,7 @@ import warnings
 from scipy.io import wavfile
 from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
+from scipy.signal import resample
 
 logger = logging.getLogger(__name__)
 
@@ -143,27 +144,94 @@ def mfcc_method2(clip,audio,sr,index,seconds_per_chunk,clip_name):
 
     return match_times
 
+def downsample(factor,values):
+    buffer_ = deque([],maxlen=factor)
+    downsampled_values = []
+    for i,value in enumerate(values):
+        buffer_.appendleft(value)
+        if (i-1)%factor==0:
+            #Take max value out of buffer
+            # or you can take higher value if their difference is too big, otherwise just average
+            downsampled_values.append(max(buffer_))
+    return np.array(downsampled_values)
+
+def find_outliers(data):
+    
+    mean = np.mean(data)
+    std = np.std(data)
+    
+    threshold = 3
+    outliers = []
+    for x in data:
+        z_score = (x - mean) / std
+        if abs(z_score) > threshold:
+            outliers.append(x)
+    return outliers  
+
+def compute_mod_z_score(data):
+  """
+  Calculates the modified z-score for a 1D array of data.
+
+  Args:
+    data: A 1D numpy array of numerical data.
+
+  Returns:
+    A 1D numpy array containing the modified z-scores for each data point.
+  """
+  median = np.median(data)
+  median_absolute_deviation = np.median(np.abs(data - median))
+
+  if median_absolute_deviation == 0:
+    return np.zeros_like(data)  # Avoid division by zero
+
+  modified_z_scores = 0.6745 * (data - median) / median_absolute_deviation
+  return modified_z_scores
+
+max_test=[]
+
 def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
-    global method_count
+    global max_test
     threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
+
+    #correlation = downsample(int(sr/10),correlation)
     
-    os.makedirs("./tmp/graph", exist_ok=True)
+    section_ts=seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)
+    graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
+    os.makedirs(graph_dir, exist_ok=True)
     #Optional: plot the correlation graph to visualize
     plt.figure(figsize=(10, 4))
     plt.plot(correlation)
     plt.title('Cross-correlation between the audio clip and full track')
     plt.xlabel('Lag')
     plt.ylabel('Correlation coefficient')
-    plt.savefig(f'./tmp/graph/cross_correlation_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.png')
+    plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
     plt.close()
 
 
-    peak_max = np.max(correlation)
-    index_max = np.argmax(correlation)
+    outliers = compute_mod_z_score(correlation)
+    
+    graph_dir = f"./tmp/graph/outliers_{clip_name}"
+    os.makedirs(graph_dir, exist_ok=True)
+    #Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(10, 4))
+    plt.plot(outliers)
+    plt.title('Cross-correlation outliers between the audio clip and full track')
+    plt.xlabel('outliers')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+    plt.close()
+
+
+    #peak_max = np.max(correlation)
+    #index_max = np.argmax(correlation)
+
+    max_score = np.max(outliers)
+    max_test.append(max_score)
+    print(f"max_score for {clip_name} {section_ts}: {max_score}")
 
     peaks = np.where(correlation > threshold)[0]
 
@@ -226,8 +294,10 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         # loudness normalize audio to -12 dB LUFS
         clip = pyln.normalize.loudness(clip, loudness, -12.0)
         
+    samples_skip_end = 0    
     # needed for correlation method
-    audio_section = np.concatenate((audio_section,clip))
+    #audio_section = np.concatenate((audio_section,clip))
+    #samples_skip_end = clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
     sf.write(f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.wav", audio_section, sr)
@@ -241,9 +311,22 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     else:
         raise "unknown method"
 
+
+    graph_dir = f"./tmp/graph/max_score_{clip_name}"
+    os.makedirs(graph_dir, exist_ok=True)
+    #Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(10, 4))
+    plt.plot(max_test)
+    plt.title('max outliers between the audio clip and full track')
+    plt.xlabel('outliers')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'{graph_dir}/{clip_name}.png')
+    plt.close()
+
+
     peak_times2 = []
     for t in peak_times:
-        if t >= 0 and t >= (len(audio_section)-clip_length - 1) / sr:
+        if t >= 0 and t >= (len(audio_section)-samples_skip_end - 1) / sr:
             #skip the placeholder clip at the end
             continue
         peak_times2.append(t)
@@ -290,7 +373,7 @@ def cleanup_peak_times(peak_times):
             peak_times_final.append(item)
             prevItem = item
         elif item - prevItem < skip_second_between:
-            print(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
+            logger.debug(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
             prevItem = item
         else:
             peak_times_final.append(item)
