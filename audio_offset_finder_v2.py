@@ -190,11 +190,11 @@ max_test = []
 
 def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     global max_test
-    threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
+    #threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
-    correlation /= np.max(correlation)
+    correlation /= np.max(correlation) - 1
 
     #correlation = downsample(int(sr/10),correlation)
 
@@ -212,9 +212,12 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
     peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
     os.makedirs(peak_dir, exist_ok=True)
+    percentile=np.percentile(correlation, 95)
+    print(f"np.percentile(correlation, 95) for {section_ts}",percentile)
 
+    height = 0.7
     # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation, threshold=np.percentile(correlation, 95), height=threshold)
+    peaks, properties = find_peaks(correlation, threshold=percentile, height=height)
 
     print(json.dumps(peaks.tolist(), indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
@@ -238,8 +241,11 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     # max_test.append(max_score)
     # print(f"max_score for {clip_name} {section_ts}: {max_score}")
 
-
-    peak_times = np.array(peaks) / sr
+    peaks_final=[]
+    # not trying to match many occurences
+    if percentile < 0.1:
+        peaks_final.extend(peaks)
+    peak_times = np.array(np.asarray(peaks_final)) / sr
 
     return peak_times
 
@@ -297,34 +303,34 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
     normalize = True
-    if normalize:
-        audio_section = audio_section / np.max(np.abs(audio_section))
-        clip = clip / np.max(np.abs(clip))
-
     # if normalize:
-    #     audio_section_seconds = len(audio_section) / sr
-    #     #normalize loudness
-    #     if audio_section_seconds < 0.5:
-    #         meter = pyln.Meter(sr, block_size=audio_section_seconds)
-    #     else:
-    #         meter = pyln.Meter(sr)  # create BS.1770 meter
-    #
-    #     loudness = meter.integrated_loudness(audio_section)
-    #
-    #     # loudness normalize audio to -12 dB LUFS
-    #     audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
-    #
-    #     clip_second = clip_length / sr
-    #
-    #     # normalize loudness
-    #     if clip_second < 0.5:
-    #         meter = pyln.Meter(sr, block_size=clip_second)
-    #     else:
-    #         meter = pyln.Meter(sr)  # create BS.1770 meter
-    #     loudness = meter.integrated_loudness(clip)
-    #
-    #     # loudness normalize audio to -12 dB LUFS
-    #     clip = pyln.normalize.loudness(clip, loudness, -12.0)
+    #     audio_section = audio_section / np.max(np.abs(audio_section))
+    #     clip = clip / np.max(np.abs(clip))
+
+    if normalize:
+        audio_section_seconds = len(audio_section) / sr
+        #normalize loudness
+        if audio_section_seconds < 0.5:
+            meter = pyln.Meter(sr, block_size=audio_section_seconds)
+        else:
+            meter = pyln.Meter(sr)  # create BS.1770 meter
+
+        loudness = meter.integrated_loudness(audio_section)
+
+        # loudness normalize audio to -12 dB LUFS
+        audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
+
+        clip_second = clip_length / sr
+
+        # normalize loudness
+        if clip_second < 0.5:
+            meter = pyln.Meter(sr, block_size=clip_second)
+        else:
+            meter = pyln.Meter(sr)  # create BS.1770 meter
+        loudness = meter.integrated_loudness(clip)
+
+        # loudness normalize audio to -12 dB LUFS
+        clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
     samples_skip_end = 0
     # needed for correlation method
