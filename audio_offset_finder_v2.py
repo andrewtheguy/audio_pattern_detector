@@ -2,6 +2,7 @@ import argparse
 from collections import deque
 import copy
 import datetime
+import json
 import logging
 import os
 import pdb
@@ -200,16 +201,19 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         
 
     if normalize:
+        audio_section_seconds = len(audio_section)/sr
         #normalize loudness
-        # measure the loudness first 
-        meter = pyln.Meter(sr) # create BS.1770 meter
+        if(audio_section_seconds < 0.5):
+            meter = pyln.Meter(sr, block_size=audio_section_seconds)
+        else:
+            meter = pyln.Meter(sr) # create BS.1770 meter
+
         loudness = meter.integrated_loudness(audio_section)
 
         # loudness normalize audio to -12 dB LUFS
         audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
 
         clip_second = clip_length / sr
-
 
         # normalize loudness
         if(clip_second < 0.5):
@@ -221,8 +225,10 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         # loudness normalize audio to -12 dB LUFS
         clip = pyln.normalize.loudness(clip, loudness, -12.0)
         
+    samples_skip_end = 0
     # needed for correlation method
     audio_section = np.concatenate((audio_section,clip))
+    samples_skip_end = clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
     sf.write(f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index*seconds_per_chunk,include_decimals=False)}.wav", audio_section, sr)
@@ -236,9 +242,10 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
     else:
         raise "unknown method"
 
+
     peak_times2 = []
     for t in peak_times:
-        if t >= 0 and t >= (len(audio_section)-clip_length - 1) / sr:
+        if t >= 0 and t >= (len(audio_section)-samples_skip_end - 1) / sr:
             #skip the placeholder clip at the end
             continue
         peak_times2.append(t)
@@ -285,7 +292,7 @@ def cleanup_peak_times(peak_times):
             peak_times_final.append(item)
             prevItem = item
         elif item - prevItem < skip_second_between:
-            print(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
+            logger.debug(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
             prevItem = item
         else:
             peak_times_final.append(item)
