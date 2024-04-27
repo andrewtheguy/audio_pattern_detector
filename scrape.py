@@ -1,5 +1,6 @@
 
 import argparse
+import sys
 from collections import deque
 import datetime
 import hashlib
@@ -51,7 +52,7 @@ schedule={
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
-    "KnowledgeCo20240427":[4157], # false positive 01:09:17
+    #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
 def url_ok(url):
@@ -425,10 +426,8 @@ def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
   return current_time > target_time
 
-def download_and_scrape(download_only=False):
-    
-    #date = datetime.datetime.now(pytz.timezone('America/Los_Angeles'))
-    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))
+def download_and_scrape(days_ago,download_only=False):
+    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
     date_str=date.strftime("%Y%m%d")
     for key, urltemplate in pairs.items():
         url = urltemplate.format(date=date_str)
@@ -438,7 +437,7 @@ def download_and_scrape(download_only=False):
         if date.weekday()+1 not in weekdays_human:
             logger.info(f"skipping {key} because it is not scheduled for today's weekday")
             continue
-        if not is_time_after(date.time(),end_time):
+        if days_ago == 0 and not is_time_after(date.time(),end_time):
             logger.info(f"skipping {key} because it is not yet from {end_time}")
             continue
         elif not url_ok(url):
@@ -457,6 +456,7 @@ def download_and_scrape(download_only=False):
             continue
 
 def command():
+    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
     parser.add_argument('action')     
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
@@ -470,9 +470,11 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        download_and_scrape(download_only=True)
+        for i in range(7):
+            download_and_scrape(days_ago=i, download_only=True)
     elif(args.action == 'download_and_scrape'):
-        download_and_scrape()
+        for i in range(7):
+            download_and_scrape(days_ago=i)
     else:
         raise ValueError(f"unknown action {args.action}")
 
