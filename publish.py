@@ -3,6 +3,7 @@ from datetime import datetime,timezone
 import glob
 import hashlib
 import json
+import logging
 import os
 import re
 import boto3
@@ -12,6 +13,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from scrape import extract_prefix
 from dotenv import load_dotenv
 from andrew_utils import get_md5sum_file
+logger = logging.getLogger(__name__)
 
 load_dotenv()  # take environment variables from .env.
 
@@ -30,7 +32,7 @@ def get_existing_object_metadata(s3,bucket_name, key):
     # check if key exists
     try:
         response = s3.head_object(Bucket=bucket_name, Key=key)
-        print(f"key exists, skip publishing")
+        logger.info(f"key exists, skip publishing")
         return response
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == '404':
@@ -49,9 +51,9 @@ def publish_to_firebase(file,path):
     with open(file, 'rb') as f:
         response = s3.put_object(Body=f, Bucket=bucket_name, Key=path)
 
-    print(response)
+    logger.info(response)
     
-    print(f"published to {path}")
+    logger.info(f"published to {path}")
     return response['ResponseMetadata']['HTTPHeaders']['x-amz-meta-cid']
 
 import requests
@@ -75,7 +77,7 @@ def upload_cloudflare(data):
   }
   url=f"{base_endpoint}/upload"
   response = requests.post(url, headers=headers, json=data)
-  print(response.text)
+  logger.info(response.text)
   response.raise_for_status()
   return response
 
@@ -84,9 +86,9 @@ def publish_podcast(folder,title,inputs,dest_dir):
     last_build_date = None
     episodes = []
     for obj in inputs:
-        #print(obj['date'])
+        #logger.info(obj['date'])
         date = datetime.strptime(obj['date'],'%Y%m%d')
-        #print('date',date)
+        #logger.info('date',date)
 
 
         filename = os.path.basename(obj['file'])
@@ -142,7 +144,7 @@ def publish_podcast(folder,title,inputs,dest_dir):
     remote_name = f"{title_clean}_{suffix}"
     data = {"key":remote_name,"xml":feed}
     upload_cloudflare(data)
-    print(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
+    logger.info(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
 
     paginator = s3.get_paginator('list_objects_v2')
 
@@ -160,7 +162,7 @@ def publish_podcast(folder,title,inputs,dest_dir):
                     file_del.append(file_name)
 
     for key in file_del:
-        print(f"deleting {key}")
+        logger.info(f"deleting {key}")
         s3.delete_object(Bucket=bucket_name, Key=key)
 
 def extract_folder(path):
@@ -194,8 +196,8 @@ def publish(folder):
     for file in m4a_files:
         cid = publish_to_firebase(file,f"{dest_dir}/{os.path.basename(file)}")
         prefix,date=extract_prefix(os.path.basename(file))
-        print(file)
-        print(date)
+        logger.info(file)
+        logger.info(date)
         results.append({"cid":cid,"title":f"{prefix}{date}",
                         "date":date,
                         "hash_md5":get_md5sum_file(file),

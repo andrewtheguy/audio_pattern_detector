@@ -4,6 +4,7 @@ from collections import deque
 import datetime
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -22,6 +23,7 @@ from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_au
 from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 import utils
+logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
 
@@ -55,14 +57,14 @@ def url_ok(url):
         #content = next(r.iter_content(10))
         return True
     else:
-        print(f"HTTP Error {r.status_code} - {r.reason}")
+        logger.error(f"HTTP Error {r.status_code} - {r.reason}")
         return False
 
 def download(url,target_file):
     if(os.path.exists(target_file)):
-        print(f"file {target_file} already exists,skipping")
+        logger.info(f"file {target_file} already exists,skipping")
         return
-    print(f'downloading {url}')
+    logger.info(f'downloading {url}')
     with tempfile.TemporaryDirectory() as tmpdir:
         basename,extension = os.path.splitext(os.path.basename(target_file))
     
@@ -72,10 +74,10 @@ def download(url,target_file):
               .run()
         )
         shutil.move(tmp_file,target_file)
-    print(f'downloaded to {target_file}')    
+    logger.info(f'downloaded to {target_file}')    
 
 def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
-    print(result)
+    logger.info(result)
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
     
@@ -186,7 +188,6 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
         # prevent missing something in the middle     
         # unlkely to happen if news report is 10 seconds from the end w/o intro
         if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
-            #print("cur_news_report",cur_news_report,"total_time",total_time)
             raise NotImplementedError(f"not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro, cur_news_report {cur_news_report}, cur_intro: {cur_intro}")
     #print("before padding",pair)
     for i,arr in enumerate(pair):
@@ -227,7 +228,6 @@ def concatenate_audio(input_files, output_file,tmpdir):
     with open(list_file,'w') as f:
         for item in input_files:
             file_name = item["file_path"]
-            print(f"file {file_name}",file=f)
 
     artist="rthk"
 
@@ -303,7 +303,7 @@ def scrape(input_file):
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
     dir = os.path.dirname(input_file)
-    print(basename)
+    logger.info(basename)
     #md5=md5file(input_file)  # to get a printable str instead of bytes
 
     tsformatted = None
@@ -313,12 +313,12 @@ def scrape(input_file):
         tsformatted=json.load(open(jsonfile))
 
     total_time = math.ceil(float(ffmpeg.probe(input_file)["format"]["duration"]))
-    print("total_time",total_time,"---")
+    logger.debug("total_time",total_time,"---")
     #exit(1)
     if not tsformatted:
         # Find clip occurrences in the full audio
         news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
-        print(news_report_peak_times)
+        print("news_report_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times],"---")
 
         #if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
         if any(basename.startswith(prefix) for prefix in ["happydaily"]):
@@ -333,22 +333,21 @@ def scrape(input_file):
             raise NotImplementedError(f"not supported {basename}")
         program_intro_peak_times=[]
         for c in clips:
-            print(f"Finding {c}")
+            #print(f"Finding {c}")
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation")
-            print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
+            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         # deduplicate
         program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
-        print(program_intro_peak_times)
+        logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
 
         for offset in news_report_peak_times:
-            print(f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
-        #    print(f"Offset: {offset}s" )
+            logger.info(f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
         
         for offset in program_intro_peak_times:
-            print(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
+            logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
         #    #print(f"Offset: {offset}s" )
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
         #print("pair",pair)
@@ -356,7 +355,7 @@ def scrape(input_file):
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     #print(pair)
-    print("tsformatted",tsformatted)
+    #logger.debug("tsformatted",tsformatted)
     with open(jsonfile,'w') as f:
         f.write(json.dumps(tsformatted, indent=4))
     splits=[]
@@ -413,13 +412,13 @@ def download_and_scrape(download_only=False):
         end_time = schedule[key]["end"]
         weekdays_human = schedule[key]["weekdays_human"]
         if date.weekday()+1 not in weekdays_human:
-            print(f"skipping {key} because it is not scheduled for today's weekday")
+            logger.info(f"skipping {key} because it is not scheduled for today's weekday")
             continue
         if not is_time_after(date.time(),end_time):
-            print(f"skipping {key} because it is not yet from {end_time}")
+            logger.info(f"skipping {key} because it is not yet from {end_time}")
             continue
         elif not url_ok(url):
-            print(f"skipping {key} because url {url} is not ok")
+            logger.warning(f"skipping {key} because url {url} is not ok")
             continue
         dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
         try:
