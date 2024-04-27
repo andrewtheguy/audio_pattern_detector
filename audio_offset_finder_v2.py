@@ -243,7 +243,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
     peaks_final=[]
     # not trying to match many occurences
-    if percentile < 0.1:
+    if percentile < 0.05:
         peaks_final.extend(peaks)
     peak_times = np.array(np.asarray(peaks_final)) / sr
 
