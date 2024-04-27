@@ -276,6 +276,7 @@ title={title}
         '-i', ffmetadatafile,
         '-map_metadata', '1',
         '-codec', 'copy',
+        '-loglevel', 'error',
         '-y',
         output_file
     ])
