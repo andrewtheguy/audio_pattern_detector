@@ -240,19 +240,9 @@ def correlation_method(clip,audio,sr,index,seconds_per_chunk,clip_name):
 def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_per_chunk,clip_name,method="correlation"):
     clip_length = len(clip)
     new_seconds = len(chunk)/sr
-    # Concatenate previous chunk for continuity in processing
-    if(previous_chunk is not None):
-        if(new_seconds < seconds_per_chunk): # too small
-            # no need for sliding window since it is the last piece
-            subtract_seconds = -(new_seconds-(seconds_per_chunk))
-            audio_section_temp = np.concatenate((previous_chunk, chunk))[(-(seconds_per_chunk)*sr):]    
-            audio_section = np.concatenate((audio_section_temp,np.array([])))
-        else:
-            subtract_seconds = sliding_window
-            audio_section = np.concatenate((previous_chunk[(-sliding_window*sr):], chunk,np.array([])))
-    else:
-        subtract_seconds = 0
-        audio_section = np.concatenate((chunk,np.array([])))
+
+    subtract_seconds = 0
+    audio_section = np.concatenate((chunk,np.array([])))
 
     #audio_section = reduce_noise_spectral_subtraction(audio_section)
 
@@ -268,16 +258,19 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         
 
     if normalize:
+        audio_section_seconds = len(audio_section)/sr
         #normalize loudness
-        # measure the loudness first 
-        meter = pyln.Meter(sr) # create BS.1770 meter
+        if(audio_section_seconds < 0.5):
+            meter = pyln.Meter(sr, block_size=audio_section_seconds)
+        else:
+            meter = pyln.Meter(sr) # create BS.1770 meter
+
         loudness = meter.integrated_loudness(audio_section)
 
         # loudness normalize audio to -12 dB LUFS
         audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
 
         clip_second = clip_length / sr
-
 
         # normalize loudness
         if(clip_second < 0.5):
@@ -305,18 +298,6 @@ def process_chunk(chunk, clip, sr, previous_chunk,sliding_window,index,seconds_p
         peak_times = chroma_method(clip, audio=audio_section, sr=sr)
     else:
         raise "unknown method"
-
-
-    graph_dir = f"./tmp/graph/max_score_{clip_name}"
-    os.makedirs(graph_dir, exist_ok=True)
-    #Optional: plot the correlation graph to visualize
-    plt.figure(figsize=(10, 4))
-    plt.plot(max_test)
-    plt.title('max outliers between the audio clip and full track')
-    plt.xlabel('outliers')
-    plt.ylabel('Correlation coefficient')
-    plt.savefig(f'{graph_dir}/{clip_name}.png')
-    plt.close()
 
 
     peak_times2 = []
@@ -399,6 +380,8 @@ def convert_audio_to_clip_format(audio_path, output_path):
 # unwind_clip_ts for starting timestamps like intro
 # could cause issues with small overlap when intro is followed right by news report
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation"):
+    global max_test
+    max_test = []
     unwind_clip_ts = True
 
     # Load the audio clip
@@ -504,5 +487,17 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method="correlation
         i = i + 1
 
     process.wait()
+    
+    graph_dir = f"./tmp/graph/max_score_{clip_name}"
+    os.makedirs(graph_dir, exist_ok=True)
+    #Optional: plot the correlation graph to visualize
+    plt.figure(figsize=(10, 4))
+    plt.plot(max_test)
+    plt.title('max outliers between the audio clip and full track')
+    plt.xlabel('outliers')
+    plt.ylabel('Correlation coefficient')
+    plt.savefig(f'{graph_dir}/{clip_name}.png')
+    plt.close()
+
     peak_times_clean = cleanup_peak_times(all_peak_times)
     return peak_times_clean

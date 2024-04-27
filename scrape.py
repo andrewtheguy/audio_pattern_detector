@@ -51,7 +51,7 @@ schedule={
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
-    "KnowledgeCo20240427":[4157], # false positive
+    #"KnowledgeCo20240427":[4157], # false positive
 }
 
 def url_ok(url):
