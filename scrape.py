@@ -308,7 +308,7 @@ def scrape(input_file):
     
     # print(extension)
     # print(dir)
-    # print(basename)
+    print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
     dir = os.path.dirname(input_file)
@@ -368,13 +368,13 @@ def scrape(input_file):
         
         for offset in program_intro_peak_times:
             logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
-        #    #print(f"Offset: {offset}s" )
-        pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
-        #print("pair",pair)
-        tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
 
         with open(f'{input_file}.separated.json','w') as f:
             f.write(json.dumps({"news_report":[news_report_peak_times,news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
+
+        pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
+        #print("pair",pair)
+        tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
 
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
