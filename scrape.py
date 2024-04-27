@@ -40,10 +40,10 @@ pairs={
 }
 
 schedule={
-    "happydaily":{"begin": 10,"end":12},
-    "healthpedia":{"begin": 13,"end":15},
-    "morningsuite":{"begin": 6,"end":10},
-    "KnowledgeCo":{"begin": 6,"end":10},
+    "happydaily":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
+    "healthpedia":{"begin": 13,"end":15,"weekdays_human":[1,2,3,4,5]},
+    "morningsuite":{"begin": 6,"end":10,"weekdays_human":[1,2,3,4,5]},
+    "KnowledgeCo":{"begin": 6,"end":8,"weekdays_human":[6]},
 }
 
 def url_ok(url):
@@ -411,6 +411,10 @@ def download_and_scrape(download_only=False):
         url = urltemplate.format(date=date_str)
         print(key)
         end_time = schedule[key]["end"]
+        weekdays_human = schedule[key]["weekdays_human"]
+        if date.weekday()+1 not in weekdays_human:
+            print(f"skipping {key} because it is not scheduled for today's weekday")
+            continue
         if not is_time_after(date.time(),end_time):
             print(f"skipping {key} because it is not yet from {end_time}")
             continue
