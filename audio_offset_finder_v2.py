@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-DEFAULT_METHOD="advanced_correlation"
+DEFAULT_METHOD="correlation"
 
 target_sample_rate = 8000
 
@@ -189,7 +189,7 @@ def compute_mod_z_score(data):
 def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     #global max_test
 
-    #debug = False
+    debug = False
 
     percentile_threshold = 0.05
 
@@ -201,6 +201,20 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     correlation /= np.max(correlation) - 1
 
     percentile=np.percentile(correlation, 95)
+
+    if debug:
+        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+        print(f"percentile for {section_ts}", percentile)
+        graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
+        # Optional: plot the correlation graph to visualize
+        plt.figure(figsize=(10, 4))
+        plt.plot(correlation)
+        plt.title('Cross-correlation between the audio clip and full track')
+        plt.xlabel('Lag')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+        plt.close()
 
     # won't try to match segments with too many matches
     # because non matching looks the same as too many matches
