@@ -320,8 +320,8 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
 
 class TestDurationAndGaps(unittest.TestCase):
     
-    def check(self,result):
-        return timestamp_sanity_check(result,skip_reasonable_time_sequence_check=False)
+    def check(self,result,allow_first_short=False):
+        return timestamp_sanity_check(result,skip_reasonable_time_sequence_check=False,allow_first_short=allow_first_short)
 
     def test_empty_array(self):
         with self.assertRaises(ValueError):
@@ -353,7 +353,24 @@ class TestDurationAndGaps(unittest.TestCase):
 
     def test_too_short(self):
         with self.assertRaises(TimeSequenceError):
-            result = self.check([[1,minutes_to_seconds(1)]])
+            result = self.check([[1,minutes_to_seconds(14)]])
+
+    def test_allow_first_short(self):
+        #with self.assertRaises(TimeSequenceError):
+        result = self.check([[1,minutes_to_seconds(6)]],allow_first_short=True)
+        with self.assertRaises(TimeSequenceError):
+            result = self.check([
+                [1,minutes_to_seconds(13)],
+                [minutes_to_seconds(14), minutes_to_seconds(18)],
+            ],
+            allow_first_short=True)
+
+    def test_allow_first_short_only_close_enough_to_beginning(self):
+        with self.assertRaises(TimeSequenceError):
+            result = self.check([
+                [4,minutes_to_seconds(9)],
+                [minutes_to_seconds(12), minutes_to_seconds(30)],
+            ])
 
     def test_gap_normal(self):
         try:

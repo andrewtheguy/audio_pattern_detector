@@ -83,15 +83,18 @@ def download(url,target_file):
         shutil.move(tmp_file,target_file)
     logger.info(f'downloaded to {target_file}')    
 
-def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
+def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_first_short=False):
     logger.info(result)
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
     
-    for r in result:
+    for i,r in enumerate(result):
         if(len(r) != 2):
             raise ValueError(f"each element in result must have 2 elements, got {r}")
-        
+
+        beginning = i == 0
+        end = i == len(result)-1
+
         cur_start_time = r[0]
         cur_end_time = r[1]
 
@@ -100,12 +103,18 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
         
         if(cur_start_time > cur_end_time):
             raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
-        
-        # program should last at least 5 minutes between half an hour interval news reports
+
         # TODO: still need to account for 1 hour interval news report at night time
+        short_allowance_special = 5
+        short_allowance_normal = 15
         if not skip_reasonable_time_sequence_check:
-            if(cur_end_time - cur_start_time < 5*60):
-                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than 5 minutes")
+            allow_short_interval = allow_first_short and beginning
+            # allow first short if intro starts in 2 minutes
+            if allow_short_interval and cur_start_time < 2*60 and (cur_end_time - cur_start_time < short_allowance_special*60):
+                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_special} minutes for beginning")
+            # news report should not last like 15 minutes
+            elif not allow_short_interval and cur_end_time - cur_start_time < short_allowance_normal*60:
+                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_normal} minutes")
     
     for i in range(1,len(result)):
         cur = result[i]
@@ -126,7 +135,8 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check):
 # did a count down and the beep intro for news report is about 6 seconds
 # skip_reasonable_time_sequence_check: skip sanity checks related to unreasonable duration or gaps, mainly for testing
 # otherwise will have to rewrite lots of tests if the parameters changed
-def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,skip_reasonable_time_sequence_check=False):
+def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
+                       skip_reasonable_time_sequence_check=False,allow_first_short=False):
     pair = []
 
     if len(news_report) != len(set(news_report)):
@@ -216,7 +226,7 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,ski
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
     
-    timestamp_sanity_check(result,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check)
+    timestamp_sanity_check(result,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short)
 
     return result
 
@@ -326,9 +336,10 @@ def scrape(input_file):
     #exit(1)
     if not tsformatted:
 
-        #if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
+        allow_first_short = False
         if any(basename.startswith(prefix) for prefix in ["happydaily"]):
             clips = introclips["happydaily"]
+            allow_first_short=True
         elif any(basename.startswith(prefix) for prefix in ["healthpedia"]):
             clips = introclips["healthpedia"]
         elif any(basename.startswith(prefix) for prefix in ["morningsuite"]):
@@ -372,7 +383,7 @@ def scrape(input_file):
         with open(f'{input_file}.separated.json','w') as f:
             f.write(json.dumps({"news_report":[news_report_peak_times,news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
 
-        pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
+        pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
         #print("pair",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
 
