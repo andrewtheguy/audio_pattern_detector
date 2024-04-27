@@ -52,7 +52,7 @@ schedule={
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
-    #"KnowledgeCo20240427":[4157], # false positive 01:09:17
+    "KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
 def url_ok(url):
@@ -350,7 +350,7 @@ def scrape(input_file):
             raise NotImplementedError(f"not supported {basename}")
         
         # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
+        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
@@ -358,12 +358,15 @@ def scrape(input_file):
             
         news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
+        for offset in news_report_peak_times:
+            logger.info(
+                f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
 
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
         for c in clips:
             #print(f"Finding {c}")
-            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation")
+            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file)
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
             program_intro_peak_times_debug.append({c:[intros,[seconds_to_time(seconds=t,include_decimals=False) for t in intros]]})
@@ -372,11 +375,7 @@ def scrape(input_file):
         program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
         logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
-        
 
-        for offset in news_report_peak_times:
-            logger.info(f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
-        
         for offset in program_intro_peak_times:
             logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
 
