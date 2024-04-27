@@ -196,7 +196,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
 
-    # correlation = downsample(int(sr/10),correlation)
+    #correlation = downsample(int(sr/10),correlation)
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
     graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
@@ -212,31 +212,32 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
     peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
     os.makedirs(peak_dir, exist_ok=True)
-    peaks, properties = find_peaks(correlation, height=0.7)
+
+    # find the peaks in the spectrogram
+    peaks, properties = find_peaks(correlation, threshold=np.percentile(correlation, 95), height=threshold)
 
     print(json.dumps(peaks.tolist(), indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
-    outliers = compute_mod_z_score(correlation)
+    # outliers = compute_mod_z_score(correlation)
+    #
+    # graph_dir = f"./tmp/graph/outliers_{clip_name}"
+    # os.makedirs(graph_dir, exist_ok=True)
+    # # Optional: plot the correlation graph to visualize
+    # plt.figure(figsize=(10, 4))
+    # plt.plot(outliers)
+    # plt.title('Cross-correlation outliers between the audio clip and full track')
+    # plt.xlabel('outliers')
+    # plt.ylabel('Correlation coefficient')
+    # plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+    # plt.close()
+    #
+    # # peak_max = np.max(correlation)
+    # # index_max = np.argmax(correlation)
+    #
+    # max_score = np.max(outliers)
+    # max_test.append(max_score)
+    # print(f"max_score for {clip_name} {section_ts}: {max_score}")
 
-    graph_dir = f"./tmp/graph/outliers_{clip_name}"
-    os.makedirs(graph_dir, exist_ok=True)
-    # Optional: plot the correlation graph to visualize
-    plt.figure(figsize=(10, 4))
-    plt.plot(outliers)
-    plt.title('Cross-correlation outliers between the audio clip and full track')
-    plt.xlabel('outliers')
-    plt.ylabel('Correlation coefficient')
-    plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
-    plt.close()
-
-    # peak_max = np.max(correlation)
-    # index_max = np.argmax(correlation)
-
-    max_score = np.max(outliers)
-    max_test.append(max_score)
-    print(f"max_score for {clip_name} {section_ts}: {max_score}")
-
-    peaks = np.where(correlation > threshold)[0]
 
     peak_times = np.array(peaks) / sr
 
@@ -296,34 +297,34 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
     normalize = True
-    # if normalize:
-    #     audio_section = audio_section / np.max(np.abs(audio_section))
-    #     clip = clip / np.max(np.abs(clip))
-
     if normalize:
-        audio_section_seconds = len(audio_section) / sr
-        #normalize loudness
-        if audio_section_seconds < 0.5:
-            meter = pyln.Meter(sr, block_size=audio_section_seconds)
-        else:
-            meter = pyln.Meter(sr)  # create BS.1770 meter
+        audio_section = audio_section / np.max(np.abs(audio_section))
+        clip = clip / np.max(np.abs(clip))
 
-        loudness = meter.integrated_loudness(audio_section)
-
-        # loudness normalize audio to -12 dB LUFS
-        audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
-
-        clip_second = clip_length / sr
-
-        # normalize loudness
-        if clip_second < 0.5:
-            meter = pyln.Meter(sr, block_size=clip_second)
-        else:
-            meter = pyln.Meter(sr)  # create BS.1770 meter
-        loudness = meter.integrated_loudness(clip)
-
-        # loudness normalize audio to -12 dB LUFS
-        clip = pyln.normalize.loudness(clip, loudness, -12.0)
+    # if normalize:
+    #     audio_section_seconds = len(audio_section) / sr
+    #     #normalize loudness
+    #     if audio_section_seconds < 0.5:
+    #         meter = pyln.Meter(sr, block_size=audio_section_seconds)
+    #     else:
+    #         meter = pyln.Meter(sr)  # create BS.1770 meter
+    #
+    #     loudness = meter.integrated_loudness(audio_section)
+    #
+    #     # loudness normalize audio to -12 dB LUFS
+    #     audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
+    #
+    #     clip_second = clip_length / sr
+    #
+    #     # normalize loudness
+    #     if clip_second < 0.5:
+    #         meter = pyln.Meter(sr, block_size=clip_second)
+    #     else:
+    #         meter = pyln.Meter(sr)  # create BS.1770 meter
+    #     loudness = meter.integrated_loudness(clip)
+    #
+    #     # loudness normalize audio to -12 dB LUFS
+    #     clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
     samples_skip_end = 0
     # needed for correlation method
