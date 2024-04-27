@@ -339,12 +339,13 @@ def scrape(input_file):
         
         # Find clip occurrences in the full audio
         news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
-        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
-        print("news_report_peak_times",news_report_peak_times_formatted,"---")
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
             news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
+            
+        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
+        print("news_report_peak_times",news_report_peak_times_formatted,"---")
 
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
