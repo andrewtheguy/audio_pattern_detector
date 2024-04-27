@@ -295,7 +295,7 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
 def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, seconds_per_chunk, clip_name,
-                  method="correlation"):
+                  method="advanced_correlation"):
     clip_length = len(clip)
     new_seconds = len(chunk) / sr
     # Concatenate previous chunk for continuity in processing
