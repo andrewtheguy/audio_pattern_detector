@@ -194,7 +194,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
-    # -1 to exclude the max
+    # -1 to bump the max to be above 1
     correlation /= np.max(correlation) - 1
 
     #correlation = downsample(int(sr/10),correlation)
@@ -256,7 +256,8 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
-    correlation /= np.max(correlation)
+    # -1 to bump the max to be above 1
+    correlation /= np.max(correlation) - 1
 
     os.makedirs("./tmp/graph", exist_ok=True)
     #Optional: plot the correlation graph to visualize
