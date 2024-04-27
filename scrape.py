@@ -48,6 +48,12 @@ schedule={
     "KnowledgeCo":{"begin": 6,"end":8,"weekdays_human":[6]},
 }
 
+
+news_report_black_list_ts = {
+    "morningsuite20240424":[5342], # fake one
+    "KnowledgeCo20240427":[4157], # false positive
+}
+
 def url_ok(url):
  
  
@@ -318,9 +324,6 @@ def scrape(input_file):
     logger.debug("total_time",total_time,"---")
     #exit(1)
     if not tsformatted:
-        # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
-        print("news_report_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times],"---")
 
         #if any(basename.startswith(prefix) for prefix in ["happydaily","healthpedia"]):
         if any(basename.startswith(prefix) for prefix in ["happydaily"]):
@@ -333,17 +336,30 @@ def scrape(input_file):
             clips = introclips["KnowledgeCo"]
         else:
             raise NotImplementedError(f"not supported {basename}")
+        
+        # Find clip occurrences in the full audio
+        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file, method="correlation")
+        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
+        print("news_report_peak_times",news_report_peak_times_formatted,"---")
+        audio_name,_ = os.path.splitext(os.path.basename(input_file))
+        exclude_ts = news_report_black_list_ts.get(audio_name,None)
+        if exclude_ts:
+            news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
+
         program_intro_peak_times=[]
+        program_intro_peak_times_debug=[]
         for c in clips:
             #print(f"Finding {c}")
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file, method="correlation")
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
+            program_intro_peak_times_debug.append({c:[intros,[seconds_to_time(seconds=t,include_decimals=False) for t in intros]]})
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         # deduplicate
         program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
         logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
+        
 
         for offset in news_report_peak_times:
             logger.info(f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
@@ -354,12 +370,17 @@ def scrape(input_file):
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time)
         #print("pair",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
+
+        with open(f'{input_file}.separated.json','w') as f:
+            f.write(json.dumps({"news_report":[news_report_peak_times,news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
+
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     #print(pair)
     #logger.debug("tsformatted",tsformatted)
     with open(jsonfile,'w') as f:
         f.write(json.dumps(tsformatted, indent=4))
+
     splits=[]
 
     output_dir= os.path.abspath(os.path.join(f"{dir}","trimmed"))
