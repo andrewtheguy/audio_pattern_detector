@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-DEFAULT_METHOD="correlation"
+DEFAULT_METHOD="advanced_correlation"
 
 target_sample_rate = 8000
 
@@ -183,13 +183,13 @@ def compute_mod_z_score(data):
     return modified_z_scores
 
 
-max_test = []
+#max_test = []
 
 
 def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    global max_test
+    #global max_test
 
-    debug = False
+    #debug = False
 
     percentile_threshold = 0.05
 
@@ -201,37 +201,41 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     correlation /= np.max(correlation) - 1
 
     percentile=np.percentile(correlation, 95)
-    if not debug:
-        # won't try to match segments with too many matches
-        # because non matching looks the same
-        if percentile >= percentile_threshold:
-            return []
 
-    #correlation = downsample(int(sr/10),correlation)
-
-    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
-    if debug:
-        graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
-        os.makedirs(graph_dir, exist_ok=True)
-        # Optional: plot the correlation graph to visualize
-        plt.figure(figsize=(10, 4))
-        plt.plot(correlation)
-        plt.title('Cross-correlation between the audio clip and full track')
-        plt.xlabel('Lag')
-        plt.ylabel('Correlation coefficient')
-        plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
-        plt.close()
-
-        peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
-        os.makedirs(peak_dir, exist_ok=True)
-        print(f"np.percentile(correlation, 95) for {section_ts}",percentile)
+    # won't try to match segments with too many matches
+    # because non matching looks the same as too many matches
+    if percentile >= percentile_threshold:
+        return []
 
     height = 0.7
     # find the peaks in the spectrogram
     peaks, properties = find_peaks(correlation, height=height)
 
-    if debug:
-        print(json.dumps(peaks.tolist(), indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+    peak_times = peaks / sr
+
+    return peak_times
+
+    #correlation = downsample(int(sr/10),correlation)
+
+    # if debug:
+    #     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+    #     graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
+    #     os.makedirs(graph_dir, exist_ok=True)
+    #     # Optional: plot the correlation graph to visualize
+    #     plt.figure(figsize=(10, 4))
+    #     plt.plot(correlation)
+    #     plt.title('Cross-correlation between the audio clip and full track')
+    #     plt.xlabel('Lag')
+    #     plt.ylabel('Correlation coefficient')
+    #     plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+    #     plt.close()
+    #
+    #     peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
+    #     os.makedirs(peak_dir, exist_ok=True)
+    #     print(f"np.percentile(correlation, 95) for {section_ts}",percentile)
+    #
+    #     print(json.dumps(peaks.tolist(), indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+
 
     # outliers = compute_mod_z_score(correlation)
     #
@@ -253,14 +257,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     # max_test.append(max_score)
     # print(f"max_score for {clip_name} {section_ts}: {max_score}")
 
-    peaks_final=[]
-    # won't try to match segments with too many matches
-    # because non matching looks the same
-    if percentile < percentile_threshold:
-        peaks_final.extend(peaks)
-    peak_times = np.array(np.asarray(peaks_final)) / sr
 
-    return peak_times
 
 
 def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
