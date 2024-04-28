@@ -411,9 +411,12 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
     samples_skip_end = 0
+
     # needed for correlation method
     if method == "correlation":
-        audio_section = np.concatenate((audio_section, clip))
+        #pad zeros to the beginning
+        zeroes = np.zeros(clip_length+1*sr)
+        audio_section = np.concatenate((audio_section,zeroes,clip))
         samples_skip_end = clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
