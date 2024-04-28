@@ -186,6 +186,13 @@ def compute_mod_z_score(data):
     modified_z_scores = 0.6745 * (data - median) / median_absolute_deviation
     return modified_z_scores
 
+def max_distance(sorted_data):
+    max_dist = 0
+    for i in range(1, len(sorted_data)):
+        dist = sorted_data[i] - sorted_data[i - 1]
+        max_dist = max(max_dist, dist)
+    return max_dist
+
 
 def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     global plot_test_x
@@ -220,7 +227,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
     height = 0.7
     # won work well for small clips
-    distance = clip_length
+    distance = max(1*sr,clip_length)
     # find the peaks in the spectrogram
     peaks, properties = find_peaks(correlation,height=height,distance=distance,prominence=0.7)
 
@@ -254,11 +261,9 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     if percentile >= percentile_threshold:
         return []
 
-    max_dist = 0
-    for i in range(1, len(peaks)):
-        dist = peaks[i] - peaks[i - 1]
-        max_dist = max(max_dist, dist)
+    max_dist = max_distance(peaks)
 
+    # multiple far away
     if max_dist > 0:
         max_allowed_between = clip_length + 2 * sr
         max_allowed_between_seconds = max_allowed_between / sr
