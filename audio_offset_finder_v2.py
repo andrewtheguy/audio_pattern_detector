@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-DEFAULT_METHOD="correlation"
+DEFAULT_METHOD="advanced_correlation"
 
 target_sample_rate = 8000
 
@@ -196,7 +196,6 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
     debug = True
 
-    percentile_threshold = 0.05
 
     #threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
@@ -208,22 +207,25 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     percentile=np.percentile(correlation, 95)
 
     height = 0.7
+    # won work well for small clips
+    distance = max(1 * sr, clip_length)
     # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation, height=height, distance=clip_length)
+    peaks, properties = find_peaks(correlation,height=height,distance=distance)
 
     if debug:
+        #print("clip_length", clip_length)
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
         print(f"percentile for {section_ts}", percentile)
-        # graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
-        # os.makedirs(graph_dir, exist_ok=True)
-        # # Optional: plot the correlation graph to visualize
-        # plt.figure(figsize=(10, 4))
-        # plt.plot(correlation)
-        # plt.title('Cross-correlation between the audio clip and full track')
-        # plt.xlabel('Lag')
-        # plt.ylabel('Correlation coefficient')
-        # plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
-        # plt.close()
+        graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
+        # Optional: plot the correlation graph to visualize
+        plt.figure(figsize=(10, 4))
+        plt.plot(correlation)
+        plt.title('Cross-correlation between the audio clip and full track')
+        plt.xlabel('Lag')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+        plt.close()
 
         peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
@@ -232,6 +234,8 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
             plot_test_y=np.append(plot_test_y, item)
         print(json.dumps((peaks/sr).tolist(), indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
+
+    percentile_threshold = 0.1
     # won't try to match segments with too many matches
     # because non matching looks the same as too many matches
     if percentile >= percentile_threshold:
