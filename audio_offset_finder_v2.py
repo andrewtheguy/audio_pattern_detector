@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-DEFAULT_METHOD="advanced_correlation"
+DEFAULT_METHOD="correlation"
 
 target_sample_rate = 8000
 
@@ -219,11 +219,14 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     #     plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
     #     plt.close()
 
+    # abs
     correlation = np.abs(correlation)
+    # replace negative values with zero in array instead of above
+    #correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
-    percentile=np.percentile(correlation, 99)
-    percentile_threshold = 0.20
+    percentile=np.percentile(correlation, 95)
+    percentile_threshold = 0.05
 
     height = 0.7
     # won work well for small clips
@@ -267,7 +270,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     if max_dist > 0:
         max_allowed_between = clip_length + 2 * sr
         max_allowed_between_seconds = max_allowed_between / sr
-        print(max_dist / sr)
+        #print(max_dist / sr)
         if(max_dist > clip_length+max_allowed_between):
             print("skipping {} because it has peak with distance larger than {} seconds".format(section_ts,max_allowed_between_seconds))
             return []
@@ -325,7 +328,10 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
-    correlation = np.abs(correlation)
+    # abs
+    #correlation = np.abs(correlation)
+    # replace negative values with zero in array instead of above
+    correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
     os.makedirs("./tmp/graph", exist_ok=True)
