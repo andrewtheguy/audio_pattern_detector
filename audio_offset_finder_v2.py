@@ -192,27 +192,41 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     global plot_test_y
 
     clip_length = len(clip)
+    clip_length_seconds = len(clip)/sr
     #print(clip_length)
 
 
     #threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
-    correlation = np.abs(correlation)
-    # -1 to bump the max to be above 1
-    correlation /= np.max(correlation) - 1
+    # if debug_mode:
+    #     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+    #     graph_dir = f"./tmp/graph/cross_correlation_orig_{clip_name}"
+    #     os.makedirs(graph_dir, exist_ok=True)
+    #     # Optional: plot the correlation graph to visualize
+    #     plt.figure(figsize=(10, 4))
+    #     plt.plot(correlation)
+    #     plt.title('Cross-correlation between the audio clip and full track')
+    #     plt.xlabel('Lag')
+    #     plt.ylabel('Correlation coefficient')
+    #     plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+    #     plt.close()
 
-    percentile=np.percentile(correlation, 95)
+    correlation = np.abs(correlation)
+    correlation /= np.max(correlation)
+
+    percentile=np.percentile(correlation, 99)
+    percentile_threshold = 0.20
 
     height = 0.7
     # won work well for small clips
     distance = clip_length
     # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation,height=height,distance=distance)
+    peaks, properties = find_peaks(correlation,height=height,distance=distance,prominence=0.7)
 
+    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
     if debug_mode:
         #print("clip_length", clip_length)
-        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
         print(f"percentile for {section_ts}", percentile)
         graph_dir = f"./tmp/graph/cross_correlation_{clip_name}"
         os.makedirs(graph_dir, exist_ok=True)
@@ -227,17 +241,31 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
         peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
+        peaks_test=[]
         for item in (peaks):
-            plot_test_x=np.append(plot_test_x, index)
-            plot_test_y=np.append(plot_test_y, item)
-        print(json.dumps((peaks/sr).tolist(), indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+            #plot_test_x=np.append(plot_test_x, index)
+            #plot_test_y=np.append(plot_test_y, item)
+            peaks_test.append([int(item),item/sr,correlation[item]])
+        print(json.dumps(peaks_test, indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
 
-    percentile_threshold = 0.05
     # won't try to match segments with too many matches
     # because non matching looks the same as too many matches
     if percentile >= percentile_threshold:
         return []
+
+    max_dist = 0
+    for i in range(1, len(peaks)):
+        dist = peaks[i] - peaks[i - 1]
+        max_dist = max(max_dist, dist)
+
+    if max_dist > 0:
+        max_allowed_between = clip_length + 2 * sr
+        max_allowed_between_seconds = max_allowed_between / sr
+        print(max_dist / sr)
+        if(max_dist > clip_length+max_allowed_between):
+            print("skipping {} because it has peak with distance larger than {} seconds".format(section_ts,max_allowed_between_seconds))
+            return []
 
     peak_times = peaks / sr
 
@@ -293,8 +321,7 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     correlation = np.abs(correlation)
-    # -1 to bump the max to be above 1
-    correlation /= np.max(correlation) - 1
+    correlation /= np.max(correlation)
 
     os.makedirs("./tmp/graph", exist_ok=True)
     if debug_mode:
