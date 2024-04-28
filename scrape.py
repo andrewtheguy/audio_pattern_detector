@@ -50,7 +50,7 @@ schedule={
     "KnowledgeCo":{"begin": 6,"end":8,"weekdays_human":[6]},
 }
 
-news_report_clip='rthk_beep.wav'
+news_report_clip='rthk_beep2.wav'
 
 
 news_report_black_list_ts = {
