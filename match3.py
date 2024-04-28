@@ -13,10 +13,11 @@ import matplotlib.pyplot as plt
 import ffmpeg
 import librosa
 import soundfile as sf
-from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD, cleanup_peak_times
+from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD, cleanup_peak_times, set_debug_mode
 from andrew_utils import seconds_to_time
 
 def main():
+    set_debug_mode(True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
