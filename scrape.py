@@ -50,12 +50,12 @@ schedule={
     "KnowledgeCo":{"begin": 6,"end":8,"weekdays_human":[6]},
 }
 
-news_report_clip='rthk_beep2.wav'
+news_report_clip='rthk_beep.wav'
 
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
-    #"KnowledgeCo20240427":[4157], # false positive 01:09:17
+    "KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
 def url_ok(url):
