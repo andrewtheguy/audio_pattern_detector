@@ -347,8 +347,10 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
         plt.close()
 
     peaks = np.where(correlation > threshold)[0]
+    #print("peaks",peaks)
 
     peak_times = np.array(peaks) / sr
+    #print("peak_times", peak_times)
 
     return peak_times
 
@@ -470,10 +472,10 @@ def cleanup_peak_times(peak_times):
 
     #print('before consolidate',peak_times)
 
-    # deduplicate
-    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
+    # deduplicate by seconds, needed if skip those less than 10 seconds not enabled
+    #peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
-    peak_times_clean2 = deque(sorted(peak_times_clean))
+    peak_times_clean2 = deque(sorted(peak_times))
     #print('before remove close',peak_times_clean2)
 
     peak_times_final = []
