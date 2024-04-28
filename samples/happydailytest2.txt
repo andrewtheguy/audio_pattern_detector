@@ -1,0 +1,22 @@
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file ./tmp/happydailytest2.wav --pattern audio_clips/rthk_beep.wav
+[598, 2398]
+Clip occurs at the following times (in seconds): 00:09:58
+Clip occurs at the following times (in seconds): 00:39:58
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder %
+
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file ./tmp/happydailytest2.wav --pattern audio_clips/rthk1theme.wav
+adjusted sliding_window to 6
+[1055, 2660]
+Clip occurs at the following times (in seconds): 00:17:35
+Clip occurs at the following times (in seconds): 00:44:20
+
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file ./tmp/happydailytest2.wav --pattern audio_clips/happydailyfemaleintro.wav
+adjusted sliding_window to 7
+[1160]
+Clip occurs at the following times (in seconds): 00:19:20
+
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file ./tmp/happydailytest2.wav --pattern audio_clips/happydailyfemale2.wav
+adjusted sliding_window to 6
+[1161, 1502]
+Clip occurs at the following times (in seconds): 00:19:21
+Clip occurs at the following times (in seconds): 00:25:02
