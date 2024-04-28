@@ -323,9 +323,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
 
 
-
 def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     # abs
@@ -334,8 +332,18 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     #correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
-    os.makedirs("./tmp/graph", exist_ok=True)
+    clip_length = len(clip)
+
+    height = 0.7
+    distance = clip_length
+    # find the peaks in the spectrogram
+    peaks, properties = find_peaks(correlation, height=height, distance=distance, prominence=0.7)
+
+    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
     if debug_mode:
+        print(f"correlation_method peaks for {section_ts}", peaks)
+        os.makedirs("./tmp/graph", exist_ok=True)
+
         #Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
         plt.plot(correlation)
@@ -346,13 +354,21 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
             f'./tmp/graph/cross_correlation_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.png')
         plt.close()
 
-    peaks = np.where(correlation > threshold)[0]
-    #print("peaks",peaks)
+        peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
+        os.makedirs(peak_dir, exist_ok=True)
+        peaks_test=[]
+        for item in (peaks):
+            #plot_test_x=np.append(plot_test_x, index)
+            #plot_test_y=np.append(plot_test_y, item)
+            peaks_test.append([int(item),item/sr,correlation[item]])
+        print(json.dumps(peaks_test, indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+
+    #peaks = np.where(correlation > threshold)[0]
 
     peak_times = np.array(peaks) / sr
-    #print("peak_times", peak_times)
 
     return peak_times
+
 
 
 # sliding_window: for previous_chunk in seconds from end
@@ -472,8 +488,8 @@ def cleanup_peak_times(peak_times):
 
     #print('before consolidate',peak_times)
 
-    # deduplicate by seconds, needed if skip those less than 10 seconds not enabled
-    #peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
+    # deduplicate by seconds
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
     peak_times_clean2 = deque(sorted(peak_times))
     #print('before remove close',peak_times_clean2)
