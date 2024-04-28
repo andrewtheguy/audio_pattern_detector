@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-DEFAULT_METHOD="correlation"
+DEFAULT_METHOD="advanced_correlation"
 
 target_sample_rate = 8000
 
@@ -229,8 +229,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     percentile_threshold = 0.05
 
     height = 0.7
-    # won work well for small clips
-    distance = max(1*sr,clip_length)
+    distance = clip_length
     # find the peaks in the spectrogram
     peaks, properties = find_peaks(correlation,height=height,distance=distance,prominence=0.7)
 
