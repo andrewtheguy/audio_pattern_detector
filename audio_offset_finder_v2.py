@@ -472,10 +472,10 @@ def cleanup_peak_times(peak_times):
 
     #print('before consolidate',peak_times)
 
-    # deduplicate by seconds, needed if skip those less than 10 seconds not enabled
-    #peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
+    # deduplicate by seconds
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
 
-    peak_times_clean2 = deque(sorted(peak_times))
+    peak_times_clean2 = deque(sorted(peak_times_clean))
     #print('before remove close',peak_times_clean2)
 
     peak_times_final = []
