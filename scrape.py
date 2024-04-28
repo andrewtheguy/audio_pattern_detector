@@ -150,7 +150,7 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
 
 
     # will bug out if not sorted
-com    # TODO maybe require input to be sorted first to prevent
+    # TODO maybe require input to be sorted first to prevent
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
