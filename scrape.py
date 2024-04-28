@@ -20,7 +20,8 @@ import paramiko
 import pytz
 import requests
 
-from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
+from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD, \
+    cleanup_peak_times
 from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 import utils
@@ -353,6 +354,7 @@ def scrape(input_file):
         
         # Find clip occurrences in the full audio
         news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}', input_file,method=DEFAULT_METHOD)
+        news_report_peak_times = cleanup_peak_times(news_report_peak_times)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
@@ -372,9 +374,7 @@ def scrape(input_file):
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
             program_intro_peak_times_debug.append({c:[intros,[seconds_to_time(seconds=t,include_decimals=False) for t in intros]]})
-        #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
-        # deduplicate
-        program_intro_peak_times = list(sorted(dict.fromkeys([peak for peak in program_intro_peak_times])))
+        program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
 

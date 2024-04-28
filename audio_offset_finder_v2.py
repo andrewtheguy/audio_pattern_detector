@@ -194,7 +194,7 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
     clip_length = len(clip)
     #print(clip_length)
 
-    debug = True
+    debug = False
 
 
     #threshold = 0.7  # Threshold for distinguishing peaks, need to be smaller for larger clips
@@ -587,17 +587,17 @@ def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method):
     process.wait()
 
     if(method == "advanced_correlation"):
-        name = os.path.basename(full_audio_path)
+        pass
         #Optional: plot the correlation graph to visualize
-        graph_dir = f"./tmp/graph/scatter/{name}"
-        os.makedirs(graph_dir, exist_ok=True)
-        plt.figure(figsize=(30, 10))
-        plt.scatter(x=plot_test_x,y=plot_test_y)
-        plt.title('test')
-        plt.xlabel('time')
-        plt.ylabel('peaks')
-        plt.savefig(f'{graph_dir}/{clip_name}.png')
-        plt.close()
+        #name = os.path.basename(full_audio_path)
+        # graph_dir = f"./tmp/graph/scatter/{name}"
+        # os.makedirs(graph_dir, exist_ok=True)
+        # plt.figure(figsize=(30, 10))
+        # plt.scatter(x=plot_test_x,y=plot_test_y)
+        # plt.title('test')
+        # plt.xlabel('time')
+        # plt.ylabel('peaks')
+        # plt.savefig(f'{graph_dir}/{clip_name}.png')
+        # plt.close()
 
-    peak_times_clean = cleanup_peak_times(all_peak_times)
-    return peak_times_clean
+    return all_peak_times
