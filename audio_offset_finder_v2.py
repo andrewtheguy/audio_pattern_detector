@@ -329,9 +329,9 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     # abs
-    #correlation = np.abs(correlation)
+    correlation = np.abs(correlation)
     # replace negative values with zero in array instead of above
-    correlation[correlation < 0] = 0
+    #correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
     os.makedirs("./tmp/graph", exist_ok=True)
