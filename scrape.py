@@ -49,6 +49,8 @@ schedule={
     "KnowledgeCo":{"begin": 6,"end":8,"weekdays_human":[6]},
 }
 
+news_report_clip='rthk_beep.wav'
+
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
@@ -350,7 +352,7 @@ def scrape(input_file):
             raise NotImplementedError(f"not supported {basename}")
         
         # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks('./audio_clips/rthk_beep.wav', input_file,method=DEFAULT_METHOD)
+        news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}', input_file,method=DEFAULT_METHOD)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
