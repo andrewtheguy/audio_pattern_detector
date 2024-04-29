@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-DEFAULT_METHOD="advanced_correlation"
+DEFAULT_METHOD="correlation"
 
 target_sample_rate = 8000
 
@@ -154,17 +154,6 @@ def downsample(factor, values):
     return np.array(downsampled_values)
 
 
-def find_outliers(data):
-    mean = np.mean(data)
-    std = np.std(data)
-
-    threshold = 3
-    outliers = []
-    for x in data:
-        z_score = (x - mean) / std
-        if abs(z_score) > threshold:
-            outliers.append(x)
-    return outliers
 
 
 def compute_mod_z_score(data):
@@ -197,7 +186,8 @@ def max_distance(sorted_data):
 def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     global plot_test_x
     global plot_test_y
-
+    #if index >6:
+    #    return []
     clip_length = len(clip)
     clip_length_seconds = len(clip)/sr
     #print(clip_length)
