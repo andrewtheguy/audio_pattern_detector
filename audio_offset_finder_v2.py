@@ -139,7 +139,7 @@ def chroma_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    if index not in [0,1,2,3,4,5]:
+    if index not in [52,53,54,55,56]:
         return []
     hop_length = int(sr/2)  # Ensure this matches the hop_length used for Mel Spectrogram
 
@@ -472,12 +472,12 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     samples_skip_end = 0
 
     # needed for correlation method
-    if method == "correlation":
+    if True:
         zeroes_second_pad=1
         #pad zeros to the beginning
         zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
-        audio_section = np.concatenate((audio_section,zeroes,clip))
-        samples_skip_end = zeroes_second_pad*sr + clip_length
+        audio_section = np.concatenate((audio_section,zeroes,clip,zeroes))
+        samples_skip_end = zeroes_second_pad*sr*2 + clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
