@@ -414,7 +414,7 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
     peak_times = np.array(peaks) / sr
 
-    print("peak_times",peak_times)
+    #print("peak_times",peak_times)
 
     return peak_times
 
@@ -447,7 +447,7 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     # peak normalize audio to -1 dB
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
-    normalize = False
+    normalize = True
     # if normalize:
     #     audio_section = audio_section / np.max(np.abs(audio_section))
     #     clip = clip / np.max(np.abs(clip))
