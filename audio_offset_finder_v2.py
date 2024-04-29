@@ -371,8 +371,6 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
 
 def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    if(index not in [25]):
-        return []
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     # abs
@@ -449,7 +447,7 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     # peak normalize audio to -1 dB
     #audio_section = pyln.normalize.peak(audio_section, -1.0)
 
-    normalize = True
+    normalize = False
     # if normalize:
     #     audio_section = audio_section / np.max(np.abs(audio_section))
     #     clip = clip / np.max(np.abs(clip))
