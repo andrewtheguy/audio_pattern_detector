@@ -100,31 +100,18 @@ def chroma_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    #if(index != 0):
-    #    return []
-    # Compute mel spectrograms
-    mel_spec_short = librosa.feature.melspectrogram(y=clip, sr=sr)
-    mel_spec_long = librosa.feature.melspectrogram(y=audio, sr=sr)
+    if(index!=0):
+        return []
+    # Extract features from the audio clip and the pattern
+    audio_features = librosa.feature.mfcc(y=audio, sr=sr)
+    pattern_features = librosa.feature.mfcc(y=clip, sr=sr)
 
-    # Calculate the cosine similarity matrix
-    #similarity_matrix = librosa.core.segment_distance(mel_spec_short.T, mel_spec_long.T, metric='cosine')
-    similarity_matrix = cosine_similarity(mel_spec_short.T, mel_spec_long.T)
+    # Compute the similarity matrix between the audio features and the pattern features
+    similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
+    print("similarity_matrix",similarity_matrix)
 
-    # Find the minimum distance for each time frame in the short clip
-    min_distance = np.min(similarity_matrix, axis=1)
-
-    # Set a threshold (adjust as needed)
-    threshold = 0.1  # Example threshold, adjust based on your data
-
-    # Identify potential matches
-    match_indices = np.where(min_distance < threshold)[0]
-
-    # Convert indices to time
-    match_times = librosa.frames_to_time(match_indices, sr=sr)
-
-    print("Matches found at:")
-    for time in match_times:
-        print(f"- {time:.2f} seconds")
+    # Find the indices of the maximum similarity values
+    indices = np.argmax(similarity_matrix, axis=1)
 
 
     if debug_mode:
@@ -133,14 +120,14 @@ def mfcc_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
         os.makedirs(graph_dir, exist_ok=True)
         # Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
-        plt.plot(min_distance)
+        plt.plot(indices)
         plt.title('mfcc_method')
         plt.xlabel('x')
         plt.ylabel('y')
         plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
         plt.close()
 
-    print(min_distance)
+    print(indices)
 
     # plt.imshow(similarity_matrix, origin='lower', aspect='auto')
     # plt.xlabel("Frame in Long Clip")
@@ -473,11 +460,11 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     samples_skip_end = 0
 
     # needed for correlation method
-    #if method == "correlation":
-    #pad zeros to the beginning and end
-    zeroes = np.zeros(clip_length+1*sr)
-    audio_section = np.concatenate((audio_section,zeroes,clip,zeroes))
-    samples_skip_end = clip_length * 2
+    if method == "correlation":
+        #pad zeros to the beginning and end
+        zeroes = np.zeros(clip_length+1*sr)
+        audio_section = np.concatenate((audio_section,zeroes,clip,zeroes))
+        samples_skip_end = clip_length * 2
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
@@ -492,7 +479,7 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         peak_times = advanced_correlation_method(clip, audio=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     elif method == "mfcc":
-        peak_times = mfcc_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
+        peak_times = mfcc_method2(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
                                  clip_name=clip_name)
     elif method == "chroma_method":
         peak_times = chroma_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
