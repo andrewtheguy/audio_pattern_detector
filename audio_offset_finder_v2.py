@@ -181,7 +181,7 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
         print("peaks",peaks)
         print("property", property)
         print("average",np.mean(inverted_distances))
-        percentile = np.percentile(inverted_distances,95)
+        percentile = np.percentile(inverted_distances,99)
         print("percentile", percentile)
         zscores=scipy.stats.zscore(inverted_distances)
         print("zscores", zscores[peaks])
