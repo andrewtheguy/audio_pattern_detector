@@ -144,7 +144,7 @@ def publish_podcast(folder,title,inputs,dest_dir):
     remote_name = f"{title_clean}_{suffix}"
     data = {"key":remote_name,"xml":feed}
     upload_cloudflare(data)
-    logger.info(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
+    print(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
 
     paginator = s3.get_paginator('list_objects_v2')
 
