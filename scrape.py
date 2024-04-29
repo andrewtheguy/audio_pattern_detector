@@ -485,10 +485,10 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        for i in range(7):
+        for i in range(1):
             download_and_scrape(days_ago=i, download_only=True)
     elif(args.action == 'download_and_scrape'):
-        for i in range(7):
+        for i in range(1):
             download_and_scrape(days_ago=i)
     else:
         raise ValueError(f"unknown action {args.action}")
