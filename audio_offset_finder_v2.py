@@ -9,6 +9,7 @@ import pdb
 import time
 import librosa
 import numpy as np
+import scipy
 from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
@@ -173,17 +174,23 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
     #print(distances)
     wlen = max(1, int(hop_length / 64))
-    peaks,property = find_peaks(inverted_distances,wlen=wlen,width=[0,hop_length/48],prominence=0.20,rel_height=0.75)
+    peaks,property = find_peaks(inverted_distances,wlen=wlen,width=[0,hop_length/64],prominence=0.20,rel_height=1)
     if len(peaks)>0:
         print("index",index)
-        print(peaks)
+        print("time", seconds_to_time(seconds=index * seconds_per_chunk))
+        print("peaks",peaks)
         print("property", property)
+        print("average",np.mean(inverted_distances))
+        percentile = np.percentile(inverted_distances,95)
+        print("percentile", percentile)
+        zscores=scipy.stats.zscore(inverted_distances)
+        print("zscores", zscores[peaks])
+        print("peaks values",inverted_distances[peaks])
 
-    # Find minimum distance and its index
-    #match_index = np.argmin(distances)
-    #min_distance = distances[match_index]
-
-    #distances_selected = np.where(distances / min_distance <= 1.05)[0]
+        # Create a boolean mask based on the threshold condition
+        mask = inverted_distances[peaks] - percentile >= 0
+        # Apply the mask to filter the indices
+        peaks = peaks[mask]
 
     # Convert match index to timestamp
     match_times = (peaks * hop_length) / sr  # sr is the sampling rate of audio
