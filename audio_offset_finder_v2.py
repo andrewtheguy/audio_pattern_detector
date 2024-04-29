@@ -139,9 +139,9 @@ def chroma_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    if index not in [52,53,54,55,56]:
-        return []
-    hop_length = int(sr/2)  # Ensure this matches the hop_length used for Mel Spectrogram
+    #if index not in [54,55,56,57,58,59,60]:
+    #    return []
+    hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
 
     # Extract MFCC features
     clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
@@ -156,6 +156,7 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
     max_distance = np.max(distances)
     #print(max_distance)
     inverted_distances = (max_distance-distances)/max_distance
+    #inverted_distances = inverted_distances - np.mean(inverted_distances)
 
     if debug_mode:
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
@@ -171,11 +172,12 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
         plt.close()
 
     #print(distances)
-
-    peaks,property = find_peaks(inverted_distances)
-    print("index",index)
-    print(peaks)
-    print("property", property)
+    wlen = max(1, int(hop_length / 64))
+    peaks,property = find_peaks(inverted_distances,wlen=wlen,width=[0,hop_length/48],prominence=0.20,rel_height=0.75)
+    if len(peaks)>0:
+        print("index",index)
+        print(peaks)
+        print("property", property)
 
     # Find minimum distance and its index
     #match_index = np.argmin(distances)
@@ -185,7 +187,8 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
     # Convert match index to timestamp
     match_times = (peaks * hop_length) / sr  # sr is the sampling rate of audio
-    print("match_times",match_times)
+    if len(peaks) > 0:
+        print("match_times",match_times)
 
     return match_times
 
@@ -472,12 +475,12 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     samples_skip_end = 0
 
     # needed for correlation method
-    if True:
+    if method == "correlation":
         zeroes_second_pad=1
         #pad zeros to the beginning
         zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
-        audio_section = np.concatenate((audio_section,zeroes,clip,zeroes))
-        samples_skip_end = zeroes_second_pad*sr*2 + clip_length
+        audio_section = np.concatenate((audio_section,zeroes,clip))
+        samples_skip_end = zeroes_second_pad*sr + clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
