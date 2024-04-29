@@ -25,6 +25,7 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
+from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
 
@@ -55,56 +56,98 @@ def load_audio_file(file_path, sr=None):
 
 
 # sample rate needs to be the same for both or bugs will happen
-def chroma_method(clip, audio, sr):
-    #global method_count
-    # Extract features from the audio clip and the pattern
-    audio_features = librosa.feature.chroma_cqt(y=audio, sr=sr)
-    pattern_features = librosa.feature.chroma_cqt(y=clip, sr=sr)
+def chroma_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
+    hop_length = 512
+    # Extract chroma features
+    clip_mfcc = librosa.feature.chroma_cqt(y=clip, sr=sr, hop_length=hop_length)
+    audio_mfcc = librosa.feature.chroma_cqt(y=audio, sr=sr, hop_length=hop_length)
 
-    # Compute the similarity matrix between the audio features and the pattern features
-    similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
+    distances = []
+    for i in range(audio_mfcc.shape[1] - clip_mfcc.shape[1] + 1):
+        dist = np.linalg.norm(clip_mfcc - audio_mfcc[:, i:i + clip_mfcc.shape[1]])
+        distances.append(dist)
 
-    # Find the indices of the maximum similarity values
-    indices = np.argmax(similarity_matrix, axis=1)
+    # Find minimum distance and its index
+    match_index = np.argmin(distances)
+    min_distance = distances[match_index]
 
-    # Get the corresponding time stamps of the matched patterns
-    time_stamps = librosa.frames_to_time(indices, sr=sr)
-    #method_count = method_count + 1
-    return time_stamps
+    if debug_mode:
+        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+        graph_dir = f"./tmp/chroma/cross_correlation_orig_{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
+        # Optional: plot the correlation graph to visualize
+        plt.figure(figsize=(10, 4))
+        plt.plot(distances)
+        plt.title('mfcc_method')
+        plt.xlabel('Lag')
+        plt.ylabel('y')
+        plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+        plt.close()
 
-#
-# # sample rate needs to be the same for both or bugs will happen
-# def mfcc_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
-#     # Extract features from the audio clip and the pattern
-#     audio_features = librosa.feature.mfcc(y=audio, sr=sr)
-#     pattern_features = librosa.feature.mfcc(y=clip, sr=sr)
-#
-#     # Compute the similarity matrix between the audio features and the pattern features
-#     similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
-#
-#     # Find the indices of the maximum similarity values
-#     indices = np.argmax(similarity_matrix, axis=1)
-#     #axis1_values = np.take(arr, 1, axis=1)
-#
-#     if debug_mode:
-#         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
-#         graph_dir = f"./tmp/mfcc/cross_correlation_orig_{clip_name}"
-#         os.makedirs(graph_dir, exist_ok=True)
-#         # Optional: plot the correlation graph to visualize
-#         plt.figure(figsize=(10, 4))
-#         plt.plot(indices)
-#         plt.title('mfcc_method')
-#         plt.xlabel('Lag')
-#         plt.ylabel('y')
-#         plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
-#         plt.close()
-#
-#     print(indices)
-#
-#     # Get the corresponding time stamps of the matched patterns
-#     time_stamps = librosa.frames_to_time(indices, sr=sr)
-#
-#     return time_stamps
+    print(distances)
+
+    #distances_ratio = [dist / min_distance for dist in distances]
+
+
+
+    distances_selected = np.where(distances / min_distance <= 1.05)[0]
+
+    # Convert match index to timestamp
+    match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
+
+    return match_times
+
+
+# sample rate needs to be the same for both or bugs will happen
+def mfcc_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
+    #if(index != 0):
+    #    return []
+    # Compute mel spectrograms
+    mel_spec_short = librosa.feature.melspectrogram(y=clip, sr=sr)
+    mel_spec_long = librosa.feature.melspectrogram(y=audio, sr=sr)
+
+    # Calculate the cosine similarity matrix
+    #similarity_matrix = librosa.core.segment_distance(mel_spec_short.T, mel_spec_long.T, metric='cosine')
+    similarity_matrix = cosine_similarity(mel_spec_short.T, mel_spec_long.T)
+
+    # Find the minimum distance for each time frame in the short clip
+    min_distance = np.min(similarity_matrix, axis=1)
+
+    # Set a threshold (adjust as needed)
+    threshold = 0.1  # Example threshold, adjust based on your data
+
+    # Identify potential matches
+    match_indices = np.where(min_distance < threshold)[0]
+
+    # Convert indices to time
+    match_times = librosa.frames_to_time(match_indices, sr=sr)
+
+    print("Matches found at:")
+    for time in match_times:
+        print(f"- {time:.2f} seconds")
+
+
+    if debug_mode:
+        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+        graph_dir = f"./tmp/mfcc_new/{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
+        # Optional: plot the correlation graph to visualize
+        plt.figure(figsize=(10, 4))
+        plt.plot(min_distance)
+        plt.title('mfcc_method')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+        plt.close()
+
+    print(min_distance)
+
+    # plt.imshow(similarity_matrix, origin='lower', aspect='auto')
+    # plt.xlabel("Frame in Long Clip")
+    # plt.ylabel("Frame in Short Clip")
+    # plt.title("Cosine Similarity Matrix")
+    # plt.show()
+    return []
 
 
 # sample rate needs to be the same for both or bugs will happen
@@ -430,11 +473,11 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     samples_skip_end = 0
 
     # needed for correlation method
-    if method == "correlation":
-        #pad zeros to the beginning
-        zeroes = np.zeros(clip_length+1*sr)
-        audio_section = np.concatenate((audio_section,zeroes,clip))
-        samples_skip_end = clip_length
+    #if method == "correlation":
+    #pad zeros to the beginning and end
+    zeroes = np.zeros(clip_length+1*sr)
+    audio_section = np.concatenate((audio_section,zeroes,clip,zeroes))
+    samples_skip_end = clip_length * 2
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
@@ -449,10 +492,11 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         peak_times = advanced_correlation_method(clip, audio=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     elif method == "mfcc":
-        peak_times = mfcc_method2(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
+        peak_times = mfcc_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
                                  clip_name=clip_name)
     elif method == "chroma_method":
-        peak_times = chroma_method(clip, audio=audio_section, sr=sr)
+        peak_times = chroma_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
+                                 clip_name=clip_name)
     else:
         raise ValueError("unknown method")
 
