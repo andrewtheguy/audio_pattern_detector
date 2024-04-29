@@ -97,50 +97,51 @@ def chroma_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
 
     return match_times
 
-
-# sample rate needs to be the same for both or bugs will happen
-def mfcc_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    if(index!=0):
-        return []
-    # Extract features from the audio clip and the pattern
-    audio_features = librosa.feature.mfcc(y=audio, sr=sr)
-    pattern_features = librosa.feature.mfcc(y=clip, sr=sr)
-
-    # Compute the similarity matrix between the audio features and the pattern features
-    similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
-    print("similarity_matrix",similarity_matrix)
-
-    # Find the indices of the maximum similarity values
-    indices = np.argmax(similarity_matrix, axis=1)
-
-
-    if debug_mode:
-        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
-        graph_dir = f"./tmp/mfcc_new/{clip_name}"
-        os.makedirs(graph_dir, exist_ok=True)
-        # Optional: plot the correlation graph to visualize
-        plt.figure(figsize=(10, 4))
-        plt.plot(indices)
-        plt.title('mfcc_method')
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
-        plt.close()
-
-    print(indices)
-
-    # plt.imshow(similarity_matrix, origin='lower', aspect='auto')
-    # plt.xlabel("Frame in Long Clip")
-    # plt.ylabel("Frame in Short Clip")
-    # plt.title("Cosine Similarity Matrix")
-    # plt.show()
-    return []
+#
+# # sample rate needs to be the same for both or bugs will happen
+# def mfcc_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
+#     if(index!=0):
+#         return []
+#     # Extract features from the audio clip and the pattern
+#     audio_features = librosa.feature.mfcc(y=audio, sr=sr)
+#     pattern_features = librosa.feature.mfcc(y=clip, sr=sr)
+#
+#     # Compute the similarity matrix between the audio features and the pattern features
+#     similarity_matrix = librosa.segment.cross_similarity(audio_features, pattern_features, mode='distance')
+#     print("similarity_matrix",similarity_matrix)
+#
+#     # Find the indices of the maximum similarity values
+#     indices = np.argmax(similarity_matrix, axis=1)
+#
+#
+#     if debug_mode:
+#         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+#         graph_dir = f"./tmp/mfcc_new/{clip_name}"
+#         os.makedirs(graph_dir, exist_ok=True)
+#         # Optional: plot the correlation graph to visualize
+#         plt.figure(figsize=(10, 4))
+#         plt.plot(indices)
+#         plt.title('mfcc_method')
+#         plt.xlabel('x')
+#         plt.ylabel('y')
+#         plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
+#         plt.close()
+#
+#     print(indices)
+#
+#     # plt.imshow(similarity_matrix, origin='lower', aspect='auto')
+#     # plt.xlabel("Frame in Long Clip")
+#     # plt.ylabel("Frame in Short Clip")
+#     # plt.title("Cosine Similarity Matrix")
+#     # plt.show()
+#     return []
 
 
 # sample rate needs to be the same for both or bugs will happen
 def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
-    frame = len(clip)
-    hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
+    if index not in [0,1,2,3,4,5]:
+        return []
+    hop_length = int(sr/2)  # Ensure this matches the hop_length used for Mel Spectrogram
 
     # Extract MFCC features
     clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
@@ -151,9 +152,10 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
         dist = np.linalg.norm(clip_mfcc - audio_mfcc[:, i:i + clip_mfcc.shape[1]])
         distances.append(dist)
 
-    # Find minimum distance and its index
-    match_index = np.argmin(distances)
-    min_distance = distances[match_index]
+    distances = np.array(distances)
+    max_distance = np.max(distances)
+    #print(max_distance)
+    inverted_distances = (max_distance-distances)/max_distance
 
     if debug_mode:
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
@@ -161,23 +163,29 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
         os.makedirs(graph_dir, exist_ok=True)
         # Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
-        plt.plot(distances)
+        plt.plot(inverted_distances)
         plt.title('mfcc_method')
-        plt.xlabel('Lag')
+        plt.xlabel('frame')
         plt.ylabel('y')
         plt.savefig(f'{graph_dir}/{index}_{section_ts}.png')
         plt.close()
 
-    print(distances)
+    #print(distances)
 
-    #distances_ratio = [dist / min_distance for dist in distances]
+    peaks,property = find_peaks(inverted_distances)
+    print("index",index)
+    print(peaks)
+    print("property", property)
 
+    # Find minimum distance and its index
+    #match_index = np.argmin(distances)
+    #min_distance = distances[match_index]
 
-
-    distances_selected = np.where(distances / min_distance <= 1.05)[0]
+    #distances_selected = np.where(distances / min_distance <= 1.05)[0]
 
     # Convert match index to timestamp
-    match_times = (distances_selected * hop_length) / sr  # sr is the sampling rate of audio
+    match_times = (peaks * hop_length) / sr  # sr is the sampling rate of audio
+    print("match_times",match_times)
 
     return match_times
 
@@ -353,6 +361,8 @@ def advanced_correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_
 
 
 def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
+    if(index not in [25]):
+        return []
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     # abs
@@ -395,6 +405,8 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
     #peaks = np.where(correlation > threshold)[0]
 
     peak_times = np.array(peaks) / sr
+
+    print("peak_times",peak_times)
 
     return peak_times
 
