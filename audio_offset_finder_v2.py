@@ -473,10 +473,11 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
 
     # needed for correlation method
     if method == "correlation":
+        zeroes_second_pad=1
         #pad zeros to the beginning
-        zeroes = np.zeros(clip_length+1*sr)
+        zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
         audio_section = np.concatenate((audio_section,zeroes,clip))
-        samples_skip_end = clip_length
+        samples_skip_end = zeroes_second_pad*sr + clip_length
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
