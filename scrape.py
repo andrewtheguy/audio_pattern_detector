@@ -29,11 +29,27 @@ logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
 
-introclips={
-    "happydaily":["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
-    "healthpedia":["rthk1theme.wav","healthpedia_intro.wav"],
-    "morningsuite":["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
-    "KnowledgeCo":["rthk2theme.wav","knowledgecointro.wav"],
+audios={
+    "happydaily": {
+        "introclips": ["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
+        "allow_first_short": True,
+        "correlation_threshold": 0.7,
+    },
+    "healthpedia": {
+        "introclips": ["rthk1theme.wav","healthpedia_intro.wav"],
+        "allow_first_short": False,
+        "correlation_threshold": 0.7,
+    },
+    "morningsuite": {
+        "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
+        "allow_first_short": False,
+        "correlation_threshold": 0.7,
+    },
+    "KnowledgeCo": {
+        "introclips": ["rthk2theme.wav","knowledgecointro.wav"],
+        "allow_first_short": False,
+        "correlation_threshold": 0.7,
+    },
 }
 
 pairs={
@@ -343,19 +359,26 @@ def scrape(input_file):
 
         allow_first_short = False
         if any(basename.startswith(prefix) for prefix in ["happydaily"]):
-            clips = introclips["happydaily"]
-            allow_first_short=True
+            audio = audios["happydaily"]
         elif any(basename.startswith(prefix) for prefix in ["healthpedia"]):
-            clips = introclips["healthpedia"]
+            audio = audios["healthpedia"]
         elif any(basename.startswith(prefix) for prefix in ["morningsuite"]):
-            clips = introclips["morningsuite"]
+            audio = audios["morningsuite"]
         elif any(basename.startswith(prefix) for prefix in ["KnowledgeCo"]):
-            clips = introclips["KnowledgeCo"]
+            audio = audios["KnowledgeCo"]
         else:
             raise NotImplementedError(f"not supported {basename}")
-        
+
+        clips = audio["introclips"]
+        allow_first_short = audio["allow_first_short"]
+        correlation_threshold_intro = audio["correlation_threshold"]
+
         # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}', input_file,method=DEFAULT_METHOD)
+        news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}',
+                                                              input_file,
+                                                              method=DEFAULT_METHOD,
+                                                              correlation_threshold = 0.7
+                                                              )
         news_report_peak_times = cleanup_peak_times(news_report_peak_times)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
@@ -372,10 +395,11 @@ def scrape(input_file):
         program_intro_peak_times_debug=[]
         for c in clips:
             #print(f"Finding {c}")
-            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD)
+            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
-            program_intro_peak_times_debug.append({c:[intros,[seconds_to_time(seconds=t,include_decimals=False) for t in intros]]})
+            intros_debug = list(dict.fromkeys([math.floor(peak) for peak in intros]))
+            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=False) for t in intros_debug]]})
         program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
@@ -485,10 +509,10 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        for i in range(1):
+        for i in range(9):
             download_and_scrape(days_ago=i, download_only=True)
     elif(args.action == 'download_and_scrape'):
-        for i in range(1):
+        for i in range(9):
             download_and_scrape(days_ago=i)
     else:
         raise ValueError(f"unknown action {args.action}")
