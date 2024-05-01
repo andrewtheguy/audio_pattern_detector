@@ -56,11 +56,20 @@ streams={
     },
 }
 
-news_report_clip='rthk_beep.wav'
+# intro is almost always prominent
+correlation_threshold_intro = 0.4
+# news report is not always prominent
+# especially with the longer beep2
+correlation_threshold_news_report = 0.3
+
+# use beep2 instead to reduce false positives, might
+# live stream whole programs instead for easier processing
+# with another unique news report clip
+news_report_clip='rthk_beep2.wav'
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
-    "KnowledgeCo20240427":[4157], # false positive 01:09:17
+    #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
 def url_ok(url):
@@ -360,13 +369,12 @@ def scrape(input_file,stream_name):
 
         clips = stream["introclips"]
         allow_first_short = stream["allow_first_short"]
-        correlation_threshold_intro = 0.7
 
         # Find clip occurrences in the full audio
         news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}',
                                                               input_file,
                                                               method=DEFAULT_METHOD,
-                                                              correlation_threshold = 0.7
+                                                              correlation_threshold = correlation_threshold_news_report,
                                                               )
         news_report_peak_times = cleanup_peak_times(news_report_peak_times)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
@@ -495,15 +503,16 @@ def command():
     args = parser.parse_args()
     if(args.action == 'scrape'):
         input_file = args.audio_file
-        scrape(input_file)
+        stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
+        scrape(input_file,stream_name=stream_name)
     elif(args.action == 'convert'):
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        for i in range(1):
+        for i in range(11):
             download_and_scrape(days_ago=i, download_only=True)
     elif(args.action == 'download_and_scrape'):
-        for i in range(1):
+        for i in range(11):
             download_and_scrape(days_ago=i)
     else:
         raise ValueError(f"unknown action {args.action}")
