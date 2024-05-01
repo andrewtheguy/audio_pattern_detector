@@ -427,7 +427,7 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
     peak_times = np.array(peaks) / sr
 
 
-    max_time = ((len(audio_section) - 1) - samples_skip_end) / sr
+    max_time = ((len(audio) - 1) - samples_skip_end) / sr
 
     # Array operation to filter peak_times
     peak_times2 = peak_times[(peak_times >= 0) & (peak_times <= max_time)]
