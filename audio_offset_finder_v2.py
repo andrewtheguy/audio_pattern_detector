@@ -388,17 +388,10 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
     correlation = correlate(audio, clip, mode='full', method='fft')
     # abs
     correlation = np.abs(correlation)
-    # replace negative values with zero in array instead of above
+    # alternative to replace negative values with zero in array instead of above
     #correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
-
-    height = threshold
-    distance = clip_length
-    # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation, height=height, distance=distance)
-
-    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
     if debug_mode:
         graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
         os.makedirs(graph_dir, exist_ok=True)
@@ -406,13 +399,24 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
         #Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
         plt.plot(correlation)
-        plt.title('Cross-correlation between the audio clip and full track')
+        plt.title('Cross-correlation between the audio clip and full track before slicing')
         plt.xlabel('Lag')
         plt.ylabel('Correlation coefficient')
         plt.savefig(
             f'{graph_dir}/{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.png')
         plt.close()
 
+    max_sample = len(audio) - samples_skip_end
+    correlation = correlation[:max_sample]
+
+    height = threshold
+    distance = clip_length
+    # find the peaks in the spectrogram
+    peaks, properties = find_peaks(correlation, height=height, distance=distance)
+
+    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+
+    if debug_mode:
         peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
         peaks_test=[]
@@ -426,13 +430,13 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     peak_times = np.array(peaks) / sr
 
+    #
+    # max_time = ((len(audio) - 1) - samples_skip_end) / sr
+    #
+    # # Array operation to filter peak_times
+    # peak_times2 = peak_times[(peak_times >= 0) & (peak_times <= max_time)]
 
-    max_time = ((len(audio) - 1) - samples_skip_end) / sr
-
-    # Array operation to filter peak_times
-    peak_times2 = peak_times[(peak_times >= 0) & (peak_times <= max_time)]
-
-    return peak_times2
+    return peak_times
 
 
 
