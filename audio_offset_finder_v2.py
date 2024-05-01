@@ -374,8 +374,16 @@ def max_distance(sorted_data):
 #     # print(f"max_score for {clip_name} {section_ts}: {max_score}")
 
 
+def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_name,threshold):
 
-def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name,threshold):
+    clip_length = len(clip)
+
+    zeroes_second_pad = 1
+    # pad zeros between audio and clip
+    zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
+    audio = np.concatenate((audio_section, zeroes, clip))
+    samples_skip_end = zeroes_second_pad * sr + clip_length
+
     # Cross-correlate and normalize correlation
     correlation = correlate(audio, clip, mode='full', method='fft')
     # abs
@@ -384,7 +392,6 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name,thre
     #correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
-    clip_length = len(clip)
 
     height = threshold
     distance = clip_length
@@ -419,9 +426,13 @@ def correlation_method(clip, audio, sr, index, seconds_per_chunk, clip_name,thre
 
     peak_times = np.array(peaks) / sr
 
-    #print("peak_times",peak_times)
 
-    return peak_times
+    max_time = ((len(audio_section) - 1) - samples_skip_end) / sr
+
+    # Array operation to filter peak_times
+    peak_times2 = peak_times[(peak_times >= 0) & (peak_times <= max_time)]
+
+    return peak_times2
 
 
 
@@ -482,22 +493,13 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         # loudness normalize audio to -12 dB LUFS
         clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
-    samples_skip_end = 0
 
-    # needed for correlation method
-    if method == "correlation":
-        zeroes_second_pad=1
-        #pad zeros between audio and clip
-        zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
-        audio_section = np.concatenate((audio_section,zeroes,clip))
-        samples_skip_end = zeroes_second_pad*sr + clip_length
-
-    if method == "mfcc":
-        zeroes_second_pad=1
-        zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
-        #pad zeros to the very end
-        audio_section = np.concatenate((audio_section,zeroes))
-        samples_skip_end = zeroes_second_pad*sr
+    # if method == "mfcc":
+    #     zeroes_second_pad=1
+    #     zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
+    #     #pad zeros to the very end
+    #     audio_section = np.concatenate((audio_section,zeroes))
+    #     samples_skip_end = zeroes_second_pad*sr
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
@@ -506,14 +508,18 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
             audio_section, sr)
 
     if method == "correlation":
-        peak_times = correlation_method(clip, audio=audio_section, sr=sr, index=index,
-                                        seconds_per_chunk=seconds_per_chunk, clip_name=clip_name,threshold=correlation_threshold)
+        # samples_skip_end does not skip results from being included yet
+        peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
+                                        seconds_per_chunk=seconds_per_chunk,
+                                        clip_name=clip_name,threshold=correlation_threshold)
     elif method == "advanced_correlation":
         raise ValueError("disabled")
         peak_times = advanced_correlation_method(clip, audio=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     elif method == "mfcc":
-        peak_times = mfcc_method2(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
+        raise ValueError("not working well yet")
+        peak_times = mfcc_method2(clip, audio=audio_section, sr=sr, index=index,
+                                  seconds_per_chunk=seconds_per_chunk,
                                  clip_name=clip_name)
     elif method == "chroma_method":
         raise ValueError("disabled")
@@ -522,14 +528,6 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     else:
         raise ValueError("unknown method")
 
-    peak_times2 = []
-    for t in peak_times:
-        if t >= 0 and t >= (len(audio_section) - samples_skip_end - 1) / sr:
-            #skip the placeholder clip at the end
-            continue
-        peak_times2.append(t)
-
-    peak_times = peak_times2
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
     #peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
 
