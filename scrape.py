@@ -29,45 +29,34 @@ logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
 
-audios={
+streams={
     "happydaily": {
         "introclips": ["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
         "allow_first_short": True,
-        "correlation_threshold": 0.7,
+        "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+        "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
     },
     "healthpedia": {
         "introclips": ["rthk1theme.wav","healthpedia_intro.wav"],
         "allow_first_short": False,
-        "correlation_threshold": 0.7,
+        "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
+        "schedule":{"begin": 13,"end":15,"weekdays_human":[1,2,3,4,5]},
     },
     "morningsuite": {
         "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
         "allow_first_short": False,
-        "correlation_threshold": 0.7,
+        "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
+        "schedule":{"begin": 6,"end":10,"weekdays_human":[1,2,3,4,5]},
     },
     "KnowledgeCo": {
         "introclips": ["rthk2theme.wav","knowledgecointro.wav"],
         "allow_first_short": False,
-        "correlation_threshold": 0.7,
+        "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
+        "schedule":{"begin": 6,"end":8,"weekdays_human":[6]},
     },
 }
 
-pairs={
-    "happydaily":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-    "healthpedia":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
-    "morningsuite":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
-    "KnowledgeCo":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
-}
-
-schedule={
-    "happydaily":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
-    "healthpedia":{"begin": 13,"end":15,"weekdays_human":[1,2,3,4,5]},
-    "morningsuite":{"begin": 6,"end":10,"weekdays_human":[1,2,3,4,5]},
-    "KnowledgeCo":{"begin": 6,"end":8,"weekdays_human":[6]},
-}
-
 news_report_clip='rthk_beep.wav'
-
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
@@ -335,7 +324,7 @@ def extract_prefix(text):
   match = re.match(r"(.*\d{8,})", text)
   return (match.group(1)[:-8],match.group(1)[-8:]) if match else (None,None)
 
-def scrape(input_file):
+def scrape(input_file,stream_name):
     
     # print(extension)
     # print(dir)
@@ -358,20 +347,20 @@ def scrape(input_file):
     if not tsformatted:
 
         allow_first_short = False
-        if any(basename.startswith(prefix) for prefix in ["happydaily"]):
-            audio = audios["happydaily"]
-        elif any(basename.startswith(prefix) for prefix in ["healthpedia"]):
-            audio = audios["healthpedia"]
-        elif any(basename.startswith(prefix) for prefix in ["morningsuite"]):
-            audio = audios["morningsuite"]
-        elif any(basename.startswith(prefix) for prefix in ["KnowledgeCo"]):
-            audio = audios["KnowledgeCo"]
+        if stream_name in ["happydaily"]:
+            stream = streams["happydaily"]
+        elif stream_name in ["healthpedia"]:
+            stream = streams["healthpedia"]
+        elif stream_name in ["morningsuite"]:
+            stream = streams["morningsuite"]
+        elif stream_name in ["KnowledgeCo"]:
+            stream = streams["KnowledgeCo"]
         else:
             raise NotImplementedError(f"not supported {basename}")
 
-        clips = audio["introclips"]
-        allow_first_short = audio["allow_first_short"]
-        correlation_threshold_intro = audio["correlation_threshold"]
+        clips = stream["introclips"]
+        allow_first_short = stream["allow_first_short"]
+        correlation_threshold_intro = 0.7
 
         # Find clip occurrences in the full audio
         news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}',
@@ -467,11 +456,13 @@ def is_time_after(current_time,hour):
 def download_and_scrape(days_ago,download_only=False):
     date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
     date_str=date.strftime("%Y%m%d")
-    for key, urltemplate in pairs.items():
-        url = urltemplate.format(date=date_str)
-        print(key)
-        end_time = schedule[key]["end"]
-        weekdays_human = schedule[key]["weekdays_human"]
+    for key, stream in streams.items():
+        url_template = stream['url']
+        url = url_template.format(date=date_str)
+        #print(key)
+        schedule=stream['schedule']
+        end_time = schedule["end"]
+        weekdays_human = schedule["weekdays_human"]
         if date.weekday()+1 not in weekdays_human:
             logger.info(f"skipping {key} because it is not scheduled for today's weekday")
             continue
@@ -488,7 +479,7 @@ def download_and_scrape(days_ago,download_only=False):
             upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
             if(download_only):
                 continue
-            scrape(dest_file)
+            scrape(dest_file,stream_name=key)
         except Exception as e:
             print(f"error happened when processing for {key}",e)
             print(traceback.format_exc())
