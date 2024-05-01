@@ -22,12 +22,14 @@ def main():
     parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
     parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default=DEFAULT_METHOD)
+    parser.add_argument('--correlation-threshold', metavar='pattern match method', type=float, help='pattern match method',
+                        default=0.7)
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     #print(args.method)
 
     # Find clip occurrences in the full audio
-    peak_times = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file, method=args.match_method)
+    peak_times = find_clip_in_audio_in_chunks(args.pattern_file, args.audio_file, method=args.match_method,correlation_threshold=args.correlation_threshold)
     print(peak_times)
     peak_times_clean = cleanup_peak_times(peak_times)
     print(peak_times_clean)
