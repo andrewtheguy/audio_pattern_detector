@@ -143,10 +143,14 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
     #if index not in [54,55,56,57,58,59,60]:
     #    return []
     hop_length = 512  # Ensure this matches the hop_length used for Mel Spectrogram
-
+    clip_len = len(clip)
+    #exit(1)
+    n_fft=2048
+    if(clip_len < 2048):
+        n_fft=clip_len
     # Extract MFCC features
-    clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length)
-    audio_mfcc = librosa.feature.mfcc(y=audio, sr=sr, hop_length=hop_length)
+    clip_mfcc = librosa.feature.mfcc(y=clip, sr=sr, hop_length=hop_length,n_fft=n_fft)
+    audio_mfcc = librosa.feature.mfcc(y=audio, sr=sr, hop_length=hop_length,n_fft=n_fft)
 
     distances = []
     for i in range(audio_mfcc.shape[1] - clip_mfcc.shape[1] + 1):
@@ -173,14 +177,15 @@ def mfcc_method2(clip, audio, sr, index, seconds_per_chunk, clip_name):
         plt.close()
 
     #print(distances)
-    wlen = max(1, int(hop_length / 64))
-    peaks,property = find_peaks(inverted_distances,wlen=wlen,width=[0,hop_length/64],prominence=0.20,rel_height=1)
+    wlen = max(int(clip_len/hop_length), int(hop_length / 64))
+    peaks,property = find_peaks(inverted_distances,wlen=wlen,width=[0,hop_length/64],height=0.7,prominence=0.6,rel_height=1)
     if len(peaks)>0:
         print("index",index)
         print("time", seconds_to_time(seconds=index * seconds_per_chunk))
         print("peaks",peaks)
         print("property", property)
         print("average",np.mean(inverted_distances))
+        print("median", np.median(inverted_distances))
         percentile = np.percentile(inverted_distances,99)
         print("percentile", percentile)
         zscores=scipy.stats.zscore(inverted_distances)
@@ -482,10 +487,17 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     # needed for correlation method
     if method == "correlation":
         zeroes_second_pad=1
-        #pad zeros to the beginning
+        #pad zeros between audio and clip
         zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
         audio_section = np.concatenate((audio_section,zeroes,clip))
         samples_skip_end = zeroes_second_pad*sr + clip_length
+
+    if method == "mfcc":
+        zeroes_second_pad=1
+        zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
+        #pad zeros to the very end
+        audio_section = np.concatenate((audio_section,zeroes))
+        samples_skip_end = zeroes_second_pad*sr
 
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
@@ -504,6 +516,7 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         peak_times = mfcc_method2(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
                                  clip_name=clip_name)
     elif method == "chroma_method":
+        raise ValueError("disabled")
         peak_times = chroma_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
                                  clip_name=clip_name)
     else:
