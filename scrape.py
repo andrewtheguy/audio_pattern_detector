@@ -281,27 +281,24 @@ def concatenate_audio(input_files, output_file,tmpdir):
     # add artist, album and title metadata
     #metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
     #metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
-    text = f"""
-;FFMETADATA1
+    text = f""";FFMETADATA1
 artist={artist}
 album={album}
-title={title}
-"""
+title={title}\n"""
     start_time = 0
+    chapter = ""
     for i in range(len(input_files)):
         duration = input_files[i]["end_time"]-input_files[i]["start_time"]
         end_time=start_time+duration
         path1=seconds_to_time(seconds=start_time,include_decimals=False).replace(':','_')
         path2=seconds_to_time(seconds=end_time,include_decimals=False).replace(':','_')
         title=f"{path1}-{path2}"
-        text += f"""
-;FFMETADATA1
+        text += f""";FFMETADATA1
 [CHAPTER]
 TIMEBASE=1/1
 START={start_time}
 END={end_time}
-title={title}
-"""
+title={title}\n"""
         start_time = end_time
 
     ffmetadatafile = os.path.join(tmpdir, 'ffmetadatafile.txt')
@@ -510,9 +507,9 @@ def download_and_scrape(download_only=False):
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', required=True)
-    parser.add_argument('--audio-file', metavar='audio file', required=True, type=str, help='audio file to find pattern')
-    parser.add_argument('--pattern-file', metavar='audio file', required=True, type=str, help='pattern file to convert sample')
+    parser.add_argument('action')
+    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
+    parser.add_argument('--pattern-file', metavar='audio file', type=str, help='pattern file to convert sample')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     if(args.action == 'scrape'):
