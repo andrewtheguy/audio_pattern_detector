@@ -1,5 +1,6 @@
 
 import argparse
+import glob
 import sys
 from collections import deque
 import datetime
@@ -14,6 +15,7 @@ import string
 import subprocess
 import tempfile
 import traceback
+from pathlib import Path
 
 import ffmpeg
 import paramiko
@@ -471,7 +473,9 @@ def download_and_scrape(download_only=False):
                 logger.warning(f"skipping {key} because url {url} is not ok")
                 print(f"skipping {key} because url {url} is not ok")
                 continue
-            dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
+            original_dir = os.path.abspath(f"./tmp/original/{key}")
+            dest_file = os.path.join(original_dir,f"{key}{date_str}.m4a")
+            os.makedirs(original_dir, exist_ok=True)
             try:
                 download(url,dest_file)
                 upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
@@ -486,13 +490,21 @@ def download_and_scrape(download_only=False):
                 continue
         if error_occurred_scraping:
             print(f"error happened when processing, skipping publishing podcasts")
-        else:
+        elif not download_only:
             podcasts_publish = list(dict.fromkeys(podcasts_publish))
             for podcast in podcasts_publish:
                 print(f"publishing podcast {podcast} after scraping")
                 # assuming one per day
                 publish_folder(podcast,files_to_publish=days_to_keep,delete_old_files=True)
-
+            m4a_files_all = sorted(glob.glob(os.path.join(original_dir, "*.m4a")))
+            # only keep last days_to_keep
+            n = len(m4a_files_all) - days_to_keep
+            n = 0 if n < 0 else n
+            #m4a_files_include = m4a_files_all[n:]
+            files_excluded = m4a_files_all[:n]
+            for file in files_excluded:
+                print(f"deleting {file}")
+                Path(file).unlink(missing_ok=True)
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
