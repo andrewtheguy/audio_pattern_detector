@@ -20,6 +20,7 @@ paramiko = "*"
 pytz = "*"
 jinja2 = "^3.1.3"
 python-dotenv = "^1.0.1"
+upload_utils= { git = "https://github.com/andrewtheguy/upload_utils.git", branch = "main" }
 andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
 setuptools = "^69.5.1"
 dtw-python = "^1.4.2"
