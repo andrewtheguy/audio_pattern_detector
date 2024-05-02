@@ -503,8 +503,10 @@ def download_and_scrape(download_only=False):
             #m4a_files_include = m4a_files_all[n:]
             files_excluded = m4a_files_all[:n]
             for file in files_excluded:
-                print(f"deleting {file}")
+                print(f"deleting {file} and its jsons")
                 Path(file).unlink(missing_ok=True)
+                Path(f"{file}.json").unlink(missing_ok=True)
+                Path(f"{file}.separated.json").unlink(missing_ok=True)
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
