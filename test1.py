@@ -3,7 +3,7 @@ import sys
 import librosa
 import numpy as np
 
-from scrape import extract_prefix
+from utils import extract_prefix
 from sklearn.metrics.pairwise import cosine_similarity
 
 print(extract_prefix("testagain2022041"))  # None
