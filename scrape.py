@@ -510,9 +510,9 @@ def download_and_scrape(download_only=False):
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
-    parser.add_argument('action')     
-    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
-    parser.add_argument('--pattern-file', metavar='audio file', type=str, help='pattern file to convert sample')
+    parser.add_argument('action', required=True)
+    parser.add_argument('--audio-file', metavar='audio file', required=True, type=str, help='audio file to find pattern')
+    parser.add_argument('--pattern-file', metavar='audio file', required=True, type=str, help='pattern file to convert sample')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     if(args.action == 'scrape'):
