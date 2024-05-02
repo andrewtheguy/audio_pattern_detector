@@ -19,8 +19,8 @@ from andrew_utils import seconds_to_time
 def main():
     set_debug_mode(True)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pattern-file', metavar='pattern file', type=str, help='pattern file')
-    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
+    parser.add_argument('--pattern-file', metavar='pattern file', required=True, type=str, help='pattern file')
+    parser.add_argument('--audio-file', metavar='audio file', type=str, required=True, help='audio file to find pattern')
     parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default=DEFAULT_METHOD)
     parser.add_argument('--correlation-threshold', metavar='pattern match method', type=float, help='pattern match method',
                         default=0.7)
