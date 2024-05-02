@@ -445,48 +445,53 @@ def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
   return current_time > target_time
 
-def download_and_scrape(days_ago,download_only=False):
-    date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
-    date_str=date.strftime("%Y%m%d")
-    podcasts_publish = []
-    error_occurred_scraping = False
+def download_and_scrape(download_only=False):
+    days_to_keep=3
+    if days_to_keep < 1:
+        raise ValueError("days_to_keep must be greater than or equal to 1")
     for key, stream in streams.items():
-        url_template = stream['url']
-        url = url_template.format(date=date_str)
-        #print(key)
-        schedule=stream['schedule']
-        end_time_hour = schedule["end"]
-        weekdays_human = schedule["weekdays_human"]
-        if date.weekday()+1 not in weekdays_human:
-            logger.info(f"skipping {key} because it is not scheduled for today's weekday")
-            continue
-        if days_ago == 0 and not is_time_after(date.time(),end_time_hour+1):
-            logger.info(f"skipping {key} because it is not yet from {end_time_hour} + 1 hour")
-            continue
-        elif not url_ok(url):
-            logger.warning(f"skipping {key} because url {url} is not ok")
-            print(f"skipping {key} because url {url} is not ok")
-            continue
-        dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
-        try:
-            download(url,dest_file)
-            upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
-            if(download_only):
+        error_occurred_scraping = False
+        podcasts_publish=[] # should only be one per stream
+        for days_ago in range(days_to_keep):
+            date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
+            date_str=date.strftime("%Y%m%d")
+            url_template = stream['url']
+            url = url_template.format(date=date_str)
+            #print(key)
+            schedule=stream['schedule']
+            end_time_hour = schedule["end"]
+            weekdays_human = schedule["weekdays_human"]
+            if date.weekday()+1 not in weekdays_human:
+                logger.info(f"skipping {key} because it is not scheduled for today's weekday")
                 continue
-            output_dir_trimmed,output_file_trimmed = scrape(dest_file,stream_name=key)
-            podcasts_publish.append(output_dir_trimmed)
-        except Exception as e:
-            print(f"error happened when processing for {key}",e)
-            print(traceback.format_exc())
-            error_occurred_scraping = True
-            continue
-    if error_occurred_scraping:
-        print(f"error happened when processing, skipping publishing podcasts")
-    else:
-        podcasts_publish = list(dict.fromkeys(podcasts_publish))
-        for podcast in podcasts_publish:
-            print(f"publishing podcast {podcast} after scraping")
-            publish_folder(podcast)
+            if days_ago == 0 and not is_time_after(date.time(),end_time_hour+1):
+                logger.info(f"skipping {key} because it is not yet from {end_time_hour} + 1 hour")
+                continue
+            elif not url_ok(url):
+                logger.warning(f"skipping {key} because url {url} is not ok")
+                print(f"skipping {key} because url {url} is not ok")
+                continue
+            dest_file = os.path.abspath(f"./tmp/{key}{date_str}.m4a")
+            try:
+                download(url,dest_file)
+                upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
+                if(download_only):
+                    continue
+                output_dir_trimmed,output_file_trimmed = scrape(dest_file,stream_name=key)
+                podcasts_publish.append(output_dir_trimmed)
+            except Exception as e:
+                print(f"error happened when processing for {key}",e)
+                print(traceback.format_exc())
+                error_occurred_scraping = True
+                continue
+        if error_occurred_scraping:
+            print(f"error happened when processing, skipping publishing podcasts")
+        else:
+            podcasts_publish = list(dict.fromkeys(podcasts_publish))
+            for podcast in podcasts_publish:
+                print(f"publishing podcast {podcast} after scraping")
+                # assuming one per day
+                publish_folder(podcast,files_to_publish=days_to_keep,delete_old_files=True)
 
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -504,11 +509,9 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        for i in range(1):
-            download_and_scrape(days_ago=i, download_only=True)
+        download_and_scrape(download_only=True)
     elif(args.action == 'download_and_scrape'):
-        for i in range(1):
-            download_and_scrape(days_ago=i)
+        download_and_scrape()
     else:
         raise ValueError(f"unknown action {args.action}")
 

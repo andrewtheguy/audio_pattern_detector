@@ -6,6 +6,8 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
+
 import boto3
 from botocore.client import Config
 import botocore
@@ -182,33 +184,40 @@ def extract_folder(path):
   return basename
 
 
-def publish_folder(folder):
+def publish_folder(folder,files_to_publish=3,delete_old_files=False):
     folder = folder.rstrip('/')
     result_file = f"{folder}/results.json"
-    results = []
-    # only keep last 3
-    m4a_files = sorted(glob.glob(os.path.join(folder,"*.m4a")))[-3:]
-    if len(m4a_files)==0:
+    publish_list = []
+    m4a_files_all=sorted(glob.glob(os.path.join(folder, "*.m4a")))
+    # only keep last files_to_publish
+    n = len(m4a_files_all) - files_to_publish
+    n = 0 if n < 0 else n
+    m4a_files_include = m4a_files_all[n:]
+    files_excluded = m4a_files_all[:n]
+    if len(m4a_files_include)==0:
         raise ValueError("no m4a files found")
     dest_dir = extract_folder(folder)
     if len(dest_dir)==0:
         raise ValueError("folder name is empty")
-    for file in m4a_files:
+    for file in m4a_files_include:
         cid = publish_to_firebase(file,f"{dest_dir}/{os.path.basename(file)}")
         prefix,date=extract_prefix(os.path.basename(file))
         logger.info(file)
         logger.info(date)
-        results.append({"cid":cid,"title":f"{prefix}{date}",
+        publish_list.append({"cid":cid,"title":f"{prefix}{date}",
                         "date":date,
                         "hash_md5":get_md5sum_file(file),
                         "file_len":os.stat(file).st_size,
                         "file": file})
-    results = sorted(results, key=lambda d: d['date'])   
+    publish_list = sorted(publish_list, key=lambda d: d['date'])
     with open(result_file,"w") as f:
-        json.dump(results,f)
-    channel = dest_dir    
-    # only publish the last 3 episodes
-    publish_podcast(folder,channel,results,dest_dir)
+        json.dump(publish_list,f)
+    channel = dest_dir
+    publish_podcast(folder,channel,publish_list,dest_dir)
+    if delete_old_files:
+        for file in files_excluded:
+            print(f"deleting {file}")
+            Path(file).unlink(missing_ok=True)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
