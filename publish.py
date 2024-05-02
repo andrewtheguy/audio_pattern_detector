@@ -10,7 +10,7 @@ import boto3
 from botocore.client import Config
 import botocore
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from scrape import extract_prefix
+from utils import extract_prefix
 from dotenv import load_dotenv
 from andrew_utils import get_md5sum_file
 logger = logging.getLogger(__name__)
@@ -182,7 +182,7 @@ def extract_folder(path):
   return basename
 
 
-def publish(folder):
+def publish_folder(folder):
     folder = folder.rstrip('/')
     result_file = f"{folder}/results.json"
     results = []
@@ -214,4 +214,4 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('folder')     
     args = parser.parse_args()
-    publish(args.folder)
+    publish_folder(args.folder)

@@ -22,12 +22,14 @@ import requests
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD, \
     cleanup_peak_times
+from publish import publish_folder
 from time_sequence_error import TimeSequenceError
 from upload_utils import upload_file
 import utils
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
+from utils import extract_prefix
 
 streams={
     "happydaily": {
@@ -69,6 +71,7 @@ news_report_clip='rthk_beep2.wav'
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
+    "morningsuite20240502":[13438], # causing trouble
     #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
@@ -88,7 +91,7 @@ def download(url,target_file):
     if(os.path.exists(target_file)):
         logger.info(f"file {target_file} already exists,skipping")
         return
-    logger.info(f'downloading {url}')
+    print(f'downloading {url}')
     with tempfile.TemporaryDirectory() as tmpdir:
         basename,extension = os.path.splitext(os.path.basename(target_file))
     
@@ -98,7 +101,7 @@ def download(url,target_file):
               .run()
         )
         shutil.move(tmp_file,target_file)
-    logger.info(f'downloaded to {target_file}')    
+    print(f'downloaded to {target_file}')
 
 def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_first_short=False):
     logger.info(result)
@@ -328,19 +331,11 @@ def get_sec_from_str(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
-# return a tuple of prefix and date
-def extract_prefix(text):
-  match = re.match(r"(.*\d{8,})", text)
-  return (match.group(1)[:-8],match.group(1)[-8:]) if match else (None,None)
-
 def scrape(input_file,stream_name):
-    
-    # print(extension)
-    # print(dir)
+
     print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
-    dir = os.path.dirname(input_file)
     logger.info(basename)
     #md5=md5file(input_file)  # to get a printable str instead of bytes
 
@@ -354,19 +349,7 @@ def scrape(input_file,stream_name):
     logger.debug("total_time",total_time,"---")
     #exit(1)
     if not tsformatted:
-
-        allow_first_short = False
-        if stream_name in ["happydaily"]:
-            stream = streams["happydaily"]
-        elif stream_name in ["healthpedia"]:
-            stream = streams["healthpedia"]
-        elif stream_name in ["morningsuite"]:
-            stream = streams["morningsuite"]
-        elif stream_name in ["KnowledgeCo"]:
-            stream = streams["KnowledgeCo"]
-        else:
-            raise NotImplementedError(f"not supported {basename}")
-
+        stream = streams[stream_name]
         clips = stream["introclips"]
         allow_first_short = stream["allow_first_short"]
 
@@ -420,17 +403,17 @@ def scrape(input_file,stream_name):
 
     splits=[]
 
-    output_dir= os.path.abspath(os.path.join(f"{dir}","trimmed"))
-    output_file= os.path.join(output_dir,f"{basename}_trimmed{extension}")
+    output_dir_trimmed= os.path.abspath(os.path.join(f"./tmp","trimmed",stream_name))
+    output_file_trimmed= os.path.join(output_dir_trimmed,f"{stream_name}_trimmed{extension}")
 
     # if os.path.exists(output_file):
     #     print(f"file {output_file} already exists,skipping")
     #     return
     
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir_trimmed, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        filename_trimmed=os.path.basename(output_file)
+        filename_trimmed=os.path.basename(output_file_trimmed)
         dirname,date_str = extract_prefix(filename_trimmed)
         dirname = '' if dirname is None else dirname
         for i,p in enumerate(pair):
@@ -445,9 +428,9 @@ def scrape(input_file,stream_name):
             splits.append({"file_path": file_segment,
                            "start_time": start_time,
                            "end_time": end_time,})
-        concatenate_audio(splits, output_file,tmpdir)
-        path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
-        upload_file(output_file,path_trimmed,skip_if_exists=True)
+        concatenate_audio(splits, output_file_trimmed,tmpdir)
+        upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
+        upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         # save segments
         for item in splits:
             dirname_segment = os.path.abspath(f"./tmp/segments/{dirname}/{date_str}")
@@ -456,6 +439,7 @@ def scrape(input_file,stream_name):
             save_path=f"{dirname_segment}/{filename_segment}"
             shutil.move(item["file_path"],save_path)
             #upload_file(item["file_path"],upload_path,skip_if_exists=True)
+    return output_dir_trimmed,output_file_trimmed
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
@@ -464,18 +448,20 @@ def is_time_after(current_time,hour):
 def download_and_scrape(days_ago,download_only=False):
     date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
     date_str=date.strftime("%Y%m%d")
+    podcasts_publish = []
+    error_occurred_scraping = False
     for key, stream in streams.items():
         url_template = stream['url']
         url = url_template.format(date=date_str)
         #print(key)
         schedule=stream['schedule']
-        end_time = schedule["end"]
+        end_time_hour = schedule["end"]
         weekdays_human = schedule["weekdays_human"]
         if date.weekday()+1 not in weekdays_human:
             logger.info(f"skipping {key} because it is not scheduled for today's weekday")
             continue
-        if days_ago == 0 and not is_time_after(date.time(),end_time):
-            logger.info(f"skipping {key} because it is not yet from {end_time}")
+        if days_ago == 0 and not is_time_after(date.time(),end_time_hour+1):
+            logger.info(f"skipping {key} because it is not yet from {end_time_hour} + 1 hour")
             continue
         elif not url_ok(url):
             logger.warning(f"skipping {key} because url {url} is not ok")
@@ -487,11 +473,20 @@ def download_and_scrape(days_ago,download_only=False):
             upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
             if(download_only):
                 continue
-            scrape(dest_file,stream_name=key)
+            output_dir_trimmed,output_file_trimmed = scrape(dest_file,stream_name=key)
+            podcasts_publish.append(output_dir_trimmed)
         except Exception as e:
             print(f"error happened when processing for {key}",e)
             print(traceback.format_exc())
+            error_occurred_scraping = True
             continue
+    if error_occurred_scraping:
+        print(f"error happened when processing, skipping publishing podcasts")
+    else:
+        podcasts_publish = list(dict.fromkeys(podcasts_publish))
+        for podcast in podcasts_publish:
+            print(f"publishing podcast {podcast} after scraping")
+            publish_folder(podcast)
 
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -509,10 +504,10 @@ def command():
         input_file = args.pattern_file
         convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
     elif(args.action == 'download'):
-        for i in range(11):
+        for i in range(1):
             download_and_scrape(days_ago=i, download_only=True)
     elif(args.action == 'download_and_scrape'):
-        for i in range(11):
+        for i in range(1):
             download_and_scrape(days_ago=i)
     else:
         raise ValueError(f"unknown action {args.action}")
