@@ -71,7 +71,7 @@ news_report_clip='rthk_beep2.wav'
 
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one
-    "morningsuite20240502":[13438], # causing trouble
+    "morningsuite20240502":[12538], # causing trouble
     #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
@@ -404,7 +404,7 @@ def scrape(input_file,stream_name):
     splits=[]
 
     output_dir_trimmed= os.path.abspath(os.path.join(f"./tmp","trimmed",stream_name))
-    output_file_trimmed= os.path.join(output_dir_trimmed,f"{stream_name}_trimmed{extension}")
+    output_file_trimmed= os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
 
     # if os.path.exists(output_file):
     #     print(f"file {output_file} already exists,skipping")
