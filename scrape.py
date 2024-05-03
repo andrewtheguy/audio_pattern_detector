@@ -35,7 +35,7 @@ from utils import extract_prefix
 
 streams={
     "happydaily": {
-        "introclips": ["happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
+        "introclips": ["rthk1theme.wav"],
         "allow_first_short": True,
         "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
         "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
