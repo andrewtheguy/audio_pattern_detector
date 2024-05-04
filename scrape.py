@@ -1,5 +1,6 @@
 
 import argparse
+import copy
 import glob
 import sys
 from collections import deque
@@ -136,7 +137,7 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
                 raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_special} minutes for beginning")
             # news report should not last like 15 minutes
             elif not allow_short_interval and cur_end_time - cur_start_time < short_allowance_normal*60:
-                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_normal} minutes")
+                raise TimeSequenceError(f"duration for program segment with cur_start_time {cur_start_time} {cur_end_time - cur_start_time} seconds is less than {short_allowance_normal} minutes")
     
     for i in range(1,len(result)):
         cur = result[i]
@@ -159,6 +160,9 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
 # otherwise will have to rewrite lots of tests if the parameters changed
 def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
                        skip_reasonable_time_sequence_check=False,allow_first_short=False):
+
+    news_report = copy.deepcopy(news_report)
+    intro = copy.deepcopy(intro)
     pair = []
 
     if len(news_report) != len(set(news_report)):
@@ -189,6 +193,10 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         # no need to trim
         return [[cur_intro, total_time]]
     
+    # news report within the first 1 minute, change to 0
+    if(news_report[0] <= 1*60 and news_report[0] < intro[0]):
+        news_report[0]=0
+
     # intro starts before news report,
     # shift cur_intro from 0 to the first intro
     # if it is less than 10 minutes,
@@ -197,6 +205,7 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     # the program has already started before 10 minutes
     if(len(intro) > 0 and intro[0] <= 10*60 and intro[0] < news_report[0]):
         cur_intro = intro.popleft()
+
     if(cur_intro > total_time):
         raise ValueError("intro overflow, is greater than total time {total_time}")
 
