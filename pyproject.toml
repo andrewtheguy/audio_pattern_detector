@@ -24,6 +24,7 @@ upload_utils= { git = "https://github.com/andrewtheguy/upload_utils.git", branch
 andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
 setuptools = "^69.5.1"
 dtw-python = "^1.4.2"
+pymongo = {extras = ["srv"], version = "^4.7.1"}
 
 [build-system]
 requires = ["poetry-core"]
