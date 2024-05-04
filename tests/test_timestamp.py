@@ -244,6 +244,28 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(11),minutes_to_seconds(17)],
                                        [minutes_to_seconds(19),self.total_time_1],
                                        ])
+        
+
+    def test_absorb_first_minute_news_report(self):
+        result = self.process(news_report=[30,minutes_to_seconds(15)],
+                                     intro=[minutes_to_seconds(8),minutes_to_seconds(18)])
+        np.testing.assert_array_equal(result,
+                                      [[minutes_to_seconds(8),minutes_to_seconds(15)],
+                                       [minutes_to_seconds(18),self.total_time_1],
+                                       ])
+        
+    def test_not_absorb_first_minute_news_report(self):
+        result = self.process(news_report=[30,minutes_to_seconds(20)],
+                                     intro=[7,minutes_to_seconds(5),minutes_to_seconds(23)],
+                                     )
+        np.testing.assert_array_equal(result,
+                                      [[7,30],
+                                       [minutes_to_seconds(5),minutes_to_seconds(20)],
+                                       [minutes_to_seconds(23),self.total_time_1],
+                                       ])
+          
+        
+        
 
 
 class TestProcessTimestampsWithPadding(unittest.TestCase):
@@ -302,7 +324,6 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
                                     ,intro=[minutes_to_seconds(20),minutes_to_seconds(40)])
         np.testing.assert_array_equal(result,
                                       [
-                                          [minutes_to_seconds(0),self.news_report_second_pad],
                                           [minutes_to_seconds(20),minutes_to_seconds(30)+self.news_report_second_pad],
                                         [minutes_to_seconds(40),self.total_time_1],
                                       ])
