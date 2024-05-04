@@ -16,9 +16,13 @@ def get_database():
     return db
     #return client['audio_offset_finder_v1']    
 
+def get_collection():
+    db = get_database()
+    return db['audios_v1']
+
 db=get_database()
 
-collection=db['audios_v1']
+collection=get_collection()
 
 # Define the keys and index options
 keys = [("show_name", 1), ("show_date", 1)]  # Replace key1 and key2 with your actual field names
