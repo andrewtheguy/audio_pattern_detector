@@ -198,8 +198,8 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         # no need to trim
         return [[cur_intro, total_time]]
     
-    # news report within the first 1 minute, change to 0
-    if(news_report[0] <= 1*60 and news_report[0] < intro[0]):
+    # news report within the first 1 minute and it is less than the first intro, change to 0
+    if(len(intro) > 0 and (news_report[0] <= 1*60 and news_report[0] < intro[0])):
         news_report[0]=0
 
     news_report=deque(news_report)
