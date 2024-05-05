@@ -72,9 +72,10 @@ correlation_threshold_news_report = 0.3
 # with another unique news report clip
 news_report_clip='rthk_beep2.wav'
 
+# no need because it is absorbing now
 news_report_black_list_ts = {
-    "morningsuite20240424":[5342], # fake one
-    "morningsuite20240502":[12538], # causing trouble
+    #"morningsuite20240424":[5342], # fake one
+    #"morningsuite20240502":[12538], # causing trouble
     #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
@@ -217,30 +218,9 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         raise ValueError("intro overflow, is greater than total time {total_time}")
 
     
-    # # absorb fake news report beep within 10 minutes of intro except short intro and news report close to the end
-    # for i,ts_intro in enumerate(intro):
-    #     seconds_absorb=10*60
-    #     # not absorbing the news reports followed by first intro
-    #     # if allow_first_short is true, if it still have false positives
-    #     # just let it fail
-    #     if allow_first_short and i == 0:
-    #         continue
-    #     news_report2=deque()
-    #     while len(news_report)>0:
-    #         news = news_report.popleft()
-    #         if(news <= ts_intro):
-    #             news_report2.append(news)
-    #         elif(news < ts_intro + seconds_absorb):
-    #             # absorb fake news report beep
-    #             continue
-    #         else:
-    #             news_report2.append(news)
-    #             #break
-    #     news_report = news_report2
-
 
     pair=[]
-
+    #print("fgfdgdfgfdgdfgfd")
     news_report_followed_by_intro = True
     while(len(news_report)>0):
         if(not news_report_followed_by_intro):
@@ -249,11 +229,23 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         cur_news_report = news_report.popleft()
         if(cur_intro > total_time):
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
-        # absorb fake news report beep within 10 minutes of intro except allow short intro and news report close to the end
+        # clean up beep beep beep
+        max_beep_repeat = 6
+        count_beep_repeat = 0
+        #print("cur_news_report",cur_news_report)
+        #print("news_report[0] - cur_news_report",news_report[0] - cur_news_report)
+        beep_tracker=cur_news_report
+        while len(news_report)>0 and news_report[0] - beep_tracker <= 2 and count_beep_repeat < max_beep_repeat:
+            beep_tracker=news_report.popleft()
+            count_beep_repeat += 1
+        # absorb fake news report beep within 16 minutes of intro except allow short intro or news report not followed by intro
+        # or absorbtion would cause too long
         if len(pair) == 0:
             pass # no absorption for first pair because it is error prone
         else:
-            while len(intro) > 0 and len(news_report)>0 and cur_news_report <= cur_intro + 10*60 and cur_news_report < intro[0]:
+            #target_min_intro_duration = 18
+            # pop only one within 15 minutes and 30 seconds   
+            if len(intro) > 0 and len(news_report)>0 and cur_news_report <= cur_intro + 15*60+30 and cur_news_report < intro[0]:
                 cur_news_report=news_report.popleft()
         pair.append([cur_intro, cur_news_report])
         # get first intro after news report while ignoring others after first
@@ -489,7 +481,7 @@ def is_time_after(current_time,hour):
   return current_time > target_time
 
 def download_and_scrape(download_only=False):
-    days_to_keep=14
+    days_to_keep=17
     if days_to_keep < 1:
         raise ValueError("days_to_keep must be greater than or equal to 1")
     for key, stream in streams.items():
