@@ -230,12 +230,12 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         if(cur_intro > total_time):
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
         # clean up beep beep beep
-        max_beep_repeat = 6
+        max_beep_repeat = 10
         count_beep_repeat = 0
         #print("cur_news_report",cur_news_report)
         #print("news_report[0] - cur_news_report",news_report[0] - cur_news_report)
         beep_tracker=cur_news_report
-        while len(news_report)>0 and news_report[0] - beep_tracker <= 2 and count_beep_repeat < max_beep_repeat:
+        while len(news_report)>0 and news_report[0] - beep_tracker <= 10 and count_beep_repeat < max_beep_repeat:
             beep_tracker=news_report.popleft()
             count_beep_repeat += 1
         # absorb fake news report beep within 16 minutes of intro except allow short intro or news report not followed by intro
