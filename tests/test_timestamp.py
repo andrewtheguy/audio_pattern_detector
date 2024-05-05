@@ -15,7 +15,7 @@ def hours_to_seconds(hours):
 class TestProcessTimestamps(unittest.TestCase):
     
     def process(self,news_report,intro):
-        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=0,skip_reasonable_time_sequence_check=True)
+        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=0)
 
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
@@ -25,11 +25,13 @@ class TestProcessTimestamps(unittest.TestCase):
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
     def test_zero_news_report(self):
-        result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(11)])
+        result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(18)])
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
-        result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(9)])
+        
+        result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(20)])
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
-        result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(12)])
+        
+        result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
     def test_zero_intro(self):
@@ -101,11 +103,11 @@ class TestProcessTimestamps(unittest.TestCase):
         self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
 
     def test_one_news_report_intro(self):
-        result = self.process(news_report=[minutes_to_seconds(11)]
-                                    ,intro=[minutes_to_seconds(12)])
+        result = self.process(news_report=[minutes_to_seconds(20)]
+                                    ,intro=[minutes_to_seconds(30)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(0),minutes_to_seconds(11)],
-                                       [minutes_to_seconds(12),self.total_time_1],
+                                      [[minutes_to_seconds(0),minutes_to_seconds(20)],
+                                       [minutes_to_seconds(30),self.total_time_1],
                                        ])
 
 
@@ -123,6 +125,7 @@ class TestProcessTimestamps(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.process(news_report=[self.total_time_1-minutes_to_seconds(5)],intro=[])
 
+    @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")
     def test_intro_first_five_minutes_news_less_than_ten(self):
         result = self.process(news_report=[minutes_to_seconds(9),self.total_time_1]
                                     ,intro=[minutes_to_seconds(5),minutes_to_seconds(11)])
@@ -131,12 +134,13 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(11),self.total_time_1]])
 
     def test_intro_first_five_minutes_news_greater_than_ten(self):
-        result = self.process(news_report=[minutes_to_seconds(11),self.total_time_1]
-                                    ,intro=[minutes_to_seconds(5),minutes_to_seconds(12)])
+        result = self.process(news_report=[minutes_to_seconds(21),self.total_time_1]
+                                    ,intro=[minutes_to_seconds(5),minutes_to_seconds(22)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(5),minutes_to_seconds(11)],
-                                       [minutes_to_seconds(12),self.total_time_1]])
+                                      [[minutes_to_seconds(5),minutes_to_seconds(21)],
+                                       [minutes_to_seconds(22),self.total_time_1]])
         
+    @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")    
     def test_intro_first_five_minutes_news_earlier(self):
         result = self.process(news_report=[minutes_to_seconds(4),self.total_time_1]
                                     ,intro=[minutes_to_seconds(5),minutes_to_seconds(12)])
@@ -151,7 +155,8 @@ class TestProcessTimestamps(unittest.TestCase):
                                       [[minutes_to_seconds(0),minutes_to_seconds(20)],
                                        [minutes_to_seconds(30),self.total_time_1]])
         
-    def test_intro_first_after_ten_minutes_news_first(self):
+    @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")    
+    def test_intro_first_after_ten_minutes_news_first_before_ten_minutes(self):
         result = self.process(news_report=[minutes_to_seconds(3),minutes_to_seconds(30)]
                                     ,intro=[minutes_to_seconds(13),minutes_to_seconds(40)])
         np.testing.assert_array_equal(result,
@@ -160,52 +165,51 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(40),self.total_time_1]],
                                        )
 
-    def test_news_report_first(self):
-        result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(20)]
-                                    ,intro=[minutes_to_seconds(11),minutes_to_seconds(35)])
+    def test_news_report_first_not_absorbed(self):
+        result = self.process(news_report=[minutes_to_seconds(23),minutes_to_seconds(53)]
+                                    ,intro=[minutes_to_seconds(33),minutes_to_seconds(63)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(0),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(11),minutes_to_seconds(20)],
-                                       [minutes_to_seconds(35),self.total_time_1],
+                                      [[minutes_to_seconds(0),minutes_to_seconds(23)],
+                                       [minutes_to_seconds(33),minutes_to_seconds(53)],
+                                       [minutes_to_seconds(63),self.total_time_1],
                                        ])
 
     def test_news_report_after_news_report(self):
         with self.assertRaises(NotImplementedError):
-            result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(20)]
-                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(50)])
+            result = self.process(news_report=[minutes_to_seconds(22),minutes_to_seconds(32)]
+                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(60)])
 
     def test_news_report_after_news_report_close_to_end(self):
-        result = self.process(news_report=[minutes_to_seconds(9),self.total_time_1 - 9]
-                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(11)])
-        np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(2),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(11),self.total_time_1 - 9],
-                                       ])
+        with self.assertRaises(NotImplementedError):
+            result = self.process(news_report=[minutes_to_seconds(22),minutes_to_seconds(62),self.total_time_1 - 9]
+                                        ,intro=[minutes_to_seconds(2),minutes_to_seconds(32)])
+            print(result)
+    
         
     #  test uneven
     def test_intro_news_report_intro(self):
-        result = self.process(news_report=[minutes_to_seconds(9)]
-                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(11)])
+        result = self.process(news_report=[minutes_to_seconds(19)]
+                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(21)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(2),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(11),self.total_time_1],
+                                      [[minutes_to_seconds(2),minutes_to_seconds(19)],
+                                       [minutes_to_seconds(21),self.total_time_1],
                                        ])
 
     def test_multiple_intros(self):
-        result = self.process(news_report=[minutes_to_seconds(9)]
-                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(3),minutes_to_seconds(4),minutes_to_seconds(11)])
+        result = self.process(news_report=[minutes_to_seconds(19)]
+                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(3),minutes_to_seconds(4),minutes_to_seconds(21)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(2),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(11),self.total_time_1],
+                                      [[minutes_to_seconds(2),minutes_to_seconds(19)],
+                                       [minutes_to_seconds(21),self.total_time_1],
                                        ])
 
-        result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(17)]
-                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),
-                                            minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])
+        result = self.process(news_report=[minutes_to_seconds(19),minutes_to_seconds(47)]
+                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(21),
+                                            minutes_to_seconds(23),minutes_to_seconds(25),minutes_to_seconds(49)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(2),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(11),minutes_to_seconds(17)],
-                                       [minutes_to_seconds(19),self.total_time_1],
+                                      [[minutes_to_seconds(2),minutes_to_seconds(19)],
+                                       [minutes_to_seconds(21),minutes_to_seconds(47)],
+                                       [minutes_to_seconds(49),self.total_time_1],
                                        ])
 
     def test_middle_same(self):
@@ -228,33 +232,26 @@ class TestProcessTimestamps(unittest.TestCase):
         self.assertIn("intro has duplicates",str(the_exception))
 
     def test_out_of_order(self):
-        result = self.process(news_report=[minutes_to_seconds(20),minutes_to_seconds(9)]
-                                    ,intro=[minutes_to_seconds(10),minutes_to_seconds(3),minutes_to_seconds(27)])
+        result = self.process(news_report=[minutes_to_seconds(51),minutes_to_seconds(21)]
+                                    ,intro=[minutes_to_seconds(31),minutes_to_seconds(3),minutes_to_seconds(61)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(3),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(10),minutes_to_seconds(20)],
-                                       [minutes_to_seconds(27),self.total_time_1],
+                                      [[minutes_to_seconds(3),minutes_to_seconds(21)],
+                                       [minutes_to_seconds(31),minutes_to_seconds(51)],
+                                       [minutes_to_seconds(61),self.total_time_1],
                                        ])
 
-        result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(17)]
-                                    ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),
-                                            minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])
-        np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(2),minutes_to_seconds(9)],
-                                       [minutes_to_seconds(11),minutes_to_seconds(17)],
-                                       [minutes_to_seconds(19),self.total_time_1],
-                                       ])
         
 
     def test_absorb_first_minute_news_report(self):
-        result = self.process(news_report=[30,minutes_to_seconds(15)],
-                                     intro=[minutes_to_seconds(8),minutes_to_seconds(18)])
+        result = self.process(news_report=[30,minutes_to_seconds(28)],
+                                     intro=[minutes_to_seconds(8),minutes_to_seconds(30)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(8),minutes_to_seconds(15)],
-                                       [minutes_to_seconds(18),self.total_time_1],
+                                      [[minutes_to_seconds(8),minutes_to_seconds(28)],
+                                       [minutes_to_seconds(30),self.total_time_1],
                                        ])
-        
-    def test_not_absorb_first_minute_news_report(self):
+    
+    @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")    
+    def test_not_absorb_first_minute_news_report_if_intro_comes_first(self):
         result = self.process(news_report=[30,minutes_to_seconds(20)],
                                      intro=[7,minutes_to_seconds(5),minutes_to_seconds(23)],
                                      )
@@ -271,7 +268,7 @@ class TestProcessTimestamps(unittest.TestCase):
 class TestProcessTimestampsWithPadding(unittest.TestCase):
     
     def process(self,news_report,intro):
-        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad,skip_reasonable_time_sequence_check=True)
+        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad)
 
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
@@ -290,11 +287,11 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
     def test_no_overlap(self):
-        result = self.process(news_report=[minutes_to_seconds(11)]
-                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(13)])
+        result = self.process(news_report=[minutes_to_seconds(30)]
+                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(35)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(8),minutes_to_seconds(11)+self.news_report_second_pad],
-                                        [minutes_to_seconds(13),self.total_time_1],
+                                      [[minutes_to_seconds(8),minutes_to_seconds(30)+self.news_report_second_pad],
+                                        [minutes_to_seconds(35),self.total_time_1],
                                       ])
         
     def test_middle_same(self):
@@ -303,32 +300,33 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
     def test_overlap(self):
-        result = self.process(news_report=[minutes_to_seconds(11),minutes_to_seconds(13)]
-                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(11)+2,minutes_to_seconds(15)])
+        result = self.process(news_report=[minutes_to_seconds(24),minutes_to_seconds(48)]
+                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(24)+2,minutes_to_seconds(50)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(8),minutes_to_seconds(11)],
-                                        [minutes_to_seconds(11)+2,minutes_to_seconds(13)+self.news_report_second_pad],
-                                        [minutes_to_seconds(15),self.total_time_1],
+                                      [[minutes_to_seconds(8),minutes_to_seconds(24)],
+                                        [minutes_to_seconds(24)+2,minutes_to_seconds(48)+self.news_report_second_pad],
+                                        [minutes_to_seconds(50),self.total_time_1],
                                       ])
 
     def test_news_report_beginning(self):
-        result = self.process(news_report=[minutes_to_seconds(0),minutes_to_seconds(13)]
-                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(15)])
+        result = self.process(news_report=[minutes_to_seconds(0),minutes_to_seconds(28)]
+                                    ,intro=[minutes_to_seconds(8),minutes_to_seconds(30)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(8),minutes_to_seconds(13)+self.news_report_second_pad],
-                                        [minutes_to_seconds(15),self.total_time_1],
+                                      [[minutes_to_seconds(8),minutes_to_seconds(28)+self.news_report_second_pad],
+                                        [minutes_to_seconds(30),self.total_time_1],
                                       ])
         
     def test_news_report_beginning_same_as_padding(self):
-        result = self.process(news_report=[self.news_report_second_pad,minutes_to_seconds(30)]
-                                    ,intro=[minutes_to_seconds(20),minutes_to_seconds(40)])
+        result = self.process(news_report=[self.news_report_second_pad,minutes_to_seconds(50)]
+                                    ,intro=[minutes_to_seconds(20),minutes_to_seconds(60)])
         np.testing.assert_array_equal(result,
                                       [
-                                          [minutes_to_seconds(20),minutes_to_seconds(30)+self.news_report_second_pad],
-                                        [minutes_to_seconds(40),self.total_time_1],
+                                        [minutes_to_seconds(20),minutes_to_seconds(50)+self.news_report_second_pad],
+                                        [minutes_to_seconds(60),self.total_time_1],
                                       ])
         
-    def test_intro_earlier(self):
+    @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")
+    def test_intro_earlier_but_still_within_padding(self):
         result = self.process(news_report=[self.news_report_second_pad,minutes_to_seconds(30)]
                                     ,intro=[self.news_report_second_pad-2,minutes_to_seconds(20),minutes_to_seconds(40)])
         np.testing.assert_array_equal(result,
