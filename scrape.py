@@ -503,11 +503,12 @@ def download_and_scrape(download_only=False):
                 # assuming one per day
                 publish_folder(podcast,files_to_publish=num_to_publish,delete_old_files=False)
             m4a_files_all = sorted(glob.glob(os.path.join(original_dir, "*.m4a")))
-            # only keep last days_to_keep
+            # only keep last days_to_keep number of files, 
+            # TODO: should account for weekends
             n = len(m4a_files_all) - days_to_keep
             n = 0 if n < 0 else n
-            #m4a_files_include = m4a_files_all[n:]
             files_excluded = m4a_files_all[:n]
+            #print(files_excluded)
             for file in files_excluded:
                 print(f"deleting {file} and its jsons")
                 Path(file).unlink(missing_ok=True)
