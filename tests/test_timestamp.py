@@ -34,10 +34,33 @@ class TestProcessTimestamps(unittest.TestCase):
         result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
-    def test_zero_intro(self):
+    def test_zero_intro_news_close_to_end(self):
         news_end = self.total_time_1-5
         result = self.process(news_report=[news_end],intro=[])
         np.testing.assert_array_equal(result,[[0,news_end]])
+        
+    def test_zero_intro_with_news_in_middle(self):
+        with self.assertRaises(NotImplementedError) as cm:
+            news_end = self.total_time_1-minutes_to_seconds(20)
+            result = self.process(news_report=[news_end],intro=[])
+        the_exception = cm.exception
+        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+
+    def test_zero_intro_with_multiple_news_in_middle(self):
+        with self.assertRaises(NotImplementedError) as cm:
+            news_middle = self.total_time_1-minutes_to_seconds(40)
+            news_end = self.total_time_1-minutes_to_seconds(20)
+            result = self.process(news_report=[news_middle,news_end],intro=[])
+        the_exception = cm.exception
+        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+
+        with self.assertRaises(NotImplementedError) as cm:
+            news_middle = self.total_time_1-minutes_to_seconds(40)
+            news_end = self.total_time_1-5
+            result = self.process(news_report=[news_middle,news_end],intro=[])
+        the_exception = cm.exception
+        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+
 
     # won't cause issues
     def test_news_overflow(self):
