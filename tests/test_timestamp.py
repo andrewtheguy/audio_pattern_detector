@@ -1,8 +1,9 @@
-from scrape import process_timestamps, timestamp_sanity_check
+
 
 import unittest
 import numpy as np
 
+from process_timestamps import process_timestamps, timestamp_sanity_check
 from time_sequence_error import TimeSequenceError
 
 def minutes_to_seconds(minutes):
