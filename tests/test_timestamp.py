@@ -45,6 +45,12 @@ class TestProcessTimestamps(unittest.TestCase):
             result = self.process(news_report=[news_end],intro=[])
         the_exception = cm.exception
         self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        
+    def test_zero_intro_with_news_at_beginning(self):
+        with self.assertRaises(NotImplementedError) as cm:
+            result = self.process(news_report=[0],intro=[])
+        the_exception = cm.exception
+        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
 
     def test_zero_intro_with_multiple_news_in_middle(self):
         with self.assertRaises(NotImplementedError) as cm:
