@@ -35,14 +35,14 @@ from andrew_utils import seconds_to_time
 from utils import extract_prefix
 
 streams={
-    # "happydaily": {
-    #     "introclips": ["rthk1theme.wav"],
-    #     "allow_first_short": True,
-    #     "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-    #     "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
-    # },
+    "happydaily": {
+        "introclips": ["rthk1theme.wav","happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
+        "allow_first_short": True,
+        "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+        "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
+    },
     "healthpedia": {
-        "introclips": ["rthk1theme.wav","healthpedia_intro.wav"],
+        "introclips": ["rthk1theme.wav","healthpedia_intro.wav","healthpediapriceless.wav"],
         "allow_first_short": False,
         "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
         "schedule":{"begin": 13,"end":15,"weekdays_human":[1,2,3,4,5]},
@@ -137,7 +137,7 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
                 raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_special} minutes for beginning")
             # news report should not last like 15 minutes
             elif not allow_short_interval and cur_end_time - cur_start_time < short_allowance_normal*60:
-                raise TimeSequenceError(f"duration for program segment with cur_start_time {cur_start_time} {cur_end_time - cur_start_time} seconds is less than {short_allowance_normal} minutes")
+                raise TimeSequenceError(f"duration for program segment with cur_start_time {seconds_to_time(cur_start_time)} with duration {seconds_to_time(cur_end_time - cur_start_time)} is less than {short_allowance_normal} minutes")
     
     for i in range(1,len(result)):
         cur = result[i]
@@ -159,10 +159,14 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
 # skip_reasonable_time_sequence_check: skip sanity checks related to unreasonable duration or gaps, mainly for testing
 # otherwise will have to rewrite lots of tests if the parameters changed
 def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
-                       skip_reasonable_time_sequence_check=False,allow_first_short=False):
+                       allow_first_short=False):
 
+    skip_reasonable_time_sequence_check=False
+
+    # defensive copy
     news_report = copy.deepcopy(news_report)
     intro = copy.deepcopy(intro)
+    
     pair = []
 
     if len(news_report) != len(set(news_report)):
