@@ -35,12 +35,12 @@ from andrew_utils import seconds_to_time
 from utils import extract_prefix
 
 streams={
-    "happydaily": {
-        "introclips": ["rthk1theme.wav"],
-        "allow_first_short": True,
-        "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-        "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
-    },
+    # "happydaily": {
+    #     "introclips": ["rthk1theme.wav"],
+    #     "allow_first_short": True,
+    #     "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+    #     "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
+    # },
     "healthpedia": {
         "introclips": ["rthk1theme.wav","healthpedia_intro.wav"],
         "allow_first_short": False,
@@ -334,11 +334,6 @@ def get_sec(time_str):
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
 
-def get_sec_from_str(time_str):
-    """Get seconds from time."""
-    h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + int(s)
-
 def scrape(input_file,stream_name):
 
     print(input_file)
@@ -351,7 +346,7 @@ def scrape(input_file,stream_name):
 
     jsonfile = f'{input_file}.json'
     if os.path.exists(jsonfile):
-        tsformatted=json.load(open(jsonfile))
+        tsformatted=json.load(open(jsonfile))['tsformatted']
 
     total_time = math.ceil(float(ffmpeg.probe(input_file)["format"]["duration"]))
     logger.debug("total_time",total_time,"---")
@@ -406,8 +401,12 @@ def scrape(input_file,stream_name):
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     #print(pair)
     #logger.debug("tsformatted",tsformatted)
+    duration = [seconds_to_time(t[1]-t[0]) for t in pair]
+    gaps=[]
+    for i in range(1,len(pair)):
+        gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
     with open(jsonfile,'w') as f:
-        f.write(json.dumps(tsformatted, indent=4))
+        f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
 
     splits=[]
 
@@ -454,7 +453,7 @@ def is_time_after(current_time,hour):
   return current_time > target_time
 
 def download_and_scrape(download_only=False):
-    days_to_keep=3
+    days_to_keep=14
     if days_to_keep < 1:
         raise ValueError("days_to_keep must be greater than or equal to 1")
     for key, stream in streams.items():
@@ -484,7 +483,7 @@ def download_and_scrape(download_only=False):
             os.makedirs(original_dir, exist_ok=True)
             try:
                 download(url,dest_file)
-                upload_file(dest_file,f"/rthk/{os.path.basename(dest_file)}",skip_if_exists=True)
+                upload_file(dest_file,f"/rthk/original/{key}/{os.path.basename(dest_file)}",skip_if_exists=True)
                 if(download_only):
                     continue
                 output_dir_trimmed,output_file_trimmed = scrape(dest_file,stream_name=key)
@@ -497,11 +496,12 @@ def download_and_scrape(download_only=False):
         if error_occurred_scraping:
             print(f"error happened when processing, skipping publishing podcasts")
         elif not download_only:
+            num_to_publish=3
             podcasts_publish = list(dict.fromkeys(podcasts_publish))
             for podcast in podcasts_publish:
                 print(f"publishing podcast {podcast} after scraping")
                 # assuming one per day
-                publish_folder(podcast,files_to_publish=days_to_keep,delete_old_files=True)
+                publish_folder(podcast,files_to_publish=num_to_publish,delete_old_files=False)
             m4a_files_all = sorted(glob.glob(os.path.join(original_dir, "*.m4a")))
             # only keep last days_to_keep
             n = len(m4a_files_all) - days_to_keep
