@@ -158,6 +158,7 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
 # did a count down and the beep intro for news report is about 6 seconds
 # skip_reasonable_time_sequence_check: skip sanity checks related to unreasonable duration or gaps, mainly for testing
 # otherwise will have to rewrite lots of tests if the parameters changed
+# allow_first_short: allow first intro short
 def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
                        allow_first_short=False):
 
@@ -181,11 +182,11 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_report=deque(sorted(news_report))
-    intro=deque(sorted(intro))
+    news_report=sorted(news_report)
+    intro=sorted(intro)
 
-    for i in intro:
-        if i > total_time:
+    for ts in intro:
+        if ts > total_time:
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
 
     cur_intro = 0
@@ -201,6 +202,9 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     if(news_report[0] <= 1*60 and news_report[0] < intro[0]):
         news_report[0]=0
 
+    news_report=deque(news_report)
+    intro=deque(intro)
+
     # intro starts before news report,
     # shift cur_intro from 0 to the first intro
     # if it is less than 10 minutes,
@@ -213,6 +217,29 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     if(cur_intro > total_time):
         raise ValueError("intro overflow, is greater than total time {total_time}")
 
+    
+    # # absorb fake news report beep within 10 minutes of intro except short intro and news report close to the end
+    # for i,ts_intro in enumerate(intro):
+    #     seconds_absorb=10*60
+    #     # not absorbing the news reports followed by first intro
+    #     # if allow_first_short is true, if it still have false positives
+    #     # just let it fail
+    #     if allow_first_short and i == 0:
+    #         continue
+    #     news_report2=deque()
+    #     while len(news_report)>0:
+    #         news = news_report.popleft()
+    #         if(news <= ts_intro):
+    #             news_report2.append(news)
+    #         elif(news < ts_intro + seconds_absorb):
+    #             # absorb fake news report beep
+    #             continue
+    #         else:
+    #             news_report2.append(news)
+    #             #break
+    #     news_report = news_report2
+
+
     pair=[]
 
     news_report_followed_by_intro = True
@@ -224,7 +251,7 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         if(cur_intro > total_time):
             raise ValueError("intro overflow, is greater than total time {total_time}")
         pair.append([cur_intro, cur_news_report])
-        # get first intro after news report
+        # get first intro after news report while ignoring others after first
         while(len(intro)>0):
              cur_intro = intro.popleft()
              if cur_intro > cur_news_report:
