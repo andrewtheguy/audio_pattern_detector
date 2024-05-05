@@ -168,7 +168,6 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     news_report = copy.deepcopy(news_report)
     intro = copy.deepcopy(intro)
     
-    pair = []
 
     if len(news_report) != len(set(news_report)):
        raise ValueError("news report has duplicates, clean up duplicates first")   
@@ -249,7 +248,13 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         news_report_followed_by_intro=False
         cur_news_report = news_report.popleft()
         if(cur_intro > total_time):
-            raise ValueError("intro overflow, is greater than total time {total_time}")
+            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        # absorb fake news report beep within 10 minutes of intro except allow short intro and news report close to the end
+        if len(pair) == 0:
+            pass # no absorption for first pair because it is error prone
+        else:
+            while len(intro) > 0 and len(news_report)>0 and cur_news_report <= cur_intro + 10*60 and cur_news_report < intro[0]:
+                cur_news_report=news_report.popleft()
         pair.append([cur_intro, cur_news_report])
         # get first intro after news report while ignoring others after first
         while(len(intro)>0):
