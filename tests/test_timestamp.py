@@ -337,6 +337,20 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(60),self.total_time_1],
                                        ])
     
+    def test_absorb_beeps_beginning(self):
+        result = self.process(news_report=[minutes_to_seconds(7),
+                                           minutes_to_seconds(7)+1,minutes_to_seconds(7)+2,minutes_to_seconds(7)+3,
+                                           minutes_to_seconds(7)+4,
+                                           minutes_to_seconds(50)],
+                                     intro=[minutes_to_seconds(1),minutes_to_seconds(16),minutes_to_seconds(60)],
+                                     allow_first_short=True,
+                                     )
+        np.testing.assert_array_equal(result,[
+                                       [minutes_to_seconds(1),minutes_to_seconds(7)],
+                                       [minutes_to_seconds(16),minutes_to_seconds(50)],
+                                       [minutes_to_seconds(60),self.total_time_1],
+                                       ])
+    
     def test_absorb_one_short_fake_news(self):
         result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(50)],
                                      intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
