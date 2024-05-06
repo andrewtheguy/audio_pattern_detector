@@ -230,11 +230,16 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     skip_reasonable_time_sequence_check=False
 
 
-    if len(news_reports) != len(set(news_reports)):
-       raise ValueError("news report has duplicates, clean up duplicates first")   
+    # if len(news_reports) != len(set(news_reports)):
+    #    raise ValueError("news report has duplicates, clean up duplicates first")   
 
-    if len(intros) != len(set(intros)):
-       raise ValueError("intro has duplicates, clean up duplicates first")   
+    # if len(intros) != len(set(intros)):
+    #    raise ValueError("intro has duplicates, clean up duplicates first")   
+
+
+    news_reports = preprocess_ts(news_reports)
+    intros = preprocess_ts(intros)
+    
 
     for ts in intros:
         if ts > total_time:
@@ -242,9 +247,6 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
-    news_reports = preprocess_ts(news_reports)
-    intros = preprocess_ts(intros)
-    
     # remove repeating beeps
     news_reports = consolidate_beeps(news_reports)
     # remove repeating intros
