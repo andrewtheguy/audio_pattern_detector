@@ -136,6 +136,11 @@ def consolidate_intros(intros,news_reports):
 # returns a copy if news_reports if first one should be cut off 
 # fix the end also           
 def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    
     news_reports=news_reports.copy()
     news_already = None
     for i,news_report in enumerate(news_reports):
@@ -146,15 +151,12 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
                 raise ValueError("cannot have more than one news report within 10 minutes")
             else:
                 news_already = news_report
+    if(len(intros)>0):
+        first_intro = intros[0]
+        if(intros[0]>INTRO_CUT_OFF):
+            raise ValueError("first intro cannot be greater than 10 minutes")            
     if(len(intros)==0 or len(news_reports)==0):
         return news_reports
-    if not is_unique_and_sorted(intros):
-        raise ValueError("intros is not unique or sorted")
-    if not is_unique_and_sorted(news_reports):
-        raise ValueError("news report is not unique or sorted")
-    first_intro = intros[0]
-    if(intros[0]>INTRO_CUT_OFF):
-        raise ValueError("first intro cannot be greater than 10 minutes")
 
     if(news_already<first_intro):
         news_reports=news_reports[1:]
@@ -168,12 +170,14 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
     if(intros[-1] > total_time):
         raise ValueError(f"intro overflow, is greater than total time {total_time}")
     
-    if(news_reports[-1] < total_time-10):
-        raise ValueError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
-    
+
     # make it complete
     if(news_reports[-1] < intros[-1]):
         news_reports.append(total_time)
+    
+    if(news_reports[-1] < total_time-10):
+        raise ValueError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
+    
     
     return news_reports
                     
