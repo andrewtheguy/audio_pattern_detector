@@ -214,7 +214,7 @@ def build_time_sequence(intros,news_reports):
         intros_debug=[seconds_to_time(seconds=t,include_decimals=False) for t in intros]
         news_reports_debug=[seconds_to_time(seconds=t,include_decimals=False) for t in news_reports]
         raise TimeSequenceError(f"intros and news reports must be the same length, otherwise it is sign of time sequence error:\n"+ 
-                                f"intros {intros_debug} news reports {news_reports_debug}")
+                                f"      intros {intros_debug}\nnews reports {news_reports_debug}")
     result =[]
     for i in range(len(intros)):
         result.append([intros[i],news_reports[i]])

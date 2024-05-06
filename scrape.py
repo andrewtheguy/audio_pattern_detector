@@ -55,7 +55,7 @@ streams={
         "schedule":{"begin": 6,"end":10,"weekdays_human":[1,2,3,4,5]},
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme.wav","knowledgecointro.wav"],
+        "introclips": ["rthk2theme.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
         "schedule":{"begin": 6,"end":8,"weekdays_human":[6]},
@@ -76,7 +76,7 @@ news_report_clip='rthk_beep2.wav'
 # no need because it is absorbing now
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
-    "morningsuite20240502":[12538], # causing trouble
+    "morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
     #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
@@ -298,7 +298,8 @@ def is_time_after(current_time,hour):
   return current_time > target_time
 
 def download_and_scrape(download_only=False):
-    days_to_keep=17
+    failed_scrape_files=[]
+    days_to_keep=18
     if days_to_keep < 1:
         raise ValueError("days_to_keep must be greater than or equal to 1")
     for key, stream in streams.items():
@@ -337,6 +338,7 @@ def download_and_scrape(download_only=False):
                 print(f"error happened when processing for {key}",e)
                 print(traceback.format_exc())
                 error_occurred_scraping = True
+                failed_scrape_files.append(dest_file)
                 continue
         if error_occurred_scraping:
             print(f"error happened when processing, skipping publishing podcasts")
@@ -359,12 +361,19 @@ def download_and_scrape(download_only=False):
                 Path(file).unlink(missing_ok=True)
                 Path(f"{file}.json").unlink(missing_ok=True)
                 Path(f"{file}.separated.json").unlink(missing_ok=True)
+
+    if failed_scrape_files:
+        print(f"failed to scrape the following files:")
+        for file in failed_scrape_files:
+            print(file)
+
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
     parser.add_argument('action')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
     parser.add_argument('--pattern-file', metavar='audio file', type=str, help='pattern file to convert sample')
+    parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     if(args.action == 'scrape'):
@@ -372,8 +381,9 @@ def command():
         stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
         scrape(input_file,stream_name=stream_name)
     elif(args.action == 'convert'):
+        # python scrape.py convert --pattern-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
         input_file = args.pattern_file
-        convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
+        convert_audio_to_clip_format(input_file,args.dest_file)
     elif(args.action == 'download'):
         download_and_scrape(download_only=True)
     elif(args.action == 'download_and_scrape'):
