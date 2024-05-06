@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 # beep 6 times, means 5 repeats
 BEEP_PATTERN_REPEAT_LIMIT = 5
+# allow one intro and news report within 10 minutes
+# but not intro past 10 minutes
+INTRO_CUT_OFF=10*60
 
 def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_first_short=False):
     logger.info(result)
@@ -94,7 +97,7 @@ def consolidate_intros(intros,news_reports):
     #no news report
     if len(news_reports) == 0:
         #just return because it is unique and sorted already
-        return intros.copy()
+        return [] if len(intros) == 0 else [intros[0]]
  
     #normalize
     if(len(intros) > 0):
@@ -129,6 +132,60 @@ def consolidate_intros(intros,news_reports):
         consolidated_intros.append(arr[0])
         
     return consolidated_intros
+    
+# returns a copy if news_reports if first one should be cut off 
+# fix the end also           
+def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
+    news_reports=news_reports.copy()
+    if(len(intros)==0 or len(news_reports)==0):
+        return news_reports
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    first_intro = intros[0]
+    if(intros[0]>INTRO_CUT_OFF):
+        raise ValueError("first intro cannot be greater than 10 minutes")
+    #intros=intros.copy()
+    #news_reports=news_reports.copy()
+    news_already = None
+    for i,news_report in enumerate(news_reports):
+        if(i > 1):
+            break
+        if(news_reports[i] <= INTRO_CUT_OFF):
+            if(news_already is not None):
+                raise ValueError("cannot have more than one news report within 10 minutes")
+            else:
+                news_already = news_report
+    if(news_already<first_intro):
+        news_reports=news_reports[1:]
+    #else:
+    #    news_reports=news_reports
+    
+    #if(new)    
+    if(len(news_reports)==0):
+        return news_reports
+    
+    if(intros[-1] > total_time):
+        raise ValueError(f"intro overflow, is greater than total time {total_time}")
+    
+    if(news_reports[-1] < total_time-10):
+        raise ValueError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
+    
+    # make it complete
+    if(news_reports[-1] < intros[-1]):
+        news_reports.append(total_time)
+    
+    return news_reports
+                    
+                
+def remove_start_equals_to_end(input):
+    result=[]
+    for arr in input:
+        if arr[0] != arr[1]:
+            result.append(arr)
+            #result.remove(arr)
+    return result
     
 
 def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
