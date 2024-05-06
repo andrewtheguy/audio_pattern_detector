@@ -185,9 +185,9 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
     return news_reports
                     
                 
-def remove_start_equals_to_end(input):
+def remove_start_equals_to_end(time_sequences):
     result=[]
-    for arr in input:
+    for arr in time_sequences:
         if arr[0] != arr[1]:
             result.append(arr)
             #result.remove(arr)
