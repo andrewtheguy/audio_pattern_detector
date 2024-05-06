@@ -194,24 +194,24 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
                  
 def build_time_sequence(intros,news_reports):
     if(len(intros) != len(news_reports)):
-        raise TimeSequenceError("intros and news reports must be the same length, otherwise it is sign of time sequence error")
+        raise TimeSequenceError(f"intros and news reports must be the same length, otherwise it is sign of time sequence error: intros {intros} news reports {news_reports}")
     result =[]
     for i in range(len(intros)):
         result.append([intros[i],news_reports[i]])
     return result    
                  
-def pad_news_report(time_sequences,seconds_to_pad=6):
+def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
     result=[]
     for i in range(1,len(time_sequences)):
         prev_seq=time_sequences[i-1]
         cur_seq=time_sequences[i]
         #enough room to pad
-        if cur_seq[0] - prev_seq[1] >= seconds_to_pad:
-            result.append([prev_seq[0],prev_seq[1]+seconds_to_pad])
+        if cur_seq[0] - prev_seq[1] >= news_report_second_pad:
+            result.append([prev_seq[0],prev_seq[1]+news_report_second_pad])
         else:
             result.append([prev_seq[0],cur_seq[0]])
-    if len(time_sequences) > 0:        
-        result.append([time_sequences[-1][0],time_sequences[-1][1]+seconds_to_pad])        
+    if len(time_sequences) > 0:
+        result.append([time_sequences[-1][0],seq if (seq:=time_sequences[-1][1]+news_report_second_pad) <= total_time else total_time])    
     return result   
                 
 def remove_start_equals_to_end(time_sequences):
@@ -253,7 +253,7 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     news_reports = news_intro_cut_off_beginning_and_end(intros,news_reports,total_time)
 
     time_sequences=build_time_sequence(intros,news_reports)
-    time_sequences=pad_news_report(time_sequences,seconds_to_pad=news_report_second_pad)
+    time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad)
     time_sequences=remove_start_equals_to_end(time_sequences)
     
 

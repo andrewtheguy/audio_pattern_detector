@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from process_timestamps import process_timestamps, timestamp_sanity_check
-from tests.test_timestamp import minutes_to_seconds
+from utils import minutes_to_seconds
 from time_sequence_error import TimeSequenceError
 
 
