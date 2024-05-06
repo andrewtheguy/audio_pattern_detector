@@ -39,25 +39,25 @@ streams={
         "introclips": ["rthk1theme.wav","happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
         "allow_first_short": True,
         "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
-        "schedule":{"begin": 10,"end":12,"weekdays_human":[1,2,3,4,5]},
+        "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
     },
     "healthpedia": {
         "introclips": ["rthk1theme.wav","healthpedia_intro.wav","healthpediapriceless.wav"],
         "allow_first_short": False,
         "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/index_0_a.m3u8",
-        "schedule":{"begin": 13,"end":15,"weekdays_human":[1,2,3,4,5]},
+        "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
     },
     "morningsuite": {
         "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/index_0_a.m3u8",
-        "schedule":{"begin": 6,"end":10,"weekdays_human":[1,2,3,4,5]},
+        "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
     },
     "KnowledgeCo": {
         "introclips": ["rthk2theme.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
-        "schedule":{"begin": 6,"end":8,"weekdays_human":[6]},
+        "schedule":{"end":8,"weekdays_human":[6]},
     },
 }
 
@@ -304,7 +304,7 @@ def is_time_after(current_time,hour):
 
 def download_and_scrape(download_only=False):
     failed_scrape_files=[]
-    days_to_keep=19
+    days_to_keep=3
     if days_to_keep < 1:
         raise ValueError("days_to_keep must be greater than or equal to 1")
     for key, stream in streams.items():
