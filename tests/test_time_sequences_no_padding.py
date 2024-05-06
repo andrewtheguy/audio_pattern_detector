@@ -20,11 +20,12 @@ class TestProcessTimestamps(unittest.TestCase):
 
     def test_zero_news_report(self):
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(18)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(20)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         
+        #with self.assertRaises(TimeSequenceError) as cm:
         result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 

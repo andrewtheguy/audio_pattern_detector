@@ -63,7 +63,7 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
         
     return result
 
-def preprocess_timestamps(peak_times):
+def preprocess_ts(peak_times):
     # deduplicate by seconds
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
     # sort
@@ -141,9 +141,12 @@ def consolidate_intros(intros,news_reports):
         
     return consolidated_intros
     
-# returns a copy if news_reports if first one should be cut off 
-# fix the end also           
-def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
+# clean up first 10 minutes and last 10 seconds
+# first intro should not happen after 10 minutes
+# first 10 minutes should have at most 1 news report, and if it does
+# that first news report should be cut off
+# last news report can only happen within 10 seconds of the end
+def news_intro_process_beginning_and_end(intros,news_reports,total_time):
     if not is_unique_and_sorted(intros):
         raise ValueError("intros is not unique or sorted")
     if not is_unique_and_sorted(news_reports):
@@ -242,15 +245,15 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_reports = preprocess_timestamps(news_reports)
-    intros = preprocess_timestamps(intros)
+    news_reports = preprocess_ts(news_reports)
+    intros = preprocess_ts(intros)
     
     # remove repeating beeps
     news_reports = consolidate_beeps(news_reports)
     # remove repeating intros
     intros = consolidate_intros(intros,news_reports)
-    # cut off extra beginning and end
-    news_reports = news_intro_cut_off_beginning_and_end(intros,news_reports,total_time)
+    # process beginning and end
+    news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
     time_sequences=build_time_sequence(intros,news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad)

@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
 
-from process_timestamps import INTRO_CUT_OFF, news_intro_cut_off_beginning_and_end, remove_start_equals_to_end
+from process_timestamps import INTRO_CUT_OFF, news_intro_process_beginning_and_end, remove_start_equals_to_end
 from utils import minutes_to_seconds
 
-class TestRemoveStartEnd(unittest.TestCase):
+class TestRemoveStartEndTheSame(unittest.TestCase):
 
     def do_test(self,time_sequences):
         return remove_start_equals_to_end(time_sequences)
