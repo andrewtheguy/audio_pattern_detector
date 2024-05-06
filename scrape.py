@@ -25,7 +25,7 @@ import requests
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD, \
     cleanup_peak_times
-from process_timestamps import process_timestamps
+from process_timestamps import preprocess_ts, process_timestamps
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
 from file_upload.upload_utils import upload_file
@@ -213,7 +213,7 @@ def scrape(input_file,stream_name):
         if exclude_ts:
             news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
             
-        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
+        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in preprocess_ts(news_report_peak_times)]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
         for offset in news_report_peak_times:
             logger.info(
@@ -230,7 +230,7 @@ def scrape(input_file,stream_name):
             program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=False) for t in intros_debug]]})
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         logger.debug(program_intro_peak_times)
-        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
+        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in preprocess_ts(program_intro_peak_times)],"---")
 
         for offset in program_intro_peak_times:
             logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
