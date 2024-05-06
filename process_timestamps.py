@@ -1,11 +1,20 @@
 from collections import deque
 import copy
 import logging
+import math
+import sys
 
 from time_sequence_error import TimeSequenceError
 from andrew_utils import seconds_to_time
+from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
+
+# allow 7 seconds of beeps to repeat
+BEEP_PATTERN_REPEAT_SECONDS = 7
+# allow one intro and news report within 10 minutes
+# but not intro past 10 minutes
+INTRO_CUT_OFF=10*60
 
 def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_first_short=False):
     logger.info(result)
@@ -54,139 +63,230 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
         
     return result
 
-# total_time is needed to set end time
-# if it ends with intro instead of news report
-# did a count down and the beep intro for news report is about 6 seconds
-# skip_reasonable_time_sequence_check: skip sanity checks related to unreasonable duration or gaps, mainly for testing
-# otherwise will have to rewrite lots of tests if the parameters changed
-# allow_first_short: allow first intro short
-def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
-                       allow_first_short=False):
-
-    skip_reasonable_time_sequence_check=False
-
-    # defensive copy
-    news_report = copy.deepcopy(news_report)
-    intro = copy.deepcopy(intro)
-    
-
-    if len(news_report) != len(set(news_report)):
-       raise ValueError("news report has duplicates, clean up duplicates first")   
-
-    if len(intro) != len(set(intro)):
-       raise ValueError("intro has duplicates, clean up duplicates first")   
-
-
-    # will bug out if not sorted
+def preprocess_ts(peak_times,remove_repeats=False):
+    # deduplicate by seconds
+    # sort: will bug out if not sorted
     # TODO maybe require input to be sorted first to prevent
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_report=sorted(news_report)
-    intro=sorted(intro)
+    #print("peak_times before",peak_times)
+    peak_times_clean = list(dict.fromkeys([peak for peak in sorted(peak_times)]))
+    #print("peak_times after",peak_times)
+    #exit(1)
+    
+    if remove_repeats:
+        # remove repeating beeps
+        peak_times_clean = consolidate_beeps(peak_times_clean)
+    
+    return peak_times_clean
 
-    for ts in intro:
+# not working for decimals yet
+def consolidate_beeps(news_reports,max_seconds=BEEP_PATTERN_REPEAT_SECONDS):
+    if len(news_reports) == 0:
+        return news_reports
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    new_ones=[]
+    #non_repeating_index = None
+    #repeat_count = 0
+    #max_seconds = BEEP_PATTERN_REPEAT_SECONDS
+    cur_first = None
+    for i,cur_news_report in enumerate(news_reports):
+        if i == 0:
+            cur_first=cur_news_report
+            #print("cur_news_report",cur_news_report)
+            #print("cur_first",cur_first)
+            #print("add current and reset")
+            new_ones.append(cur_news_report)
+        else:
+            #print("cur_news_report",cur_news_report)
+            #print("cur_first",cur_first)
+            #print("cur_news_report - cur_first",cur_news_report - cur_first)
+            if (cur_news_report - cur_first <= max_seconds): #seconds
+                pass
+                #repeat_count += 1
+            else:
+                #print("add current and reset")
+                #repeat_count = 0
+                cur_first=cur_news_report
+                #non_repeating_index=i
+                new_ones.append(cur_news_report)
+            #print("---------------")    
+    return new_ones            
+        
+# news_reports need to be unique         
+def consolidate_intros(intros,news_reports):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    
+    consolidated_intros = []
+
+
+    #no news report or intro
+    if len(news_reports) == 0 or len(intros) == 0:
+        #just return beginning
+        return [0] if len(intros) == 0 else [intros[0]]
+ 
+    #normalize
+    if(len(intros) > 0):
+        if(intros[0]<0):
+            raise ValueError("intro cannot be negative")
+    else: # no intros
+         return []   
+
+   
+    intros=deque(intros)
+    news_reports=deque(news_reports)
+    
+    arr2=[]
+    
+    # min 1 intro and 1 news report
+    while news_reports:
+        temp=[]
+
+        news = news_reports.popleft()
+  
+        # Check if there are extra intros before the current news
+        while intros and intros[0] < news:
+            temp.append(intros.popleft())
+            #intro=intros.popleft()
+        arr2.append(temp)
+
+    arr2.append(intros)
+
+    for arr in arr2:
+        if len(arr) == 0:
+            continue
+        consolidated_intros.append(arr[0])
+        
+    return consolidated_intros
+    
+# clean up first 10 minutes and last 10 seconds
+# first intro should not happen after 10 minutes
+# first 10 minutes should have at most 1 news report, and if it does
+# that first news report should be cut off
+# last news report can only happen within 10 seconds of the end
+def news_intro_process_beginning_and_end(intros,news_reports,total_time):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    
+    news_reports=news_reports.copy()
+    news_already = None
+    for i,news_report in enumerate(news_reports):
+        if(i > 1):
+            break
+        if(news_reports[i] <= INTRO_CUT_OFF):
+            if(news_already is not None):
+                raise TimeSequenceError("cannot have more than one news report within 10 minutes")
+            else:
+                news_already = news_report
+    if(len(intros)>0):
+        first_intro = intros[0]
+        if(intros[0]>INTRO_CUT_OFF):
+            raise TimeSequenceError("first intro cannot be greater than 10 minutes")            
+    if(len(intros)==0 or len(news_reports)==0):
+        return [total_time]
+
+    # chop the first news report if it is less than 10 minutes
+    if(news_already is not None and news_already<first_intro):
+        news_reports=news_reports[1:]
+    #else:
+    #    news_reports=news_reports
+    
+    #treat news report as happening at the end
+    if(len(news_reports)==0):
+        return [total_time]
+    
+    if(intros[-1] > total_time):
+        raise ValueError(f"intro overflow, is greater than total time {total_time}")
+
+
+    end_cut_off_seconds = 10
+
+    # make it complete
+    if(news_reports[-1] < intros[-1]):
+        news_reports.append(total_time)
+    
+    if(news_reports[-1] < total_time-end_cut_off_seconds):
+        raise TimeSequenceError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
+    
+    return news_reports
+                 
+def build_time_sequence(intros,news_reports):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    if(len(intros) != len(news_reports)):
+        intros_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in intros]
+        news_reports_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in news_reports]
+        raise TimeSequenceError(f"intros and news reports must be the same length, otherwise it is sign of time sequence error:\n"+ 
+                                f"      intros {intros_debug}\nnews reports {news_reports_debug}")
+    result =[]
+    for i in range(len(intros)):
+        result.append([intros[i],news_reports[i]])
+    return result    
+                 
+def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
+    result=[]
+    for i in range(1,len(time_sequences)):
+        prev_seq=time_sequences[i-1]
+        cur_seq=time_sequences[i]
+        #enough room to pad
+        if cur_seq[0] - prev_seq[1] >= news_report_second_pad:
+            result.append([prev_seq[0],prev_seq[1]+news_report_second_pad])
+        else:
+            result.append([prev_seq[0],cur_seq[0]])
+    if len(time_sequences) > 0:
+        result.append([time_sequences[-1][0],seq if (seq:=time_sequences[-1][1]+news_report_second_pad) <= total_time else total_time])    
+    return result   
+                
+def remove_start_equals_to_end(time_sequences):
+    return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
+    
+# main function
+def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
+                       allow_first_short=False):
+
+    skip_reasonable_time_sequence_check=False
+
+
+    # if len(news_reports) != len(set(news_reports)):
+    #    raise ValueError("news report has duplicates, clean up duplicates first")   
+
+    # if len(intros) != len(set(intros)):
+    #    raise ValueError("intro has duplicates, clean up duplicates first")   
+
+
+    news_reports = preprocess_ts(news_reports,remove_repeats=True)
+    intros = preprocess_ts(intros)
+    
+
+    for ts in intros:
         if ts > total_time:
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        elif ts < 0:
+            raise ValueError(f"intro is less than 0")
 
-    cur_intro = 0
+    # remove repeating intros
+    intros = consolidate_intros(intros,news_reports)
+    # process beginning and end
+    news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
-    #news_report = deque([598, 2398, 3958, 5758])
-    #intro = deque([1056, 2661, 4463])
-    # no news report
-    if(len(news_report)==0):
-        # no need to trim
-        return [[cur_intro, total_time]]
+    time_sequences=build_time_sequence(intros,news_reports)
+    time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
+    time_sequences=remove_start_equals_to_end(time_sequences)
     
-    # news report within the first 1 minute and it is less than the first intro, change to 0
-    if(len(intro) > 0 and (news_report[0] <= 1*60 and news_report[0] < intro[0])):
-        news_report[0]=0
-
-    news_report=deque(news_report)
-    intro=deque(intro)
-
-    # intro starts before news report,
-    # shift cur_intro from 0 to the first intro
-    # if it is less than 10 minutes,
-    # it is very unlikely to miss a news report
-    # within the first 10 minutes and at the same time
-    # the program has already started before 10 minutes
-    if(len(intro) > 0 and intro[0] <= 10*60 and intro[0] < news_report[0]):
-        cur_intro = intro.popleft()
-
-    if(cur_intro > total_time):
-        raise ValueError("intro overflow, is greater than total time {total_time}")
-
-    
-
-    pair=[]
-    #print("fgfdgdfgfdgdfgfd")
-    news_report_followed_by_intro = True
-    while(len(news_report)>0):
-        if(not news_report_followed_by_intro):
-           raise ValueError("cannot have news report followed by news report")
-        news_report_followed_by_intro=False
-        cur_news_report = news_report.popleft()
-        if(cur_intro > total_time):
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
-        # clean up beep beep beep
-        max_beep_repeat = 10
-        count_beep_repeat = 0
-        #print("cur_news_report",cur_news_report)
-        #print("news_report[0] - cur_news_report",news_report[0] - cur_news_report)
-        beep_tracker=cur_news_report
-        while len(news_report)>0 and news_report[0] - beep_tracker <= 10 and count_beep_repeat < max_beep_repeat:
-            beep_tracker=news_report.popleft()
-            count_beep_repeat += 1
-        # absorb fake news report beep within 16 minutes of intro except allow short intro or news report not followed by intro
-        # or absorbtion would cause too long
-        if len(pair) == 0:
-            pass # no absorption for first pair because it is error prone
-        else:
-            #target_min_intro_duration = 18
-            # pop only one within 15 minutes and 30 seconds   
-            if len(intro) > 0 and len(news_report)>0 and cur_news_report <= cur_intro + 15*60+30 and cur_news_report < intro[0]:
-                cur_news_report=news_report.popleft()
-        pair.append([cur_intro, cur_news_report])
-        # get first intro after news report while ignoring others after first
-        while(len(intro)>0):
-             cur_intro = intro.popleft()
-             if cur_intro > cur_news_report:
-                 # ends with intro but no news report
-                 if len(news_report)==0:
-                    pair.append([cur_intro, total_time])
-
-                 if(len(news_report)>0 and cur_intro > news_report[0]):
-                    # intro greater than two news reports, which means it is news report followed by news report
-                    # will cause start time to be greater than end time for the next time range to be added
-                    news_report_followed_by_intro=False
-                 else:    
-                    news_report_followed_by_intro=True    
-                 break
-        # prevent missing something in the middle     
-        # unlkely to happen if news report is 10 seconds from the end w/o intro
-        if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
-            raise NotImplementedError(f"not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro, cur_news_report {cur_news_report}, cur_intro: {cur_intro}")
-    #print("before padding",pair)
-    for i,arr in enumerate(pair):
-        cur_intro = arr[0]
-        cur_news_report = arr[1]
-        if(i+1>=len(pair)):
-            next_intro = None
-        else:
-            next_intro = pair[i+1][0]
-        # pad news_report_second_pad seconds to news report if it is larger then news_report_second_pad
-        if((next_intro is None or (cur_news_report + news_report_second_pad <= next_intro and cur_news_report>news_report_second_pad)) and cur_news_report < total_time):
-            arr[1] = cur_news_report + news_report_second_pad
-    #print("after padding",pair)
-
-    # remove start = end
-    result = list(filter(lambda x: (x[0] != x[1]), pair)) 
 
     #required sanity check
-    if(len(result) == 0):
-        raise ValueError("result cannot be empty")
+    if(len(time_sequences) == 0):
+        raise ValueError("time_sequences cannot be empty")
     
-    timestamp_sanity_check(result,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short)
+    timestamp_sanity_check(time_sequences,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short)
 
-    return result
+    return time_sequences
