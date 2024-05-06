@@ -29,10 +29,11 @@ class TestConsolidateIntros(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [3])
         
+        # if no news reports, but multiple intros, only return first one
         result = self.do_test(intros=[3,4],
                               news_reports=[])
         np.testing.assert_array_equal(result,
-                                      [3,4])
+                                      [3])
         
     def test_news_report_in_between_intros(self):
         result = self.do_test(intros=[20,70],
