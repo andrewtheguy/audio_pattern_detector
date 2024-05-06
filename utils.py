@@ -24,3 +24,8 @@ def get_ffprobe_info(filename):
     #    returncode = e.returncode  # Error code
 
     return json.loads(result.decode("utf-8"))  # Decode bytes to string
+  
+def is_unique_and_sorted(array):
+  if len(array) != len(set(array)):
+    return False  # Not unique
+  return all(array[i] <= array[i+1] for i in range(len(array)-1))

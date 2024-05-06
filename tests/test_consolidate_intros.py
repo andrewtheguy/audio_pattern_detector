@@ -5,7 +5,7 @@ from process_timestamps import consolidate_intros
 
 class TestConsolidateIntros(unittest.TestCase):
     def do_test(self,intros,news_reports):
-        return consolidate_intros(intros,news_reports)
+        return consolidate_intros((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))))
     
     def test_zero_everything(self):
         result = self.do_test(intros=[],

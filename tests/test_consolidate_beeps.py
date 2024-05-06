@@ -5,7 +5,7 @@ from process_timestamps import consolidate_beeps
 
 class TestConsolidateBeeps(unittest.TestCase):
     def do_test(self,news_reports):
-        return consolidate_beeps(news_reports)
+        return consolidate_beeps(list(dict.fromkeys(news_reports)))
     
     def test_zero_everything(self):
         result = self.do_test(news_reports=[])
