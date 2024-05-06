@@ -4,12 +4,6 @@ import numpy as np
 from process_timestamps import process_timestamps, timestamp_sanity_check
 from time_sequence_error import TimeSequenceError
 
-def minutes_to_seconds(minutes):
-    return minutes*60
-
-
-def hours_to_seconds(hours):
-    return minutes_to_seconds(hours*60)
 
 class TestProcessTimestamps(unittest.TestCase):
     
