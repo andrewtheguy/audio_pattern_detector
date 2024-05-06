@@ -212,7 +212,7 @@ def scrape(input_file,stream_name):
             news_report_peak_times_filtered = []
             for second in preprocess_ts(news_report_peak_times,remove_repeats=True):
                 #print(second)
-                if second not in exclude_ts:
+                if math.floor(second) not in exclude_ts:
                     news_report_peak_times_filtered.append(second)
                 else:
                     print(f"excluding {seconds_to_time(second)}, ({second}) seconds mark from news_report_peak_times")
