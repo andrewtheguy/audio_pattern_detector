@@ -11,17 +11,17 @@ class TestConsolidateIntros(unittest.TestCase):
         result = self.do_test(intros=[],
                               news_reports=[])
         np.testing.assert_array_equal(result,
-                                      [])
+                                      [0])
         
     def test_news_reports_only(self):
         result = self.do_test(intros=[],
                               news_reports=[3,4])
         np.testing.assert_array_equal(result,
-                                      [])
+                                      [0])
         result = self.do_test(intros=[],
                               news_reports=[3,50])
         np.testing.assert_array_equal(result,
-                                      [])
+                                      [0])
         
     def test_intros_only(self):
         result = self.do_test(intros=[3],

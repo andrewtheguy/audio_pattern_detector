@@ -66,7 +66,11 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
 def preprocess_ts(peak_times):
     # deduplicate by seconds
     peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
-    # sort
+    # sort: will bug out if not sorted
+    # TODO maybe require input to be sorted first to prevent
+    # sorting inputs that are already sorted again
+    #news_report = deque([40,90,300])
+    #intro =       deque([60,200,400])
     return sorted(peak_times_clean)
 
 # not working for decimals yet
@@ -102,10 +106,10 @@ def consolidate_intros(intros,news_reports):
     consolidated_intros = []
 
 
-    #no news report
-    if len(news_reports) == 0:
-        #just return because it is unique and sorted already
-        return [] if len(intros) == 0 else [intros[0]]
+    #no news report or intro
+    if len(news_reports) == 0 or len(intros) == 0:
+        #just return beginning
+        return [0] if len(intros) == 0 else [intros[0]]
  
     #normalize
     if(len(intros) > 0):
@@ -167,7 +171,7 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
         if(intros[0]>INTRO_CUT_OFF):
             raise ValueError("first intro cannot be greater than 10 minutes")            
     if(len(intros)==0 or len(news_reports)==0):
-        return news_reports
+        return [total_time]
 
     # chop the first news report if it is less than 10 minutes
     if(news_already is not None and news_already<first_intro):
@@ -175,13 +179,13 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
     #else:
     #    news_reports=news_reports
     
-    #if(new)    
+    #treat news report as happening at the end
     if(len(news_reports)==0):
-        return news_reports
+        return [total_time]
     
     if(intros[-1] > total_time):
         raise ValueError(f"intro overflow, is greater than total time {total_time}")
-    
+
 
     end_cut_off_seconds = 10
 
@@ -191,7 +195,6 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
     
     if(news_reports[-1] < total_time-end_cut_off_seconds):
         raise ValueError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
-    
     
     return news_reports
                  
@@ -220,7 +223,7 @@ def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
 def remove_start_equals_to_end(time_sequences):
     return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
     
-
+# main function
 def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
                        allow_first_short=False):
 
@@ -239,12 +242,6 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
-
-    # will bug out if not sorted
-    # TODO maybe require input to be sorted first to prevent
-    # sorting inputs that are already sorted again
-    #news_report = deque([40,90,300])
-    #intro =       deque([60,200,400])
     news_reports = preprocess_ts(news_reports)
     intros = preprocess_ts(intros)
     
@@ -256,7 +253,7 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
     time_sequences=build_time_sequence(intros,news_reports)
-    time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad)
+    time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
     time_sequences=remove_start_equals_to_end(time_sequences)
     
 
