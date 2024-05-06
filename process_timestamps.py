@@ -248,12 +248,12 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     # remove repeating beeps
     news_reports = consolidate_beeps(news_reports)
     # remove repeating intros
-    intros = consolidate_intros(intros)
+    intros = consolidate_intros(intros,news_reports)
     # cut off extra beginning and end
     news_reports = news_intro_cut_off_beginning_and_end(intros,news_reports,total_time)
 
     time_sequences=build_time_sequence(intros,news_reports)
-    time_sequences=pad_news_report(time_sequences)
+    time_sequences=pad_news_report(time_sequences,seconds_to_pad=news_report_second_pad)
     time_sequences=remove_start_equals_to_end(time_sequences)
     
 
