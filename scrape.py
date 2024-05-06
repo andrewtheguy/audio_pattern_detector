@@ -207,9 +207,15 @@ def scrape(input_file,stream_name):
                                                               correlation_threshold = correlation_threshold_news_report,
                                                               )
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
-        #exclude_ts = news_report_black_list_ts.get(audio_name,None)
-        #if exclude_ts:
-        #    news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
+        exclude_ts = news_report_black_list_ts.get(audio_name,None)
+        if exclude_ts:
+            news_report_peak_times_filtered = []
+            for second in news_report_peak_times:
+                if int(second) not in exclude_ts:
+                    news_report_peak_times_filtered.append(second)
+                else:
+                    print(f"excluding {seconds_to_time(second)}, ({second}) seconds mark from news_report_peak_times")
+            news_report_peak_times = news_report_peak_times_filtered        
             
         news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
