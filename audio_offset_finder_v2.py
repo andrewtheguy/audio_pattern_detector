@@ -599,6 +599,9 @@ def convert_audio_arr_to_float(audio):
 
 
 def convert_audio_to_clip_format(audio_path, output_path):
+    if not os.path.exists(audio_path):
+        raise ValueError(f"Audio {audio_path} does not exist")
+    
     # Load the audio clip
     clip = load_audio_file(audio_path, sr=target_sample_rate)
 
@@ -608,11 +611,16 @@ def convert_audio_to_clip_format(audio_path, output_path):
     sf.write(output_path, clip, target_sample_rate)
 
 
-# unwind_clip_ts for starting timestamps like intro
 # could cause issues with small overlap when intro is followed right by news report
 def find_clip_in_audio_in_chunks(clip_path, full_audio_path, method,correlation_threshold):
-    global max_test
-    max_test = []
+    if not os.path.exists(clip_path):
+        raise ValueError(f"Clip {clip_path} does not exist")
+    
+    if not os.path.exists(full_audio_path):
+        raise ValueError(f"Full audio {full_audio_path} does not exist")
+    
+    #global max_test
+    #max_test = []
     unwind_clip_ts = True
 
     # Load the audio clip
