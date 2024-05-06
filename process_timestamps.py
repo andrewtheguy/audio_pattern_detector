@@ -1,6 +1,7 @@
 from collections import deque
 import copy
 import logging
+import math
 import sys
 
 from time_sequence_error import TimeSequenceError
@@ -62,6 +63,13 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
         
     return result
 
+def preprocess_timestamps(peak_times):
+    # deduplicate by seconds
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
+    # sort
+    return sorted(peak_times_clean)
+
+# not working for decimals yet
 def consolidate_beeps(news_reports):
     if len(news_reports) == 0:
         return news_reports
@@ -184,6 +192,14 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
     
     return news_reports
                  
+def build_time_sequence(intros,news_reports):
+    if(len(intros) != len(news_reports)):
+        raise TimeSequenceError("intros and news reports must be the same length, otherwise it is sign of time sequence error")
+    result =[]
+    for i in range(len(intros)):
+        result.append([intros[i],news_reports[i]])
+    return result    
+                 
 def pad_news_report(time_sequences,seconds_to_pad=6):
     result=[]
     for i in range(1,len(time_sequences)):
@@ -199,12 +215,7 @@ def pad_news_report(time_sequences,seconds_to_pad=6):
     return result   
                 
 def remove_start_equals_to_end(time_sequences):
-    result=[]
-    for arr in time_sequences:
-        if arr[0] != arr[1]:
-            result.append(arr)
-            #result.remove(arr)
-    return result
+    return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
     
 
 def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
@@ -231,108 +242,25 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_reports=deque(sorted(news_reports))
-    intros=deque(sorted(intros))
-
-
-    cur_intro = 0
-
-    #news_report = deque([598, 2398, 3958, 5758])
-    #intro = deque([1056, 2661, 4463])
-    # no news report
-    if(len(news_reports)==0):
-        # no need to trim
-        return [[cur_intro, total_time]]
+    news_reports = preprocess_timestamps(news_reports)
+    intros = preprocess_timestamps(intros)
     
-    # news report within the first 1 minute and it is less than the first intro, change to 0
-    if(len(intros) > 0 and (news_reports[0] <= 1*60 and news_reports[0] < intros[0])):
-        news_reports[0]=0
+    # remove repeating beeps
+    news_reports = consolidate_beeps(news_reports)
+    # remove repeating intros
+    intros = consolidate_intros(intros)
+    # cut off extra beginning and end
+    news_reports = news_intro_cut_off_beginning_and_end(intros,news_reports,total_time)
 
-    news_reports=deque(news_reports)
-    intros=deque(intros)
-
-    # intro starts before news report,
-    # shift cur_intro from 0 to the first intro
-    # if it is less than 10 minutes,
-    # it is very unlikely to miss a news report
-    # within the first 10 minutes and at the same time
-    # the program has already started before 10 minutes
-    if(len(intros) > 0 and intros[0] <= 10*60 and intros[0] < news_reports[0]):
-        cur_intro = intros.popleft()
-
-    if(cur_intro > total_time):
-        raise ValueError("intro overflow, is greater than total time {total_time}")
-
+    time_sequences=build_time_sequence(intros,news_reports)
+    time_sequences=pad_news_report(time_sequences)
+    time_sequences=remove_start_equals_to_end(time_sequences)
     
-
-    pair=[]
-    #print("fgfdgdfgfdgdfgfd")
-    news_report_followed_by_intro = True
-    while(len(news_reports)>0):
-        if(not news_report_followed_by_intro):
-           raise ValueError("cannot have news report followed by news report")
-        news_report_followed_by_intro=False
-        cur_news_report = news_reports.popleft()
-        if(cur_intro > total_time):
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
-        # clean up beep beep beep
-        max_beep_repeat = 10
-        count_beep_repeat = 0
-        #print("cur_news_report",cur_news_report)
-        #print("news_report[0] - cur_news_report",news_report[0] - cur_news_report)
-        beep_tracker=cur_news_report
-        while len(news_reports)>0 and news_reports[0] - beep_tracker <= 10 and count_beep_repeat < max_beep_repeat:
-            beep_tracker=news_reports.popleft()
-            count_beep_repeat += 1
-        # absorb fake news report beep within 16 minutes of intro except allow short intro or news report not followed by intro
-        # or absorbtion would cause too long
-        if len(pair) == 0:
-            pass # no absorption for first pair because it is error prone
-        else:
-            #target_min_intro_duration = 18
-            # pop only one within 15 minutes and 30 seconds   
-            if len(intros) > 0 and len(news_reports)>0 and cur_news_report <= cur_intro + 15*60+30 and cur_news_report < intros[0]:
-                cur_news_report=news_reports.popleft()
-        pair.append([cur_intro, cur_news_report])
-        # get first intro after news report while ignoring others after first
-        while(len(intros)>0):
-             cur_intro = intros.popleft()
-             if cur_intro > cur_news_report:
-                 # ends with intro but no news report
-                 if len(news_reports)==0:
-                    pair.append([cur_intro, total_time])
-
-                 if(len(news_reports)>0 and cur_intro > news_reports[0]):
-                    # intro greater than two news reports, which means it is news report followed by news report
-                    # will cause start time to be greater than end time for the next time range to be added
-                    news_report_followed_by_intro=False
-                 else:    
-                    news_report_followed_by_intro=True    
-                 break
-        # prevent missing something in the middle     
-        # unlkely to happen if news report is 10 seconds from the end w/o intro
-        if not news_report_followed_by_intro and cur_news_report <= total_time - 10:
-            raise NotImplementedError(f"not handling news report not followed by intro yet unless news report is 10 seconds from the end to prevent missing an intro, cur_news_report {cur_news_report}, cur_intro: {cur_intro}")
-    #print("before padding",pair)
-    for i,arr in enumerate(pair):
-        cur_intro = arr[0]
-        cur_news_report = arr[1]
-        if(i+1>=len(pair)):
-            next_intro = None
-        else:
-            next_intro = pair[i+1][0]
-        # pad news_report_second_pad seconds to news report if it is larger then news_report_second_pad
-        if((next_intro is None or (cur_news_report + news_report_second_pad <= next_intro and cur_news_report>news_report_second_pad)) and cur_news_report < total_time):
-            arr[1] = cur_news_report + news_report_second_pad
-    #print("after padding",pair)
-
-    # remove start = end
-    result = list(filter(lambda x: (x[0] != x[1]), pair)) 
 
     #required sanity check
-    if(len(result) == 0):
-        raise ValueError("result cannot be empty")
+    if(len(time_sequences) == 0):
+        raise ValueError("time_sequences cannot be empty")
     
-    timestamp_sanity_check(result,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short)
+    timestamp_sanity_check(time_sequences,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short)
 
-    return result
+    return time_sequences
