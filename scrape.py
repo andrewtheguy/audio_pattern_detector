@@ -23,8 +23,7 @@ import paramiko
 import pytz
 import requests
 
-from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD, \
-    cleanup_peak_times
+from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
 from process_timestamps import preprocess_ts, process_timestamps
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
@@ -177,7 +176,7 @@ title={title}\n"""
 def get_sec(time_str):
     """Get seconds from time."""
     h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + int(s)
+    return int(h) * 3600 + int(m) * 60 + float(s)
 
 def scrape(input_file,stream_name):
 
@@ -207,17 +206,16 @@ def scrape(input_file,stream_name):
                                                               method=DEFAULT_METHOD,
                                                               correlation_threshold = correlation_threshold_news_report,
                                                               )
-        #news_report_peak_times = cleanup_peak_times(news_report_peak_times)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
-        exclude_ts = news_report_black_list_ts.get(audio_name,None)
-        if exclude_ts:
-            news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
+        #exclude_ts = news_report_black_list_ts.get(audio_name,None)
+        #if exclude_ts:
+        #    news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
             
-        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
+        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
-        for offset in news_report_peak_times:
-            logger.info(
-                f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
+        #for offset in news_report_peak_times:
+        #    logger.info(
+        #        f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
 
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
@@ -226,25 +224,25 @@ def scrape(input_file,stream_name):
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
-            intros_debug = list(dict.fromkeys([math.floor(peak) for peak in intros]))
-            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=False) for t in intros_debug]]})
+            intros_debug = sorted(intros)
+            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
         #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
-        logger.debug(program_intro_peak_times)
-        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
+        #logger.debug(program_intro_peak_times)
+        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
-        for offset in program_intro_peak_times:
-            logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
+        #for offset in program_intro_peak_times:
+        #    logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=True)}" )
 
         with open(f'{input_file}.separated.json','w') as f:
-            f.write(json.dumps({"news_report":[news_report_peak_times,news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
+            f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
 
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
-        #print("pair",pair)
-        tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
+        #print("pair before rehydration",pair)
+        tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
 
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
-    #print(pair)
+        #print("pair after rehydration",pair)
     #logger.debug("tsformatted",tsformatted)
     duration = [seconds_to_time(t[1]-t[0]) for t in pair]
     gaps=[]
