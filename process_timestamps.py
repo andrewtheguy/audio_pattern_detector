@@ -158,7 +158,8 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
     if(len(intros)==0 or len(news_reports)==0):
         return news_reports
 
-    if(news_already<first_intro):
+    # chop the first news report if it is less than 10 minutes
+    if(news_already is not None and news_already<first_intro):
         news_reports=news_reports[1:]
     #else:
     #    news_reports=news_reports
@@ -171,11 +172,13 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
         raise ValueError(f"intro overflow, is greater than total time {total_time}")
     
 
+    end_cut_off_seconds = 10
+
     # make it complete
     if(news_reports[-1] < intros[-1]):
         news_reports.append(total_time)
     
-    if(news_reports[-1] < total_time-10):
+    if(news_reports[-1] < total_time-end_cut_off_seconds):
         raise ValueError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
     
     

@@ -86,5 +86,25 @@ class TestConsolidateIntros(unittest.TestCase):
         np.testing.assert_array_equal(result_news_report,
                                       [60,self.total_time_1])
         
+        
+    def test_news_ends_early(self):
+        with self.assertRaises(ValueError) as cm:
+            result_news_report = self.do_test(intros=[40,INTRO_CUT_OFF+50],
+                                news_reports=[INTRO_CUT_OFF+10,INTRO_CUT_OFF+200])
+        the_exception = cm.exception
+        self.assertIn("cannot end with news reports unless it is within 10 seconds",str(the_exception))
+        
+    def test_news_not_ends_early(self):
+        result_news_report = self.do_test(intros=[40,INTRO_CUT_OFF+50],
+                                news_reports=[INTRO_CUT_OFF+10,self.total_time_1])
+        np.testing.assert_array_equal(result_news_report,
+                                [INTRO_CUT_OFF+10,self.total_time_1])
+        
+        result_news_report = self.do_test(intros=[40,INTRO_CUT_OFF+50],
+                                news_reports=[INTRO_CUT_OFF+10,self.total_time_1-5])
+        np.testing.assert_array_equal(result_news_report,
+                                [INTRO_CUT_OFF+10,self.total_time_1-5])
+        
+        
 if __name__ == '__main__':
     unittest.main()
