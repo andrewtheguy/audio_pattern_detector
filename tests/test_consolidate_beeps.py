@@ -35,7 +35,6 @@ class TestConsolidateBeeps(unittest.TestCase):
         result = self.do_test(news_report=[10,30,50,51,52,53,70,71,72,73,74])
         np.testing.assert_array_equal(result,[10,30,50,70])
         
-
     def test_3_repeats(self):
         result = self.do_test(news_report=[11,12,13,14,30,50,70])
         np.testing.assert_array_equal(result,[11,30,50,70])
@@ -43,14 +42,34 @@ class TestConsolidateBeeps(unittest.TestCase):
     def test_4_repeats(self):
         result = self.do_test(news_report=[11,12,13,14,15,30,50,70])
         np.testing.assert_array_equal(result,[11,30,50,70])
+        
+    def test_4_repeats_end(self):
+        result = self.do_test(news_report=[11,30,50,70,71,72,73,74])
+        np.testing.assert_array_equal(result,[11,30,50,70])
 
     def test_5_repeats(self):
         result = self.do_test(news_report=[11,12,13,14,15,16,30,50,70])
         np.testing.assert_array_equal(result,[11,30,50,70])
         
+    def test_5_repeats_middle(self):
+        result = self.do_test(news_report=[7,11,12,13,14,15,16,30,50,70])
+        np.testing.assert_array_equal(result,[7,11,30,50,70])
+        
+    def test_5_repeats_end(self):
+        result = self.do_test(news_report=[11,30,50,70,71,72,73,74,75])
+        np.testing.assert_array_equal(result,[11,30,50,70])
+        
     def test_6_repeats(self):
         result = self.do_test(news_report=[11,12,13,14,15,16,17,30,50,70])
         np.testing.assert_array_equal(result,[11,17,30,50,70])
+        
+    def test_6_repeats_middle(self):
+        result = self.do_test(news_report=[7,11,12,13,14,15,16,17,30,50,70])
+        np.testing.assert_array_equal(result,[7,11,17,30,50,70])
+        
+    def test_6_repeats_end(self):
+        result = self.do_test(news_report=[11,30,50,70,71,72,73,74,75,76])
+        np.testing.assert_array_equal(result,[11,30,50,70,76])
         
 
 if __name__ == '__main__':
