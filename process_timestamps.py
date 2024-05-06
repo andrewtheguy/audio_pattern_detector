@@ -57,43 +57,78 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
         
     return result
 
-def consolidate_beeps(news_report):
+def consolidate_beeps(news_reports):
     #news_report=deque(news_report)
-    if len(news_report) == 0:
-        return news_report
+    if len(news_reports) == 0:
+        return news_reports
     new_ones=[]
     #non_repeating_index = None
     repeat_count = 0
     repeat_limit = BEEP_PATTERN_REPEAT_LIMIT
-    for i,cur_news_report in enumerate(news_report):
+    for i,cur_news_report in enumerate(news_reports):
         if i == 0:
             #non_repeating_index=i
             new_ones.append(cur_news_report)
         else:
-            if repeat_count < repeat_limit and cur_news_report - news_report[i-1] <= 2: #seconds
+            if repeat_count < repeat_limit and cur_news_report - news_reports[i-1] <= 2: #seconds
                 repeat_count += 1
             else:
                 repeat_count = 0
                 #non_repeating_index=i
                 new_ones.append(cur_news_report)
-                
     return new_ones            
         
+# news_reports need to be unique         
+def consolidate_intros(intros,news_reports):
 
+    consolidated_intros = []
+    intro_index = 0
+    news_index = 0
+    
+    #edge case
+    if len(news_reports) == 0:
+        return list(dict.fromkeys(intros))
+    
+    while intro_index < len(intros) and news_index < len(news_reports):
+        intro = intros[intro_index]
+        news = news_reports[news_index]
 
-def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
+        if intro <= news:
+            consolidated_intros.append(intro)
+
+        # Check if there are extra intros before the current news
+        while intro_index < len(intros) - 1 and intros[intro_index + 1] < news:
+            intro_index += 1  # Skip extra intros
+
+        intro_index += 1
+        news_index += 1  # Move to the next news report
+
+    print("intro_index",intro_index)
+    print("news_index",news_index)
+    # leftover intros
+    if(intro_index < len(intros) and intros[intro_index]>=news_reports[-1]):
+        consolidated_intros.append(intros[intro_index])
+        
+    # leftover news reports    
+    #if(news_index < len(news_reports) and news_reports[news_index]>=intros[-1]):
+    #    consolidated_intros.append(intros[-1])
+        
+    return consolidated_intros
+    
+
+def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
                        allow_first_short=False):
 
     skip_reasonable_time_sequence_check=False
 
 
-    if len(news_report) != len(set(news_report)):
+    if len(news_reports) != len(set(news_reports)):
        raise ValueError("news report has duplicates, clean up duplicates first")   
 
-    if len(intro) != len(set(intro)):
+    if len(intros) != len(set(intros)):
        raise ValueError("intro has duplicates, clean up duplicates first")   
 
-    for ts in intro:
+    for ts in intros:
         if ts > total_time:
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
         elif ts < 0:
@@ -105,8 +140,8 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_report=deque(sorted(news_report))
-    intro=deque(sorted(intro))
+    news_reports=deque(sorted(news_reports))
+    intros=deque(sorted(intros))
 
 
     cur_intro = 0
@@ -114,16 +149,16 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     #news_report = deque([598, 2398, 3958, 5758])
     #intro = deque([1056, 2661, 4463])
     # no news report
-    if(len(news_report)==0):
+    if(len(news_reports)==0):
         # no need to trim
         return [[cur_intro, total_time]]
     
     # news report within the first 1 minute and it is less than the first intro, change to 0
-    if(len(intro) > 0 and (news_report[0] <= 1*60 and news_report[0] < intro[0])):
-        news_report[0]=0
+    if(len(intros) > 0 and (news_reports[0] <= 1*60 and news_reports[0] < intros[0])):
+        news_reports[0]=0
 
-    news_report=deque(news_report)
-    intro=deque(intro)
+    news_reports=deque(news_reports)
+    intros=deque(intros)
 
     # intro starts before news report,
     # shift cur_intro from 0 to the first intro
@@ -131,8 +166,8 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     # it is very unlikely to miss a news report
     # within the first 10 minutes and at the same time
     # the program has already started before 10 minutes
-    if(len(intro) > 0 and intro[0] <= 10*60 and intro[0] < news_report[0]):
-        cur_intro = intro.popleft()
+    if(len(intros) > 0 and intros[0] <= 10*60 and intros[0] < news_reports[0]):
+        cur_intro = intros.popleft()
 
     if(cur_intro > total_time):
         raise ValueError("intro overflow, is greater than total time {total_time}")
@@ -142,11 +177,11 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     pair=[]
     #print("fgfdgdfgfdgdfgfd")
     news_report_followed_by_intro = True
-    while(len(news_report)>0):
+    while(len(news_reports)>0):
         if(not news_report_followed_by_intro):
            raise ValueError("cannot have news report followed by news report")
         news_report_followed_by_intro=False
-        cur_news_report = news_report.popleft()
+        cur_news_report = news_reports.popleft()
         if(cur_intro > total_time):
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
         # clean up beep beep beep
@@ -155,8 +190,8 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         #print("cur_news_report",cur_news_report)
         #print("news_report[0] - cur_news_report",news_report[0] - cur_news_report)
         beep_tracker=cur_news_report
-        while len(news_report)>0 and news_report[0] - beep_tracker <= 10 and count_beep_repeat < max_beep_repeat:
-            beep_tracker=news_report.popleft()
+        while len(news_reports)>0 and news_reports[0] - beep_tracker <= 10 and count_beep_repeat < max_beep_repeat:
+            beep_tracker=news_reports.popleft()
             count_beep_repeat += 1
         # absorb fake news report beep within 16 minutes of intro except allow short intro or news report not followed by intro
         # or absorbtion would cause too long
@@ -165,18 +200,18 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
         else:
             #target_min_intro_duration = 18
             # pop only one within 15 minutes and 30 seconds   
-            if len(intro) > 0 and len(news_report)>0 and cur_news_report <= cur_intro + 15*60+30 and cur_news_report < intro[0]:
-                cur_news_report=news_report.popleft()
+            if len(intros) > 0 and len(news_reports)>0 and cur_news_report <= cur_intro + 15*60+30 and cur_news_report < intros[0]:
+                cur_news_report=news_reports.popleft()
         pair.append([cur_intro, cur_news_report])
         # get first intro after news report while ignoring others after first
-        while(len(intro)>0):
-             cur_intro = intro.popleft()
+        while(len(intros)>0):
+             cur_intro = intros.popleft()
              if cur_intro > cur_news_report:
                  # ends with intro but no news report
-                 if len(news_report)==0:
+                 if len(news_reports)==0:
                     pair.append([cur_intro, total_time])
 
-                 if(len(news_report)>0 and cur_intro > news_report[0]):
+                 if(len(news_reports)>0 and cur_intro > news_reports[0]):
                     # intro greater than two news reports, which means it is news report followed by news report
                     # will cause start time to be greater than end time for the next time range to be added
                     news_report_followed_by_intro=False
