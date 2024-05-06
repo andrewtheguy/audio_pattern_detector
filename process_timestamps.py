@@ -163,13 +163,13 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
             break
         if(news_reports[i] <= INTRO_CUT_OFF):
             if(news_already is not None):
-                raise ValueError("cannot have more than one news report within 10 minutes")
+                raise TimeSequenceError("cannot have more than one news report within 10 minutes")
             else:
                 news_already = news_report
     if(len(intros)>0):
         first_intro = intros[0]
         if(intros[0]>INTRO_CUT_OFF):
-            raise ValueError("first intro cannot be greater than 10 minutes")            
+            raise TimeSequenceError("first intro cannot be greater than 10 minutes")            
     if(len(intros)==0 or len(news_reports)==0):
         return [total_time]
 
@@ -194,7 +194,7 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
         news_reports.append(total_time)
     
     if(news_reports[-1] < total_time-end_cut_off_seconds):
-        raise ValueError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
+        raise TimeSequenceError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
     
     return news_reports
                  
