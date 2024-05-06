@@ -26,6 +26,19 @@ def get_ffprobe_info(filename):
     return json.loads(result.decode("utf-8"))  # Decode bytes to string
   
 def is_unique_and_sorted(array):
-  if len(array) != len(set(array)):
-    return False  # Not unique
-  return all(array[i] <= array[i+1] for i in range(len(array)-1))
+  for i in range(len(array)-1):
+    if array[i] >= array[i+1]:
+      return False  # Not sorted or unique
+  return True  # Unique and sorted
+
+
+array1 = [1, 2, 3, 4, 5]  # Unique and sorted
+array2 = [1, 2, 2, 4, 5]  # Not unique
+array3 = [1, 4, 2, 3, 5]  # Unique but not sorted
+array4 = [1, 2, 4, 2, 5]  # Not unique
+
+if __name__ == '__main__':
+  assert(is_unique_and_sorted(array1)==True)  # Output: True
+  assert(is_unique_and_sorted(array2)==False)  # Output: False
+  assert(is_unique_and_sorted(array3)==False)  # Output: False
+  assert(is_unique_and_sorted(array4)==False)  # Output: False
