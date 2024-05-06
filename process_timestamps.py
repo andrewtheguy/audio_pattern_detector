@@ -10,8 +10,8 @@ from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
 
-# allow 6 seconds of beeps to repeat
-BEEP_PATTERN_REPEAT_SECONDS = 6
+# allow 7 seconds of beeps to repeat
+BEEP_PATTERN_REPEAT_SECONDS = 7
 # allow one intro and news report within 10 minutes
 # but not intro past 10 minutes
 INTRO_CUT_OFF=10*60
@@ -82,7 +82,7 @@ def preprocess_ts(peak_times,remove_repeats=False):
     return peak_times_clean
 
 # not working for decimals yet
-def consolidate_beeps(news_reports):
+def consolidate_beeps(news_reports,max_seconds=BEEP_PATTERN_REPEAT_SECONDS):
     if len(news_reports) == 0:
         return news_reports
     if not is_unique_and_sorted(news_reports):
@@ -90,7 +90,7 @@ def consolidate_beeps(news_reports):
     new_ones=[]
     #non_repeating_index = None
     #repeat_count = 0
-    max_seconds = BEEP_PATTERN_REPEAT_SECONDS
+    #max_seconds = BEEP_PATTERN_REPEAT_SECONDS
     cur_first = None
     for i,cur_news_report in enumerate(news_reports):
         if i == 0:
@@ -218,6 +218,10 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
     return news_reports
                  
 def build_time_sequence(intros,news_reports):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
     if(len(intros) != len(news_reports)):
         intros_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in intros]
         news_reports_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in news_reports]
