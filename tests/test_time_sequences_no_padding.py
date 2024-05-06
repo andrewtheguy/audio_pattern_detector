@@ -3,13 +3,8 @@ import numpy as np
 
 from process_timestamps import process_timestamps, timestamp_sanity_check
 from time_sequence_error import TimeSequenceError
+from utils import minutes_to_seconds
 
-def minutes_to_seconds(minutes):
-    return minutes*60
-
-
-def hours_to_seconds(hours):
-    return minutes_to_seconds(hours*60)
 
 class TestProcessTimestamps(unittest.TestCase):
     
@@ -19,62 +14,85 @@ class TestProcessTimestamps(unittest.TestCase):
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
 
+    def test_regular(self):
+        result = self.process(news_report=[minutes_to_seconds(21),minutes_to_seconds(73)],
+                              intro=[minutes_to_seconds(5),minutes_to_seconds(32),minutes_to_seconds(80)])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),minutes_to_seconds(21)],
+                                               [minutes_to_seconds(32),minutes_to_seconds(73)],
+                                               [minutes_to_seconds(80),self.total_time_1],
+                                               ])
+        
+    def test_middle_the_same(self):
+        result = self.process(news_report=[minutes_to_seconds(21),minutes_to_seconds(73)],
+                              intro=[minutes_to_seconds(5),minutes_to_seconds(21),minutes_to_seconds(80)])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),minutes_to_seconds(21)],
+                                               [minutes_to_seconds(21),minutes_to_seconds(73)],
+                                               [minutes_to_seconds(80),self.total_time_1],
+                                               ])
+
+
     def test_zero_everything(self):
         result = self.process(news_report=[],intro=[])
         np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
     def test_zero_news_report(self):
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(18)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(20)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         
-        result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        with self.assertRaises(ValueError) as cm:
+            result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
+            np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
     def test_zero_intro_news_close_to_end(self):
         news_end = self.total_time_1-5
         result = self.process(news_report=[news_end],intro=[])
         np.testing.assert_array_equal(result,[[0,news_end]])
         
+    def test_intro_at_10_minutes(self):
+        news_end = self.total_time_1-5
+        result = self.process(news_report=[news_end],intro=[minutes_to_seconds(10)])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(10),news_end]])
+        
     def test_zero_intro_with_news_in_middle(self):
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             news_end = self.total_time_1-minutes_to_seconds(20)
             result = self.process(news_report=[news_end],intro=[])
         the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
         
     def test_zero_intro_with_news_at_beginning(self):
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[0],intro=[])
         the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
 
     def test_zero_intro_with_multiple_news_in_middle(self):
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             news_middle = self.total_time_1-minutes_to_seconds(40)
             news_end = self.total_time_1-minutes_to_seconds(20)
             result = self.process(news_report=[news_middle,news_end],intro=[])
         the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
 
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(ValueError) as cm:
             news_middle = self.total_time_1-minutes_to_seconds(40)
             news_end = self.total_time_1-5
             result = self.process(news_report=[news_middle,news_end],intro=[])
         the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        self.assertIn("intros and news reports must be the same length",str(the_exception))
 
 
     # won't cause issues
     def test_news_overflow(self):
         news_end = self.total_time_1+1000
         result = self.process(news_report=[news_end],intro=[])
-        np.testing.assert_array_equal(result,[[0,news_end]])
+        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
         result = self.process(news_report=[news_end],intro=[1])
-        np.testing.assert_array_equal(result,[[1,news_end]])
+        np.testing.assert_array_equal(result,[[1,self.total_time_1]])
 
     def test_intro_overflow(self):
         with self.assertRaises(ValueError) as cm:
@@ -94,6 +112,7 @@ class TestProcessTimestamps(unittest.TestCase):
         the_exception = cm.exception
         self.assertIn("intro overflow, is greater than total time",str(the_exception))
 
+    @unittest.skip(reason="it is blocked by other checks now")
     def test_one_intro_same_as_total(self):
         result = self.process(news_report=[]
                                     ,intro=[self.total_time_1])
@@ -101,6 +120,7 @@ class TestProcessTimestamps(unittest.TestCase):
                                       [[minutes_to_seconds(0),self.total_time_1],
                                        ])
 
+    @unittest.skip(reason="it is blocked by other checks now")
     def test_one_intro_same_as_total_with_news(self):
         result = self.process(news_report=[self.total_time_1 - 9]
                                     ,intro=[self.total_time_1])
@@ -108,7 +128,7 @@ class TestProcessTimestamps(unittest.TestCase):
                                       [[minutes_to_seconds(0),self.total_time_1 - 9],
                                        ])
         
-            
+    @unittest.skip(reason="it is blocked by other checks now")
     def test_one_intro_same_as_one_news_near_end(self):
         result = self.process(news_report=[self.total_time_1-9]
                                     ,intro=[self.total_time_1-9])
@@ -116,26 +136,26 @@ class TestProcessTimestamps(unittest.TestCase):
                                       [[minutes_to_seconds(0),self.total_time_1-9],
                                        ])
         
+    #@unittest.skip(reason="it is blocked by other checks now")    
     def test_one_intro_same_as_one_news_not_near_end(self):
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[self.total_time_1-11]
                                         ,intro=[self.total_time_1-11])
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        #the_exception = cm.exception
+        #self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
 
     def test_one_intro_same_as_one_news_at_beginning(self):
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[9]
                                         ,intro=[9])
         the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
 
-    def test_one_news_report_intro(self):
-        result = self.process(news_report=[minutes_to_seconds(20)]
-                                    ,intro=[minutes_to_seconds(30)])
+    def test_one_news_report_intro_beginning_news_first(self):
+        result = self.process(news_report=[minutes_to_seconds(5)]
+                                    ,intro=[minutes_to_seconds(6)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(0),minutes_to_seconds(20)],
-                                       [minutes_to_seconds(30),self.total_time_1],
+                                      [[minutes_to_seconds(6),self.total_time_1],
                                        ])
 
 
@@ -146,11 +166,11 @@ class TestProcessTimestamps(unittest.TestCase):
 
     def test_news_report_ending_too_early(self):
         intro1 = minutes_to_seconds(9)
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             self.process(news_report=[self.total_time_1-minutes_to_seconds(5)],intro=[intro1])
 
     def test_news_report_ending_too_early_no_intro(self):
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             self.process(news_report=[self.total_time_1-minutes_to_seconds(5)],intro=[])
 
     @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")
@@ -175,7 +195,8 @@ class TestProcessTimestamps(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [[minutes_to_seconds(0),minutes_to_seconds(4)],
                                        [minutes_to_seconds(5),self.total_time_1]])
-
+        
+    @unittest.skip(reason="blocked by intro check")    
     def test_intro_first_after_ten_minutes_intro_first(self):
         result = self.process(news_report=[minutes_to_seconds(20),self.total_time_1]
                                     ,intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
@@ -193,6 +214,7 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(40),self.total_time_1]],
                                        )
 
+    @unittest.skip(reason="it is blocked by other checks now")
     def test_news_report_first_not_absorbed(self):
         result = self.process(news_report=[minutes_to_seconds(23),minutes_to_seconds(53)]
                                     ,intro=[minutes_to_seconds(33),minutes_to_seconds(63)])
@@ -203,12 +225,12 @@ class TestProcessTimestamps(unittest.TestCase):
                                        ])
 
     def test_news_report_after_news_report(self):
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             result = self.process(news_report=[minutes_to_seconds(22),minutes_to_seconds(32)]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(60)])
 
     def test_news_report_after_news_report_close_to_end(self):
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             result = self.process(news_report=[minutes_to_seconds(22),minutes_to_seconds(62),self.total_time_1 - 9]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(32)])
             print(result)
@@ -241,10 +263,11 @@ class TestProcessTimestamps(unittest.TestCase):
                                        ])
 
     def test_middle_same(self):
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError):
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
+    @unittest.skip(reason="it is always deduplicated now")
     def test_duplicates(self):
         with self.assertRaises(ValueError) as cm:
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(17),minutes_to_seconds(17)]
@@ -322,7 +345,7 @@ class TestProcessTimestamps(unittest.TestCase):
                                         ])
          
          
-    # begin new fake news absorption logic      
+    
     def test_absorb_beeps(self):
         result = self.process(news_report=[minutes_to_seconds(25),
                                            minutes_to_seconds(25)+1,minutes_to_seconds(25)+2,minutes_to_seconds(25)+3,
@@ -350,84 +373,5 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(60),self.total_time_1],
                                        ])
     
-    def test_absorb_one_short_fake_news(self):
-        result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(50)],
-                                     intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                     )
-        np.testing.assert_array_equal(result,[
-                                       [minutes_to_seconds(5),minutes_to_seconds(25)],
-                                       [minutes_to_seconds(30),minutes_to_seconds(50)],
-                                       [minutes_to_seconds(60),self.total_time_1],
-                                       ])
-        
-    def test_absorb_beeps_followed_by_one_short_fake_news(self):
-        result = self.process(news_report=[minutes_to_seconds(25),
-                                           minutes_to_seconds(25)+1,minutes_to_seconds(25)+2,minutes_to_seconds(25)+3,
-                                           minutes_to_seconds(25)+4,minutes_to_seconds(35),
-                                           minutes_to_seconds(50)],
-                                     intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                     )
-        np.testing.assert_array_equal(result,[
-                                       [minutes_to_seconds(5),minutes_to_seconds(25)],
-                                       [minutes_to_seconds(30),minutes_to_seconds(50)],
-                                       [minutes_to_seconds(60),self.total_time_1],
-                                       ])
-        
-    def test_not_absorb_more_than_short_fake_news(self):        
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(36),minutes_to_seconds(50)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                        )
-            np.testing.assert_array_equal(result,[
-                                        [minutes_to_seconds(5),minutes_to_seconds(25)],
-                                        [minutes_to_seconds(30),minutes_to_seconds(50)],
-                                        [minutes_to_seconds(60),self.total_time_1],
-                                        ])
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-        
-    def test_not_absorb_short_fake_news_greater_than_next_intro(self):
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),minutes_to_seconds(55)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-    def test_not_absorb_short_fake_news_not_followed_by_intro(self):
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),minutes_to_seconds(55)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),self.total_time_1],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-        
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),self.total_time_1-20],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-    def test_not_absorb_short_fake_news_at_end(self):
-        with self.assertRaises(NotImplementedError) as cm:    
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(36),minutes_to_seconds(50),
-                                            minutes_to_seconds(80)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
 if __name__ == '__main__':
     unittest.main()

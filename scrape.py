@@ -23,9 +23,8 @@ import paramiko
 import pytz
 import requests
 
-from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD, \
-    cleanup_peak_times
-from process_timestamps import process_timestamps
+from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
+from process_timestamps import preprocess_ts, process_timestamps
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
 from file_upload.upload_utils import upload_file
@@ -55,7 +54,7 @@ streams={
         "schedule":{"begin": 6,"end":10,"weekdays_human":[1,2,3,4,5]},
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme.wav","knowledgecointro.wav"],
+        "introclips": ["rthk2theme.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/index_0_a.m3u8",
         "schedule":{"begin": 6,"end":8,"weekdays_human":[6]},
@@ -76,7 +75,7 @@ news_report_clip='rthk_beep2.wav'
 # no need because it is absorbing now
 news_report_black_list_ts = {
     "morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
-    "morningsuite20240502":[12538], # causing trouble
+    "morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
     #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
@@ -177,7 +176,7 @@ title={title}\n"""
 def get_sec(time_str):
     """Get seconds from time."""
     h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + int(s)
+    return int(h) * 3600 + int(m) * 60 + float(s)
 
 def scrape(input_file,stream_name):
 
@@ -207,17 +206,23 @@ def scrape(input_file,stream_name):
                                                               method=DEFAULT_METHOD,
                                                               correlation_threshold = correlation_threshold_news_report,
                                                               )
-        news_report_peak_times = cleanup_peak_times(news_report_peak_times)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
-            news_report_peak_times = [time for time in news_report_peak_times if time not in exclude_ts]
-            
-        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=False) for t in news_report_peak_times]
+            news_report_peak_times_filtered = []
+            for second in preprocess_ts(news_report_peak_times,remove_repeats=True):
+                #print(second)
+                if math.floor(second) not in exclude_ts:
+                    news_report_peak_times_filtered.append(second)
+                else:
+                    print(f"excluding {seconds_to_time(second)}, ({second}) seconds mark from news_report_peak_times")
+            news_report_peak_times = news_report_peak_times_filtered        
+        #exit(1)    
+        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
-        for offset in news_report_peak_times:
-            logger.info(
-                f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
+        #for offset in news_report_peak_times:
+        #    logger.info(
+        #        f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
 
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
@@ -226,25 +231,25 @@ def scrape(input_file,stream_name):
             intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
-            intros_debug = list(dict.fromkeys([math.floor(peak) for peak in intros]))
-            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=False) for t in intros_debug]]})
-        program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
-        logger.debug(program_intro_peak_times)
-        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
+            intros_debug = sorted(intros)
+            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
+        #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
+        #logger.debug(program_intro_peak_times)
+        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
-        for offset in program_intro_peak_times:
-            logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
+        #for offset in program_intro_peak_times:
+        #    logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=True)}" )
 
         with open(f'{input_file}.separated.json','w') as f:
-            f.write(json.dumps({"news_report":[news_report_peak_times,news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
+            f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
 
         pair = process_timestamps(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
-        #print("pair",pair)
-        tsformatted = [[seconds_to_time(seconds=t,include_decimals=False) for t in sublist] for sublist in pair]
+        #print("pair before rehydration",pair)
+        tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
 
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
-    #print(pair)
+        #print("pair after rehydration",pair)
     #logger.debug("tsformatted",tsformatted)
     duration = [seconds_to_time(t[1]-t[0]) for t in pair]
     gaps=[]
@@ -298,7 +303,8 @@ def is_time_after(current_time,hour):
   return current_time > target_time
 
 def download_and_scrape(download_only=False):
-    days_to_keep=17
+    failed_scrape_files=[]
+    days_to_keep=19
     if days_to_keep < 1:
         raise ValueError("days_to_keep must be greater than or equal to 1")
     for key, stream in streams.items():
@@ -337,6 +343,7 @@ def download_and_scrape(download_only=False):
                 print(f"error happened when processing for {key}",e)
                 print(traceback.format_exc())
                 error_occurred_scraping = True
+                failed_scrape_files.append({"file":dest_file,"error":str(e)})
                 continue
         if error_occurred_scraping:
             print(f"error happened when processing, skipping publishing podcasts")
@@ -359,12 +366,19 @@ def download_and_scrape(download_only=False):
                 Path(file).unlink(missing_ok=True)
                 Path(f"{file}.json").unlink(missing_ok=True)
                 Path(f"{file}.separated.json").unlink(missing_ok=True)
+
+    if failed_scrape_files:
+        print(f"failed to scrape the following files:")
+        for hash in failed_scrape_files:
+            print("file",hash["file"],"error",hash["error"],"---")
+
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
     parser.add_argument('action')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
     parser.add_argument('--pattern-file', metavar='audio file', type=str, help='pattern file to convert sample')
+    parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     if(args.action == 'scrape'):
@@ -372,8 +386,9 @@ def command():
         stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
         scrape(input_file,stream_name=stream_name)
     elif(args.action == 'convert'):
+        # python scrape.py convert --pattern-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
         input_file = args.pattern_file
-        convert_audio_to_clip_format(input_file,os.path.splitext(input_file)[0]+"_converted.wav")
+        convert_audio_to_clip_format(input_file,args.dest_file)
     elif(args.action == 'download'):
         download_and_scrape(download_only=True)
     elif(args.action == 'download_and_scrape'):
