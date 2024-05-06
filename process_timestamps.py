@@ -7,6 +7,9 @@ from andrew_utils import seconds_to_time
 
 logger = logging.getLogger(__name__)
 
+# beep 6 times, means 5 repeats
+BEEP_PATTERN_REPEAT_LIMIT = 5
+
 def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_first_short=False):
     logger.info(result)
     if(len(result) == 0):
@@ -54,21 +57,35 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
         
     return result
 
-# total_time is needed to set end time
-# if it ends with intro instead of news report
-# did a count down and the beep intro for news report is about 6 seconds
-# skip_reasonable_time_sequence_check: skip sanity checks related to unreasonable duration or gaps, mainly for testing
-# otherwise will have to rewrite lots of tests if the parameters changed
-# allow_first_short: allow first intro short
+def consolidate_beeps(news_report):
+    #news_report=deque(news_report)
+    if len(news_report) == 0:
+        return news_report
+    new_ones=[]
+    #non_repeating_index = None
+    repeat_count = 0
+    repeat_limit = BEEP_PATTERN_REPEAT_LIMIT
+    for i,cur_news_report in enumerate(news_report):
+        if i == 0:
+            #non_repeating_index=i
+            new_ones.append(cur_news_report)
+        else:
+            if repeat_count < repeat_limit and cur_news_report - news_report[i-1] <= 2: #seconds
+                repeat_count += 1
+            else:
+                repeat_count = 0
+                #non_repeating_index=i
+                new_ones.append(cur_news_report)
+                
+    return new_ones            
+        
+
+
 def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
                        allow_first_short=False):
 
     skip_reasonable_time_sequence_check=False
 
-    # defensive copy
-    news_report = copy.deepcopy(news_report)
-    intro = copy.deepcopy(intro)
-    
 
     if len(news_report) != len(set(news_report)):
        raise ValueError("news report has duplicates, clean up duplicates first")   
@@ -76,18 +93,21 @@ def process_timestamps(news_report,intro,total_time,news_report_second_pad=6,
     if len(intro) != len(set(intro)):
        raise ValueError("intro has duplicates, clean up duplicates first")   
 
+    for ts in intro:
+        if ts > total_time:
+            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        elif ts < 0:
+            raise ValueError(f"intro is less than 0")
+
 
     # will bug out if not sorted
     # TODO maybe require input to be sorted first to prevent
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    news_report=sorted(news_report)
-    intro=sorted(intro)
+    news_report=deque(sorted(news_report))
+    intro=deque(sorted(intro))
 
-    for ts in intro:
-        if ts > total_time:
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
 
     cur_intro = 0
 
