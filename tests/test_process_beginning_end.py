@@ -15,25 +15,31 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
         result_news_report = self.do_test(intros=[],
                               news_reports=[])
         np.testing.assert_array_equal(result_news_report,
-                                      [])
+                                      [self.total_time_1])
         
-    def test_news_reports_only(self):
+    def test_news_reports_only_before_cut_off_too_many(self):
         with self.assertRaises(ValueError) as cm:
             result_news_report = self.do_test(intros=[],
                               news_reports=[3,4])
         the_exception = cm.exception
         self.assertIn("cannot have more than one news report within 10 minutes",str(the_exception))
-
+    
+    def test_news_reports_only_before_cut_off_not_too_many(self):
         result_news_report = self.do_test(intros=[],
                               news_reports=[3])
         np.testing.assert_array_equal(result_news_report,
-                                      [3])
+                                      [self.total_time_1])
+        
+        result_news_report = self.do_test(intros=[20],
+                              news_reports=[3])
+        np.testing.assert_array_equal(result_news_report,
+                                      [self.total_time_1])
         
     def test_intros_only(self):
         result_news_report = self.do_test(intros=[3],
                               news_reports=[])
         np.testing.assert_array_equal(result_news_report,
-                                      [])
+                                      [self.total_time_1])
         
         
     def test_too_many_news(self):
@@ -73,12 +79,12 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
         result_news_report = self.do_test(intros=[40],
                               news_reports=[20])
         np.testing.assert_array_equal(result_news_report,
-                                      [])
+                                      [self.total_time_1])
         
         result_news_report = self.do_test(intros=[INTRO_CUT_OFF-10],
                               news_reports=[20])
         np.testing.assert_array_equal(result_news_report,
-                                      [])
+                                      [self.total_time_1])
         
     def test_intro_before_news(self):
         result_news_report = self.do_test(intros=[40,80],

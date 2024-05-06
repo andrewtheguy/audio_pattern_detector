@@ -21,11 +21,15 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
 
     def test_zero_news_report(self):
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(11)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(9)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
-        result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(12)])
-        np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
+        with self.assertRaises(ValueError) as cm:
+          result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(12)])
+          np.testing.assert_array_equal(result,[[0,self.total_time_1]])
+        the_exception = cm.exception
+        self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
+
 
     def test_no_overlap(self):
         result = self.process(news_report=[minutes_to_seconds(30)]
@@ -36,7 +40,7 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
                                       ])
         
     def test_middle_same(self):
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(TimeSequenceError):
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
@@ -44,7 +48,7 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
         result = self.process(news_report=[minutes_to_seconds(24),minutes_to_seconds(48)]
                                     ,intro=[minutes_to_seconds(8),minutes_to_seconds(24)+2,minutes_to_seconds(50)])
         np.testing.assert_array_equal(result,
-                                      [[minutes_to_seconds(8),minutes_to_seconds(24)],
+                                      [[minutes_to_seconds(8),minutes_to_seconds(24)+2],
                                         [minutes_to_seconds(24)+2,minutes_to_seconds(48)+self.news_report_second_pad],
                                         [minutes_to_seconds(50),self.total_time_1],
                                       ])
@@ -59,10 +63,10 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
         
     def test_news_report_beginning_same_as_padding(self):
         result = self.process(news_report=[self.news_report_second_pad,minutes_to_seconds(50)]
-                                    ,intro=[minutes_to_seconds(20),minutes_to_seconds(60)])
+                                    ,intro=[minutes_to_seconds(10),minutes_to_seconds(60)])
         np.testing.assert_array_equal(result,
                                       [
-                                        [minutes_to_seconds(20),minutes_to_seconds(50)+self.news_report_second_pad],
+                                        [minutes_to_seconds(10),minutes_to_seconds(50)+self.news_report_second_pad],
                                         [minutes_to_seconds(60),self.total_time_1],
                                       ])
         
