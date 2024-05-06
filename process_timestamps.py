@@ -1,9 +1,11 @@
 from collections import deque
 import copy
 import logging
+import sys
 
 from time_sequence_error import TimeSequenceError
 from andrew_utils import seconds_to_time
+from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +60,10 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
     return result
 
 def consolidate_beeps(news_reports):
-    #news_report=deque(news_report)
     if len(news_reports) == 0:
         return news_reports
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
     new_ones=[]
     #non_repeating_index = None
     repeat_count = 0
@@ -80,14 +83,27 @@ def consolidate_beeps(news_reports):
         
 # news_reports need to be unique         
 def consolidate_intros(intros,news_reports):
-
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    
     consolidated_intros = []
     intro_index = 0
     news_index = 0
     
     #edge case
     if len(news_reports) == 0:
+        #unique
         return list(dict.fromkeys(intros))
+    
+    news_reports=news_reports.copy()
+    
+    #normalize
+    if(len(intros) > 0):
+        if(intros[-1]>news_reports[-1]):
+            news_reports.append(sys.maxsize)
+    
     
     while intro_index < len(intros) and news_index < len(news_reports):
         intro = intros[intro_index]
