@@ -183,7 +183,20 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
     
     
     return news_reports
-                    
+                 
+def pad_news_report(time_sequences,seconds_to_pad=6):
+    result=[]
+    for i in range(1,len(time_sequences)):
+        prev_seq=time_sequences[i-1]
+        cur_seq=time_sequences[i]
+        #enough room to pad
+        if cur_seq[0] - prev_seq[1] >= seconds_to_pad:
+            result.append([prev_seq[0],prev_seq[1]+seconds_to_pad])
+        else:
+            result.append([prev_seq[0],cur_seq[0]])
+    if len(time_sequences) > 0:        
+        result.append([time_sequences[-1][0],time_sequences[-1][1]+seconds_to_pad])        
+    return result   
                 
 def remove_start_equals_to_end(time_sequences):
     result=[]
