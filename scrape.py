@@ -338,7 +338,7 @@ def download_and_scrape(download_only=False):
                 print(f"error happened when processing for {key}",e)
                 print(traceback.format_exc())
                 error_occurred_scraping = True
-                failed_scrape_files.append(dest_file)
+                failed_scrape_files.append({"file":dest_file,"error":str(e)})
                 continue
         if error_occurred_scraping:
             print(f"error happened when processing, skipping publishing podcasts")
@@ -364,8 +364,8 @@ def download_and_scrape(download_only=False):
 
     if failed_scrape_files:
         print(f"failed to scrape the following files:")
-        for file in failed_scrape_files:
-            print(file)
+        for hash in failed_scrape_files:
+            print("file",hash["file"],"error",hash["error"],"---")
 
 def command():
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
