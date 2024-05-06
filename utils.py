@@ -31,6 +31,13 @@ def is_unique_and_sorted(array):
       return False  # Not sorted or unique
   return True  # Unique and sorted
 
+def minutes_to_seconds(minutes):
+    return minutes*60
+
+
+def hours_to_seconds(hours):
+    return minutes_to_seconds(hours*60)
+
 
 array1 = [1, 2, 3, 4, 5]  # Unique and sorted
 array2 = [1, 2, 2, 4, 5]  # Not unique

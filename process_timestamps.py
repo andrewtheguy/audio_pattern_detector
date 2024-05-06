@@ -137,17 +137,6 @@ def consolidate_intros(intros,news_reports):
 # fix the end also           
 def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
     news_reports=news_reports.copy()
-    if(len(intros)==0 or len(news_reports)==0):
-        return news_reports
-    if not is_unique_and_sorted(intros):
-        raise ValueError("intros is not unique or sorted")
-    if not is_unique_and_sorted(news_reports):
-        raise ValueError("news report is not unique or sorted")
-    first_intro = intros[0]
-    if(intros[0]>INTRO_CUT_OFF):
-        raise ValueError("first intro cannot be greater than 10 minutes")
-    #intros=intros.copy()
-    #news_reports=news_reports.copy()
     news_already = None
     for i,news_report in enumerate(news_reports):
         if(i > 1):
@@ -157,6 +146,16 @@ def news_intro_cut_off_beginning_and_end(intros,news_reports,total_time):
                 raise ValueError("cannot have more than one news report within 10 minutes")
             else:
                 news_already = news_report
+    if(len(intros)==0 or len(news_reports)==0):
+        return news_reports
+    if not is_unique_and_sorted(intros):
+        raise ValueError("intros is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("news report is not unique or sorted")
+    first_intro = intros[0]
+    if(intros[0]>INTRO_CUT_OFF):
+        raise ValueError("first intro cannot be greater than 10 minutes")
+
     if(news_already<first_intro):
         news_reports=news_reports[1:]
     #else:
