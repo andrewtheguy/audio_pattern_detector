@@ -13,12 +13,12 @@ class TestRemoveStartEnd(unittest.TestCase):
         
     def test_remove(self):
 
-        result_news_report = self.do_test(time_sequences=[[30,60],
+        result = self.do_test(time_sequences=[[30,60],
                                                           [90,90],
                                                           [120,140],
                                                           [180,180],
                                                           ])
-        np.testing.assert_array_equal(result_news_report,
+        np.testing.assert_array_equal(result,
                                       [[30,60],
                                        [120,140],
                                        ])
