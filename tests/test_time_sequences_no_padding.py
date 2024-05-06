@@ -267,6 +267,7 @@ class TestProcessTimestamps(unittest.TestCase):
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
+    @unittest.skip(reason="it is always deduplicated now")
     def test_duplicates(self):
         with self.assertRaises(ValueError) as cm:
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(17),minutes_to_seconds(17)]
