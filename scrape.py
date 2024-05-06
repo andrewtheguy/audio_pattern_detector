@@ -207,7 +207,7 @@ def scrape(input_file,stream_name):
                                                               method=DEFAULT_METHOD,
                                                               correlation_threshold = correlation_threshold_news_report,
                                                               )
-        news_report_peak_times = cleanup_peak_times(news_report_peak_times)
+        #news_report_peak_times = cleanup_peak_times(news_report_peak_times)
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
@@ -228,7 +228,7 @@ def scrape(input_file,stream_name):
             program_intro_peak_times.extend(intros)
             intros_debug = list(dict.fromkeys([math.floor(peak) for peak in intros]))
             program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=False) for t in intros_debug]]})
-        program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
+        #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
         logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=False) for t in program_intro_peak_times],"---")
 
