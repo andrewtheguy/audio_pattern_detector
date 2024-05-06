@@ -87,25 +87,24 @@ def consolidate_beeps(news_reports):
     for i,cur_news_report in enumerate(news_reports):
         if i == 0:
             cur_first=cur_news_report
-            print("cur_news_report",cur_news_report)
-            print("cur_first",cur_first)
-            #print("cur_first+max_seconds",cur_first+max_seconds)
-            print("add current and reset")
+            #print("cur_news_report",cur_news_report)
+            #print("cur_first",cur_first)
+            #print("add current and reset")
             new_ones.append(cur_news_report)
         else:
-            print("cur_news_report",cur_news_report)
-            print("cur_first",cur_first)
-            print("cur_news_report - cur_first",cur_news_report - cur_first)
-            if (cur_news_report - cur_first <= max_seconds) and (cur_news_report - news_reports[i-1] <= 2): #seconds
+            #print("cur_news_report",cur_news_report)
+            #print("cur_first",cur_first)
+            #print("cur_news_report - cur_first",cur_news_report - cur_first)
+            if (cur_news_report - cur_first <= max_seconds): #seconds
                 pass
                 #repeat_count += 1
             else:
-                print("add current and reset")
+                #print("add current and reset")
                 #repeat_count = 0
                 cur_first=cur_news_report
                 #non_repeating_index=i
                 new_ones.append(cur_news_report)
-            print("---------------")    
+            #print("---------------")    
     return new_ones            
         
 # news_reports need to be unique         

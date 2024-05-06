@@ -52,8 +52,8 @@ class TestConsolidateBeeps(unittest.TestCase):
         np.testing.assert_array_equal(result,[11,30,50,70])
         
     def test_5_seconds_middle(self):
-        result = self.do_test(news_reports=[7, 11,12,13,14,15,16, 30,50,70])
-        np.testing.assert_array_equal(result,[7,11,30,50,70])
+        result = self.do_test(news_reports=[7, 21,22,23,24,25,26, 40,60,80])
+        np.testing.assert_array_equal(result,[7,21,40,60,80])
         
     def test_5_seconds_end(self):
         result = self.do_test(news_reports=[11,30,50, 70,71,72,73,74,75])
@@ -64,8 +64,12 @@ class TestConsolidateBeeps(unittest.TestCase):
         np.testing.assert_array_equal(result,[11,30,50,70])
         
     def test_6_seconds_middle(self):
-        result = self.do_test(news_reports=[7, 11,12,13,14,15,16,17, 30,50,70])
-        np.testing.assert_array_equal(result,[7,11,30,50,70])
+        result = self.do_test(news_reports=[4, 11,12,13,14,15,16,17, 30,50,70])
+        np.testing.assert_array_equal(result,[4,11,30,50,70])
+        
+    def test_6_seconds_middle_extra(self):
+        result = self.do_test(news_reports=[5,11, 12,13,14,15,16,17, 30,50,70])
+        np.testing.assert_array_equal(result,[5,12,30,50,70])
         
     def test_6_seconds_beginning_middle_and_end(self):
         result = self.do_test(news_reports=[0,1,2,3,4,5,6, 11,30,50, 70,71,72,73,74,75,76, 80, 90,91,92])
@@ -76,8 +80,16 @@ class TestConsolidateBeeps(unittest.TestCase):
         np.testing.assert_array_equal(result,[0,11,30,50,70,80,90])
         
     def test_2_seconds_between_repeat_6(self):
-        result = self.do_test(news_reports=[0,1,2,4,5,6,7, 11,30,50, 70,71,72,74,75,76, 80, 90,91,92])
-        np.testing.assert_array_equal(result,[0,7,11,30,50,70,80,90])
+        result = self.do_test(news_reports=[0,1,2,4,5,6,7, 14,30,50, 70,71,72,74,75,76, 80, 90,91,92])
+        np.testing.assert_array_equal(result,[0,7,14,30,50,70,80,90])
+        
+    def test_5_and_6_seconds_between_repeat_6(self):
+        result = self.do_test(news_reports=[0,5,6, 11,30,50, 70,76, 80, 90,91,92])
+        np.testing.assert_array_equal(result,[0,11,30,50,70,80,90])
+        
+    def test_5_and_6_seconds_between_repeat_6_extra_one(self):
+        result = self.do_test(news_reports=[0,5,6,7, 14,30,50, 70,76, 80, 90,91,92])
+        np.testing.assert_array_equal(result,[0,7,14,30,50,70,80,90])
         
     def test_6_seconds_end(self):
         result = self.do_test(news_reports=[11,30,50, 70,71,72,73,74,75,76])
