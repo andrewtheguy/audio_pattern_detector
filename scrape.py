@@ -210,13 +210,14 @@ def scrape(input_file,stream_name):
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
             news_report_peak_times_filtered = []
-            for second in news_report_peak_times:
-                if int(second) not in exclude_ts:
+            for second in preprocess_ts(news_report_peak_times,remove_repeats=True):
+                #print(second)
+                if second not in exclude_ts:
                     news_report_peak_times_filtered.append(second)
                 else:
                     print(f"excluding {seconds_to_time(second)}, ({second}) seconds mark from news_report_peak_times")
             news_report_peak_times = news_report_peak_times_filtered        
-            
+        #exit(1)    
         news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
         #for offset in news_report_peak_times:

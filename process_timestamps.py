@@ -63,15 +63,23 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
         
     return result
 
-def preprocess_ts(peak_times):
+def preprocess_ts(peak_times,remove_repeats=False):
     # deduplicate by seconds
-    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
     # sort: will bug out if not sorted
     # TODO maybe require input to be sorted first to prevent
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
-    return sorted(peak_times_clean)
+    #print("peak_times before",peak_times)
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in sorted(peak_times)]))
+    #print("peak_times after",peak_times)
+    #exit(1)
+    
+    if remove_repeats:
+        # remove repeating beeps
+        peak_times_clean = consolidate_beeps(peak_times_clean)
+    
+    return peak_times_clean
 
 # not working for decimals yet
 def consolidate_beeps(news_reports):
@@ -251,7 +259,7 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     #    raise ValueError("intro has duplicates, clean up duplicates first")   
 
 
-    news_reports = preprocess_ts(news_reports)
+    news_reports = preprocess_ts(news_reports,remove_repeats=True)
     intros = preprocess_ts(intros)
     
 
@@ -261,8 +269,6 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
-    # remove repeating beeps
-    news_reports = consolidate_beeps(news_reports)
     # remove repeating intros
     intros = consolidate_intros(intros,news_reports)
     # process beginning and end
