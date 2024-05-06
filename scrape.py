@@ -35,10 +35,10 @@ from andrew_utils import seconds_to_time
 from utils import extract_prefix
 
 streams={
-    "happydaily": {
-        "introclips": ["rthk1theme.wav","happydailyfirstintro.wav","happydailyfemaleintro.wav","happydailyfemale2.wav"],
+    "itsahappyday": {
+        "introclips": ["rthk1theme_new.wav","itsahappyday_intro.wav"],
         "allow_first_short": True,
-        "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/{date}.m4a/index_0_a.m3u8",
+        "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/itsahappyday/m4a/{date}.m4a/index_0_a.m3u8",
         "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
     },
     "healthpedia": {
