@@ -91,39 +91,51 @@ def consolidate_intros(intros,news_reports):
     consolidated_intros = []
     intro_index = 0
     news_index = 0
-    
-    #edge case
+
+    #no news report
     if len(news_reports) == 0:
-        #unique
-        return list(dict.fromkeys(intros))
-    
-    news_reports=news_reports.copy()
-    
+        #just return because it is unique and sorted already
+        return intros.copy()
+ 
     #normalize
     if(len(intros) > 0):
-        if(intros[-1]>news_reports[-1]):
-            news_reports.append(sys.maxsize)
-    
-    
-    while intro_index < len(intros) and news_index < len(news_reports):
-        intro = intros[intro_index]
-        news = news_reports[news_index]
+        if(intros[0]<0):
+            raise ValueError("intro cannot be negative")
+        ## intro needs to be smaller than news report at the
+        #if(intros[0]>news_reports[0]):
+        #    print("insering -1")
+        #    intros.insert(0,-1)
+    else: # no intros
+         return []   
 
-        if intro <= news:
-            consolidated_intros.append(intro)
+   
+    intros=deque(intros)
+    news_reports=deque(news_reports)
+    
+    arr2=[]
+    
+    # min 1 intro and 1 news report
+    while news_reports:
+        temp=[]
+        #intro = intros.popleft()
+        #consolidated_intros.append(intro)
+
+        news = news_reports.popleft()
+        #if news > intro:
+        #    continue
 
         # Check if there are extra intros before the current news
-        while intro_index < len(intros) - 1 and intros[intro_index + 1] < news:
-            intro_index += 1  # Skip extra intros
+        while intros and intros[0] < news:
+            temp.append(intros.popleft())
+            #intro=intros.popleft()
+        arr2.append(temp)
 
-        intro_index += 1
-        news_index += 1  # Move to the next news report
+    arr2.append(intros)
 
-    print("intro_index",intro_index)
-    print("news_index",news_index)
-    # leftover intros
-    if(intro_index < len(intros) and intros[intro_index]>=news_reports[-1]):
-        consolidated_intros.append(intros[intro_index])
+    for arr in arr2:
+        if len(arr) == 0:
+            continue
+        consolidated_intros.append(arr[0])
         
     # leftover news reports    
     #if(news_index < len(news_reports) and news_reports[news_index]>=intros[-1]):
