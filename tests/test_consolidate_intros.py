@@ -87,6 +87,11 @@ class TestConsolidateIntros(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [1600,2900])
         
+        #result = self.do_test(intros=               [1600,     3300],
+        #                      news_reports=[400,1500,2800,3200,3400,3500])
+        #np.testing.assert_array_equal(result,
+        #                              [1600,3300])
+        
 
         
     def test_extras_no_overlapping(self):
