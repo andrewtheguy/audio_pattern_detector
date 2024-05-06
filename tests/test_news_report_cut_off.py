@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from process_timestamps import news_intro_cut_off_beginning_and_end
+from process_timestamps import INTRO_CUT_OFF, news_intro_cut_off_beginning_and_end
 from utils import minutes_to_seconds
 
 class TestConsolidateIntros(unittest.TestCase):
@@ -48,5 +48,43 @@ class TestConsolidateIntros(unittest.TestCase):
                               news_reports=[4,25])
         the_exception = cm.exception
         self.assertIn("cannot have more than one news report within 10 minutes",str(the_exception))
+        
+      
+    def test_intro_too_late(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.do_test(intros=[INTRO_CUT_OFF+10],
+                                news_reports=[])
+        the_exception = cm.exception
+        self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
+        
+        with self.assertRaises(ValueError) as cm:
+            result = self.do_test(intros=[INTRO_CUT_OFF+10],
+                                news_reports=[4])
+        the_exception = cm.exception
+        self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
+        
+        with self.assertRaises(ValueError) as cm:
+            result = self.do_test(intros=[INTRO_CUT_OFF+10,minutes_to_seconds(30)],
+                                news_reports=[INTRO_CUT_OFF+14,minutes_to_seconds(35)])
+        the_exception = cm.exception
+        self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
+        
+    def test_news_before_intro(self):
+        result_news_report = self.do_test(intros=[40],
+                              news_reports=[20])
+        np.testing.assert_array_equal(result_news_report,
+                                      [])
+        
+        result_news_report = self.do_test(intros=[INTRO_CUT_OFF-10],
+                              news_reports=[20])
+        np.testing.assert_array_equal(result_news_report,
+                                      [])
+        
+    def test_intro_before_news(self):
+        result_news_report = self.do_test(intros=[40,80],
+                              news_reports=[60])
+        np.testing.assert_array_equal(result_news_report,
+                                      [60,self.total_time_1])
+        
 if __name__ == '__main__':
     unittest.main()
