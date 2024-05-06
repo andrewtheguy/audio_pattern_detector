@@ -1,15 +1,15 @@
 import unittest
 import numpy as np
 
-from process_timestamps import INTRO_CUT_OFF, news_intro_cut_off_beginning_and_end
+from process_timestamps import INTRO_CUT_OFF, news_intro_process_beginning_and_end
 from utils import minutes_to_seconds
 
-class TestConsolidateIntros(unittest.TestCase):
+class TestProcessBeginningAndEndTs(unittest.TestCase):
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
 
     def do_test(self,intros,news_reports):
-        return news_intro_cut_off_beginning_and_end((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))),self.total_time_1)
+        return news_intro_process_beginning_and_end((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))),self.total_time_1)
     
     def test_zero_everything(self):
         result_news_report = self.do_test(intros=[],
