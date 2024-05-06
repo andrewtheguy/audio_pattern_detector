@@ -57,20 +57,20 @@ class TestProcessTimestamps(unittest.TestCase):
         np.testing.assert_array_equal(result,[[minutes_to_seconds(10),news_end]])
         
     def test_zero_intro_with_news_in_middle(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             news_end = self.total_time_1-minutes_to_seconds(20)
             result = self.process(news_report=[news_end],intro=[])
         the_exception = cm.exception
         self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
         
     def test_zero_intro_with_news_at_beginning(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[0],intro=[])
         the_exception = cm.exception
         self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
 
     def test_zero_intro_with_multiple_news_in_middle(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             news_middle = self.total_time_1-minutes_to_seconds(40)
             news_end = self.total_time_1-minutes_to_seconds(20)
             result = self.process(news_report=[news_middle,news_end],intro=[])
@@ -138,14 +138,14 @@ class TestProcessTimestamps(unittest.TestCase):
         
     #@unittest.skip(reason="it is blocked by other checks now")    
     def test_one_intro_same_as_one_news_not_near_end(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[self.total_time_1-11]
                                         ,intro=[self.total_time_1-11])
         #the_exception = cm.exception
         #self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
 
     def test_one_intro_same_as_one_news_at_beginning(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[9]
                                         ,intro=[9])
         the_exception = cm.exception
