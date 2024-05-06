@@ -71,7 +71,7 @@ def preprocess_ts(peak_times,remove_repeats=False):
     #news_report = deque([40,90,300])
     #intro =       deque([60,200,400])
     #print("peak_times before",peak_times)
-    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in sorted(peak_times)]))
+    peak_times_clean = list(dict.fromkeys([peak for peak in sorted(peak_times)]))
     #print("peak_times after",peak_times)
     #exit(1)
     
@@ -219,8 +219,8 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
                  
 def build_time_sequence(intros,news_reports):
     if(len(intros) != len(news_reports)):
-        intros_debug=[seconds_to_time(seconds=t,include_decimals=False) for t in intros]
-        news_reports_debug=[seconds_to_time(seconds=t,include_decimals=False) for t in news_reports]
+        intros_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in intros]
+        news_reports_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in news_reports]
         raise TimeSequenceError(f"intros and news reports must be the same length, otherwise it is sign of time sequence error:\n"+ 
                                 f"      intros {intros_debug}\nnews reports {news_reports_debug}")
     result =[]
