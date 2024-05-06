@@ -89,8 +89,7 @@ def consolidate_intros(intros,news_reports):
         raise ValueError("news report is not unique or sorted")
     
     consolidated_intros = []
-    intro_index = 0
-    news_index = 0
+
 
     #no news report
     if len(news_reports) == 0:
@@ -101,10 +100,6 @@ def consolidate_intros(intros,news_reports):
     if(len(intros) > 0):
         if(intros[0]<0):
             raise ValueError("intro cannot be negative")
-        ## intro needs to be smaller than news report at the
-        #if(intros[0]>news_reports[0]):
-        #    print("insering -1")
-        #    intros.insert(0,-1)
     else: # no intros
          return []   
 
@@ -117,13 +112,9 @@ def consolidate_intros(intros,news_reports):
     # min 1 intro and 1 news report
     while news_reports:
         temp=[]
-        #intro = intros.popleft()
-        #consolidated_intros.append(intro)
 
         news = news_reports.popleft()
-        #if news > intro:
-        #    continue
-
+  
         # Check if there are extra intros before the current news
         while intros and intros[0] < news:
             temp.append(intros.popleft())
@@ -136,10 +127,6 @@ def consolidate_intros(intros,news_reports):
         if len(arr) == 0:
             continue
         consolidated_intros.append(arr[0])
-        
-    # leftover news reports    
-    #if(news_index < len(news_reports) and news_reports[news_index]>=intros[-1]):
-    #    consolidated_intros.append(intros[-1])
         
     return consolidated_intros
     
