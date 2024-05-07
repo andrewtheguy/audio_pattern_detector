@@ -44,19 +44,19 @@ streams={
     "healthpedia": {
         "introclips": ["rthk1theme.wav","healthpedia_intro.wav","healthpediapriceless.wav"],
         "allow_first_short": False,
-        "url": "https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/master.m3u8",
+        "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
     },
     "morningsuite": {
         "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
         "allow_first_short": False,
-        "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
+        "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
     },
     "KnowledgeCo": {
         "introclips": ["rthk2theme.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
         "allow_first_short": False,
-        "url":"https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
+        "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},
     },
 }
