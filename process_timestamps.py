@@ -32,8 +32,10 @@ def timestamp_sanity_check(result,total_time):
         cur_start_time = r[0]
         cur_end_time = r[1]
 
-        if cur_start_time > total_time:
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        if cur_start_time >= total_time:
+            raise ValueError(f"start time overflow, is greater or equals to total time {total_time}")
+        elif(cur_end_time == cur_start_time):
+            raise ValueError(f"start time is equal to end time, did you forget to remove zero duration sequences first?")
         elif(cur_start_time < 0):
             raise ValueError(f"start time {cur_start_time} is less than 0")
         
@@ -251,19 +253,19 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
     
     return news_reports
                  
-def build_time_sequence(intros,news_reports):
-    if not is_unique_and_sorted(intros):
-        raise ValueError("intros is not unique or sorted")
-    if not is_unique_and_sorted(news_reports):
-        raise ValueError("news report is not unique or sorted")
-    if(len(intros) != len(news_reports)):
-        intros_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in intros]
-        news_reports_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in news_reports]
-        raise TimeSequenceError(f"intros and news reports must be the same length, otherwise it is sign of time sequence error:\n"+ 
-                                f"      intros {intros_debug}\nnews reports {news_reports_debug}")
+def build_time_sequence(start_times,end_times):
+    if not is_unique_and_sorted(start_times):
+        raise ValueError("start_times is not unique or sorted")
+    if not is_unique_and_sorted(end_times):
+        raise ValueError("end_times is not unique or sorted")
+    if(len(start_times) != len(end_times)):
+        intros_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in start_times]
+        news_reports_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in end_times]
+        raise TimeSequenceError(f"start_times and end_times must be the same length, otherwise it is sign of time sequence error:\n"+ 
+                                f"      start_times {intros_debug}\nend_times {news_reports_debug}")
     result =[]
-    for i in range(len(intros)):
-        result.append([intros[i],news_reports[i]])
+    for i in range(len(start_times)):
+        result.append([start_times[i],end_times[i]])
     return result    
                  
 def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
@@ -309,7 +311,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     # process beginning and end
     news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
-    time_sequences=build_time_sequence(intros,news_reports)
+    time_sequences=build_time_sequence(start_times=intros,end_times=news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
     time_sequences=remove_start_equals_to_end(time_sequences)
 
