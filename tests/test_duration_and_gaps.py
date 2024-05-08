@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from process_timestamps import process_timestamps, timestamp_sanity_check
+from process_timestamps import timestamp_sanity_check_rthk
 from utils import minutes_to_seconds
 from time_sequence_error import TimeSequenceError
 
@@ -10,7 +10,7 @@ class TestDurationAndGaps(unittest.TestCase):
         self.total_time_1=minutes_to_seconds(120)
 
     def check(self,result,allow_first_short=False):
-        return timestamp_sanity_check(result,skip_reasonable_time_sequence_check=False,allow_first_short=allow_first_short,total_time=self.total_time_1)
+        return timestamp_sanity_check_rthk(result,allow_first_short=allow_first_short,total_time=self.total_time_1)
 
 
     def test_empty_array(self):
