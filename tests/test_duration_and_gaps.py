@@ -6,9 +6,12 @@ from utils import minutes_to_seconds
 from time_sequence_error import TimeSequenceError
 
 class TestDurationAndGaps(unittest.TestCase):
-    
+    def setUp(self):
+        self.total_time_1=minutes_to_seconds(120)
+
     def check(self,result,allow_first_short=False):
-        return timestamp_sanity_check(result,skip_reasonable_time_sequence_check=False,allow_first_short=allow_first_short)
+        return timestamp_sanity_check(result,skip_reasonable_time_sequence_check=False,allow_first_short=allow_first_short,total_time=self.total_time_1)
+
 
     def test_empty_array(self):
         with self.assertRaises(ValueError):
@@ -23,6 +26,18 @@ class TestDurationAndGaps(unittest.TestCase):
             result = self.check([[1,minutes_to_seconds(18)]])
         except Exception as e:  
             self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
+
+    def test_intro_negative(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.check([[-1,minutes_to_seconds(18)]])
+        the_exception = cm.exception
+        self.assertIn("less than 0",str(the_exception))
+    
+    def test_intro_overflow(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.check([[self.total_time_1+10,self.total_time_1+minutes_to_seconds(18)]])
+        the_exception = cm.exception
+        self.assertIn("overflow",str(the_exception))
         
     def test_1_value(self):
         with self.assertRaises(ValueError):
