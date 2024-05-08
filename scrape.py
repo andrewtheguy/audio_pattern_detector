@@ -120,7 +120,7 @@ def split_audio(input_file, output_file, start_time, end_time,total_time,artist,
 
 def concatenate_audio(input_files, output_file,tmpdir):
     list_file = os.path.join(tmpdir, 'list.txt')
-    with open(list_file,'w') as f:
+    with open(list_file,'w') as f:                                            
         for item in input_files:
             file_name = item["file_path"]
             print(f"file {file_name}",file=f)
@@ -178,6 +178,26 @@ def get_sec(time_str):
     """Get seconds from time."""
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + float(s)
+
+def split_audio_by_time_sequences(input_file,total_time,pair,output_dir):
+    splits=[]
+    dirname,date_str = extract_prefix(input_file)
+    dirname = '' if dirname is None else dirname
+    artist=dirname
+    basename,extension = os.path.splitext(os.path.basename(input_file))
+    for i,p in enumerate(pair):
+        start_time = p[0]
+        end_time = p[1]
+        path1=seconds_to_time(seconds=start_time,include_decimals=False).replace(':','_')
+        path2=seconds_to_time(seconds=end_time,include_decimals=False).replace(':','_')
+        title=f"{path1}-{path2}"
+        filename=f"{title}{extension}"
+        file_segment = os.path.join(output_dir,filename)
+        split_audio(input_file, file_segment, start_time, end_time, total_time,artist=artist,album=date_str,title=title)
+        splits.append({"file_path": file_segment,
+                        "start_time": start_time,
+                        "end_time": end_time,})
+    return splits
 
 def scrape(input_file,stream_name):
     save_segments = True
@@ -259,7 +279,7 @@ def scrape(input_file,stream_name):
     with open(jsonfile,'w') as f:
         f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
 
-    splits=[]
+    #splits=[]
 
     output_dir_trimmed= os.path.abspath(os.path.join(f"./tmp","trimmed",stream_name))
     output_file_trimmed= os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
@@ -274,18 +294,7 @@ def scrape(input_file,stream_name):
         filename_trimmed=os.path.basename(output_file_trimmed)
         dirname,date_str = extract_prefix(filename_trimmed)
         dirname = '' if dirname is None else dirname
-        for i,p in enumerate(pair):
-            start_time = p[0]
-            end_time = p[1]
-            path1=seconds_to_time(seconds=start_time,include_decimals=False).replace(':','_')
-            path2=seconds_to_time(seconds=end_time,include_decimals=False).replace(':','_')
-            title=f"{path1}-{path2}"
-            filename=f"{title}{extension}"
-            file_segment = os.path.join(tmpdir,filename)
-            split_audio(input_file, file_segment, start_time, end_time, total_time,artist=dirname,album=date_str,title=title)
-            splits.append({"file_path": file_segment,
-                           "start_time": start_time,
-                           "end_time": end_time,})
+        splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
         concatenate_audio(splits, output_file_trimmed,tmpdir)
         upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
