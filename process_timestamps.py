@@ -16,8 +16,8 @@ BEEP_PATTERN_REPEAT_SECONDS = 7
 # but not intro past 10 minutes
 INTRO_CUT_OFF=10*60
 
-def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,total_time,allow_first_short=False):
-    logger.info(result)
+def timestamp_sanity_check(result,total_time):
+
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
     
@@ -34,27 +34,49 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,total_time
 
         if cur_start_time > total_time:
             raise ValueError(f"intro overflow, is greater than total time {total_time}")
-        elif cur_start_time < 0:
-            raise ValueError(f"intro is less than 0")
-
-        if(cur_start_time < 0):
+        elif(cur_start_time < 0):
             raise ValueError(f"start time {cur_start_time} is less than 0")
         
         if(cur_start_time > cur_end_time):
             raise ValueError(f"start time {cur_start_time} is greater than end time {cur_end_time}")
 
+    for i in range(1,len(result)):
+        cur = result[i]
+        cur_start_time = cur[0]
+        prev = result[i-1]
+        prev_end_time = prev[1]
+        gap = cur_start_time - prev_end_time
+        if(gap < 0):
+            raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
+   
+    return result
+
+def timestamp_sanity_check_rthk(result,total_time,allow_first_short=False):
+    timestamp_sanity_check(result,total_time)
+    
+    for i,r in enumerate(result):
+        if(len(r) != 2):
+            raise ValueError(f"each element in result must have 2 elements, got {r}")
+
+        beginning = i == 0
+        # allow end to be larger than total time for now
+        end = i == len(result)-1
+
+        cur_start_time = r[0]
+        cur_end_time = r[1]
+        
         # TODO: still need to account for 1 hour interval news report at night time
         short_allowance_special = 5
         short_allowance_normal = 15
-        if not skip_reasonable_time_sequence_check:
-            allow_short_interval = allow_first_short and beginning
-            # allow first short if intro starts in 2 minutes
-            if allow_short_interval and cur_start_time < 2*60 and (cur_end_time - cur_start_time < short_allowance_special*60):
-                raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_special} minutes for beginning")
-            # news report should not last like 15 minutes
-            elif not allow_short_interval and cur_end_time - cur_start_time < short_allowance_normal*60:
-                raise TimeSequenceError(f"duration for program segment with cur_start_time {seconds_to_time(cur_start_time)} with duration {seconds_to_time(cur_end_time - cur_start_time)} is less than {short_allowance_normal} minutes")
-    
+        
+        allow_short_interval = allow_first_short and beginning
+        # allow first short if intro starts in 2 minutes
+        if allow_short_interval and cur_start_time < 2*60 and (cur_end_time - cur_start_time < short_allowance_special*60):
+            raise TimeSequenceError(f"duration for program segment {cur_end_time - cur_start_time} seconds is less than {short_allowance_special} minutes for beginning")
+        # news report should not last like 15 minutes
+        elif not allow_short_interval and cur_end_time - cur_start_time < short_allowance_normal*60:
+            raise TimeSequenceError(f"duration for program segment with cur_start_time {seconds_to_time(cur_start_time)} with duration {seconds_to_time(cur_end_time - cur_start_time)} is less than {short_allowance_normal} minutes")
+
     for i in range(1,len(result)):
         cur = result[i]
         cur_start_time = cur[0]
@@ -64,7 +86,7 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,total_time
         if(gap < 0):
             raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
         # news report and commercial time should not be 15 minutes or longer
-        elif(not skip_reasonable_time_sequence_check and gap >= 15*60):
+        elif(gap >= 15*60):
             raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 15 minutes or longer")
         
     return result
@@ -265,9 +287,6 @@ def remove_start_equals_to_end(time_sequences):
 def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
                        allow_first_short=False):
 
-    skip_reasonable_time_sequence_check=False
-
-
     # if len(news_reports) != len(set(news_reports)):
     #    raise ValueError("news report has duplicates, clean up duplicates first")   
 
@@ -294,6 +313,6 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
     time_sequences=remove_start_equals_to_end(time_sequences)
 
-    timestamp_sanity_check(time_sequences,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short,total_time=total_time)
+    timestamp_sanity_check_rthk(time_sequences,allow_first_short=allow_first_short,total_time=total_time)
 
     return time_sequences
