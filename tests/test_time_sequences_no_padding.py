@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from process_timestamps import process_timestamps, timestamp_sanity_check
+from process_timestamps import process_timestamps
 from time_sequence_error import TimeSequenceError
 from utils import minutes_to_seconds
 
