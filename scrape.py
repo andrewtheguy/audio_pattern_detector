@@ -1,6 +1,7 @@
 
 import argparse
 import copy
+import fcntl
 import glob
 import sys
 from collections import deque
@@ -303,6 +304,12 @@ def is_time_after(current_time,hour):
   return current_time > target_time
 
 def download_and_scrape(download_only=False):
+    try:
+        lockfile = open(f'./tmp/lockfile', "a+")
+        fcntl.lockf(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as e:
+        raise RuntimeError('can only run one download_and_scrape at a time')
+   
     failed_scrape_files=[]
     days_to_keep=3
     if days_to_keep < 1:
