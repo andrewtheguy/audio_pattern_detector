@@ -24,8 +24,23 @@ class TestTimestampSanityCheck(unittest.TestCase):
     def test_valid(self):
         try:
             result = self.check([[1,minutes_to_seconds(18)]])
+            result = self.check([[1,minutes_to_seconds(18)],[minutes_to_seconds(19),minutes_to_seconds(21)]])
         except Exception as e:  
             self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
+
+    # need to strip start=end first if needed before checking
+    def test_not_allow_start_same_as_end(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.check([[1,minutes_to_seconds(18)]])
+            result = self.check([[1,minutes_to_seconds(18)],[minutes_to_seconds(19),minutes_to_seconds(19)]])
+        the_exception = cm.exception
+        self.assertIn("start time is equal to end time",str(the_exception))
+
+    def test_not_allow_start_the_same_as_total(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.check([[1,minutes_to_seconds(18)],[self.total_time_1,self.total_time_1+minutes_to_seconds(19)]])
+        the_exception = cm.exception
+        self.assertIn("greater or equals to total time",str(the_exception))
 
     def test_intro_negative(self):
         with self.assertRaises(ValueError) as cm:

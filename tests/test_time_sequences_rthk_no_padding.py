@@ -82,7 +82,7 @@ class TestProcessTimestamps(unittest.TestCase):
             news_end = self.total_time_1-5
             result = self.process(news_report=[news_middle,news_end],intro=[])
         the_exception = cm.exception
-        self.assertIn("intros and news reports must be the same length",str(the_exception))
+        self.assertIn("start_times and end_times must be the same length",str(the_exception))
 
 
     # won't cause issues
