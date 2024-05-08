@@ -180,7 +180,7 @@ def get_sec(time_str):
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 def scrape(input_file,stream_name):
-
+    save_segments = True
     print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
@@ -289,13 +289,14 @@ def scrape(input_file,stream_name):
         concatenate_audio(splits, output_file_trimmed,tmpdir)
         upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
-        # save segments
-        for item in splits:
-            dirname_segment = os.path.abspath(f"./tmp/segments/{dirname}/{date_str}")
-            os.makedirs(dirname_segment, exist_ok=True)
-            filename_segment=os.path.basename(item["file_path"])
-            save_path=f"{dirname_segment}/{filename_segment}"
-            shutil.move(item["file_path"],save_path)
+        if save_segments:
+            # save segments
+            for item in splits:
+                dirname_segment = os.path.abspath(f"./tmp/segments/{dirname}/{date_str}")
+                os.makedirs(dirname_segment, exist_ok=True)
+                filename_segment=os.path.basename(item["file_path"])
+                save_path=f"{dirname_segment}/{filename_segment}"
+                shutil.move(item["file_path"],save_path)
             #upload_file(item["file_path"],upload_path,skip_if_exists=True)
     return output_dir_trimmed,output_file_trimmed
 
