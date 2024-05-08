@@ -7,7 +7,7 @@ from time_sequence_error import TimeSequenceError
 
 
 class TestProcessTimestampsWithPadding(unittest.TestCase):
-    
+
     def process(self,news_report,intro):
         return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad)
 

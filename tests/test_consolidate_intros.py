@@ -2,11 +2,30 @@ import unittest
 import numpy as np
 
 from process_timestamps import consolidate_intros
+from utils import minutes_to_seconds
 
 class TestConsolidateIntros(unittest.TestCase):
+    def setUp(self):
+        self.total_time_1=minutes_to_seconds(120)
+        
     def do_test(self,intros,news_reports):
-        return consolidate_intros((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))))
+        return consolidate_intros((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))),self.total_time_1)
     
+    def test_intro_negative(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.do_test(intros=      [-1,800],
+                                news_reports=[300,1200,5000])
+        the_exception = cm.exception
+        self.assertIn("less than 0",str(the_exception))
+        
+    def test_intro_more_than_total(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.do_test(intros=      [100,self.total_time_1+10],
+                                news_reports=[300])
+        the_exception = cm.exception
+        self.assertIn("overflow",str(the_exception))
+        
+
     def test_zero_everything(self):
         result = self.do_test(intros=[],
                               news_reports=[])

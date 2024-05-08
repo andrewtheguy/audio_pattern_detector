@@ -16,7 +16,7 @@ BEEP_PATTERN_REPEAT_SECONDS = 7
 # but not intro past 10 minutes
 INTRO_CUT_OFF=10*60
 
-def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_first_short=False):
+def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,total_time,allow_first_short=False):
     logger.info(result)
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
@@ -26,10 +26,16 @@ def timestamp_sanity_check(result,skip_reasonable_time_sequence_check,allow_firs
             raise ValueError(f"each element in result must have 2 elements, got {r}")
 
         beginning = i == 0
+        # allow end to be larger than total time for now
         end = i == len(result)-1
 
         cur_start_time = r[0]
         cur_end_time = r[1]
+
+        if cur_start_time > total_time:
+            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        elif cur_start_time < 0:
+            raise ValueError(f"intro is less than 0")
 
         if(cur_start_time < 0):
             raise ValueError(f"start time {cur_start_time} is less than 0")
@@ -116,12 +122,18 @@ def consolidate_beeps(news_reports,max_seconds=BEEP_PATTERN_REPEAT_SECONDS):
     return new_ones            
         
 # news_reports need to be unique         
-def consolidate_intros(intros,news_reports):
+def consolidate_intros(intros,news_reports,total_time):
     if not is_unique_and_sorted(intros):
         raise ValueError("intros is not unique or sorted")
     if not is_unique_and_sorted(news_reports):
         raise ValueError("news report is not unique or sorted")
     
+    for ts in intros:
+        if ts > total_time:
+            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        elif ts < 0:
+            raise ValueError(f"intro is less than 0")
+
     consolidated_intros = []
 
 
@@ -274,19 +286,14 @@ def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
             raise ValueError(f"intro is less than 0")
 
     # remove repeating intros
-    intros = consolidate_intros(intros,news_reports)
+    intros = consolidate_intros(intros,news_reports,total_time)
     # process beginning and end
     news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
     time_sequences=build_time_sequence(intros,news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
     time_sequences=remove_start_equals_to_end(time_sequences)
-    
 
-    #required sanity check
-    if(len(time_sequences) == 0):
-        raise ValueError("time_sequences cannot be empty")
-    
-    timestamp_sanity_check(time_sequences,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short)
+    timestamp_sanity_check(time_sequences,skip_reasonable_time_sequence_check=skip_reasonable_time_sequence_check,allow_first_short=allow_first_short,total_time=total_time)
 
     return time_sequences
