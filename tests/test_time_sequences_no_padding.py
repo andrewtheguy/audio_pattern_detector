@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from process_timestamps import process_timestamps
+from process_timestamps import process_timestamps_rthk
 from time_sequence_error import TimeSequenceError
 from utils import minutes_to_seconds
 
@@ -9,7 +9,7 @@ from utils import minutes_to_seconds
 class TestProcessTimestamps(unittest.TestCase):
     
     def process(self,news_report,intro,allow_first_short=False):
-        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=0,allow_first_short=allow_first_short)
+        return process_timestamps_rthk(news_report,intro,total_time=self.total_time_1,news_report_second_pad=0,allow_first_short=allow_first_short)
 
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)

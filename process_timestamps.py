@@ -284,7 +284,7 @@ def remove_start_equals_to_end(time_sequences):
     return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
     
 # main function
-def process_timestamps(news_reports,intros,total_time,news_report_second_pad=6,
+def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pad=6,
                        allow_first_short=False):
 
     # if len(news_reports) != len(set(news_reports)):

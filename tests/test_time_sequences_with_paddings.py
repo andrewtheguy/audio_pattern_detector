@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from process_timestamps import process_timestamps
+from process_timestamps import process_timestamps_rthk
 from utils import minutes_to_seconds
 from time_sequence_error import TimeSequenceError
 
@@ -9,7 +9,7 @@ from time_sequence_error import TimeSequenceError
 class TestProcessTimestampsWithPadding(unittest.TestCase):
 
     def process(self,news_report,intro):
-        return process_timestamps(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad)
+        return process_timestamps_rthk(news_report,intro,total_time=self.total_time_1,news_report_second_pad=self.news_report_second_pad)
 
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
