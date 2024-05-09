@@ -1,11 +1,11 @@
 import unittest
 import numpy as np
 
-from process_timestamps import consolidate_beeps
+from process_timestamps import consolidate_close_by
 
 class TestConsolidateBeeps(unittest.TestCase):
     def do_test(self,news_reports):
-        return consolidate_beeps(list(dict.fromkeys(news_reports)),max_seconds=6)
+        return consolidate_close_by(list(dict.fromkeys(news_reports)),max_seconds=6)
     
     def test_zero_everything(self):
         result = self.do_test(news_reports=[])
