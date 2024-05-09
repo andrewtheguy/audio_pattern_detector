@@ -32,16 +32,19 @@ logger = logging.getLogger(__name__)
 
 from upload_utils.sftp import create_remote_sftp_dir_recursively,file_exists
 
+def connect_ssh_client(ssh_client):
+    # remote server credentials
+    host = "10.22.33.20"
+    username = "andrew"
+    password = "qwertasdfg"
+    port = '2022'
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
+
 def upload_file(file,dest_path,skip_if_exists=False):
     # create ssh client 
     with paramiko.SSHClient() as ssh_client:
-        # remote server credentials
-        host = "10.22.33.20"
-        username = "andrew"
-        password = "qwertasdfg"
-        port = '2022'
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
+        connect_ssh_client(ssh_client)
 
         # create an SFTP client object
         with ssh_client.open_sftp() as sftp:
@@ -72,17 +75,14 @@ def upload_file_with_webdav(file,dest_path,skip_if_exists=False):
 #    client.mkdir(dir)
     client.upload_file(file,dest_path,overwrite=True)
 
-if __name__ == '__main__':
+def sftp_file_exists(remote_path):
     with paramiko.SSHClient() as ssh_client:
-        # remote server credentials
-        host = "10.22.33.20"
-        username = "andrew"
-        password = "qwertasdfg"
-        port = '2022'
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
+        connect_ssh_client(ssh_client)
 
         # create an SFTP client object
         with ssh_client.open_sftp() as sftp:
             #create_remote_sftp_dir_recursively(sftp_client=sftp, remote_dir="/chafa/trimmed/chilo")
-            print(file_exists(sftp_client=sftp, remote_path="/chafa/trimmed/chilo"))
+            return file_exists(sftp_client=sftp, remote_path=remote_path)
+
+if __name__ == '__main__':
+    upload_file("test_upload.py","/chilo/chjafa/test_upload.py")

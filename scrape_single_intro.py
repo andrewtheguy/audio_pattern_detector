@@ -13,9 +13,11 @@ import ffmpeg
 from audio_offset_finder_v2 import DEFAULT_METHOD, find_clip_in_audio_in_chunks
 
 from andrew_utils import seconds_to_time
+from file_upload.upload_utils2 import sftp_file_exists, upload_file
 from process_timestamps import process_timestamps_single_intro
 from scrape import get_sec, split_audio_by_time_sequences
 from utils import extract_prefix
+from upload_utils import sftp
 
 streams={
     "漫談法律": {
@@ -27,7 +29,6 @@ streams={
 correlation_threshold_intro = 0.3
 
 def scrape_single_intro(input_file,stream_name,date_str):
-    save_segments = True
     print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
@@ -109,6 +110,12 @@ def scrape_single_intro(input_file,stream_name,date_str):
         #upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         #upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         
+        upload_dir = f"/am1430/segments/{dirname}/{date_str}"
+        if sftp_file_exists(remote_path=upload_dir):
+            print(f"file {upload_dir} already exists,skipping upload")
+            upload = False
+        else:
+            upload = True
         # save segments
         for item in splits:
             dirname_segment = os.path.abspath(f"./tmp/segments/{dirname}/{date_str}")
@@ -116,7 +123,10 @@ def scrape_single_intro(input_file,stream_name,date_str):
             filename_segment=os.path.basename(item["file_path"])
             save_path=f"{dirname_segment}/{filename_segment}"
             shutil.move(item["file_path"],save_path)
-            #upload_file(item["file_path"],upload_path,skip_if_exists=True)
+            if upload:
+                upload_path = f"{upload_dir}/{filename_segment}"
+                upload_file(save_path,upload_path,skip_if_exists=True)
+        
     return output_dir_trimmed,output_file_trimmed
 
 
