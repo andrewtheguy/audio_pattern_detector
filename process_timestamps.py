@@ -264,7 +264,7 @@ def build_time_sequence(start_times,end_times):
         intros_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in start_times]
         news_reports_debug=[seconds_to_time(seconds=t,include_decimals=True) for t in end_times]
         raise TimeSequenceError(f"start_times and end_times must be the same length, otherwise it is sign of time sequence error:\n"+ 
-                                f"      start_times {intros_debug}\nend_times {news_reports_debug}")
+                                f"start_times {intros_debug}\n  end_times {news_reports_debug}")
     result =[]
     for i in range(len(start_times)):
         result.append([start_times[i],end_times[i]])
