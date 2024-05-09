@@ -394,8 +394,6 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     section_label = seconds_to_time(index*60)
     if debug_mode:
-
-        print(f" {section_label}: percentile", np.percentile(correlation, 99))
         graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
         os.makedirs(graph_dir, exist_ok=True)
 
@@ -410,7 +408,12 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
         plt.close()
 
     max_sample = len(audio) - samples_skip_end
+    #trim placeholder clip
     correlation = correlation[:max_sample]
+    if debug_mode:
+        print(f"{section_label} percentile", np.percentile(correlation, 99))
+        print(f"{section_label} max correlation: {max(correlation)}")
+        print(f"---")
 
     height = threshold
     distance = clip_length
