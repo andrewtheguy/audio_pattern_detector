@@ -23,6 +23,17 @@ class TestBuildTimeSequence(unittest.TestCase):
                                        [1400,1600],
                                        ])
         
+    def test_skip_start_equals_to_end(self):
+
+        result = self.do_test([300,900, 1300, 1400],
+                              [600,1200,1300, 1600],
+                            )
+        np.testing.assert_array_equal(result,
+                                      [[300,600],
+                                       [900,1200],
+                                       [1400,1600],
+                                       ])
+        
     def test_build_invalid(self):
         with self.assertRaises(TimeSequenceError):
             result = self.do_test([300,900,1400],
