@@ -322,14 +322,26 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 
 # TODO: still need to write tests for this
 # this will limit the end to total_time unlike the rthk one, which allows end of time sequence to be greater than total time
-def process_timestamps_single_intro(intros,total_time):
-
+def process_timestamps_single_intro(intros,ending,ends_with_intro=False):
+    if not ends_with_intro and not ending:  
+        raise ValueError("ending is required if not ending with intro")
+    
+    if ends_with_intro and ending:  
+        raise ValueError("cannot provide ending if ending with intro")
+    
     intros = preprocess_ts(intros,remove_repeats=True,max_repeat_seconds=20)
     
+    if(ends_with_intro):
+        ending = None
+        breakpoint = None
+        if(len(intros)<2):
+            raise ValueError("Not enough intros found for ends_with_intro")
+        ending = intros[-1]
+        intros = intros[:-1]
 
     for ts in intros:
-        if ts > total_time:
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        if ts > ending:
+            raise ValueError(f"intro overflow, is greater than total time {ending}")
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
@@ -338,10 +350,12 @@ def process_timestamps_single_intro(intros,total_time):
         intro=intros[i]
         end_times.append(intro)
 
-    end_times.append(total_time)    
+    #print(end_times)   
+
+    end_times.append(ending)    
 
     time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
 
-    timestamp_sanity_check(time_sequences,total_time=total_time)
+    timestamp_sanity_check(time_sequences,total_time=ending)
 
     return time_sequences

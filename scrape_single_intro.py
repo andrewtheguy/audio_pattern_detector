@@ -23,7 +23,12 @@ streams={
     "漫談法律": {
         "introclips": ["am1430/漫談法律intro.wav"],
         "endingclips": ["am1430/opinion_only.wav"],
-    }
+        "ends_with_intro": False,
+    },
+    "天空下的彩虹": {
+        "introclips": ["am1430/天空下的彩虹intro.wav"],
+        "ends_with_intro": True,
+    },
 }
 
 correlation_threshold_intro = 0.3
@@ -63,19 +68,24 @@ def scrape_single_intro(input_file,stream_name,date_str):
         #logger.debug(program_intro_peak_times)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
-        ending_clips = stream["endingclips"]
-        # find earliest ending
-        ending = total_time
-        endings_array = []
-        for c in ending_clips:
-            #print(f"Finding {c}")
-            endings=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
-            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
-            endings_array.extend(endings)
-        ending = min(endings_array)
-        print("ending",seconds_to_time(seconds=ending,include_decimals=True),"---")
+        ends_with_intro = stream["ends_with_intro"]
+  
+        if not ends_with_intro:
+            ending_clips = stream["endingclips"]
+            # find earliest ending
+            ending = total_time
+            endings_array = []
+            for c in ending_clips:
+                #print(f"Finding {c}")
+                endings=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
+                #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
+                endings_array.extend(endings)
+            ending = min(endings_array)
+            print("ending",seconds_to_time(seconds=ending,include_decimals=True),"---")
+        else:
+            ending = None # will be calculated later
 
-        pair = process_timestamps_single_intro(program_intro_peak_times,ending)
+        pair = process_timestamps_single_intro(program_intro_peak_times,ending,ends_with_intro=ends_with_intro)
         #print("pair before rehydration",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
 
