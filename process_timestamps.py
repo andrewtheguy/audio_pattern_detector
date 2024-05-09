@@ -268,7 +268,7 @@ def build_time_sequence(start_times,end_times):
     result =[]
     for i in range(len(start_times)):
         result.append([start_times[i],end_times[i]])
-    return result    
+    return remove_start_equals_to_end(result)
                  
 def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
     result=[]
@@ -315,7 +315,6 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 
     time_sequences=build_time_sequence(start_times=intros,end_times=news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
-    time_sequences=remove_start_equals_to_end(time_sequences)
 
     timestamp_sanity_check_rthk(time_sequences,allow_first_short=allow_first_short,total_time=total_time)
 
@@ -342,8 +341,6 @@ def process_timestamps_single_intro(intros,total_time):
     end_times.append(total_time)    
 
     time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
-    #maybe merge remove_start_equals_to_end to build_time_sequence
-    time_sequences=remove_start_equals_to_end(time_sequences)
 
     timestamp_sanity_check(time_sequences,total_time=total_time)
 
