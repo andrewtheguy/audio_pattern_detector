@@ -28,7 +28,7 @@ from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_au
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
-from file_upload.upload_utils import upload_file
+from file_upload.upload_utils2 import upload_file
 import utils
 logger = logging.getLogger(__name__)
 

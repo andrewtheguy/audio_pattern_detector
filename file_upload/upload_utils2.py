@@ -30,7 +30,7 @@ import paramiko
 from webdav4.client import Client
 logger = logging.getLogger(__name__)
 
-from upload_utils.sftp import create_remote_sftp_dir_recursively
+from upload_utils.sftp import create_remote_sftp_dir_recursively,file_exists
 
 def upload_file(file,dest_path,skip_if_exists=False):
     # create ssh client 
@@ -71,3 +71,18 @@ def upload_file_with_webdav(file,dest_path,skip_if_exists=False):
     logger.info(f"uploading {file} to {dest_path}")
 #    client.mkdir(dir)
     client.upload_file(file,dest_path,overwrite=True)
+
+if __name__ == '__main__':
+    with paramiko.SSHClient() as ssh_client:
+        # remote server credentials
+        host = "10.22.33.20"
+        username = "andrew"
+        password = "qwertasdfg"
+        port = '2022'
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
+
+        # create an SFTP client object
+        with ssh_client.open_sftp() as sftp:
+            #create_remote_sftp_dir_recursively(sftp_client=sftp, remote_dir="/chafa/trimmed/chilo")
+            print(file_exists(sftp_client=sftp, remote_path="/chafa/trimmed/chilo"))
