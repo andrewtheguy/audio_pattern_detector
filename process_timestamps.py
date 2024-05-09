@@ -325,7 +325,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 # this will limit the end to total_time unlike the rthk one, which allows end of time sequence to be greater than total time
 def process_timestamps_single_intro(intros,total_time):
 
-    intros = preprocess_ts(intros)
+    intros = preprocess_ts(intros,remove_repeats=True,max_repeat_seconds=20)
     
 
     for ts in intros:
