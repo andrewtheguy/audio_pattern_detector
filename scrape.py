@@ -49,7 +49,7 @@ streams={
         "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
     },
     "morningsuite": {
-        "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","rthk2theme.wav"],
+        "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","morningsuitebababa.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
