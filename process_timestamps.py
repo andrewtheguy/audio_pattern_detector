@@ -329,7 +329,7 @@ def process_timestamps_single_intro(intros,ending,expected_num_segments,ends_wit
     if ends_with_intro and ending:  
         raise ValueError("cannot provide ending if ending with intro")
     
-    intros = preprocess_ts(intros,remove_repeats=True,max_repeat_seconds=20)
+    intros = preprocess_ts(intros,remove_repeats=True,max_repeat_seconds=60)
     
     if(ends_with_intro):
         ending = None
@@ -354,6 +354,8 @@ def process_timestamps_single_intro(intros,ending,expected_num_segments,ends_wit
     end_times.append(ending)    
 
     time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
+
+    print([[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in time_sequences])
 
     if(len(time_sequences) != expected_num_segments):
         raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
