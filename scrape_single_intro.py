@@ -1,9 +1,11 @@
 
 
 import argparse
+import glob
 import json
 import math
 import os
+from pathlib import Path
 import shutil
 import tempfile
 from venv import logger
@@ -20,16 +22,22 @@ from utils import extract_prefix
 from upload_utils import sftp
 
 streams={
-    "漫談法律": {
-        "introclips": ["am1430/漫談法律intro.wav"],
-        "endingclips": ["am1430/opinion_only.wav"],
-        "ends_with_intro": False,
+    "1810加油站": {
+        "introclips": ["am1430/1810_add_oil_intro.wav","am1430/1810_add_oil_end.wav"],
+        #"endingclips": ["am1430/1810_add_oil_end.wav"],
+        "ends_with_intro": True,
         "expected_num_segments": 4,
     },
     "天空下的彩虹": {
         "introclips": ["am1430/天空下的彩虹intro.wav"],
         "ends_with_intro": True,
         "expected_num_segments": 3,
+    },
+    "漫談法律": {
+        "introclips": ["am1430/漫談法律intro.wav"],
+        "endingclips": ["am1430/opinion_only.wav"],
+        "ends_with_intro": False,
+        "expected_num_segments": 4,
     },
 }
 
@@ -82,7 +90,7 @@ def scrape_single_intro(input_file,stream_name,date_str):
                 endings=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
                 #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
                 endings_array.extend(endings)
-            ending = min(endings_array)
+            ending = max(endings_array)
             print("ending",seconds_to_time(seconds=ending,include_decimals=True),"---")
         else:
             ending = None # will be calculated later
@@ -131,16 +139,20 @@ def scrape_single_intro(input_file,stream_name,date_str):
         else:
             upload = True
         # save segments
+        new_segments=[]
         for item in splits:
             dirname_segment = os.path.abspath(f"./tmp/segments/{dirname}/{date_str}")
             os.makedirs(dirname_segment, exist_ok=True)
             filename_segment=os.path.basename(item["file_path"])
             save_path=f"{dirname_segment}/{filename_segment}"
             shutil.move(item["file_path"],save_path)
+            new_segments.append(save_path)
             if upload:
                 upload_path = f"{upload_dir}/{filename_segment}"
                 upload_file(save_path,upload_path,skip_if_exists=True)
-        
+        for item in glob.glob(f"{dirname_segment}/*.m4a"):
+            if item not in new_segments:
+                Path(item).unlink(missing_ok=True)
     return output_dir_trimmed,output_file_trimmed
 
 
