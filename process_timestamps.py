@@ -93,7 +93,7 @@ def timestamp_sanity_check_rthk(result,total_time,allow_first_short=False):
         
     return result
 
-def preprocess_ts(peak_times,remove_repeats=False):
+def preprocess_ts(peak_times,remove_repeats=False,max_repeat_seconds=None):
     # deduplicate by seconds
     # sort: will bug out if not sorted
     # TODO maybe require input to be sorted first to prevent
@@ -106,13 +106,15 @@ def preprocess_ts(peak_times,remove_repeats=False):
     #exit(1)
     
     if remove_repeats:
+        if not max_repeat_seconds:
+            raise ValueError("max_repeat_seconds is required for remove repeats")
         # remove repeating beeps
-        peak_times_clean = consolidate_beeps(peak_times_clean)
+        peak_times_clean = consolidate_close_by(peak_times_clean,max_seconds=max_repeat_seconds)
     
     return peak_times_clean
 
-# not working for decimals yet
-def consolidate_beeps(news_reports,max_seconds=BEEP_PATTERN_REPEAT_SECONDS):
+
+def consolidate_close_by(news_reports,max_seconds):
     if len(news_reports) == 0:
         return news_reports
     if not is_unique_and_sorted(news_reports):
@@ -296,7 +298,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     #    raise ValueError("intro has duplicates, clean up duplicates first")   
 
 
-    news_reports = preprocess_ts(news_reports,remove_repeats=True)
+    news_reports = preprocess_ts(news_reports,remove_repeats=True,max_repeat_seconds=BEEP_PATTERN_REPEAT_SECONDS)
     intros = preprocess_ts(intros)
     
 
@@ -316,5 +318,33 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     time_sequences=remove_start_equals_to_end(time_sequences)
 
     timestamp_sanity_check_rthk(time_sequences,allow_first_short=allow_first_short,total_time=total_time)
+
+    return time_sequences
+
+# TODO: still need to write tests for this
+# this will limit the end to total_time unlike the rthk one, which allows end of time sequence to be greater than total time
+def process_timestamps_single_intro(intros,total_time):
+
+    intros = preprocess_ts(intros)
+    
+
+    for ts in intros:
+        if ts > total_time:
+            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        elif ts < 0:
+            raise ValueError(f"intro is less than 0")
+
+    end_times = []
+    for i in range(1,len(intros)):
+        intro=intros[i]
+        end_times.append(intro)
+
+    end_times.append(total_time)    
+
+    time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
+    #maybe merge remove_start_equals_to_end to build_time_sequence
+    time_sequences=remove_start_equals_to_end(time_sequences)
+
+    timestamp_sanity_check(time_sequences,total_time=total_time)
 
     return time_sequences
