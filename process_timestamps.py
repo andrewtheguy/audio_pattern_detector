@@ -322,7 +322,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 
 # TODO: still need to write tests for this
 # this will limit the end to total_time unlike the rthk one, which allows end of time sequence to be greater than total time
-def process_timestamps_single_intro(intros,ending,ends_with_intro=False):
+def process_timestamps_single_intro(intros,ending,expected_num_segments,ends_with_intro=False):
     if not ends_with_intro and not ending:  
         raise ValueError("ending is required if not ending with intro")
     
@@ -333,7 +333,6 @@ def process_timestamps_single_intro(intros,ending,ends_with_intro=False):
     
     if(ends_with_intro):
         ending = None
-        breakpoint = None
         if(len(intros)<2):
             raise ValueError("Not enough intros found for ends_with_intro")
         ending = intros[-1]
@@ -355,6 +354,9 @@ def process_timestamps_single_intro(intros,ending,ends_with_intro=False):
     end_times.append(ending)    
 
     time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
+
+    if(len(time_sequences) != expected_num_segments):
+        raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
 
     timestamp_sanity_check(time_sequences,total_time=ending)
 

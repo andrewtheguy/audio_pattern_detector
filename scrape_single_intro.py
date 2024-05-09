@@ -24,10 +24,12 @@ streams={
         "introclips": ["am1430/漫談法律intro.wav"],
         "endingclips": ["am1430/opinion_only.wav"],
         "ends_with_intro": False,
+        "expected_num_segments": 4,
     },
     "天空下的彩虹": {
         "introclips": ["am1430/天空下的彩虹intro.wav"],
         "ends_with_intro": True,
+        "expected_num_segments": 3,
     },
 }
 
@@ -85,7 +87,9 @@ def scrape_single_intro(input_file,stream_name,date_str):
         else:
             ending = None # will be calculated later
 
-        pair = process_timestamps_single_intro(program_intro_peak_times,ending,ends_with_intro=ends_with_intro)
+        expected_num_segments = stream["expected_num_segments"]
+
+        pair = process_timestamps_single_intro(program_intro_peak_times,ending,ends_with_intro=ends_with_intro,expected_num_segments=expected_num_segments)
         #print("pair before rehydration",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
 
