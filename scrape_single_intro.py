@@ -67,9 +67,11 @@ def scrape_single_intro(input_file,stream_name,date_str):
 
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
+        clip_paths=[f'./audio_clips/{c}' for c in clips]
+        intros_all=find_clip_in_audio_in_chunks(clip_paths, input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
         for c in clips:
-            #print(f"Finding {c}")
-            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
+            clip_path=f'./audio_clips/{c}'
+            intros=intros_all[clip_path]
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
             intros_debug = sorted(intros)
