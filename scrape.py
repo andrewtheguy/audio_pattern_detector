@@ -225,12 +225,19 @@ def scrape(input_file,stream_name):
         clips = stream["introclips"]
         allow_first_short = stream["allow_first_short"]
 
+        news_report_clip_path=f'./audio_clips/{news_report_clip}'
+
+        clip_paths=[f'./audio_clips/{clip}' for clip in clips]
+
+        clip_paths=[news_report_clip_path,*clip_paths]
+
         # Find clip occurrences in the full audio
-        news_report_peak_times = find_clip_in_audio_in_chunks(f'./audio_clips/{news_report_clip}',
-                                                              input_file,
-                                                              method=DEFAULT_METHOD,
-                                                              correlation_threshold = correlation_threshold_news_report,
-                                                              )
+        all_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths,
+                                                           full_audio_path=input_file,
+                                                           method=DEFAULT_METHOD,
+                                                           correlation_threshold = correlation_threshold_news_report,
+                                                           )
+        news_report_peak_times = all_clip_peak_times[news_report_clip_path]
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
@@ -252,8 +259,7 @@ def scrape(input_file,stream_name):
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
         for c in clips:
-            #print(f"Finding {c}")
-            intros=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
+            intros=all_clip_peak_times[f'./audio_clips/{c}']
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
             intros_debug = sorted(intros)
