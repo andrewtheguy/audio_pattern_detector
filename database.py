@@ -38,7 +38,7 @@ def setup_collections():
     segments_collection = get_segments_collection()
 
     # Define the keys and index options
-    keys = [("show_name", 1), ("show_date", 1)]
+    keys = [("show_name", 1), ("show_episode", 1)]
     index_options = {"unique": True}
 
     # Create the index
@@ -82,34 +82,29 @@ def scan_directory(directory):
                     {'$addToSet': { 'files': file_path } }
                 );
 
+def save_timestamps_to_db(show_name, show_episode, segments):
+    segments_collection = get_segments_collection()
+    segments_collection.update_one(
+        {"show_name": show_name, "show_episode": show_episode},
+        {"$set": {"segments": segments},
+        }, upsert=True
+    )
+
+def save_debug_info_to_db(show_name, show_episode, debug_info):
+    segments_collection = get_segments_collection()
+    segments_collection.update_one(
+        {"show_name": show_name, "show_episode": show_episode},
+        {"$set": {"debug_info": debug_info},
+        }, upsert=True
+    )
+
+def find_episode_segments_in_db(show_name, show_episode):
+    segments_collection = get_segments_collection()
+    return segments_collection.find_one({"show_name": show_name, "show_episode": show_episode})
 
 setup_collections()
 
 if __name__ == '__main__':
-    #client.admin.command('ping')
-    #print("Pinged your deployment. You successfully connected to MongoDB!")
-    #files_collection = get_files_collection()
-    scan_directory("./tmp")
+    #scan_directory("./tmp")
     segments_collection = get_segments_collection()
-    segments_collection.update_one(
-        {"show_name": "test1", "show_date": "20220414"},
-        {"$set": {"segments": [
-            [
-                "00:02:22",
-                "00:10:04"
-            ],
-            [
-                "00:19:11",
-                "00:40:04"
-            ],
-            [
-                "00:45:49",
-                "01:06:04"
-            ],
-            [
-                "01:16:11",
-                "01:36:04"
-            ]
-        ]},
-        }, upsert=True
-    )
+    print(segments_collection.find_one({"show_name": "test1","show_episode":"20220414"}))

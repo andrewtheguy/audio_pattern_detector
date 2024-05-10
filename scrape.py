@@ -25,6 +25,7 @@ import pytz
 import requests
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
+from database import find_episode_segments_in_db, save_debug_info_to_db, save_timestamps_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
@@ -209,13 +210,18 @@ def scrape(input_file,stream_name):
 
     tsformatted = None
 
-    jsonfile = f'{input_file}.json'
-    if os.path.exists(jsonfile):
-        tsformatted=json.load(open(jsonfile))['tsformatted']
+    #jsonfile = f'{input_file}.json'
+    #if os.path.exists(jsonfile):
+
+    show_name,date_str = extract_prefix(basename)
+    episode = find_episode_segments_in_db(show_name,date_str)
+    if episode:
+        tsformatted=episode['segments']
 
     total_time = math.ceil(float(ffmpeg.probe(input_file)["format"]["duration"]))
     logger.debug("total_time",total_time,"---")
-    #exit(1)
+    
+
     if not tsformatted:
         stream = streams[stream_name]
         clips = stream["introclips"]
@@ -261,8 +267,9 @@ def scrape(input_file,stream_name):
         #for offset in program_intro_peak_times:
         #    logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=True)}" )
 
-        with open(f'{input_file}.separated.json','w') as f:
-            f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
+        #with open(f'{input_file}.separated.json','w') as f:
+        #    f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
+        save_debug_info_to_db(show_name,date_str,{"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug})
 
         pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
         #print("pair before rehydration",pair)
@@ -276,10 +283,11 @@ def scrape(input_file,stream_name):
     gaps=[]
     for i in range(1,len(pair)):
         gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
-    with open(jsonfile,'w') as f:
-        f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
+    #with open(jsonfile,'w') as f:
+    #    f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
 
-    #splits=[]
+    
+    save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
     output_dir_trimmed= os.path.abspath(os.path.join(f"./tmp","trimmed",stream_name))
     output_file_trimmed= os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
@@ -370,7 +378,7 @@ def download_and_scrape(download_only=False):
             for podcast in podcasts_publish:
                 print(f"publishing podcast {podcast} after scraping")
                 # assuming one per day
-                publish_folder(podcast,files_to_publish=num_to_publish,delete_old_files=False)
+                publish_folder(podcast,files_to_publish=num_to_publish,delete_old_files=True)
             m4a_files_all = sorted(glob.glob(os.path.join(original_dir, "*.m4a")))
             # only keep last days_to_keep number of files, 
             # TODO: should account for weekends
