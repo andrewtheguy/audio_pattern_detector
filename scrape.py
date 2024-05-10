@@ -201,7 +201,7 @@ def split_audio_by_time_sequences(input_file,total_time,pair,output_dir):
     return splits
 
 def scrape(input_file,stream_name):
-    save_segments = True
+    save_segments = False
     print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
