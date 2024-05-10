@@ -119,14 +119,14 @@ def split_audio(input_file, output_file, start_time, end_time,total_time,artist,
             .output(output_file,acodec='copy',vcodec='copy', loglevel="error", **metadata_dict).overwrite_output().run()
     )
 
-def concatenate_audio(input_files, output_file,tmpdir):
+def concatenate_audio(input_files, output_file,tmpdir,channel_name):
     list_file = os.path.join(tmpdir, 'list.txt')
     with open(list_file,'w') as f:                                            
         for item in input_files:
             file_name = item["file_path"]
             print(f"file {file_name}",file=f)
 
-    artist="rthk"
+    artist=channel_name
 
     basename,extension = os.path.splitext(os.path.basename(output_file))
 
@@ -312,7 +312,7 @@ def scrape(input_file,stream_name):
         dirname,date_str = extract_prefix(filename_trimmed)
         dirname = '' if dirname is None else dirname
         splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
-        concatenate_audio(splits, output_file_trimmed,tmpdir)
+        concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="rthk")
         upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         if save_segments:
