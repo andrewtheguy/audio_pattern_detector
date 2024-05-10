@@ -208,15 +208,13 @@ def scrape(input_file,stream_name):
     logger.info(basename)
     #md5=md5file(input_file)  # to get a printable str instead of bytes
 
+    show_name,date_str = extract_prefix(basename)
+
     tsformatted = None
 
-    #jsonfile = f'{input_file}.json'
-    #if os.path.exists(jsonfile):
-
-    show_name,date_str = extract_prefix(basename)
-    episode = find_episode_segments_in_db(show_name,date_str)
-    if episode:
-        tsformatted=episode['segments']
+    jsonfile = f'{input_file}.json'
+    if os.path.exists(jsonfile):
+        tsformatted=json.load(open(jsonfile))['tsformatted']
 
     total_time = math.ceil(float(ffmpeg.probe(input_file)["format"]["duration"]))
     logger.debug("total_time",total_time,"---")
@@ -283,11 +281,12 @@ def scrape(input_file,stream_name):
     gaps=[]
     for i in range(1,len(pair)):
         gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
-    #with open(jsonfile,'w') as f:
-    #    f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
+    with open(jsonfile,'w') as f:
+        f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
 
+    upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=False)
     
-    save_timestamps_to_db(show_name,date_str,segments=tsformatted)
+    #save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
     output_dir_trimmed= os.path.abspath(os.path.join(f"./tmp","trimmed",stream_name))
     output_file_trimmed= os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
@@ -390,7 +389,7 @@ def download_and_scrape(download_only=False):
                 print(f"deleting {file} and its jsons")
                 Path(file).unlink(missing_ok=True)
                 Path(f"{file}.json").unlink(missing_ok=True)
-                Path(f"{file}.separated.json").unlink(missing_ok=True)
+                #Path(f"{file}.separated.json").unlink(missing_ok=True)
 
     if failed_scrape_files:
         print(f"failed to scrape the following files:")
