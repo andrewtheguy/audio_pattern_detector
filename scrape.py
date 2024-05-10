@@ -144,19 +144,23 @@ title={title}\n"""
     chapter = ""
     for i in range(len(input_files)):
         duration = input_files[i]["end_time"]-input_files[i]["start_time"]
-        end_time=start_time+duration
-        path1=seconds_to_time(seconds=start_time,include_decimals=False).replace(':','_')
-        path2=seconds_to_time(seconds=end_time,include_decimals=False).replace(':','_')
+        #print(f"start_time {start_time}")
+        #print(f"duration {duration}")
+        end_time=round(start_time+duration*1000)
+        #print(f"end_time {end_time}")
+        path1=seconds_to_time(seconds=input_files[i]["start_time"],include_decimals=False).replace(':','_')
+        path2=seconds_to_time(seconds=input_files[i]["end_time"],include_decimals=False).replace(':','_')
         title=f"{path1}-{path2}"
         text += f""";FFMETADATA1
 [CHAPTER]
-TIMEBASE=1/1
+TIMEBASE=1/1000
 START={start_time}
 END={end_time}
 title={title}\n"""
         start_time = end_time
 
     ffmetadatafile = os.path.join(tmpdir, 'ffmetadatafile.txt')
+    #print(text)
     with open(ffmetadatafile, "w") as myfile:
         myfile.write(text)
 
