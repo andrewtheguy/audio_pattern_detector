@@ -164,7 +164,7 @@ title={title}\n"""
     with open(ffmetadatafile, "w") as myfile:
         myfile.write(text)
 
-    subprocess.run([
+    result = subprocess.run([
         'ffmpeg', 
         '-f', 'concat',
         '-safe', '0',
@@ -177,6 +177,8 @@ title={title}\n"""
         '-y',
         output_file
     ])
+    if result.returncode != 0:
+        raise RuntimeError("ffmpeg failed")
 
 
 def get_sec(time_str):
