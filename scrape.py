@@ -26,7 +26,7 @@ import requests
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
 from database import find_episode_segments_in_db, save_debug_info_to_db, save_timestamps_to_db
-from process_timestamps import preprocess_ts, process_timestamps_rthk
+from process_timestamps import BEEP_PATTERN_REPEAT_SECONDS, preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
 from file_upload.upload_utils2 import upload_file
@@ -218,15 +218,16 @@ def scrape(input_file,stream_name):
 
     tsformatted = None
 
-    jsonfile = f'{input_file}.json'
-    if os.path.exists(jsonfile):
-        tsformatted=json.load(open(jsonfile))['tsformatted']
 
     total_time = math.ceil(float(ffmpeg.probe(input_file)["format"]["duration"]))
     logger.debug("total_time",total_time,"---")
     
 
-    if not tsformatted:
+    jsonfile = f'{input_file}.json'
+    if os.path.exists(jsonfile):
+        with open(jsonfile,'r') as f:
+            tsformatted=json.load(f)['tsformatted']
+    else:
         stream = streams[stream_name]
         clips = stream["introclips"]
         allow_first_short = stream["allow_first_short"]
@@ -243,12 +244,25 @@ def scrape(input_file,stream_name):
                                                            method=DEFAULT_METHOD,
                                                            correlation_threshold = correlation_threshold_news_report,
                                                            )
+        
+        program_intro_peak_times=[]
+        program_intro_peak_times_debug=[]
+        for c in clips:
+            intros=all_clip_peak_times[f'./audio_clips/{c}']
+            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
+            program_intro_peak_times.extend(intros)
+            intros_debug = sorted(intros)
+            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
+
+        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
+
+
         news_report_peak_times = all_clip_peak_times[news_report_clip_path]
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
         exclude_ts = news_report_black_list_ts.get(audio_name,None)
         if exclude_ts:
             news_report_peak_times_filtered = []
-            for second in preprocess_ts(news_report_peak_times,remove_repeats=True):
+            for second in preprocess_ts(news_report_peak_times,remove_repeats=True,max_repeat_seconds=BEEP_PATTERN_REPEAT_SECONDS):
                 #print(second)
                 if math.floor(second) not in exclude_ts:
                     news_report_peak_times_filtered.append(second)
@@ -262,21 +276,6 @@ def scrape(input_file,stream_name):
         #    logger.info(
         #        f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
 
-        program_intro_peak_times=[]
-        program_intro_peak_times_debug=[]
-        for c in clips:
-            intros=all_clip_peak_times[f'./audio_clips/{c}']
-            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
-            program_intro_peak_times.extend(intros)
-            intros_debug = sorted(intros)
-            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
-        #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
-        #logger.debug(program_intro_peak_times)
-        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
-
-        #for offset in program_intro_peak_times:
-        #    logger.info(f"Clip program_intro_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=True)}" )
-
         #with open(f'{input_file}.separated.json','w') as f:
         #    f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
         save_debug_info_to_db(show_name,date_str,{"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug})
@@ -284,19 +283,19 @@ def scrape(input_file,stream_name):
         pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
         #print("pair before rehydration",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
+        duration = [seconds_to_time(t[1]-t[0]) for t in pair]
+        gaps=[]
+        for i in range(1,len(pair)):
+            gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
+        with open(jsonfile,'w') as f:
+            #print("jsonfile",jsonfile)
+            content = json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4)
+            #print(content)
+            f.write(content)
 
-    else:
-        pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
-        #print("pair after rehydration",pair)
-    #logger.debug("tsformatted",tsformatted)
-    duration = [seconds_to_time(t[1]-t[0]) for t in pair]
-    gaps=[]
-    for i in range(1,len(pair)):
-        gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
-    with open(jsonfile,'w') as f:
-        f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
-
-    upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=False)
+    pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
+    
+    upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
     
     #save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
