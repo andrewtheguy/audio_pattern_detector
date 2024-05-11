@@ -109,7 +109,8 @@ if __name__ == '__main__':
                 print(f"Downloading {entry['url']} to {filename}")
                 download_file_with_curl(entry['url'], filename)
                 print(f"Downloaded {entry['url']}")
-                conn.execute("INSERT OR IGNORE INTO podcast_tracker_v1 (guid,done) VALUES (?, ?)", (guid, True));    
+                conn.execute("INSERT OR IGNORE INTO podcast_tracker_v1 (guid,done) VALUES (?, ?)", (guid, True));  
+                conn.commit()
                 #print(record)
             #print(f"Downloading {entry['url']} to {filename}")
             #download_file_with_curl(entry['url'], filename)
