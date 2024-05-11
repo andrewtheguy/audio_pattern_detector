@@ -41,27 +41,27 @@ def parse_feed(rss_feed):
         guid=entry.guid
         for char in onedrive_disallowed_chars:
             title = title.replace(char, '_')
-        #print(title)
-        #continue
-        # Different feeds might use different keys for the audio URL.
-        # Here are some common ones:
+        found_one = None
         if 'enclosures' in entry:
             for enclosure in entry.enclosures:
                 type = enclosure.type
                 url = enclosure.url
                 if type.startswith('audio/'):
                     #print(enclosure.url)
-                    episode_urls.append({'filename':f'{title}.{get_extension(type)}','url':url,'guid':guid})
+                    found_one = {'filename':f'{title}.{get_extension(type)}','url':url,'guid':guid}
                     break
-        elif 'links' in entry:
-            for link in entry.links:
-                type = link.type
-                url = link.href
-                if link.rel == 'enclosure' and type.startswith('audio/'):
-                    #print(link.href)
-                    episode_urls.append({'filename':f'{title}.{get_extension(type)}','url':url,'guid':guid})
-                    break
-
+        # elif 'links' in entry:
+        #     for link in entry.links:
+        #         type = link.type
+        #         url = link.href
+        #         if link.rel == 'enclosure' and type.startswith('audio/'):
+        #             #print(link.href)
+        #             episode_urls.append({'filename':f'{title}.{get_extension(type)}','url':url,'guid':guid})
+        #             break
+        if found_one:
+            episode_urls.append(found_one)
+        else:
+            raise RuntimeError(f"Could not find an audio file in the entry: {entry}")
     return episode_urls
 
 if __name__ == '__main__':
@@ -104,8 +104,5 @@ if __name__ == '__main__':
                 print(f"Downloaded {entry['url']}")
                 conn.execute("INSERT OR IGNORE INTO podcast_tracker_v1 (guid,done) VALUES (?, ?)", (guid, True));  
                 conn.commit()
-                #print(record)
-            #print(f"Downloading {entry['url']} to {filename}")
-            #download_file_with_curl(entry['url'], filename)
-            #print(f"Downloaded {entry['url']}")
+   
 
