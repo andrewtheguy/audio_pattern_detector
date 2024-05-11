@@ -10,7 +10,7 @@ onedrive_disallowed_chars = ['"', '*', ':', '<', '>', '?', '/', '\\', '|']
 def download_file_with_curl(url, filename):
 
     # Construct the curl command
-    curl_command = ["curl", "-o", filename, url]
+    curl_command = ["curl", "-f", "-o", filename, url]
 
     # Run the command and capture the output
     process = subprocess.run(
