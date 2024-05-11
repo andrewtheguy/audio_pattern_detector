@@ -135,8 +135,7 @@ def scrape_single_intro(input_file,stream_name):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         filename_trimmed=os.path.basename(output_file_trimmed)
-        dirname,date_str = extract_prefix(filename_trimmed)
-        dirname = '' if dirname is None else dirname
+        dirname=stream_name
         splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
         concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="am1430")
         upload_path_trimmed = f"/am1430/trimmed/{dirname}/{filename_trimmed}"
