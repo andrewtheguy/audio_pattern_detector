@@ -39,6 +39,12 @@ streams={
         "ends_with_intro": False,
         "expected_num_segments": 4,
     },
+    "日落大道": {
+        "introclips": ["am1430/日落大道intro.wav"],
+        #"endingclips": ["am1430/opinion_only.wav"],
+        "ends_with_intro": False,
+        "expected_num_segments": 4,
+    },
 }
 
 correlation_threshold_intro = 0.3

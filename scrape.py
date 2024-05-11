@@ -56,7 +56,7 @@ streams={
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
+        "introclips": ["rthk2theme.wav","rthk2theme_new.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},

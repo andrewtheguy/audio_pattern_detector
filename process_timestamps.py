@@ -254,7 +254,7 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
         raise TimeSequenceError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
     
     return news_reports
-                 
+
 def build_time_sequence(start_times,end_times):
     if not is_unique_and_sorted(start_times):
         raise ValueError("start_times is not unique or sorted")
@@ -269,6 +269,28 @@ def build_time_sequence(start_times,end_times):
     for i in range(len(start_times)):
         result.append([start_times[i],end_times[i]])
     return remove_start_equals_to_end(result)
+
+# to be called before build_time_sequence where all starts and ends are included
+def absorb_fake_news_report(intros,new_reports):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("start_times is not unique or sorted")
+    if not is_unique_and_sorted(new_reports):
+        raise ValueError("end_times is not unique or sorted")
+    
+    #new_reports = new_reports.copy()
+    if(len(intros) >= len(new_reports)):
+        return new_reports.copy()
+    
+    exclude_list=[]
+
+    for i,intro in enumerate(intros):
+        if(new_reports[i] - intro > 0 and new_reports[i] - intro < 10*60): # exclude less than 10
+            if(new_reports[i+1]-intro < 26*60): # don't exclude if excluding it will make it longer than 26 minutes
+                # still won't work if there is legit long sequence or a real one was cut off but the fake one happens early
+                exclude_list.append(i)
+
+    return [news_report for i, news_report in enumerate(new_reports) if i not in exclude_list]            
+    
                  
 def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
     result=[]
@@ -313,6 +335,8 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     # process beginning and end
     news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
+    # absorb fake news report before building time sequence
+    news_reports = absorb_fake_news_report(intros,news_reports)
     time_sequences=build_time_sequence(start_times=intros,end_times=news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
 
@@ -351,7 +375,7 @@ def process_timestamps_single_intro(intros,ending,expected_num_segments,ends_wit
 
     #print(end_times)   
 
-    end_times.append(ending)    
+    end_times.append(ending)
 
     time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
 
