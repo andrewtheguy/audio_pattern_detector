@@ -144,12 +144,12 @@ title={title}\n"""
     for i in range(len(input_files)):
         duration = input_files[i]["end_time"]-input_files[i]["start_time"]
         #print(f"start_time {start_time}")
-        #print(f"duration {duration}")
+        print(f"duration {duration}")
         end_time=round(start_time+duration*1000)
         end_time = round(total_time*1000) if end_time > total_time*1000 else end_time
-        #print(f"end_time {end_time}")
+        print(f"end_time {end_time}")
         path1=seconds_to_time(seconds=input_files[i]["start_time"],include_decimals=False).replace(':','_')
-        path2=seconds_to_time(seconds=end_time/1000,include_decimals=False).replace(':','_')
+        path2=seconds_to_time(seconds=input_files[i]["end_time"],include_decimals=False).replace(':','_')
         title=f"{path1}-{path2}"
         text += f""";FFMETADATA1
 [CHAPTER]
