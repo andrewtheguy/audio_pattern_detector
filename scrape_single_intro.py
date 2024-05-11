@@ -137,7 +137,7 @@ def scrape_single_intro(input_file,stream_name):
         filename_trimmed=os.path.basename(output_file_trimmed)
         dirname=stream_name
         splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
-        concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="am1430")
+        concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="am1430",total_time=total_time)
         upload_path_trimmed = f"/am1430/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         

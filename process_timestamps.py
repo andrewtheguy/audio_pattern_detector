@@ -20,7 +20,7 @@ def timestamp_sanity_check(result,total_time):
 
     if(len(result) == 0):
         raise ValueError("result cannot be empty")
-    
+
     for i,r in enumerate(result):
         if(len(r) != 2):
             raise ValueError(f"each element in result must have 2 elements, got {r}")
@@ -51,6 +51,10 @@ def timestamp_sanity_check(result,total_time):
         if(gap < 0):
             raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
    
+    
+    if(result[-1][1] > total_time):
+        raise TimeSequenceError(f"no longer allow end time {result[-1][1]} greater than total time {total_time}")
+
     return result
 
 def timestamp_sanity_check_rthk(result,total_time,allow_first_short=False):

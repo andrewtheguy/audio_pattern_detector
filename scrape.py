@@ -119,7 +119,7 @@ def split_audio(input_file, output_file, start_time, end_time,total_time,artist,
             .output(output_file,acodec='copy',vcodec='copy', loglevel="error", **metadata_dict).overwrite_output().run()
     )
 
-def concatenate_audio(input_files, output_file,tmpdir,channel_name):
+def concatenate_audio(input_files, output_file,tmpdir,channel_name, total_time):
     list_file = os.path.join(tmpdir, 'list.txt')
     with open(list_file,'w') as f:                                            
         for item in input_files:
@@ -141,15 +141,15 @@ artist={artist}
 album={album}
 title={title}\n"""
     start_time = 0
-    chapter = ""
     for i in range(len(input_files)):
         duration = input_files[i]["end_time"]-input_files[i]["start_time"]
         #print(f"start_time {start_time}")
         #print(f"duration {duration}")
         end_time=round(start_time+duration*1000)
+        end_time = round(total_time*1000) if end_time > total_time*1000 else end_time
         #print(f"end_time {end_time}")
         path1=seconds_to_time(seconds=input_files[i]["start_time"],include_decimals=False).replace(':','_')
-        path2=seconds_to_time(seconds=input_files[i]["end_time"],include_decimals=False).replace(':','_')
+        path2=seconds_to_time(seconds=end_time/1000,include_decimals=False).replace(':','_')
         title=f"{path1}-{path2}"
         text += f""";FFMETADATA1
 [CHAPTER]
@@ -313,7 +313,7 @@ def scrape(input_file,stream_name):
         dirname,date_str = extract_prefix(filename_trimmed)
         dirname = '' if dirname is None else dirname
         splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
-        concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="rthk")
+        concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="rthk",total_time=total_time)
         upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         if save_segments:
