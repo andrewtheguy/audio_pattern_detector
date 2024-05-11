@@ -1,80 +1,79 @@
-""" # begin new fake news absorption logic      
-    def test_absorb_one_short_fake_news(self):
-        result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(50)],
-                                     intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
+import unittest
+import numpy as np
+
+from process_timestamps import INTRO_CUT_OFF, absorb_fake_news_report, build_time_sequence
+from time_sequence_error import TimeSequenceError
+from utils import minutes_to_seconds
+
+class TestAbsorbFakeNews(unittest.TestCase):
+
+    def do_test(self,intros,news_reports):
+        return absorb_fake_news_report(intros,news_reports)
+    
+    def test_no_absorb_more_intros_than_news(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(6),minutes_to_seconds(30),minutes_to_seconds(90)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(50)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
                                      )
-        np.testing.assert_array_equal(result,[
-                                       [minutes_to_seconds(5),minutes_to_seconds(25)],
-                                       [minutes_to_seconds(30),minutes_to_seconds(50)],
-                                       [minutes_to_seconds(60),self.total_time_1],
-                                       ])
-        
-    def test_absorb_beeps_followed_by_one_short_fake_news(self):
-        result = self.process(news_report=[minutes_to_seconds(25),
-                                           minutes_to_seconds(25)+1,minutes_to_seconds(25)+2,minutes_to_seconds(25)+3,
-                                           minutes_to_seconds(25)+4,minutes_to_seconds(35),
-                                           minutes_to_seconds(50)],
-                                     intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
+        np.testing.assert_array_equal(result,
+                                       news_reports,
+                                       ) 
+
+    def test_no_absorb_same_length(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(90)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(50)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
                                      )
-        np.testing.assert_array_equal(result,[
-                                       [minutes_to_seconds(5),minutes_to_seconds(25)],
-                                       [minutes_to_seconds(30),minutes_to_seconds(50)],
-                                       [minutes_to_seconds(60),self.total_time_1],
-                                       ])
+        np.testing.assert_array_equal(result,
+                                       news_reports,
+                                       )
         
-    def test_not_absorb_more_than_short_fake_news(self):        
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(36),minutes_to_seconds(50)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                        )
-            np.testing.assert_array_equal(result,[
-                                        [minutes_to_seconds(5),minutes_to_seconds(25)],
-                                        [minutes_to_seconds(30),minutes_to_seconds(50)],
-                                        [minutes_to_seconds(60),self.total_time_1],
-                                        ])
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
+    def test_no_absorb_in_between(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),                        minutes_to_seconds(65)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(60),minutes_to_seconds(90)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
+                                     )
+        np.testing.assert_array_equal(result,
+                                       news_reports,
+                                       )
         
-    def test_not_absorb_short_fake_news_greater_than_next_intro(self):
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),minutes_to_seconds(55)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-    def test_not_absorb_short_fake_news_not_followed_by_intro(self):
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),minutes_to_seconds(55)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),self.total_time_1],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
+    def test_absorb_one(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65),minutes_to_seconds(85)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
+                                     )
+        np.testing.assert_array_equal(result,
+                                       [minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(85)],
+                                       )
         
+    def test_not_absorb_if_results_to_long_duration(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65),minutes_to_seconds(100)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
+                                     )
+        np.testing.assert_array_equal(result,news_reports)
+        
+    def test_absorb_only_one(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65),minutes_to_seconds(66),minutes_to_seconds(85)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
+                                     )
+        np.testing.assert_array_equal(result,
+                                       [minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(66),minutes_to_seconds(85)],
+                                       )
 
-        with self.assertRaises(NotImplementedError) as cm:
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(50),self.total_time_1-20],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
-
-    def test_not_absorb_short_fake_news_at_end(self):
-        with self.assertRaises(NotImplementedError) as cm:    
-            result = self.process(news_report=[minutes_to_seconds(25),minutes_to_seconds(35),minutes_to_seconds(36),minutes_to_seconds(50),
-                                            minutes_to_seconds(80)],
-                                        intro=[minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)],
-                                        )
-        the_exception = cm.exception
-        self.assertIn("not handling news report not followed by intro yet unless news report is 10 seconds",str(the_exception))
- """
+    def test_not_absorb_negative(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(56),minutes_to_seconds(85)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
+                                     )
+        np.testing.assert_array_equal(result,
+                                       news_reports,
+                                       )
