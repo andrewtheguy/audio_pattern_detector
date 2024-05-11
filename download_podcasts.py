@@ -8,13 +8,7 @@ import feedparser
 onedrive_disallowed_chars = ['"', '*', ':', '<', '>', '?', '/', '\\', '|']
 
 def download_file_with_curl(url, filename):
-  """Downloads a file using the curl command.
 
-  Args:
-    url: The URL of the file to download.
-    filename: The local filename to save the file as.
-  """
-  try:
     # Construct the curl command
     curl_command = ["curl", "-o", filename, url]
 
@@ -29,8 +23,7 @@ def download_file_with_curl(url, filename):
       raise RuntimeError(f"Curl command failed: {error_message}")
 
     print(f"File '{filename}' downloaded successfully using curl.")
-  except (subprocess.CalledProcessError, RuntimeError) as e:
-    print(f"Error downloading file: {e}")
+
 
 def get_extension(type):
     if type in ['audio/mpeg', 'audio/mp3']:
