@@ -28,6 +28,13 @@ class TestTimestampSanityCheck(unittest.TestCase):
         except Exception as e:  
             self.fail(f"myFunc() raised {type(e)}: {e} unexpectedly!")
 
+    def test_no_news_overflow(self):
+        with self.assertRaises(TimeSequenceError) as cm:
+            result = self.check([[1,minutes_to_seconds(18)],[minutes_to_seconds(19),self.total_time_1+10]])
+        the_exception = cm.exception
+        self.assertIn("greater than total time",str(the_exception))
+
+
     # need to strip start=end first if needed before checking
     def test_not_allow_start_same_as_end(self):
         with self.assertRaises(ValueError) as cm:
