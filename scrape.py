@@ -76,8 +76,8 @@ news_report_clip='rthk_beep2.wav'
 
 # no need because it is absorbing now
 news_report_black_list_ts = {
-    "morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
-    "morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
+    #"morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
+    #"morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
     #"KnowledgeCo20240427":[4157], # false positive 01:09:17
 }
 
