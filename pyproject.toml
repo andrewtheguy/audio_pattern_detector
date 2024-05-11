@@ -25,6 +25,7 @@ andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch
 setuptools = "^69.5.1"
 dtw-python = "^1.4.2"
 pymongo = {extras = ["srv"], version = "^4.7.1"}
+feedparser = "^6.0.11"
 
 [build-system]
 requires = ["poetry-core"]
