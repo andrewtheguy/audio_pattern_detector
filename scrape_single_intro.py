@@ -39,17 +39,18 @@ streams={
         "ends_with_intro": False,
         "expected_num_segments": 4,
     },
-    "日落大道": {
-        "introclips": ["am1430/日落大道intro.wav"],
-        #"endingclips": ["am1430/opinion_only.wav"],
+    "日落大道": { # for recorded one
+        "introclips": ["am1430/日落大道smallinterlude.wav","am1430/日落大道interlude.wav"],
+        #"endingclips": ["am1430/thankyouwatchingsunset.wav"],
+        "endingclips": [],
         "ends_with_intro": False,
-        "expected_num_segments": 4,
+        "expected_num_segments": 5,
     },
 }
 
 correlation_threshold_intro = 0.3
 
-def scrape_single_intro(input_file,stream_name,date_str):
+def scrape_single_intro(input_file,stream_name):
     print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
@@ -90,7 +91,7 @@ def scrape_single_intro(input_file,stream_name,date_str):
   
         if not ends_with_intro:
             ending_clips = stream["endingclips"]
-            # find earliest ending
+            # find earliest ending or fallback to total_time
             ending = total_time
             endings_array = []
             for c in ending_clips:
@@ -98,7 +99,8 @@ def scrape_single_intro(input_file,stream_name,date_str):
                 endings=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
                 #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
                 endings_array.extend(endings)
-            ending = max(endings_array)
+            if len(endings_array)>0:
+                ending = max(endings_array)
             print("ending",seconds_to_time(seconds=ending,include_decimals=True),"---")
         else:
             ending = None # will be calculated later
@@ -152,9 +154,12 @@ def command():
     args = parser.parse_args()
 
     input_file = args.audio_file
-    stream_name,date_str = extract_prefix(os.path.basename(input_file))
-    #stream_name = "漫談法律"
-    scrape_single_intro(input_file,stream_name=stream_name,date_str=date_str)
+    input_dir = os.path.dirname(input_file)
+    #stream_name,date_str = extract_prefix(os.path.basename(input_file))
+
+    stream_name = os.path.basename(input_dir)
+    #print(stream_name)
+    scrape_single_intro(input_file,stream_name=stream_name)
 
 
 
