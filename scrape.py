@@ -78,7 +78,7 @@ news_report_clip='rthk_beep2.wav'
 news_report_blacklist_ts = {
     #"morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
     #"morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
-    "KnowledgeCo20240511":[6176], # false positive 01:42:56
+    "KnowledgeCo20240511":[6176], # missing intro after 01:42:56
 }
 
 def url_ok(url):
