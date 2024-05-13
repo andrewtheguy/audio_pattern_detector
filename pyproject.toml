@@ -7,6 +7,7 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
+apscheduler = "^3.10.4"
 python = "^3.12"
 librosa = "*"
 numpy = "*"
@@ -23,7 +24,6 @@ python-dotenv = "^1.0.1"
 upload_utils= { git = "https://github.com/andrewtheguy/upload_utils.git", branch = "main" }
 andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
 setuptools = "^69.5.1"
-dtw-python = "^1.4.2"
 pymongo = {extras = ["srv"], version = "^4.7.1"}
 feedparser = "^6.0.11"
 
