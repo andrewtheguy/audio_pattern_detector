@@ -345,6 +345,7 @@ def download_and_scrape(download_only=False):
     for key, stream in streams.items():
         error_occurred_scraping = False
         podcasts_publish=[] # should only be one per stream
+        original_dir = os.path.abspath(f"./tmp/original/{key}")
         for days_ago in range(days_to_keep):
             date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
             date_str=date.strftime("%Y%m%d")
@@ -364,7 +365,6 @@ def download_and_scrape(download_only=False):
                 logger.warning(f"skipping {key} because url {url} is not ok")
                 print(f"skipping {key} because url {url} is not ok")
                 continue
-            original_dir = os.path.abspath(f"./tmp/original/{key}")
             dest_file = os.path.join(original_dir,f"{key}{date_str}.m4a")
             os.makedirs(original_dir, exist_ok=True)
             try:
