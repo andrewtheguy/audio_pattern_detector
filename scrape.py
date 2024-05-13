@@ -259,7 +259,7 @@ def scrape(input_file,stream_name):
 
         news_report_peak_times = all_clip_peak_times[news_report_clip_path]
         audio_name,_ = os.path.splitext(os.path.basename(input_file))
-        exclude_ts = news_report_black_list_ts.get(audio_name,None)
+        exclude_ts = news_report_blacklist_ts.get(audio_name,None)
         if exclude_ts:
             news_report_peak_times_filtered = []
             for second in preprocess_ts(news_report_peak_times,remove_repeats=True,max_repeat_seconds=BEEP_PATTERN_REPEAT_SECONDS):
