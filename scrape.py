@@ -25,7 +25,7 @@ import pytz
 import requests
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
-from database import find_episode_segments_in_db, save_debug_info_to_db, save_timestamps_to_db
+#from database import save_debug_info_to_db
 from process_timestamps import BEEP_PATTERN_REPEAT_SECONDS, preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from time_sequence_error import TimeSequenceError
@@ -278,7 +278,7 @@ def scrape(input_file,stream_name):
 
         #with open(f'{input_file}.separated.json','w') as f:
         #    f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
-        save_debug_info_to_db(show_name,date_str,{"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug})
+        #save_debug_info_to_db(show_name,date_str,{"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug})
 
         pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
         #print("pair before rehydration",pair)

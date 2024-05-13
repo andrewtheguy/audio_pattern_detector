@@ -68,39 +68,44 @@ def scrape_single_intro(input_file,stream_name):
     #exit(1)
     if not tsformatted:
         stream = streams[stream_name]
-        clips = stream["introclips"]
-
-        audio_name,_ = os.path.splitext(os.path.basename(input_file))
-
-        program_intro_peak_times=[]
-        program_intro_peak_times_debug=[]
-        clip_paths=[f'./audio_clips/{c}' for c in clips]
-        intros_all=find_clip_in_audio_in_chunks(clip_paths, input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
-        for c in clips:
-            clip_path=f'./audio_clips/{c}'
-            intros=intros_all[clip_path]
-            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
-            program_intro_peak_times.extend(intros)
-            intros_debug = sorted(intros)
-            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
-        #program_intro_peak_times = cleanup_peak_times(program_intro_peak_times)
-        #logger.debug(program_intro_peak_times)
-        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
+        intro_clips = stream["introclips"]
+        ending_clips = []
 
         ends_with_intro = stream["ends_with_intro"]
+
+        if not ends_with_intro:
+            ending_clips=stream["endingclips"]
+
+
+        clip_paths=[f'./audio_clips/{c}' for c in intro_clips+ending_clips]
+
+
+        #audio_name,_ = os.path.splitext(os.path.basename(input_file))
+
+        program_intro_peak_times=[]
+        #program_intro_peak_times_debug=[]
+
+        peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
+        for c in intro_clips:
+            clip_path=f'./audio_clips/{c}'
+            intros=peaks_all[clip_path]
+            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
+            program_intro_peak_times.extend(intros)
+        print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
+
   
         if not ends_with_intro:
-            ending_clips = stream["endingclips"]
             # find earliest ending or fallback to total_time
             ending = total_time
             endings_array = []
             for c in ending_clips:
-                #print(f"Finding {c}")
-                endings=find_clip_in_audio_in_chunks(f'./audio_clips/{c}', input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
+                clip_path=f'./audio_clips/{c}'
+                endings=peaks_all[clip_path]
                 #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
                 endings_array.extend(endings)
+            print("all endings",[seconds_to_time(seconds=t,include_decimals=True) for t in endings_array],"---")
             if len(endings_array)>0:
-                ending = max(endings_array)
+                ending = max(endings_array)     
             print("ending",seconds_to_time(seconds=ending,include_decimals=True),"---")
         else:
             ending = None # will be calculated later
