@@ -39,6 +39,12 @@ streams={
         "ends_with_intro": False,
         "expected_num_segments": 4,
     },
+    "置業興家": {
+        "introclips": ["am1430/置業興家intro.wav"],
+        "endingclips": ["am1430/opinion_only.wav"],
+        "ends_with_intro": False,
+        "expected_num_segments": 1,
+    },
     "日落大道": { # for recorded one
         "introclips": ["am1430/日落大道smallinterlude.wav","am1430/日落大道interlude.wav"],
         #"endingclips": ["am1430/thankyouwatchingsunset.wav"],
