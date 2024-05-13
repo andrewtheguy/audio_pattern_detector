@@ -38,4 +38,4 @@ COPY . /usr/src/app
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD python schedule.py
+CMD ["python", "-u", "schedule.py"]
