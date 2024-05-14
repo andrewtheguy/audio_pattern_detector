@@ -50,7 +50,7 @@ streams={
         #"endingclips": ["am1430/thankyouwatchingsunset.wav"],
         "endingclips": [],
         "ends_with_intro": False,
-        "expected_num_segments": 5,
+        #"expected_num_segments": 5,
     },
 }
 
@@ -116,7 +116,7 @@ def scrape_single_intro(input_file,stream_name):
         else:
             ending = None # will be calculated later
 
-        expected_num_segments = stream["expected_num_segments"]
+        expected_num_segments = stream.get("expected_num_segments")
 
         pair = process_timestamps_single_intro(program_intro_peak_times,ending,ends_with_intro=ends_with_intro,expected_num_segments=expected_num_segments)
         #print("pair before rehydration",pair)
