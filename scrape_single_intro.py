@@ -45,6 +45,16 @@ streams={
         "ends_with_intro": False,
         "expected_num_segments": 1,
     },
+    "日落大道": {
+        "introclips": ["am1430/日落大道smallinterlude.wav","am1430/日落大道interlude.wav"],
+        "endingclips": ["am1430/thankyouwatchingsunset.wav"],
+        #"endingclips": [],
+        "ends_with_intro": False,
+        #"expected_num_segments": 5,
+    },
+}
+
+recorded_streams={
     "日落大道": { # for recorded one
         "introclips": ["am1430/日落大道smallinterlude.wav","am1430/日落大道interlude.wav"],
         #"endingclips": ["am1430/thankyouwatchingsunset.wav"],
@@ -56,7 +66,7 @@ streams={
 
 correlation_threshold_intro = 0.3
 
-def scrape_single_intro(input_file,stream_name):
+def scrape_single_intro(input_file,stream_name,recorded):
     print(input_file)
     #exit(1)
     basename,extension = os.path.splitext(os.path.basename(input_file))
@@ -73,7 +83,8 @@ def scrape_single_intro(input_file,stream_name):
     logger.debug("total_time",total_time,"---")
     #exit(1)
     if not tsformatted:
-        stream = streams[stream_name]
+        target_streams = streams if not recorded else recorded_streams
+        stream = target_streams[stream_name]
         intro_clips = stream["introclips"]
         ending_clips = []
 
@@ -166,10 +177,11 @@ def command():
     input_file = args.audio_file
     input_dir = os.path.dirname(input_file)
     #stream_name,date_str = extract_prefix(os.path.basename(input_file))
+    recorded = "recorded" in input_dir
 
     stream_name = os.path.basename(input_dir)
     #print(stream_name)
-    scrape_single_intro(input_file,stream_name=stream_name)
+    scrape_single_intro(input_file,stream_name=stream_name,recorded=recorded)
 
 
 
