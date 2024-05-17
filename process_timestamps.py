@@ -281,7 +281,7 @@ def absorb_fake_news_report(intros,new_reports):
     if not is_unique_and_sorted(new_reports):
         raise ValueError("end_times is not unique or sorted")
     
-    #new_reports = new_reports.copy()
+    # don't try
     if(len(intros) >= len(new_reports)):
         return new_reports.copy()
     
@@ -289,9 +289,14 @@ def absorb_fake_news_report(intros,new_reports):
 
     for i,intro in enumerate(intros):
         if(new_reports[i] - intro > 0 and new_reports[i] - intro < 10*60): # exclude less than 10
+            excluded_one = False
             if(new_reports[i+1]-intro < 26*60): # don't exclude if excluding it will make it longer than 26 minutes
                 # still won't work if there is legit long sequence or a real one was cut off but the fake one happens early
                 exclude_list.append(i)
+                excluded_one = True
+            #if excluded_one and new_reports[i+1] - new_reports[i] < 60:
+            #    # exclude one more close by
+            #    exclude_list.append(i+1)
 
     return [news_report for i, news_report in enumerate(new_reports) if i not in exclude_list]            
     
