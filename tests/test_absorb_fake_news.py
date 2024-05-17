@@ -67,6 +67,36 @@ class TestAbsorbFakeNews(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                        [minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(66),minutes_to_seconds(85)],
                                        )
+        
+    def test_absorb_only_one_second_close_by(self):
+        intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+        news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65),minutes_to_seconds(65)+2,minutes_to_seconds(85)]
+        result = self.do_test(news_reports=news_reports,
+                                     intros=intros,
+                                     )
+        np.testing.assert_array_equal(result,
+                                       [minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65)+2,minutes_to_seconds(85)],
+                                       )
+
+    # def test_absorb_two_when_second_one_close_by(self):
+    #     intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+    #     news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65),minutes_to_seconds(65)+2,minutes_to_seconds(85)]
+    #     result = self.do_test(news_reports=news_reports,
+    #                                  intros=intros,
+    #                                  )
+    #     np.testing.assert_array_equal(result,
+    #                                    [minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(85)],
+    #                                    )
+
+    # def test_absorb_only_two_when_second_one_close_by(self):
+    #     intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
+    #     news_reports=[minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(65),minutes_to_seconds(65)+2,minutes_to_seconds(66),minutes_to_seconds(85)]
+    #     result = self.do_test(news_reports=news_reports,
+    #                                  intros=intros,
+    #                                  )
+    #     np.testing.assert_array_equal(result,
+    #                                    [minutes_to_seconds(25),minutes_to_seconds(55),minutes_to_seconds(66),minutes_to_seconds(85)],
+    #                                    )
 
     def test_not_absorb_negative(self):
         intros=      [minutes_to_seconds(5),minutes_to_seconds(30),minutes_to_seconds(60)]
