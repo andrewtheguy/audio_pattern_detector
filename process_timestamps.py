@@ -27,9 +27,9 @@ def timestamp_sanity_check(result,total_time):
         if(len(r) != 2):
             raise ValueError(f"each element in result must have 2 elements, got {r}")
 
-        beginning = i == 0
-        # allow end to be larger than total time for now
-        end = i == len(result)-1
+        #beginning = i == 0
+        # not allow end to be larger than total time for now
+        #end = i == len(result)-1
 
         cur_start_time = r[0]
         cur_end_time = r[1]
