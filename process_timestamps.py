@@ -10,8 +10,10 @@ from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
 
-# allow 7 seconds of beeps to repeat
-BEEP_PATTERN_REPEAT_SECONDS = 7
+# allow 1 minutes of beeps to repeat
+# used to be 7 seconds but sometimes it gets false positive from
+# traffic news intro happening within a minute 
+BEEP_PATTERN_REPEAT_SECONDS = 60
 # allow one intro and news report within 10 minutes
 # but not intro past 10 minutes
 INTRO_CUT_OFF=10*60
@@ -288,12 +290,12 @@ def absorb_fake_news_report(intros,new_reports):
     exclude_list=[]
 
     for i,intro in enumerate(intros):
-        if(new_reports[i] - intro > 0 and new_reports[i] - intro < 10*60): # exclude less than 10
-            excluded_one = False
+        if(new_reports[i] - intro > 0 and new_reports[i] - intro < 10*60): # only consider less than 10 minutes
+            #excluded_one = False
             if(new_reports[i+1]-intro < 26*60): # don't exclude if excluding it will make it longer than 26 minutes
                 # still won't work if there is legit long sequence or a real one was cut off but the fake one happens early
                 exclude_list.append(i)
-                excluded_one = True
+                #excluded_one = True
             #if excluded_one and new_reports[i+1] - new_reports[i] < 60:
             #    # exclude one more close by
             #    exclude_list.append(i+1)
