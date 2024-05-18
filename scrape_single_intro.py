@@ -63,7 +63,7 @@ recorded_streams={
     },
 }
 
-correlation_threshold_intro = 0.3
+correlation_threshold_intro = 0.4
 
 def scrape_single_intro(input_file,stream_name,recorded):
     print(input_file)
