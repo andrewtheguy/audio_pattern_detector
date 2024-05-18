@@ -31,7 +31,7 @@ streams={
     "天空下的彩虹": {
         "introclips": ["am1430/天空下的彩虹intro.wav"],
         "ends_with_intro": True,
-        "expected_num_segments": 3,
+        #"expected_num_segments": 3,
     },
     "漫談法律": {
         "introclips": ["am1430/漫談法律intro.wav"],
