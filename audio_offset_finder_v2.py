@@ -28,6 +28,7 @@ from scipy.signal import resample
 from scipy.signal import find_peaks
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 logger = logging.getLogger(__name__)
 
 #ignore possible clipping
@@ -321,14 +322,8 @@ def cleanup_peak_times(peak_times):
 
 
 def convert_audio_arr_to_float(audio):
-    # Convert buffer to float32 using NumPy                                                                                 
-    audio_as_np_int16 = np.frombuffer(audio, dtype=np.int16)
-    audio_as_np_float32 = audio_as_np_int16.astype(np.float32)
-
-    # Normalise float32 array so that values are between -1.0 and +1.0                                                      
-    max_int16 = 2 ** 15
-    audio_normalised = audio_as_np_float32 / max_int16
-    return audio_normalised
+    #raise "chafa"
+    return librosa.util.buf_to_float(audio,n_bytes=2, dtype='float32')
 
 
 def convert_audio_to_clip_format(audio_path, output_path):
