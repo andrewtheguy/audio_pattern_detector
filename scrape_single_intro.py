@@ -18,7 +18,6 @@ from andrew_utils import seconds_to_time
 from file_upload.upload_utils2 import sftp_file_exists, upload_file
 from process_timestamps import process_timestamps_single_intro
 from scrape import concatenate_audio, get_sec, split_audio_by_time_sequences
-from utils import extract_prefix
 from upload_utils import sftp
 
 streams={
@@ -165,7 +164,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         
     return output_dir_trimmed,output_file_trimmed
 
-def command():
+if __name__ == '__main__':
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
 
@@ -182,17 +181,3 @@ def command():
     stream_name = os.path.basename(input_dir)
     #print(stream_name)
     scrape_single_intro(input_file,stream_name=stream_name,recorded=recorded)
-
-
-
-    
-if __name__ == '__main__':
-    #print(url_ok("https://rthkaod3-vh.akamaihd.net/i/m4a/radio/archive/radio1/happydaily/m4a/20240417.m4a/index_0_a.m3u8"))
-    
-    #upload_file("./tmp/out.pcm","/test5/5.pcm",skip_if_exists=True)
-    
-    #exit(1)
-    #pair=[]
-    #process(pair)
-    #print(pair)
-    command()
