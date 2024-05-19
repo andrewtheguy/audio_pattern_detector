@@ -34,9 +34,15 @@ streams={
     },
     "漫談法律": {
         "introclips": ["am1430/漫談法律intro.wav"],
-        "endingclips": ["am1430/opinion_only.wav"],
+        "endingclips": ["am1430/opinion_only2.wav"],
         "ends_with_intro": False,
         "expected_num_segments": 4,
+    },
+    "法律天地": {
+        "introclips": ["am1430/法律天地intro.wav"],
+        "endingclips": ["am1430/opinion_only2.wav"],
+        "ends_with_intro": False,
+        "expected_num_segments": 1,
     },
     "置業興家": {
         "introclips": ["am1430/置業興家intro.wav"],
