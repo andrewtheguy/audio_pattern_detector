@@ -112,7 +112,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             endings_array.extend(endings)
 
-        print("ending_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")    
+        print("ending_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(endings_array)],"---")    
     
         expected_num_segments = stream.get("expected_num_segments")
 
