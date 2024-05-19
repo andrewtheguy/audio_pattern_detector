@@ -16,7 +16,7 @@ from audio_offset_finder_v2 import DEFAULT_METHOD, find_clip_in_audio_in_chunks
 
 from andrew_utils import seconds_to_time
 from file_upload.upload_utils2 import sftp_file_exists, upload_file
-from process_timestamps import process_timestamps_single_intro
+from process_timestamps import process_timestamps_simple
 from scrape import concatenate_audio, get_sec, split_audio_by_time_sequences
 from upload_utils import sftp
 
@@ -46,7 +46,7 @@ streams={
     },
     "日落大道": {
         "introclips": ["am1430/日落大道smallinterlude.wav","am1430/日落大道interlude.wav"],
-        "endingclips": ["am1430/thankyouwatchingsunset.wav"],
+        "endingclips": ["am1430/programsponsoredby.wav","am1430/thankyouwatchingsunset.wav"],
         #"endingclips": [],
         "ends_with_intro": False,
         #"expected_num_segments": 5,
@@ -89,17 +89,13 @@ def scrape_single_intro(input_file,stream_name,recorded):
 
         ends_with_intro = stream["ends_with_intro"]
 
-        if not ends_with_intro:
-            ending_clips=stream["endingclips"]
+        ending_clips=stream.get("endingclips",[])
 
 
         clip_paths=[f'./audio_clips/{c}' for c in intro_clips+ending_clips]
 
-
-        #audio_name,_ = os.path.splitext(os.path.basename(input_file))
-
         program_intro_peak_times=[]
-        #program_intro_peak_times_debug=[]
+
 
         peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
         for c in intro_clips:
@@ -109,26 +105,21 @@ def scrape_single_intro(input_file,stream_name,recorded):
             program_intro_peak_times.extend(intros)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
-  
-        if not ends_with_intro:
-            # find earliest ending or fallback to total_time
-            ending = total_time
-            endings_array = []
-            for c in ending_clips:
-                clip_path=f'./audio_clips/{c}'
-                endings=peaks_all[clip_path]
-                #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
-                endings_array.extend(endings)
-            print("all endings",[seconds_to_time(seconds=t,include_decimals=True) for t in endings_array],"---")
-            if len(endings_array)>0:
-                ending = max(endings_array)     
-            print("ending",seconds_to_time(seconds=ending,include_decimals=True),"---")
-        else:
-            ending = None # will be calculated later
+        endings_array = []
+        for c in ending_clips:
+            clip_path=f'./audio_clips/{c}'
+            endings=peaks_all[clip_path]
+            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
+            endings_array.extend(endings)
 
+        print("ending_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")    
+    
         expected_num_segments = stream.get("expected_num_segments")
 
-        pair = process_timestamps_single_intro(program_intro_peak_times,ending,ends_with_intro=ends_with_intro,expected_num_segments=expected_num_segments)
+        pair = process_timestamps_simple(program_intro_peak_times,endings_array,ends_with_intro=ends_with_intro,total_time=total_time,
+                                         expected_num_segments=expected_num_segments,
+                                         intro_max_repeat_seconds=60,
+                                         )
         #print("pair before rehydration",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
 

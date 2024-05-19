@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 from process_timestamps import consolidate_intros
+from time_sequence_error import TimeSequenceError
 from utils import minutes_to_seconds
 
 class TestConsolidateIntros(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestConsolidateIntros(unittest.TestCase):
         self.assertIn("less than 0",str(the_exception))
         
     def test_intro_more_than_total(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=      [100,self.total_time_1+10],
                                 news_reports=[300])
         the_exception = cm.exception

@@ -49,3 +49,9 @@ if __name__ == '__main__':
   assert(is_unique_and_sorted(array2)==False)  # Output: False
   assert(is_unique_and_sorted(array3)==False)  # Output: False
   assert(is_unique_and_sorted(array4)==False)  # Output: False
+
+  def list_get(my_list, index, default):
+    try:
+        return my_list[index]
+    except IndexError:
+        return default

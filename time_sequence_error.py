@@ -1,2 +1,2 @@
-class TimeSequenceError(ValueError):
+class TimeSequenceError(RuntimeError):
     pass
