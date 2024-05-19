@@ -24,7 +24,7 @@ class TestProcessTimestampsWithPadding(unittest.TestCase):
         np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(9)])
         np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
           result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(12)])
           np.testing.assert_array_equal(result,[[0,self.total_time_1]])
         the_exception = cm.exception

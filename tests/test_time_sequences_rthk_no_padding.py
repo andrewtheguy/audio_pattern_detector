@@ -42,7 +42,7 @@ class TestProcessTimestamps(unittest.TestCase):
         result = self.process(news_report=[],intro=[minutes_to_seconds(5),minutes_to_seconds(20)])
         np.testing.assert_array_equal(result,[[minutes_to_seconds(5),self.total_time_1]])
         
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[],intro=[minutes_to_seconds(11),minutes_to_seconds(30)])
             np.testing.assert_array_equal(result,[[0,self.total_time_1]])
 
@@ -77,7 +77,7 @@ class TestProcessTimestamps(unittest.TestCase):
         the_exception = cm.exception
         self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             news_middle = self.total_time_1-minutes_to_seconds(40)
             news_end = self.total_time_1-5
             result = self.process(news_report=[news_middle,news_end],intro=[])
@@ -95,19 +95,19 @@ class TestProcessTimestamps(unittest.TestCase):
         np.testing.assert_array_equal(result,[[1,self.total_time_1]])
 
     def test_intro_overflow(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             intro = self.total_time_1+500
             news_end = self.total_time_1+1000
             result = self.process(news_report=[news_end],intro=[intro])
         the_exception = cm.exception
         self.assertIn("intro overflow, is greater than total time",str(the_exception))
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             result = self.process(news_report=[self.total_time_1+10],intro=[self.total_time_1+1500])
         the_exception = cm.exception
         self.assertIn("intro overflow, is greater than total time",str(the_exception))
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             result = self.process(news_report=[10,self.total_time_1+10],intro=[5,self.total_time_1+1500])
         the_exception = cm.exception
         self.assertIn("intro overflow, is greater than total time",str(the_exception))
@@ -166,11 +166,11 @@ class TestProcessTimestamps(unittest.TestCase):
 
     def test_news_report_ending_too_early(self):
         intro1 = minutes_to_seconds(9)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             self.process(news_report=[self.total_time_1-minutes_to_seconds(5)],intro=[intro1])
 
     def test_news_report_ending_too_early_no_intro(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             self.process(news_report=[self.total_time_1-minutes_to_seconds(5)],intro=[])
 
     @unittest.skip(reason="reasonable time sequence is always enforced now, which makes this setup always throw timesequenceerror having the beginning too short")
@@ -225,12 +225,12 @@ class TestProcessTimestamps(unittest.TestCase):
                                        ])
 
     def test_news_report_after_news_report(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             result = self.process(news_report=[minutes_to_seconds(22),minutes_to_seconds(32)]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(60)])
 
     def test_news_report_after_news_report_close_to_end(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             result = self.process(news_report=[minutes_to_seconds(22),minutes_to_seconds(62),self.total_time_1 - 9]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(32)])
             print(result)
@@ -263,19 +263,19 @@ class TestProcessTimestamps(unittest.TestCase):
                                        ])
 
     def test_middle_same(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TimeSequenceError):
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(11),]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(9),minutes_to_seconds(13)])
 
     @unittest.skip(reason="it is always deduplicated now")
     def test_duplicates(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(9),minutes_to_seconds(17),minutes_to_seconds(17)]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),
                                                 minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])
         the_exception = cm.exception
         self.assertIn("news report has duplicates",str(the_exception))
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[minutes_to_seconds(9),minutes_to_seconds(17)]
                                         ,intro=[minutes_to_seconds(2),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),minutes_to_seconds(11),
                                                 minutes_to_seconds(13),minutes_to_seconds(15),minutes_to_seconds(19)])

@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 from process_timestamps import INTRO_CUT_OFF, news_intro_process_beginning_and_end
+from time_sequence_error import TimeSequenceError
 from utils import minutes_to_seconds
 
 class TestProcessBeginningAndEndTs(unittest.TestCase):
@@ -18,7 +19,7 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
                                       [self.total_time_1])
         
     def test_news_reports_only_before_cut_off_too_many(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result_news_report = self.do_test(intros=[],
                               news_reports=[3,4])
         the_exception = cm.exception
@@ -43,13 +44,13 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
         
         
     def test_too_many_news(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=[3,120],
                                 news_reports=[4,5])
         the_exception = cm.exception
         self.assertIn("cannot have more than one news report within 10 minutes",str(the_exception))
         
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=[3,120],
                               news_reports=[4,25])
         the_exception = cm.exception
@@ -57,19 +58,19 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
         
       
     def test_intro_too_late(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=[INTRO_CUT_OFF+10],
                                 news_reports=[])
         the_exception = cm.exception
         self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
         
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=[INTRO_CUT_OFF+10],
                                 news_reports=[4])
         the_exception = cm.exception
         self.assertIn("first intro cannot be greater than 10 minutes",str(the_exception))
         
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=[INTRO_CUT_OFF+10,minutes_to_seconds(30)],
                                 news_reports=[INTRO_CUT_OFF+14,minutes_to_seconds(35)])
         the_exception = cm.exception
@@ -94,7 +95,7 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
         
         
     def test_news_ends_early(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TimeSequenceError) as cm:
             result_news_report = self.do_test(intros=[40,INTRO_CUT_OFF+50],
                                 news_reports=[INTRO_CUT_OFF+10,INTRO_CUT_OFF+200])
         the_exception = cm.exception

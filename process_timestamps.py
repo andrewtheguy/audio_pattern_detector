@@ -162,7 +162,7 @@ def consolidate_intros(intros,news_reports,total_time):
     
     for ts in intros:
         if ts > total_time:
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+            raise TimeSequenceError(f"intro overflow, is greater than total time {total_time}")
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
@@ -247,7 +247,7 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
         return [total_time]
     
     if(intros[-1] > total_time):
-        raise ValueError(f"intro overflow, is greater than total time {total_time}")
+        raise TimeSequenceError(f"intro overflow, is greater than total time {total_time}")
 
 
     end_cut_off_seconds = 10
@@ -337,7 +337,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 
     for ts in intros:
         if ts > total_time:
-            raise ValueError(f"intro overflow, is greater than total time {total_time}")
+            raise TimeSequenceError(f"intro overflow, is greater than total time {total_time}")
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
@@ -355,46 +355,127 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 
     return time_sequences
 
-# TODO: still need to write tests for this
-# this will limit the end to total_time unlike the rthk one, which allows end of time sequence to be greater than total time
-def process_timestamps_single_intro(intros,ending,expected_num_segments=None,ends_with_intro=False):
-    if not ends_with_intro and not ending:  
-        raise ValueError("ending is required if not ending with intro")
+def process_timestamps_simple(intros,endings,total_time,expected_num_segments=None,ends_with_intro=False,intro_max_repeat_seconds=None):
+    marker_intro=0
+    marker_ending=1
+    if intro_max_repeat_seconds:
+        intros = preprocess_ts(intros,remove_repeats=True,max_repeat_seconds=intro_max_repeat_seconds)
+    else:
+        intros = preprocess_ts(intros,remove_repeats=False)
+    endings = preprocess_ts(endings,remove_repeats=False)
     
-    if ends_with_intro and ending:  
-        raise ValueError("cannot provide ending if ending with intro")
-    
-    intros = preprocess_ts(intros,remove_repeats=True,max_repeat_seconds=60)
-    
+
+    #print("intros before",intros)
+    #print("endings before",endings)       
+
     if(ends_with_intro):
-        ending = None
         if(len(intros)<2):
-            raise ValueError("Not enough intros found for ends_with_intro")
-        ending = intros[-1]
-        intros = intros[:-1]
+            ends_with_intro = False
+            #raise ValueError("Not enough intros found for ends_with_intro")
+    if(ends_with_intro):    
+        intro_ending = intros[-1]
+        #print("len(endings)",len(endings))
+        #print("endings[-1]",endings[-1])
+        #print("intro_ending",intro_ending)
+        if len(endings) > 0 and endings[-1] > intro_ending:
+            ends_with_intro = False
+            #raise ValueError("ends_with_intro is set but ending is greater than last intro")
+        else:
+            endings.append(intro_ending)
+            intros = intros[:-1]
+
+   # print("ends_with_intro",ends_with_intro)
+
+    if not ends_with_intro:
+        if(len(endings)==0 or endings[-1] < total_time):   
+            endings.append(total_time)    
+
+    #print("intros before2",intros)
+    #print("endings before2",endings)        
+
+    if(len(endings)>0 and endings[-1] > total_time):
+        raise TimeSequenceError(f"ending overflow, is greater than total time {total_time}")
 
     for ts in intros:
-        if ts > ending:
-            raise ValueError(f"intro overflow, is greater than total time {ending}")
+        if ts > total_time:
+            raise TimeSequenceError(f"intro overflow, is greater than total time {total_time}")
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
+        
+    if(len(intros) == 0):
+        raise ValueError("intros cannot be empty")    
 
+    arr=[]
+    for intro in intros:
+        arr.append((intro,marker_intro))
+
+    for ending in endings:
+        arr.append((ending,marker_ending))    
+
+    arr.sort(key=lambda x: x[0])
+    arr = deque(arr)
+
+    start_times = []
     end_times = []
-    for i in range(1,len(intros)):
-        intro=intros[i]
-        end_times.append(intro)
+    
+    #print("arr before",arr)
 
-    #print(end_times)   
+    prev_marker = None
+    # pop all endings before the first intro
+    while len(arr) > 0:
+        item = arr[0]
+        if item[1] == marker_intro:
+            prev_marker = marker_intro
+            start_times.append(item[0])
+            arr.popleft()
+            break
+        else:
+            prev_marker = marker_ending
+            arr.popleft()
+    
+    #print(arr)
+    #print(start_times)
+    #print(end_times)
 
-    end_times.append(ending)
+    while len(arr) > 0:
+        item = arr.popleft()
+        cur_marker = item[1]
+        if prev_marker is None:
+            raise ValueError("prev_marker should not be None")
+        intro_followed_by_intro = prev_marker == marker_intro and cur_marker == marker_intro
+        intro_followed_by_ending = prev_marker == marker_intro and cur_marker == marker_ending
+        ending_followed_by_ending = prev_marker == marker_ending and cur_marker == marker_ending
+        ending_followed_by_intro = prev_marker == marker_ending and cur_marker == marker_intro
+        prev_marker = cur_marker
+        if intro_followed_by_intro:
+            start_times.append(item[0])
+            end_times.append(item[0])
+        elif intro_followed_by_ending:
+            end_times.append(item[0]) 
+        elif ending_followed_by_ending:
+            pass
+        elif ending_followed_by_intro:       
+            start_times.append(item[0])
+        else:
+            raise ValueError(f"unexpected marker combination {prev_marker} and {cur_marker}")
 
-    time_sequences=build_time_sequence(start_times=intros,end_times=end_times)
+    #ending = total_time if ending > total_time else ending    
 
-    print([[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in time_sequences])
+    # end_times = []
+    # for i in range(1,len(intros)):
+    #     intro=intros[i]
+    #     end_times.append(intro)
+
+
+    #end_times.append(ending)
+
+    time_sequences=build_time_sequence(start_times=start_times,end_times=end_times)
+
+    #print([[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in time_sequences])
 
     if(expected_num_segments and len(time_sequences) != expected_num_segments):
         raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
 
-    timestamp_sanity_check(time_sequences,total_time=ending)
+    timestamp_sanity_check(time_sequences,total_time=total_time)
 
     return time_sequences
