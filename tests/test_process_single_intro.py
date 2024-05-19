@@ -49,6 +49,13 @@ class TestProcessSingleIntro(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [[3,self.total_time_1]])
         
+    def test_not_allow_no_intro(self):
+        with self.assertRaises(ValueError) as cm:
+            result = self.do_test(intros=      [],
+                                endings=[minutes_to_seconds(20),minutes_to_seconds(40)])
+        the_exception = cm.exception
+        self.assertIn("intros cannot be empty",str(the_exception))
+
     def test_normal(self):
         result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30)],
                               endings=[minutes_to_seconds(20),minutes_to_seconds(40)])
