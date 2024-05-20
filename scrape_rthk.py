@@ -59,7 +59,7 @@ streams={
 correlation_threshold_intro = 0.4
 # news report is not always prominent
 # especially with the longer beep2
-correlation_threshold_news_report = 0.2
+correlation_threshold_news_report = 0.3
 
 # use beep2 instead to reduce false positives, might
 # live stream whole programs instead for easier processing
