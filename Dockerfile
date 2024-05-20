@@ -32,6 +32,9 @@ WORKDIR $app
 
 COPY . /usr/src/app
 
+# numba patch
+ENV NUMBA_CACHE_DIR=/tmp
+
 #COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 
 #COPY --chown=1000:1000 --from=intermediate /tmp/frontend/public /usr/src/app/public
