@@ -1,7 +1,7 @@
 import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from scrape import download_and_scrape
+from scrape_rthk import download_and_scrape
 
 logging.basicConfig(level=logging.INFO)
 #logging.getLogger('scrape').setLevel(logging.INFO)
