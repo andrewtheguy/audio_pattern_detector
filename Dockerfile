@@ -33,7 +33,7 @@ WORKDIR $app
 COPY . /usr/src/app
 
 # numba patch
-ENV NUMBA_CACHE_DIR=/tmp
+ENV NUMBA_CACHE_DIR=/tmp/numba_cache_dir
 
 #COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 
