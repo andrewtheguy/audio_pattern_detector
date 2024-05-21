@@ -18,7 +18,7 @@ import pytz
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
 #from database import save_debug_info_to_db
-from process_timestamps import BEEP_PATTERN_REPEAT_SECONDS, preprocess_ts, process_timestamps_rthk
+from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from scrape import concatenate_audio, download, get_sec, split_audio_by_time_sequences, url_ok
 from time_sequence_error import TimeSequenceError
@@ -46,6 +46,8 @@ streams={
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
+        "news_report_strategy":"theme_clip",
+        "news_report_strategy_expected_count":4,
     },
     "KnowledgeCo": {
         "introclips": ["rthk2theme_new.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
@@ -57,24 +59,108 @@ streams={
 
 # intro is almost always prominent
 correlation_threshold_intro = 0.4
-# news report is not always prominent
-# especially with the longer beep2
-correlation_threshold_news_report = 0.3
 
-# use beep2 instead to reduce false positives, might
-# live stream whole programs instead for easier processing
-# with another unique news report clip
-news_report_clip='rthk_beep2.wav'
+def get_by_news_report_strategy_beep(input_file):
+    news_report_blacklist_ts = {
+        #"morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
+        #"morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
+        "KnowledgeCo20240511":[6176], # missing intro after 01:42:56
+    }
 
-# no need because it is absorbing now
-news_report_blacklist_ts = {
-    #"morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
-    #"morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
-    "KnowledgeCo20240511":[6176], # missing intro after 01:42:56
-}
+    beep_pattern_repeat_seconds = 7
+
+    # use beep2 instead to reduce false positives, might
+    # live stream whole programs instead for easier processing
+    # with another unique news report clip
+    news_report_clip='rthk_beep2.wav'
+    news_report_clip_path=f'./audio_clips/{news_report_clip}'
+
+    clip_paths_news_report=[news_report_clip_path]
+
+    # news report is not always prominent
+    # especially with the longer beep2
+    correlation_threshold_news_report = 0.3
+    news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
+                                                        full_audio_path=input_file,
+                                                        method=DEFAULT_METHOD,
+                                                        correlation_threshold = correlation_threshold_news_report,
+                                                        )
+
+    news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
+    audio_name,_ = os.path.splitext(os.path.basename(input_file))
+    exclude_ts = news_report_blacklist_ts.get(audio_name,None)
+    
+    news_report_peak_times_filtered = []
+    for second in preprocess_ts(news_report_peak_times,remove_repeats=True,max_repeat_seconds=beep_pattern_repeat_seconds):
+        if exclude_ts:
+            if math.floor(second) not in exclude_ts:
+                news_report_peak_times_filtered.append(second)
+            else:
+                print(f"excluding {seconds_to_time(second)}, ({second}) seconds mark from news_report_peak_times")
+        else:
+            news_report_peak_times_filtered.append(second)        
+        news_report_peak_times = news_report_peak_times_filtered   
+    return news_report_peak_times 
 
 
-def scrape(input_file,stream_name):
+def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count,total_time):
+
+    if news_report_strategy_expected_count < 1:
+        raise ValueError("news_report_strategy_expected_count must be greater than or equal to 1")
+    
+    # approximayte length between last beep and theme clip
+    second_backtrack = 8
+
+    # use beep2 instead to reduce false positives, might
+    # live stream whole programs instead for easier processing
+    # with another unique news report clip
+    news_report_clip='rthk_news_report_theme.wav'
+    news_report_clip_path=f'./audio_clips/{news_report_clip}'
+
+    clip_paths_news_report=[news_report_clip_path]
+
+    correlation_threshold_news_report = 0.7
+    news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
+                                                        full_audio_path=input_file,
+                                                        method=DEFAULT_METHOD,
+                                                        correlation_threshold = correlation_threshold_news_report,
+                                                        )
+
+    news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
+
+    # sort and remove dup
+    news_report_peak_times = preprocess_ts(news_report_peak_times,remove_repeats=False)
+
+    if len(news_report_peak_times) != news_report_strategy_expected_count:
+        raise ValueError(f"expected {news_report_strategy_expected_count} news reports but found {len(news_report_peak_times)}")
+    
+    if(news_report_peak_times[0] > 30 * 60):
+        raise ValueError("first news report is too late, should not happen unless there is really a valid case for it")
+    
+    for i in range(1,len(news_report_peak_times)):
+        if news_report_peak_times[i] - news_report_peak_times[i-1] < 45*60:
+            raise ValueError("distance between news reports is too short, should not happen unless there is really a valid case for it")
+        elif news_report_peak_times[i] - news_report_peak_times[i-1] > 60*60:
+            raise ValueError("distance between news reports is more than an hour in between, should not happen unless there is really a valid case for it")
+        
+    news_report_final = []
+    for i,second in enumerate(news_report_peak_times):
+        if second > total_time:
+            raise ValueError("news report theme cannot be after total time")
+        
+        second_beg = second - second_backtrack
+
+        news_report_final.append(second_beg)
+        # add 30 minutes after each news report
+        next_report = second_beg+30*60
+        if next_report < total_time:
+            news_report_final.append(next_report)
+        #if i == len(news_report_peak_times)-1:
+        #    pass
+          
+    return news_report_final
+
+def scrape(input_file,stream_name,always_reprocess=False):
     save_segments = False
     print(input_file)
     #exit(1)
@@ -92,31 +178,45 @@ def scrape(input_file,stream_name):
     
 
     jsonfile = f'{input_file}.json'
-    if os.path.exists(jsonfile):
+    if (not always_reprocess) and os.path.exists(jsonfile):
         with open(jsonfile,'r') as f:
             tsformatted=json.load(f)['tsformatted']
     else:
         stream = streams[stream_name]
         clips = stream["introclips"]
         allow_first_short = stream["allow_first_short"]
+        news_report_strategy=stream.get("news_report_strategy","beep")
+        news_report_strategy_expected_count=stream.get("news_report_strategy_expected_count",None)
 
-        news_report_clip_path=f'./audio_clips/{news_report_clip}'
 
-        clip_paths=[f'./audio_clips/{clip}' for clip in clips]
 
-        clip_paths=[news_report_clip_path,*clip_paths]
+        if news_report_strategy == "beep":
+            news_report_peak_times = get_by_news_report_strategy_beep(input_file=input_file)
+            news_report_second_pad = 6
+        elif news_report_strategy == "theme_clip":
+            if news_report_strategy_expected_count is None:
+                raise ValueError("news_report_strategy_expected_count must be set when strategy is theme_clip")
+            news_report_peak_times = get_by_news_report_theme_clip(input_file=input_file,news_report_strategy_expected_count=news_report_strategy_expected_count,total_time=total_time)
+            news_report_second_pad = 0
+        else:
+            raise ValueError(f"unknown news report strategy {news_report_strategy}")
+        
+        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
+        print("news_report_peak_times",news_report_peak_times_formatted,"---")
+
+        clip_paths_intros=[f'./audio_clips/{clip}' for clip in clips]
 
         # Find clip occurrences in the full audio
-        all_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths,
+        intro_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_intros,
                                                            full_audio_path=input_file,
                                                            method=DEFAULT_METHOD,
-                                                           correlation_threshold = correlation_threshold_news_report,
+                                                           correlation_threshold = correlation_threshold_intro,
                                                            )
         
         program_intro_peak_times=[]
         program_intro_peak_times_debug=[]
         for c in clips:
-            intros=all_clip_peak_times[f'./audio_clips/{c}']
+            intros=intro_clip_peak_times[f'./audio_clips/{c}']
             #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
             intros_debug = sorted(intros)
@@ -124,22 +224,8 @@ def scrape(input_file,stream_name):
 
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
-
-        news_report_peak_times = all_clip_peak_times[news_report_clip_path]
-        audio_name,_ = os.path.splitext(os.path.basename(input_file))
-        exclude_ts = news_report_blacklist_ts.get(audio_name,None)
-        if exclude_ts:
-            news_report_peak_times_filtered = []
-            for second in preprocess_ts(news_report_peak_times,remove_repeats=True,max_repeat_seconds=BEEP_PATTERN_REPEAT_SECONDS):
-                #print(second)
-                if math.floor(second) not in exclude_ts:
-                    news_report_peak_times_filtered.append(second)
-                else:
-                    print(f"excluding {seconds_to_time(second)}, ({second}) seconds mark from news_report_peak_times")
-            news_report_peak_times = news_report_peak_times_filtered        
         #exit(1)    
-        news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
-        print("news_report_peak_times",news_report_peak_times_formatted,"---")
+
         #for offset in news_report_peak_times:
         #    logger.info(
         #        f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
@@ -148,16 +234,16 @@ def scrape(input_file,stream_name):
         #    f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
         #save_debug_info_to_db(show_name,date_str,{"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug})
 
-        pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short)
-        #print("pair before rehydration",pair)
+        pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
+        print("final sequences",tsformatted)
         duration = [seconds_to_time(t[1]-t[0]) for t in pair]
-        gaps=[]
+        distance_endings=[]
         for i in range(1,len(pair)):
-            gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
+            distance_endings.append(seconds_to_time(pair[i][1]-pair[i-1][1]))
         with open(jsonfile,'w') as f:
             #print("jsonfile",jsonfile)
-            content = json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4)
+            content = json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"distance_endings":distance_endings}, indent=4)
             #print(content)
             f.write(content)
 
@@ -286,7 +372,7 @@ if __name__ == '__main__':
     if(args.action == 'scrape'):
         input_file = args.audio_file
         stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
-        scrape(input_file,stream_name=stream_name)
+        scrape(input_file,stream_name=stream_name,always_reprocess=True)
     elif(args.action == 'download'):
         download_and_scrape(download_only=True)
     elif(args.action == 'download_and_scrape'):

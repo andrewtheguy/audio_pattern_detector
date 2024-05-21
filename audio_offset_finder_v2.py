@@ -139,6 +139,7 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
     if debug_mode:
         print(f"{section_label} percentile", np.percentile(correlation, 99))
         print(f"{section_label} max correlation: {max(correlation)}")
+        print(f"{section_label} ratio: {np.percentile(correlation, 99)/max(correlation)}")
         print(f"---")
 
     height = threshold
