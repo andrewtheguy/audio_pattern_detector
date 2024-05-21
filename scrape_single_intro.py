@@ -132,7 +132,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
     else:
         pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
         #print("pair after rehydration",pair)
-    #logger.debug("tsformatted",tsformatted)
+    print("tsformatted",tsformatted)
     duration = [seconds_to_time(t[1]-t[0]) for t in pair]
     gaps=[]
     for i in range(1,len(pair)):
