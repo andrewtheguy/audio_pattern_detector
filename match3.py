@@ -3,6 +3,7 @@ from collections import deque
 import copy
 import datetime
 import pdb
+import pprint
 import time
 import librosa
 import numpy as np
@@ -38,6 +39,13 @@ def main():
         print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
     #    #print(f"Offset: {offset}s" )
     
+    distances=[]
+    for i in range(1,len(peak_times_clean)):
+        hour_delta = peak_times_clean[i]//3600-peak_times_clean[i-1]//3600
+        distance = peak_times_clean[i]-peak_times_clean[i-1]
+        distances.append({"distance":seconds_to_time(seconds=distance),"hour_delta":hour_delta,"pair":[seconds_to_time(seconds=peak_times_clean[i-1]),seconds_to_time(seconds=peak_times_clean[i])]})
+    print("Distances between clips:")    
+    pprint.pprint(distances)    
 
 if __name__ == '__main__':
     main()
