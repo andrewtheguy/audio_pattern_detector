@@ -208,11 +208,11 @@ def consolidate_intros(intros,news_reports,total_time):
         
     return consolidated_intros
     
-# clean up first 10 minutes and last 10 seconds
+# clean up first 10 minutes 
 # first intro should not happen after 10 minutes
 # first 10 minutes should have at most 1 news report, and if it does
 # that first news report should be cut off
-# last news report can only happen within 10 seconds of the end
+# last news report can only happen within 2 minutes of the end
 def news_intro_process_beginning_and_end(intros,news_reports,total_time):
     if not is_unique_and_sorted(intros):
         raise ValueError("intros is not unique or sorted")
@@ -250,14 +250,14 @@ def news_intro_process_beginning_and_end(intros,news_reports,total_time):
         raise TimeSequenceError(f"intro overflow, is greater than total time {total_time}")
 
 
-    end_cut_off_seconds = 10
+    end_cut_off_seconds = 2*60
 
     # make it complete
     if(news_reports[-1] < intros[-1]):
         news_reports.append(total_time)
     
     if(news_reports[-1] < total_time-end_cut_off_seconds):
-        raise TimeSequenceError(f"cannot end with news reports unless it is within 10 seconds of the end to prevent missing things")
+        raise TimeSequenceError(f"cannot end with news reports unless it is within 2 minutes of the end to prevent missing things")
     
     return news_reports
 

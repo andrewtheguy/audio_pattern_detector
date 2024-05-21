@@ -99,7 +99,7 @@ class TestProcessBeginningAndEndTs(unittest.TestCase):
             result_news_report = self.do_test(intros=[40,INTRO_CUT_OFF+50],
                                 news_reports=[INTRO_CUT_OFF+10,INTRO_CUT_OFF+200])
         the_exception = cm.exception
-        self.assertIn("cannot end with news reports unless it is within 10 seconds",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within",str(the_exception))
         
     def test_news_not_ends_early(self):
         result_news_report = self.do_test(intros=[40,INTRO_CUT_OFF+50],
