@@ -10,10 +10,6 @@ from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
 
-# allow 1 minutes of beeps to repeat
-# used to be 7 seconds but sometimes it gets false positive from
-# traffic news intro happening within a minute 
-BEEP_PATTERN_REPEAT_SECONDS = 60
 # allow one intro and news report within 10 minutes
 # but not intro past 10 minutes
 INTRO_CUT_OFF=10*60
@@ -126,9 +122,7 @@ def consolidate_close_by(news_reports,max_seconds):
     if not is_unique_and_sorted(news_reports):
         raise ValueError("news report is not unique or sorted")
     new_ones=[]
-    #non_repeating_index = None
-    #repeat_count = 0
-    #max_seconds = BEEP_PATTERN_REPEAT_SECONDS
+
     cur_first = None
     for i,cur_news_report in enumerate(news_reports):
         if i == 0:
@@ -321,7 +315,7 @@ def remove_start_equals_to_end(time_sequences):
     return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
     
 # main function
-def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pad=6,
+def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pad=0,
                        allow_first_short=False):
 
     # if len(news_reports) != len(set(news_reports)):
@@ -331,7 +325,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     #    raise ValueError("intro has duplicates, clean up duplicates first")   
 
 
-    news_reports = preprocess_ts(news_reports,remove_repeats=True,max_repeat_seconds=BEEP_PATTERN_REPEAT_SECONDS)
+    news_reports = preprocess_ts(news_reports)
     intros = preprocess_ts(intros)
     
 
