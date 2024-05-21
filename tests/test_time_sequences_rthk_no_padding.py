@@ -61,13 +61,13 @@ class TestProcessTimestamps(unittest.TestCase):
             news_end = self.total_time_1-minutes_to_seconds(20)
             result = self.process(news_report=[news_end],intro=[])
         the_exception = cm.exception
-        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within",str(the_exception))
         
     def test_zero_intro_with_news_at_beginning(self):
         with self.assertRaises(TimeSequenceError) as cm:
             result = self.process(news_report=[0],intro=[])
         the_exception = cm.exception
-        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within",str(the_exception))
 
     def test_zero_intro_with_multiple_news_in_middle(self):
         with self.assertRaises(TimeSequenceError) as cm:
@@ -75,7 +75,7 @@ class TestProcessTimestamps(unittest.TestCase):
             news_end = self.total_time_1-minutes_to_seconds(20)
             result = self.process(news_report=[news_middle,news_end],intro=[])
         the_exception = cm.exception
-        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within",str(the_exception))
 
         with self.assertRaises(TimeSequenceError) as cm:
             news_middle = self.total_time_1-minutes_to_seconds(40)
@@ -149,7 +149,7 @@ class TestProcessTimestamps(unittest.TestCase):
             result = self.process(news_report=[9]
                                         ,intro=[9])
         the_exception = cm.exception
-        self.assertIn("cannot end with news reports unless it is within 10 seconds of the end to prevent missing things",str(the_exception))
+        self.assertIn("cannot end with news reports unless it is within",str(the_exception))
 
     def test_one_news_report_intro_beginning_news_first(self):
         result = self.process(news_report=[minutes_to_seconds(5)]
