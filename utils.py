@@ -2,6 +2,8 @@ import json
 import re
 import subprocess
 
+import numpy as np
+
 
 # return a tuple of prefix and date
 # happydaily20220430 will return ("happydaily","20220430")
@@ -38,6 +40,18 @@ def minutes_to_seconds(minutes):
 def hours_to_seconds(hours):
     return minutes_to_seconds(hours*60)
 
+def find_nearest_distance_backwards(array, value):
+    array = np.asarray(array)
+    arr2=(value - array)
+    arr2=arr2[arr2 >= 0]
+    return arr2.min()
+    #return arr2[idx]
+
+def find_nearest_distance_forward(array, value):
+    array = np.asarray(array)
+    arr2=(array - value)
+    arr2=arr2[arr2 >= 0]
+    return arr2.min()
 
 if __name__ == '__main__':
   array1 = [1, 2, 3, 4, 5]  # Unique and sorted

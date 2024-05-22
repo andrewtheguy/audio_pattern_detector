@@ -28,7 +28,7 @@ from file_upload.upload_utils2 import upload_file
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
-from utils import extract_prefix, get_ffprobe_info
+from utils import extract_prefix, find_nearest_distance_backwards, get_ffprobe_info
 
 streams={
     "itsahappyday": {
@@ -136,11 +136,7 @@ def get_single_beep(input_file):
     return news_report_peak_times,clip_length_second
     #return preprocess_ts(news_report_peak_times,remove_repeats=False)
 
-def find_nearest_distance(array, value):
-    array = np.asarray(array)
-    arr2=(value - array)
-    idx = arr2[arr2 >= 0].argmin()
-    return arr2[idx]
+
 
 # it is easier to match using the news report theme clip than beep
 def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count,total_time):
@@ -193,7 +189,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         if second > total_time:
             raise ValueError("news report theme cannot be after total time")
         
-        second_backtrack = find_nearest_distance(single_beep_ts,second)-clip_length_second
+        second_backtrack = find_nearest_distance_backwards(single_beep_ts,second)-clip_length_second
         #print('second_backtrack',second_backtrack,'---')
         if second_backtrack > 10:
             # could be theme found but not beep
@@ -208,7 +204,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         news_report_final.append(second_beg)
         # add 30 minutes after each news report, then backtrack to the nearest beep
         next_report = second_beg+30*60
-        next_report_second_backtrack = find_nearest_distance(single_beep_ts,next_report)-clip_length_second
+        next_report_second_backtrack = find_nearest_distance_backwards(single_beep_ts,next_report)-clip_length_second
         if next_report_second_backtrack > 10:
             # could be beep not prominent enough
             print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
