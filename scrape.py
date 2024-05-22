@@ -44,7 +44,7 @@ def download(url,target_file):
               .run()
         )
         clip_length_second_file = float(get_ffprobe_info(tmp_file)['format']['duration'])
-        second_tolerate=0.1
+        second_tolerate=0.5
         if abs(clip_length_second_file - clip_length_second_stream) > second_tolerate:
             raise ValueError(f"downloaded file duration {clip_length_second_file} does not match stream duration {clip_length_second_stream} by {second_tolerate} seconds")
         shutil.move(tmp_file,target_file)
