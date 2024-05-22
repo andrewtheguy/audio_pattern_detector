@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import os
+import pprint
 import shutil
 import tempfile
 import traceback
@@ -17,7 +18,7 @@ import ffmpeg
 import numpy as np
 import pytz
 
-from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
+from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
 #from database import save_debug_info_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
@@ -27,7 +28,7 @@ from file_upload.upload_utils2 import upload_file
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
-from utils import extract_prefix
+from utils import extract_prefix, get_ffprobe_info
 
 streams={
     "itsahappyday": {
@@ -52,7 +53,7 @@ streams={
         "news_report_strategy_expected_count":4,
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme_new.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
+        "introclips": ["rthk2theme.wav","rthk2theme_new.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},
@@ -116,6 +117,10 @@ def get_single_beep(input_file):
     news_report_clip='rthk_beep.wav'
     news_report_clip_path=f'./audio_clips/{news_report_clip}'
 
+    clip_length_second = float(get_ffprobe_info(news_report_clip_path)['format']['duration'])
+    #pprint.pprint(metadata)
+    #raise "chafa"
+
     clip_paths_news_report=[news_report_clip_path]
 
     # higher threshold because it is a short beep
@@ -125,10 +130,13 @@ def get_single_beep(input_file):
                                                         method=DEFAULT_METHOD,
                                                         correlation_threshold = correlation_threshold_news_report,
                                                         )
-
-    news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
     
-    return news_report_peak_times
+    news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
+    cleanup_news_report_peak_times = [seconds_to_time(seconds=t,include_decimals=True) for t in cleanup_peak_times(news_report_peak_times)]
+    print("news_report_peak_times single beep",cleanup_news_report_peak_times,"---")
+    print("clip_length_second single beep",clip_length_second,"---")
+    
+    return news_report_peak_times,clip_length_second
     #return preprocess_ts(news_report_peak_times,remove_repeats=False)
 
 def find_nearest_distance(array, value):
@@ -142,10 +150,9 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     if news_report_strategy_expected_count < 1:
         raise ValueError("news_report_strategy_expected_count must be greater than or equal to 1")
     
-    # approximate length between last beep and theme clip
-    second_backtrack = 8
+    #second_backtrack = 8
 
-    single_beep_ts=get_single_beep(input_file)
+    single_beep_ts,clip_length_second=get_single_beep(input_file)
 
     # use beep2 instead to reduce false positives, might
     # live stream whole programs instead for easier processing
@@ -184,9 +191,12 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         if second > total_time:
             raise ValueError("news report theme cannot be after total time")
         
-        #second_backtrack = find_nearest_distance(single_beep_ts,second)
+        second_backtrack = find_nearest_distance(single_beep_ts,second)-clip_length_second
+        print('second_backtrack',second_backtrack,'---')
         if second_backtrack > 10:
-            raise ValueError("news report theme is too far from the beep, potentially a bug")
+            print("warn: next_report_second where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
+            next_report_second_backtrack=8
+            #raise ValueError("news report theme is too far from the beep, potentially a bug")
         
         #print('second_backtrack',second_backtrack,'---')
 
@@ -200,7 +210,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
             print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
             next_report_second_backtrack=0
         print('next_report_second_backtrack',second_backtrack,'---')    
-        next_report = next_report - next_report_second_backtrack
+        next_report = next_report - next_report_second_backtrack-clip_length_second
         
         if next_report < total_time:
             news_report_final.append(next_report)
