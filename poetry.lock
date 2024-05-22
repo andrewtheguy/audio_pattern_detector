@@ -13,7 +13,7 @@ develop = false
 type = "git"
 url = "https://github.com/andrewtheguy/andrew_utils.git"
 reference = "main"
-resolved_reference = "34a3922449edc8a9bb789a3955e5b81313add0bd"
+resolved_reference = "5a0d60139c339db7f3fdcc530aa69062730b4b40"
 
 [[package]]
 name = "apscheduler"
