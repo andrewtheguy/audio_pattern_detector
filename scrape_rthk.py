@@ -162,10 +162,11 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
 
     clip_paths_news_report=[news_report_clip_path]
 
+    # correlation_threshold_news_report is currently ignored
     correlation_threshold_news_report = 0.7
     news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
                                                         full_audio_path=input_file,
-                                                        method=DEFAULT_METHOD,
+                                                        method="non_repeating_correlation",
                                                         correlation_threshold = correlation_threshold_news_report,
                                                         )
 
