@@ -22,8 +22,8 @@ COPY --from=builder /tmp/requirements.txt /tmp/requirements.txt
 
 RUN pip3 install -r /tmp/requirements.txt
 
-COPY --from=andrewchen5678/static-ffmpeg:20211210-3 /ffmpeg /usr/local/bin/
-COPY --from=andrewchen5678/static-ffmpeg:20211210-3 /ffprobe /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:7.0-1 /ffmpeg /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:7.0-1 /ffprobe /usr/local/bin/
 
 #VOLUME '/usr/src/app'
 
