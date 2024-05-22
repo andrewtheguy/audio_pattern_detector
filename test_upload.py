@@ -1,2 +1,2 @@
 from file_upload.upload_utils2 import upload_file
-upload_file_with_sftp("test_upload.py","/test_upload.py")
+print(upload_file('test1.py',"/test.txt",skip_if_exists=True))
