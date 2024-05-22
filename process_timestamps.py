@@ -332,9 +332,10 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
                     logger.warning(f"find_nearest_distance_forward returned None for {prev_news_report}")        
                 elif(closest_backup_intro_dist > 0 and closest_backup_intro_dist <= 10*60):
                     closest_backup_intro_ts = prev_news_report + closest_backup_intro_dist
-                    logger.info(f"inserting backup intro at {seconds_to_time(closest_backup_intro_ts)}")
-                    #raise "chafa"
-                    if closest_backup_intro_ts < news_reports[i]:
+                    if len(intros_new) > 0 and closest_backup_intro_ts <= intros_new[-1]:
+                        logger.warning(f"closest_backup_intro_ts {seconds_to_time(closest_backup_intro_ts)} >= {seconds_to_time(intros_new[-1])}, ignoring")
+                    elif closest_backup_intro_ts < news_reports[i]:
+                        print(f"inserting backup intro at {seconds_to_time(closest_backup_intro_ts)}")
                         intros.appendleft(closest_backup_intro_ts)
                         appended = True
                 else:
@@ -352,6 +353,8 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
             cur = intros.popleft()
             if cur != placeholder:
                 intros_new.append(cur)
+        if not is_unique_and_sorted(intros_new):
+            raise ValueError(f"intros_new afterwards {[seconds_to_time(i) for i in intros_new]} is not unique or sorted")
         return intros_new    
     else:
         return intros    
@@ -359,7 +362,7 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
 # only works if news report timestamp is accurate    
 def fill_in_short_intervals_missing_intros(intros,news_reports):
     if not is_unique_and_sorted(intros):
-        raise ValueError("start_times is not unique or sorted")
+        raise ValueError(f"start_times {[seconds_to_time(i) for i in intros]} is not unique or sorted")
     if not is_unique_and_sorted(news_reports):
         raise ValueError("end_times is not unique or sorted")
     # defensive copy
@@ -399,6 +402,8 @@ def fill_in_short_intervals_missing_intros(intros,news_reports):
             cur = intros.popleft()
             if cur != placeholder:
                 intros_new.append(cur)
+        if not is_unique_and_sorted(intros_new):
+            raise ValueError(f"intros_new afterwards {[seconds_to_time(i) for i in intros]} is not unique or sorted")
         return intros_new    
     else:
         return intros

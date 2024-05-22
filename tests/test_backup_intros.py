@@ -91,10 +91,40 @@ class TestBackupIntros(unittest.TestCase):
     def test_smaller_size_non_consecutive(self):
         result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(120)],
                               backup_intro_ts=[minutes_to_seconds(75),minutes_to_seconds(76)],
-                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(100),minutes_to_seconds(130)])
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(100),minutes_to_seconds(130),minutes_to_seconds(150)])
         np.testing.assert_array_equal(result,
                                       [minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(75),minutes_to_seconds(120)])
+        
+    def test_not_adding_if_will_overlap(self):
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(82),minutes_to_seconds(120)],
+                              backup_intro_ts=[minutes_to_seconds(85)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(80),minutes_to_seconds(130),minutes_to_seconds(150)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(82),minutes_to_seconds(120)])
+        
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(82),minutes_to_seconds(120)],
+                              backup_intro_ts=[minutes_to_seconds(81)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(80),minutes_to_seconds(130),minutes_to_seconds(150)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(82),minutes_to_seconds(120)])
+        
+        
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(90),minutes_to_seconds(120)],
+                              backup_intro_ts=[minutes_to_seconds(85)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(80),minutes_to_seconds(130),minutes_to_seconds(150)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(90),minutes_to_seconds(120)])
 
+
+
+    def test_not_adding_if_will_overlap2(self):
+        #raise NotImplementedError("This test is not implemented")
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(70),minutes_to_seconds(110)],
+                              backup_intro_ts=[minutes_to_seconds(107)],
+                              news_reports=[minutes_to_seconds(50),minutes_to_seconds(90),minutes_to_seconds(105),minutes_to_seconds(130)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(70),minutes_to_seconds(110)])
+      
     def test_smaller_size_beginning_non_consecutive(self):
         result = self.do_test(intros=[minutes_to_seconds(8),minutes_to_seconds(80),minutes_to_seconds(120)],
                               backup_intro_ts=[minutes_to_seconds(1),minutes_to_seconds(2)],
