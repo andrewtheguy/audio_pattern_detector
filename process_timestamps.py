@@ -320,10 +320,12 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
     if len(intros) < len(news_reports) and len(backup_intro_ts) > 0:
         intros_new = []
         intros = deque(intros)
+        placeholder = None
+        intros.append(placeholder)
         i=0
-        while len(intros) > 0 and len(intros_new) + len(intros) < len(news_reports):
+        while len(intros) > 0 and len(intros_new) + len(intros) <= len(news_reports):
             appended = False
-            if intros[0] > news_reports[i]:
+            if intros[0] is None or intros[0] > news_reports[i]:
                 prev_news_report = 0 if i == 0 else news_reports[i-1]
                 closest_backup_intro_dist = find_nearest_distance_forward(backup_intro_ts, prev_news_report)
                 if(closest_backup_intro_dist is None):
@@ -342,10 +344,14 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
             if appended:
                 continue
             else:
-                intros_new.append(intros.popleft())
+                cur = intros.popleft()
+                if cur != placeholder:
+                    intros_new.append(cur)
                 i+=1
         while len(intros) > 0:
-            intros_new.append(intros.popleft())
+            cur = intros.popleft()
+            if cur != placeholder:
+                intros_new.append(cur)
         return intros_new    
     else:
         return intros    
@@ -365,26 +371,34 @@ def fill_in_short_intervals_missing_intros(intros,news_reports):
     if len(intros) < len(news_reports):
         intros_new = []
         intros = deque(intros)
+        placeholder = None
+        intros.append(placeholder)
+        #print("intros",intros)
+        #exit(1)
         i=0
-        while len(intros) > 0 and len(intros_new) + len(intros) < len(news_reports):
+        while len(intros) > 0 and len(intros_new) + len(intros) <= len(news_reports):
             appended = False
-            if intros[0] > news_reports[i]:
+            if intros[0] is None or intros[0] > news_reports[i]:
                 prev_news_report = 0 if i == 0 else news_reports[i-1]
                 if(news_reports[i] - prev_news_report < 24*60): #make up if less than 24 minutes
-                    print(f"adding news report at {seconds_to_time(prev_news_report)} before {seconds_to_time(intros[0])} because clip is short and nothing is found")
+                    print(f"adding news report at {seconds_to_time(prev_news_report)} before {seconds_to_time(intros[0]) if intros[0] is not None else 'end'} because clip is short and nothing is found")
                     intros.appendleft(prev_news_report)
                     appended = True
                 else:
                     logger.warning(f"news_reports[i] {seconds_to_time(news_reports[i])} is farther than 24 minutes from {prev_news_report}")       
                 if not appended:
-                    logger.warning(f"no backup intro found to be appendable for {intros[0]}")        
+                    logger.warning(f"no backup intro found to be appendable for {seconds_to_time(intros[0]) if intros[0] is not None else 'end'}")        
             if appended:
                 continue
             else:
-                intros_new.append(intros.popleft())
+                cur = intros.popleft()
+                if cur != placeholder:
+                    intros_new.append(cur)
                 i+=1
         while len(intros) > 0:
-            intros_new.append(intros.popleft())
+            cur = intros.popleft()
+            if cur != placeholder:
+                intros_new.append(cur)
         return intros_new    
     else:
         return intros
