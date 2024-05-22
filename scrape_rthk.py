@@ -41,6 +41,7 @@ streams={
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
     },
+    # rthk2 needs a different strategy for news report because it is less consistent
     "morningsuite": {
         "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","morningsuitebababa.wav","morningsuiteinterlude1.wav"],
         "allow_first_short": False,
