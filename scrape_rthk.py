@@ -197,7 +197,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         #print('second_backtrack',second_backtrack,'---')
         if second_backtrack > 10:
             # could be theme found but not beep
-            print("warn: next_report_second where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
+            print("warn: second_backtrack where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
             second_backtrack=8
             #raise ValueError("news report theme is too far from the beep, potentially a bug")
         
