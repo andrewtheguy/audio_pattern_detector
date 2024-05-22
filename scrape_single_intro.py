@@ -15,7 +15,7 @@ import ffmpeg
 from audio_offset_finder_v2 import DEFAULT_METHOD, find_clip_in_audio_in_chunks
 
 from andrew_utils import seconds_to_time
-from file_upload.upload_utils2 import sftp_file_exists, upload_file
+from file_upload.upload_utils2 import upload_file
 from process_timestamps import process_timestamps_simple
 from scrape import concatenate_audio, get_sec, split_audio_by_time_sequences
 from upload_utils import sftp
@@ -157,7 +157,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
         concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="am1430",total_time=total_time)
         upload_path_trimmed = f"/am1430/trimmed/{dirname}/{filename_trimmed}"
-        upload_file_with_sftp(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
+        upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         
     return output_dir_trimmed,output_file_trimmed
 
