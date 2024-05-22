@@ -46,8 +46,8 @@ streams={
     },
     # rthk2 needs a different strategy for news report because it is less consistent
     "morningsuite": {
-        "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","morningsuitebababa.wav","morningsuiteinterlude1.wav"],
-        "backupintroclips": ["rthk2theme_new.wav"],
+        "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav"],
+        "backupintroclips": ["rthk2theme.wav","rthk2theme_new.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
@@ -55,7 +55,8 @@ streams={
         "news_report_strategy_expected_count":4,
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme.wav","rthk2theme_new.wav","knowledgecointro.wav"],
+        "introclips": ["rthk2theme_new.wav","knowledgecointro.wav"],
+        "backupintroclips": ["rthk2theme.wav","rthk2theme_new.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},
@@ -434,13 +435,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
+    parser.add_argument('--audio-folder', metavar='audio folder', type=str, help='audio folder to find pattern')
     parser.add_argument('--pattern-file', metavar='audio file', type=str, help='pattern file to convert sample')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
     if(args.action == 'scrape'):
-        input_file = args.audio_file
-        stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
-        scrape(input_file,stream_name=stream_name,always_reprocess=True)
+        audio_folder = args.audio_folder
+        if audio_folder:
+            for input_file in glob.glob(os.path.join(audio_folder, "*.m4a")):
+                stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
+                scrape(input_file,stream_name=stream_name,always_reprocess=True)
+        else:        
+            input_file = args.audio_file
+            stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
+            scrape(input_file,stream_name=stream_name,always_reprocess=True)
     elif(args.action == 'download'):
         download_and_scrape(download_only=True)
     elif(args.action == 'download_and_scrape'):
