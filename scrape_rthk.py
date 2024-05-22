@@ -55,7 +55,7 @@ streams={
         "news_report_strategy_expected_count":4,
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme.wav","rthk2theme_new.wav","knowledgecointro.wav","knowledge_co_e_word_intro.wav"],
+        "introclips": ["rthk2theme.wav","rthk2theme_new.wav","knowledgecointro.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},
@@ -306,7 +306,7 @@ def scrape(input_file,stream_name,always_reprocess=False):
         print("backup_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(backup_intro_peak_times)],"---")
 
 
-        pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,backup_intro_ts=backup_intro_peak_times,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad)
+        pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,backup_intro_ts=backup_intro_peak_times,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad,news_report_strategy=news_report_strategy)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
         print("final sequences",tsformatted)
         duration = [seconds_to_time(t[1]-t[0]) for t in pair]
