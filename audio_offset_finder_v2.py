@@ -196,16 +196,7 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         subtract_seconds = 0
         audio_section = np.concatenate((chunk, np.array([])))
 
-    #audio_section = reduce_noise_spectral_subtraction(audio_section)
-
-    #audio_section = audio_section / np.max(np.abs(audio_section))
-    # peak normalize audio to -1 dB
-    #audio_section = pyln.normalize.peak(audio_section, -1.0)
-
     normalize = True
-    # if normalize:
-    #     audio_section = audio_section / np.max(np.abs(audio_section))
-    #     clip = clip / np.max(np.abs(clip))
 
     if normalize:
         audio_section_seconds = len(audio_section) / sr
@@ -232,14 +223,6 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         # loudness normalize audio to -12 dB LUFS
         clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
-
-    # if method == "mfcc":
-    #     zeroes_second_pad=1
-    #     zeroes = np.zeros(clip_length+zeroes_second_pad*sr)
-    #     #pad zeros to the very end
-    #     audio_section = np.concatenate((audio_section,zeroes))
-    #     samples_skip_end = zeroes_second_pad*sr
-
     os.makedirs("./tmp/audio", exist_ok=True)
     if debug_mode:
         sf.write(
@@ -255,27 +238,11 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         raise ValueError("disabled")
         peak_times = advanced_correlation_method(clip, audio=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
-    elif method == "mfcc":
-        raise ValueError("not working well yet")
-        peak_times = mfcc_method2(clip, audio=audio_section, sr=sr, index=index,
-                                  seconds_per_chunk=seconds_per_chunk,
-                                 clip_name=clip_name)
-    elif method == "chroma_method":
-        raise ValueError("disabled")
-        peak_times = chroma_method(clip, audio=audio_section, sr=sr, index=index, seconds_per_chunk=seconds_per_chunk,
-                                 clip_name=clip_name)
     else:
         raise ValueError("unknown method")
 
-    #print(peak_times)
-    #print(subtract_seconds)
-
     peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
-    #peak_times_final = [peak_time for peak_time in peak_times_final if peak_time >= 0]
 
-    #for item in correlation:
-    #    if item > threshold:
-    #        print(item)
     return peak_times_final
 
 # only for testing
