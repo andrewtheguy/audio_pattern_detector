@@ -36,7 +36,7 @@ def main():
     print(peak_times_clean)
 
     for offset in peak_times_clean:
-        print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset,include_decimals=False)}" )
+        print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}" )
     #    #print(f"Offset: {offset}s" )
     
     distances=[]

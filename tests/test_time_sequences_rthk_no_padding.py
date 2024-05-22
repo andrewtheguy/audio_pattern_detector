@@ -345,7 +345,7 @@ class TestProcessTimestamps(unittest.TestCase):
                                         ])
          
          
-    
+    @unittest.skip(reason="no longer absorbing beeps")
     def test_absorb_beeps(self):
         result = self.process(news_report=[minutes_to_seconds(25),
                                            minutes_to_seconds(25)+1,minutes_to_seconds(25)+2,minutes_to_seconds(25)+3,
@@ -358,7 +358,8 @@ class TestProcessTimestamps(unittest.TestCase):
                                        [minutes_to_seconds(30),minutes_to_seconds(50)],
                                        [minutes_to_seconds(60),self.total_time_1],
                                        ])
-    
+        
+    @unittest.skip(reason="no longer absorbing beeps")
     def test_absorb_beeps_beginning(self):
         result = self.process(news_report=[minutes_to_seconds(7),
                                            minutes_to_seconds(7)+1,minutes_to_seconds(7)+2,minutes_to_seconds(7)+3,

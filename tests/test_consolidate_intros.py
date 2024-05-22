@@ -9,8 +9,8 @@ class TestConsolidateIntros(unittest.TestCase):
     def setUp(self):
         self.total_time_1=minutes_to_seconds(120)
         
-    def do_test(self,intros,news_reports):
-        return consolidate_intros((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))),self.total_time_1)
+    def do_test(self,intros,news_reports,backup_intro_ts=[]):
+        return consolidate_intros((list(dict.fromkeys(intros))),(list(dict.fromkeys(news_reports))),self.total_time_1,backup_intro_ts=backup_intro_ts)
     
     def test_intro_negative(self):
         with self.assertRaises(ValueError) as cm:
@@ -155,5 +155,13 @@ class TestConsolidateIntros(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [100,300])
         
+    def test_making_up_late_intro(self):
+        result = self.do_test(intros=[minutes_to_seconds(15),minutes_to_seconds(60),minutes_to_seconds(90),minutes_to_seconds(120)],
+                              backup_intro_ts=[minutes_to_seconds(5)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(100),minutes_to_seconds(130)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(5),minutes_to_seconds(60),minutes_to_seconds(90),minutes_to_seconds(120)])
+        
+
 if __name__ == '__main__':
     unittest.main()
