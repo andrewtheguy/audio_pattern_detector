@@ -15,7 +15,7 @@ from audio_offset_finder_v2 import convert_audio_to_clip_format, DEFAULT_METHOD
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
-from utils import extract_prefix
+from utils import extract_prefix, get_ffprobe_info
 
 
 def url_ok(url):
@@ -35,14 +35,17 @@ def download(url,target_file):
         logger.info(f"file {target_file} already exists,skipping")
         return
     print(f'downloading {url}')
+    clip_length_second_stream = float(get_ffprobe_info(url)['format']['duration'])
     with tempfile.TemporaryDirectory() as tmpdir:
         basename,extension = os.path.splitext(os.path.basename(target_file))
-    
         tmp_file = os.path.join(tmpdir,f"download{extension}")
         (
         ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="error")
               .run()
         )
+        clip_length_second_file = float(get_ffprobe_info(tmp_file)['format']['duration'])
+        if abs(clip_length_second_file - clip_length_second_stream) > 1:
+            raise ValueError(f"downloaded file duration {clip_length_second_file} does not match stream duration {clip_length_second_stream} by 1 second")
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')
 
