@@ -162,8 +162,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
 
     clip_paths_news_report=[news_report_clip_path]
 
-    # correlation_threshold_news_report is currently ignored
-    correlation_threshold_news_report = 0.7
+    correlation_threshold_news_report = 0.4
     news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
                                                         full_audio_path=input_file,
                                                         method="non_repeating_correlation",
@@ -176,7 +175,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     news_report_peak_times = preprocess_ts(news_report_peak_times,remove_repeats=False)
 
     if len(news_report_peak_times) != news_report_strategy_expected_count:
-        raise ValueError(f"expected {news_report_strategy_expected_count} news reports but found {len(news_report_peak_times)}")
+        raise ValueError(f"expected {news_report_strategy_expected_count} news reports but found {len(news_report_peak_times)}: {[seconds_to_time(t) for t in news_report_peak_times]}")
     
     if(news_report_peak_times[0] > 30 * 60):
         raise ValueError("first news report is too late, should not happen unless there is really a valid case for it")
