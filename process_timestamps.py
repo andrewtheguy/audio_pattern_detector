@@ -333,7 +333,7 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
                 elif(closest_backup_intro_dist > 0 and closest_backup_intro_dist <= 10*60):
                     closest_backup_intro_ts = prev_news_report + closest_backup_intro_dist
                     if len(intros_new) > 0 and closest_backup_intro_ts <= intros_new[-1]:
-                        logger.warning(f"closest_backup_intro_ts {seconds_to_time(closest_backup_intro_ts)} >= {seconds_to_time(intros_new[-1])}, ignoring")
+                        logger.warning(f"closest_backup_intro_ts {seconds_to_time(closest_backup_intro_ts)} >= prev intro {seconds_to_time(intros_new[-1])}, ignoring")
                     elif closest_backup_intro_ts < news_reports[i]:
                         print(f"inserting backup intro at {seconds_to_time(closest_backup_intro_ts)}")
                         intros.appendleft(closest_backup_intro_ts)
