@@ -33,6 +33,7 @@ from utils import extract_prefix, find_nearest_distance_backwards, get_ffprobe_i
 streams={
     "itsahappyday": {
         "introclips": ["itsahappyday_intro.wav"],
+        "backupintroclips": ["rthk1theme_new.wav"],
         "allow_first_short": True,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/itsahappyday/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
@@ -46,6 +47,7 @@ streams={
     # rthk2 needs a different strategy for news report because it is less consistent
     "morningsuite": {
         "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav","morningsuitebababa.wav","morningsuiteinterlude1.wav"],
+        "backupintroclips": ["rthk2theme_new.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
@@ -147,7 +149,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     #second_backtrack = 8
 
     single_beep_ts,clip_length_second=get_single_beep(input_file)
-    cleanup_single_beep_ts = [seconds_to_time(seconds=t,include_decimals=True) for t in cleanup_peak_times(single_beep_ts)]
+    #cleanup_single_beep_ts = [seconds_to_time(seconds=t,include_decimals=True) for t in cleanup_peak_times(single_beep_ts)]
     #print("cleanup_single_beep_ts single beep",cleanup_single_beep_ts,"---")
     #print("clip_length_second single beep",clip_length_second,"---")
 
@@ -189,13 +191,18 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         if second > total_time:
             raise ValueError("news report theme cannot be after total time")
         
-        second_backtrack = find_nearest_distance_backwards(single_beep_ts,second)-clip_length_second
-        #print('second_backtrack',second_backtrack,'---')
-        if second_backtrack > 10:
-            # could be theme found but not beep
-            print("warn: second_backtrack where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
+        dist1=find_nearest_distance_backwards(single_beep_ts,second)
+        if dist1 is None:
+            print("warn: second_backtrack cannot find_nearest_distance_backwards, changing it to 8")
             second_backtrack=8
-            #raise ValueError("news report theme is too far from the beep, potentially a bug")
+        else:
+            second_backtrack = dist1-clip_length_second
+            #print('second_backtrack',second_backtrack,'---')
+            if second_backtrack > 10:
+                # could be theme found but not beep
+                print("warn: second_backtrack where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
+                second_backtrack=8
+                #raise ValueError("news report theme is too far from the beep, potentially a bug")
         
         #print('second_backtrack',second_backtrack,'---')
 
@@ -204,11 +211,16 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         news_report_final.append(second_beg)
         # add 30 minutes after each news report, then backtrack to the nearest beep
         next_report = second_beg+30*60
-        next_report_second_backtrack = find_nearest_distance_backwards(single_beep_ts,next_report)-clip_length_second
-        if next_report_second_backtrack > 10:
-            # could be beep not prominent enough
-            print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
+        dist2=find_nearest_distance_backwards(single_beep_ts,next_report)
+        if dist2 is None:
+            print("warn: next_report_second_backtrack no distance for whatever reason, changing it to 0")
             next_report_second_backtrack=0
+        else:    
+            next_report_second_backtrack = dist2-clip_length_second
+            if next_report_second_backtrack > 10:
+                # could be beep not prominent enough
+                print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
+                next_report_second_backtrack=0
         #print('next_report_second_backtrack',second_backtrack,'---')    
         next_report = next_report - next_report_second_backtrack
         
@@ -242,7 +254,8 @@ def scrape(input_file,stream_name,always_reprocess=False):
             tsformatted=json.load(f)['tsformatted']
     else:
         stream = streams[stream_name]
-        clips = stream["introclips"]
+        intro_clips = stream["introclips"]
+        backup_intro_clips = stream.get("backupintroclips",[])
         allow_first_short = stream["allow_first_short"]
         news_report_strategy=stream.get("news_report_strategy","beep")
         news_report_strategy_expected_count=stream.get("news_report_strategy_expected_count",None)
@@ -263,27 +276,37 @@ def scrape(input_file,stream_name,always_reprocess=False):
         news_report_peak_times_formatted=[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(news_report_peak_times)]
         print("news_report_peak_times",news_report_peak_times_formatted,"---")
 
-        clip_paths_intros=[f'./audio_clips/{clip}' for clip in clips]
+        clip_paths_intros=[f'./audio_clips/{clip}' for clip in intro_clips]
+        backup_intro_clip_paths=[f'./audio_clips/{clip}' for clip in backup_intro_clips]
 
         # Find clip occurrences in the full audio
-        intro_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_intros,
+        intro_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_intros+backup_intro_clip_paths,
                                                            full_audio_path=input_file,
                                                            method=DEFAULT_METHOD,
                                                            correlation_threshold = correlation_threshold_intro,
                                                            )
         
         program_intro_peak_times=[]
-        program_intro_peak_times_debug=[]
-        for c in clips:
+        #program_intro_peak_times_debug=[]
+        for c in intro_clips:
             intros=intro_clip_peak_times[f'./audio_clips/{c}']
-            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
-            intros_debug = sorted(intros)
-            program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
+            #intros_debug = sorted(intros)
+            #program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
 
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
-        pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad)
+        backup_intro_peak_times=[]
+        for c in backup_intro_clips:
+            intros=intro_clip_peak_times[f'./audio_clips/{c}']
+            backup_intro_peak_times.extend(intros)
+            #intros_debug = sorted(intros)
+            #program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
+
+        print("backup_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(backup_intro_peak_times)],"---")
+
+
+        pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,backup_intro_ts=backup_intro_peak_times,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
         print("final sequences",tsformatted)
         duration = [seconds_to_time(t[1]-t[0]) for t in pair]

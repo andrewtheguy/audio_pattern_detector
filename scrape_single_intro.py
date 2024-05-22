@@ -107,7 +107,6 @@ def scrape_single_intro(input_file,stream_name,recorded):
         for c in intro_clips:
             clip_path=f'./audio_clips/{c}'
             intros=peaks_all[clip_path]
-            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             program_intro_peak_times.extend(intros)
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
 
@@ -115,7 +114,6 @@ def scrape_single_intro(input_file,stream_name,recorded):
         for c in ending_clips:
             clip_path=f'./audio_clips/{c}'
             endings=peaks_all[clip_path]
-            #print("intros",[seconds_to_time(seconds=t,include_decimals=False) for t in intros],"---")
             endings_array.extend(endings)
 
         print("ending_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(endings_array)],"---")    

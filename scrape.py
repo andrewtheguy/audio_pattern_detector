@@ -53,9 +53,9 @@ def split_audio(input_file, output_file, start_time, end_time,total_time,artist,
 
     metadata_list = ["title={}".format(title), "artist={}".format(artist), "album={}".format(album), ]
     metadata_dict = {f"metadata:g:{i}": e for i, e in enumerate(metadata_list)}
-
+    #raise "chafa"
     (
-    ffmpeg.input(input_file, ss=seconds_to_time(seconds=start_time,include_decimals=False), to=seconds_to_time(seconds=end_time,include_decimals=False))
+    ffmpeg.input(input_file, ss=seconds_to_time(seconds=start_time,include_decimals=True), to=seconds_to_time(seconds=end_time,include_decimals=True))
             .output(output_file,acodec='copy',vcodec='copy', loglevel="error", **metadata_dict).overwrite_output().run()
     )
 

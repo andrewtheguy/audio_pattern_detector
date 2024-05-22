@@ -6,7 +6,7 @@ import sys
 
 from time_sequence_error import TimeSequenceError
 from andrew_utils import seconds_to_time
-from utils import is_unique_and_sorted
+from utils import find_nearest_distance_forward, is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ def consolidate_close_by(news_reports,max_seconds):
     return new_ones            
         
 # news_reports need to be unique         
-def consolidate_intros(intros,news_reports,total_time):
+def consolidate_intros(intros,news_reports,total_time,backup_intro_ts=[]):
     if not is_unique_and_sorted(intros):
         raise ValueError("intros is not unique or sorted")
     if not is_unique_and_sorted(news_reports):
@@ -200,6 +200,12 @@ def consolidate_intros(intros,news_reports,total_time):
             continue
         consolidated_intros.append(arr[0])
         
+    if len(consolidated_intros) > 0 and consolidated_intros[0] > INTRO_CUT_OFF and len(backup_intro_ts) > 0:
+        # need to pad an earlier intro from backup if any
+        closest_backup_intro_ts = min(backup_intro_ts)
+        if(closest_backup_intro_ts <= INTRO_CUT_OFF):
+            consolidated_intros[0]=closest_backup_intro_ts
+
     return consolidated_intros
     
 # clean up first 10 minutes 
@@ -296,6 +302,53 @@ def absorb_fake_news_report(intros,new_reports):
 
     return [news_report for i, news_report in enumerate(new_reports) if i not in exclude_list]            
     
+# not really need to sort backup_intro_ts    
+def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("start_times is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("end_times is not unique or sorted")
+    # defensive copy
+    intros = intros.copy()
+    if len(news_reports) == 0:
+        return intros
+    if len(backup_intro_ts) == 0:
+        return intros
+    if len(intros) == 0:
+        return [min(backup_intro_ts)]
+
+    if len(intros) < len(news_reports) and len(backup_intro_ts) > 0:
+        intros_new = []
+        intros = deque(intros)
+        i=0
+        while len(intros) > 0 and len(intros_new) + len(intros) < len(news_reports):
+            appended = False
+            if intros[0] > news_reports[i]:
+                prev_news_report = 0 if i == 0 else news_reports[i-1]
+                closest_backup_intro_dist = find_nearest_distance_forward(backup_intro_ts, prev_news_report)
+                if(closest_backup_intro_dist is None):
+                    logger.warning(f"find_nearest_distance_forward returned None for {prev_news_report}")        
+                elif(closest_backup_intro_dist > 0 and closest_backup_intro_dist <= 10*60):
+                    closest_backup_intro_ts = prev_news_report + closest_backup_intro_dist
+                    logger.info(f"inserting backup intro at {seconds_to_time(closest_backup_intro_ts)}")
+                    #raise "chafa"
+                    if closest_backup_intro_ts < news_reports[i]:
+                        intros.appendleft(closest_backup_intro_ts)
+                        appended = True
+                else:
+                    logger.warning(f"closest_backup_intro_dist {closest_backup_intro_dist} is farther than 10 minutes from {prev_news_report}")       
+                if not appended:
+                    logger.warning(f"no backup intro found to be appendable for {intros[0]}")        
+            if appended:
+                continue
+            else:
+                intros_new.append(intros.popleft())
+                i+=1
+        while len(intros) > 0:
+            intros_new.append(intros.popleft())
+        return intros_new    
+    else:
+        return intros    
                  
 def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
     result=[]
@@ -315,7 +368,7 @@ def remove_start_equals_to_end(time_sequences):
     return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
     
 # main function
-def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pad=0,
+def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pad=0,backup_intro_ts=[],
                        allow_first_short=False):
 
     # if len(news_reports) != len(set(news_reports)):
@@ -335,20 +388,16 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
         elif ts < 0:
             raise ValueError(f"intro is less than 0")
 
-    # remove repeating intros
-    intros = consolidate_intros(intros,news_reports,total_time)
+    # remove repeating intros and add backup one at beginning if needed
+    intros = consolidate_intros(intros,news_reports,total_time,backup_intro_ts=backup_intro_ts)
     # process beginning and end
     news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
     # absorb fake news report before building time sequence
     news_reports = absorb_fake_news_report(intros,news_reports)
-
-    #backup_intro_ts=[8289]
-
-    #if len(intros) < len(news_reports):
-    #    for i in range(len(intros)):
-    #        if intros[i] > news_reports[i]:
-    #            raise TimeSequenceError(f"intro {intros[i]} is greater than news report {news_reports[i]}")
+    
+    #print("intros",intros,"news_reports",news_reports,"backup_intro_ts",backup_intro_ts)
+    intros = pad_from_backup_intro_ts(intros,backup_intro_ts=backup_intro_ts,news_reports=news_reports)
 
     time_sequences=build_time_sequence(start_times=intros,end_times=news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)

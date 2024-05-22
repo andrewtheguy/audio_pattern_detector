@@ -44,6 +44,8 @@ def find_nearest_distance_backwards(array, value):
     array = np.asarray(array)
     arr2=(value - array)
     arr2=arr2[arr2 >= 0]
+    if len(arr2)==0:
+      return None
     return arr2.min()
     #return arr2[idx]
 
@@ -51,6 +53,8 @@ def find_nearest_distance_forward(array, value):
     array = np.asarray(array)
     arr2=(array - value)
     arr2=arr2[arr2 >= 0]
+    if len(arr2)==0:
+        return None
     return arr2.min()
 
 if __name__ == '__main__':
