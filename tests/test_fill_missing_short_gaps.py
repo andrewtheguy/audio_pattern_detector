@@ -83,7 +83,7 @@ class TestFillMissingShortGaps(unittest.TestCase):
 
     def test_not_make_up_beginning_non_consecutive_long_duration(self):
         result = self.do_test(intros=[minutes_to_seconds(80),minutes_to_seconds(120)],
-                              news_reports=[minutes_to_seconds(30),minutes_to_seconds(70),minutes_to_seconds(90),minutes_to_seconds(130)])
+                              news_reports=[minutes_to_seconds(30),minutes_to_seconds(100),minutes_to_seconds(130)])
         np.testing.assert_array_equal(result,
                                       [minutes_to_seconds(80),minutes_to_seconds(120)])
         
@@ -105,5 +105,17 @@ class TestFillMissingShortGaps(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [minutes_to_seconds(30),minutes_to_seconds(40),minutes_to_seconds(60),minutes_to_seconds(110),minutes_to_seconds(150)])
         
+    def test_not_make_up_end_long(self):
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(80),minutes_to_seconds(110)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(60)])
+
+    def test_make_up_end(self):
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(80),minutes_to_seconds(100)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(80)])
+
 if __name__ == '__main__':
     unittest.main()

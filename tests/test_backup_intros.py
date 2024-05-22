@@ -134,5 +134,12 @@ class TestBackupIntros(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [minutes_to_seconds(30),minutes_to_seconds(45),minutes_to_seconds(60),minutes_to_seconds(75),minutes_to_seconds(150)])
         
+    def test_make_up_end(self):
+        result = self.do_test(intros=[minutes_to_seconds(30),minutes_to_seconds(60)],
+                              backup_intro_ts=[minutes_to_seconds(90)],
+                              news_reports=[minutes_to_seconds(40),minutes_to_seconds(80),minutes_to_seconds(110)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30),minutes_to_seconds(60),minutes_to_seconds(90)])
+        
 if __name__ == '__main__':
     unittest.main()
