@@ -145,6 +145,7 @@ def find_nearest_distance(array, value):
     idx = arr2[arr2 >= 0].argmin()
     return arr2[idx]
 
+# it is easier to match using the news report theme clip than beep
 def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count,total_time):
 
     if news_report_strategy_expected_count < 1:
@@ -194,6 +195,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         second_backtrack = find_nearest_distance(single_beep_ts,second)-clip_length_second
         print('second_backtrack',second_backtrack,'---')
         if second_backtrack > 10:
+            # could be theme found but not beep
             print("warn: next_report_second where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
             next_report_second_backtrack=8
             #raise ValueError("news report theme is too far from the beep, potentially a bug")
@@ -207,6 +209,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         next_report = second_beg+30*60
         next_report_second_backtrack = find_nearest_distance(single_beep_ts,next_report)
         if next_report_second_backtrack > 10:
+            # could be beep not prominent enough
             print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
             next_report_second_backtrack=0
         print('next_report_second_backtrack',second_backtrack,'---')    
