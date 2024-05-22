@@ -349,6 +349,45 @@ def pad_from_backup_intro_ts(intros,backup_intro_ts,news_reports):
         return intros_new    
     else:
         return intros    
+    
+# only works if news report timestamp is accurate    
+def fill_in_short_intervals_missing_intros(intros,news_reports):
+    if not is_unique_and_sorted(intros):
+        raise ValueError("start_times is not unique or sorted")
+    if not is_unique_and_sorted(news_reports):
+        raise ValueError("end_times is not unique or sorted")
+    # defensive copy
+    intros = intros.copy()
+    if len(news_reports) == 0:
+        return intros
+    if len(intros) == 0:
+        return intros
+    if len(intros) < len(news_reports):
+        intros_new = []
+        intros = deque(intros)
+        i=0
+        while len(intros) > 0 and len(intros_new) + len(intros) < len(news_reports):
+            appended = False
+            if intros[0] > news_reports[i]:
+                prev_news_report = 0 if i == 0 else news_reports[i-1]
+                if(news_reports[i] - prev_news_report < 24*60): #make up if less than 24 minutes
+                    print(f"adding news report at {seconds_to_time(prev_news_report)} before {seconds_to_time(intros[0])} because clip is short and nothing is found")
+                    intros.appendleft(prev_news_report)
+                    appended = True
+                else:
+                    logger.warning(f"news_reports[i] {seconds_to_time(news_reports[i])} is farther than 24 minutes from {prev_news_report}")       
+                if not appended:
+                    logger.warning(f"no backup intro found to be appendable for {intros[0]}")        
+            if appended:
+                continue
+            else:
+                intros_new.append(intros.popleft())
+                i+=1
+        while len(intros) > 0:
+            intros_new.append(intros.popleft())
+        return intros_new    
+    else:
+        return intros
                  
 def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
     result=[]
@@ -367,9 +406,9 @@ def pad_news_report(time_sequences,total_time,news_report_second_pad=6):
 def remove_start_equals_to_end(time_sequences):
     return list(filter(lambda x: (x[0] != x[1]), time_sequences)) 
     
-# main function
+# main function, if news_report_strategy is theme_clip, won't absorb fake news report
 def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pad=0,backup_intro_ts=[],
-                       allow_first_short=False):
+                       allow_first_short=False,news_report_strategy="beep"):
 
     # if len(news_reports) != len(set(news_reports)):
     #    raise ValueError("news report has duplicates, clean up duplicates first")   
@@ -393,11 +432,16 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     # process beginning and end
     news_reports = news_intro_process_beginning_and_end(intros,news_reports,total_time)
 
-    # absorb fake news report before building time sequence
-    news_reports = absorb_fake_news_report(intros,news_reports)
+    if news_report_strategy == "beep":
+        # absorb fake news report before building time sequence
+        news_reports = absorb_fake_news_report(intros,news_reports)
     
     #print("intros",intros,"news_reports",news_reports,"backup_intro_ts",backup_intro_ts)
     intros = pad_from_backup_intro_ts(intros,backup_intro_ts=backup_intro_ts,news_reports=news_reports)
+
+    if news_report_strategy == "theme_clip":
+        #pass
+        intros = fill_in_short_intervals_missing_intros(intros,news_reports=news_reports)
 
     time_sequences=build_time_sequence(start_times=intros,end_times=news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
