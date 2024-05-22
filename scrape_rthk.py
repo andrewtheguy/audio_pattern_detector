@@ -14,6 +14,7 @@ import traceback
 from pathlib import Path
 
 import ffmpeg
+import numpy as np
 import pytz
 
 from audio_offset_finder_v2 import convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
@@ -105,14 +106,46 @@ def get_by_news_report_strategy_beep(input_file):
         news_report_peak_times = news_report_peak_times_filtered   
     return news_report_peak_times 
 
+# only used for helping get_by_news_report_theme_clip for now
+# can tolerate some inaccuracies
+def get_single_beep(input_file):
+
+    # use beep2 instead to reduce false positives, might
+    # live stream whole programs instead for easier processing
+    # with another unique news report clip
+    news_report_clip='rthk_beep.wav'
+    news_report_clip_path=f'./audio_clips/{news_report_clip}'
+
+    clip_paths_news_report=[news_report_clip_path]
+
+    # higher threshold because it is a short beep
+    correlation_threshold_news_report = 0.6
+    news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
+                                                        full_audio_path=input_file,
+                                                        method=DEFAULT_METHOD,
+                                                        correlation_threshold = correlation_threshold_news_report,
+                                                        )
+
+    news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
+    
+    return news_report_peak_times
+    #return preprocess_ts(news_report_peak_times,remove_repeats=False)
+
+def find_nearest_distance(array, value):
+    array = np.asarray(array)
+    arr2=(value - array)
+    idx = arr2[arr2 >= 0].argmin()
+    return arr2[idx]
 
 def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count,total_time):
 
     if news_report_strategy_expected_count < 1:
         raise ValueError("news_report_strategy_expected_count must be greater than or equal to 1")
     
-    # approximayte length between last beep and theme clip
+    # approximate length between last beep and theme clip
     second_backtrack = 8
+
+    single_beep_ts=get_single_beep(input_file)
 
     # use beep2 instead to reduce false positives, might
     # live stream whole programs instead for easier processing
@@ -151,11 +184,24 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         if second > total_time:
             raise ValueError("news report theme cannot be after total time")
         
+        #second_backtrack = find_nearest_distance(single_beep_ts,second)
+        if second_backtrack > 10:
+            raise ValueError("news report theme is too far from the beep, potentially a bug")
+        
+        #print('second_backtrack',second_backtrack,'---')
+
         second_beg = second - second_backtrack
 
         news_report_final.append(second_beg)
-        # add 30 minutes after each news report
+        # add 30 minutes after each news report, then backtrack to the nearest beep
         next_report = second_beg+30*60
+        next_report_second_backtrack = find_nearest_distance(single_beep_ts,next_report)
+        if next_report_second_backtrack > 10:
+            print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
+            next_report_second_backtrack=0
+        print('next_report_second_backtrack',second_backtrack,'---')    
+        next_report = next_report - next_report_second_backtrack
+        
         if next_report < total_time:
             news_report_final.append(next_report)
         #if i == len(news_report_peak_times)-1:
