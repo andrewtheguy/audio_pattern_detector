@@ -343,7 +343,12 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
     # absorb fake news report before building time sequence
     news_reports = absorb_fake_news_report(intros,news_reports)
 
-    #backup_intro_ts=[4397]
+    #backup_intro_ts=[8289]
+
+    #if len(intros) < len(news_reports):
+    #    for i in range(len(intros)):
+    #        if intros[i] > news_reports[i]:
+    #            raise TimeSequenceError(f"intro {intros[i]} is greater than news report {news_reports[i]}")
 
     time_sequences=build_time_sequence(start_times=intros,end_times=news_reports)
     time_sequences=pad_news_report(time_sequences,news_report_second_pad=news_report_second_pad,total_time=total_time)
