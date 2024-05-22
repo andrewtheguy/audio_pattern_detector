@@ -22,7 +22,7 @@ from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from scrape import concatenate_audio, download, get_sec, split_audio_by_time_sequences, url_ok
 from time_sequence_error import TimeSequenceError
-from file_upload.upload_utils2 import upload_file
+from file_upload.upload_utils2 import upload_file_with_sftp
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
@@ -54,6 +54,8 @@ streams={
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},
+        "news_report_strategy":"theme_clip",
+        "news_report_strategy_expected_count":3,
     },
 }
 
@@ -249,7 +251,7 @@ def scrape(input_file,stream_name,always_reprocess=False):
 
     pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
     
-    upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
+    upload_file_with_sftp(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
     
     #save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
@@ -269,7 +271,7 @@ def scrape(input_file,stream_name,always_reprocess=False):
         splits=split_audio_by_time_sequences(input_file,total_time,pair,tmpdir)
         concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="rthk",total_time=total_time)
         upload_path_trimmed = f"/rthk/trimmed/{dirname}/{filename_trimmed}"
-        upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
+        upload_file_with_sftp(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         if save_segments:
             # save segments
             for item in splits:
@@ -278,7 +280,7 @@ def scrape(input_file,stream_name,always_reprocess=False):
                 filename_segment=os.path.basename(item["file_path"])
                 save_path=f"{dirname_segment}/{filename_segment}"
                 shutil.move(item["file_path"],save_path)
-            #upload_file(item["file_path"],upload_path,skip_if_exists=True)
+            #upload_file_with_sftp(item["file_path"],upload_path,skip_if_exists=True)
     return output_dir_trimmed,output_file_trimmed
 
 def is_time_after(current_time,hour):
@@ -323,7 +325,7 @@ def download_and_scrape(download_only=False):
             os.makedirs(original_dir, exist_ok=True)
             try:
                 download(url,dest_file)
-                upload_file(dest_file,f"/rthk/original/{key}/{os.path.basename(dest_file)}",skip_if_exists=True)
+                upload_file_with_sftp(dest_file,f"/rthk/original/{key}/{os.path.basename(dest_file)}",skip_if_exists=True)
                 if(download_only):
                     continue
                 output_dir_trimmed,output_file_trimmed = scrape(dest_file,stream_name=key)

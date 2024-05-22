@@ -40,7 +40,7 @@ def download(url,target_file):
     
         tmp_file = os.path.join(tmpdir,f"download{extension}")
         (
-        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="error")
+        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc','seg_max_retry':'5'}, c='copy', loglevel="error")
               .run()
         )
         shutil.move(tmp_file,target_file)

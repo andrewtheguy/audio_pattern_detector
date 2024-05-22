@@ -41,7 +41,7 @@ def connect_ssh_client(ssh_client):
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh_client.connect(hostname=host,port=port,username=username,password=password, look_for_keys=False)
 
-def upload_file(file,dest_path,skip_if_exists=False):
+def upload_file_with_sftp(file,dest_path,skip_if_exists=False):
     # create ssh client 
     with paramiko.SSHClient() as ssh_client:
         connect_ssh_client(ssh_client)
@@ -49,14 +49,10 @@ def upload_file(file,dest_path,skip_if_exists=False):
         # create an SFTP client object
         with ssh_client.open_sftp() as sftp:
             if skip_if_exists:
-                try:
-                    sftp.stat(dest_path)
-                    logger.info(f'file {dest_path} already exists,skipping')
+                if file_exists(sftp_client=sftp, remote_path=dest_path):
+                    print(f'file {dest_path} already exists,skipping')
                     return
-                except IOError:
-                    logger.info(f"file {dest_path} doesn't exist, uploading")
-                    #return
-            logger.info(f"uploading {file} to {dest_path}")
+            print(f"uploading {file} to {dest_path}")
             create_remote_sftp_dir_recursively(sftp_client=sftp, remote_dir=os.path.dirname(dest_path))
             sftp.put(file,dest_path)
 
@@ -73,7 +69,7 @@ def upload_file_with_webdav(file,dest_path,skip_if_exists=False):
         client.mkdir(dir)
     logger.info(f"uploading {file} to {dest_path}")
 #    client.mkdir(dir)
-    client.upload_file(file,dest_path,overwrite=True)
+    client.upload_file_with_sftp(file,dest_path,overwrite=True)
 
 def sftp_file_exists(remote_path):
     with paramiko.SSHClient() as ssh_client:
@@ -85,4 +81,4 @@ def sftp_file_exists(remote_path):
             return file_exists(sftp_client=sftp, remote_path=remote_path)
 
 if __name__ == '__main__':
-    upload_file("test_upload.py","/chilo/chjafa/test_upload.py")
+    upload_file_with_sftp("test_upload.py","/chilo/chjafa/test_upload.py")
