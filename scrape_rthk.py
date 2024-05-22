@@ -132,9 +132,6 @@ def get_single_beep(input_file):
                                                         )
     
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
-    cleanup_news_report_peak_times = [seconds_to_time(seconds=t,include_decimals=True) for t in cleanup_peak_times(news_report_peak_times)]
-    print("news_report_peak_times single beep",cleanup_news_report_peak_times,"---")
-    print("clip_length_second single beep",clip_length_second,"---")
     
     return news_report_peak_times,clip_length_second
     #return preprocess_ts(news_report_peak_times,remove_repeats=False)
@@ -154,12 +151,15 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     #second_backtrack = 8
 
     single_beep_ts,clip_length_second=get_single_beep(input_file)
+    cleanup_single_beep_ts = [seconds_to_time(seconds=t,include_decimals=True) for t in cleanup_peak_times(single_beep_ts)]
+    #print("cleanup_single_beep_ts single beep",cleanup_single_beep_ts,"---")
+    #print("clip_length_second single beep",clip_length_second,"---")
 
     # use beep2 instead to reduce false positives, might
     # live stream whole programs instead for easier processing
     # with another unique news report clip
-    news_report_clip='rthk_news_report_theme.wav'
-    news_report_clip_path=f'./audio_clips/{news_report_clip}'
+    #news_report_clip='rthk_news_report_theme.wav'
+    news_report_clip_path=f'./audio_clips/rthk_news_report_theme.wav'
 
     clip_paths_news_report=[news_report_clip_path]
 
@@ -188,16 +188,17 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
             raise ValueError("distance between news reports is more than an hour in between, should not happen unless there is really a valid case for it")
         
     news_report_final = []
+    #print("news_report_peak_times before",news_report_peak_times,"---")
     for i,second in enumerate(news_report_peak_times):
         if second > total_time:
             raise ValueError("news report theme cannot be after total time")
         
         second_backtrack = find_nearest_distance(single_beep_ts,second)-clip_length_second
-        print('second_backtrack',second_backtrack,'---')
+        #print('second_backtrack',second_backtrack,'---')
         if second_backtrack > 10:
             # could be theme found but not beep
             print("warn: next_report_second where theme happens too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 8")
-            next_report_second_backtrack=8
+            second_backtrack=8
             #raise ValueError("news report theme is too far from the beep, potentially a bug")
         
         #print('second_backtrack',second_backtrack,'---')
@@ -207,19 +208,19 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
         news_report_final.append(second_beg)
         # add 30 minutes after each news report, then backtrack to the nearest beep
         next_report = second_beg+30*60
-        next_report_second_backtrack = find_nearest_distance(single_beep_ts,next_report)
+        next_report_second_backtrack = find_nearest_distance(single_beep_ts,next_report)-clip_length_second
         if next_report_second_backtrack > 10:
             # could be beep not prominent enough
             print("warn: next_report_second_backtrack too far from the beep, potentially a bug or just no beep happening in the middle, changing it to 0")
             next_report_second_backtrack=0
-        print('next_report_second_backtrack',second_backtrack,'---')    
-        next_report = next_report - next_report_second_backtrack-clip_length_second
+        #print('next_report_second_backtrack',second_backtrack,'---')    
+        next_report = next_report - next_report_second_backtrack
         
         if next_report < total_time:
             news_report_final.append(next_report)
         #if i == len(news_report_peak_times)-1:
         #    pass
-          
+    #print("news_report_final",news_report_final,"---")
     return news_report_final
 
 def scrape(input_file,stream_name,always_reprocess=False):
@@ -285,16 +286,6 @@ def scrape(input_file,stream_name,always_reprocess=False):
             program_intro_peak_times_debug.append({c:[intros_debug,[seconds_to_time(seconds=t,include_decimals=True) for t in intros_debug]]})
 
         print("program_intro_peak_times",[seconds_to_time(seconds=t,include_decimals=True) for t in sorted(program_intro_peak_times)],"---")
-
-        #exit(1)    
-
-        #for offset in news_report_peak_times:
-        #    logger.info(
-        #        f"Clip news_report_peak_times at the following times (in seconds): {seconds_to_time(seconds=offset, include_decimals=False)}")
-
-        #with open(f'{input_file}.separated.json','w') as f:
-        #    f.write(json.dumps({"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug}, indent=4))
-        #save_debug_info_to_db(show_name,date_str,{"news_report":[sorted(news_report_peak_times),news_report_peak_times_formatted],"intros": program_intro_peak_times_debug})
 
         pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
