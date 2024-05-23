@@ -268,7 +268,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
 
     if percentile > conditional_percentile:
-        print(len(peaks),peaks)
+        #print(len(peaks),peaks)
         if len(peaks) > 1:
             if debug_mode:
                 print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
