@@ -177,15 +177,16 @@ def consolidate_intros(intros,news_reports,total_time,backup_intro_ts=[]):
 
    
     intros=deque(intros)
-    news_reports=deque(news_reports)
+    #orig_news_reports=copy.deepcopy(news_reports)
+    q_news_reports=deque(news_reports)
     
     arr2=[]
     
     # min 1 intro and 1 news report
-    while news_reports:
+    while q_news_reports:
         temp=[]
 
-        news = news_reports.popleft()
+        news = q_news_reports.popleft()
   
         # Check if there are extra intros before the current news
         while intros and intros[0] < news:
@@ -205,6 +206,21 @@ def consolidate_intros(intros,news_reports,total_time,backup_intro_ts=[]):
         closest_backup_intro_ts = min(backup_intro_ts)
         if(closest_backup_intro_ts <= INTRO_CUT_OFF):
             consolidated_intros[0]=closest_backup_intro_ts
+    #print(len(news_reports))
+    #raise 'cahfa'
+    if len(consolidated_intros) > 0 and len(news_reports) > 0 and len(backup_intro_ts) > 0:
+        #raise 'cahfa'
+        if(news_reports[-1] > consolidated_intros[-1]):
+            closest_backup_intro_ts = max(backup_intro_ts)
+            if(closest_backup_intro_ts > consolidated_intros[-1] and closest_backup_intro_ts > news_reports[-1]):
+                #raise "chafa"
+                consolidated_intros.append(closest_backup_intro_ts)
+
+    for ts in consolidated_intros:
+        if ts > total_time:
+            raise TimeSequenceError(f"consolidated_intros overflow, is greater than total time {total_time}")
+        elif ts < 0:
+            raise ValueError(f"consolidated_intros is less than 0")
 
     return consolidated_intros
     
