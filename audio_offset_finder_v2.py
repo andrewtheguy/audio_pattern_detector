@@ -100,6 +100,8 @@ def max_distance(sorted_data):
     return max_dist
 
 
+# won't work well for very short clips like single beep
+# because it gives too many false positives
 def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_name,threshold):
 
     clip_length = len(clip)
@@ -158,11 +160,12 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
         peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
         peaks_test=[]
-        for item in (peaks):
+        for i,item in enumerate(peaks):
             #plot_test_x=np.append(plot_test_x, index)
             #plot_test_y=np.append(plot_test_y, item)
             peaks_test.append([int(item),item/sr,correlation[item]])
-        print(json.dumps(peaks_test, indent=2), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+        peaks_test.append({"properties":properties})
+        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
     #peaks = np.where(correlation > threshold)[0]
 
@@ -182,6 +185,9 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
+# won't work well if there are multiple occurrences of the same clip
+# within the same audio_section because it inflates percentile
+# and triggers multiple peaks elimination fallback
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
     #if index != 108:
     #    return []
