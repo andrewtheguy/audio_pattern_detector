@@ -211,10 +211,12 @@ def consolidate_intros(intros,news_reports,total_time,backup_intro_ts=[]):
     if len(consolidated_intros) > 0 and len(news_reports) > 0 and len(backup_intro_ts) > 0:
         #raise 'cahfa'
         if(news_reports[-1] > consolidated_intros[-1]):
-            closest_backup_intro_ts = max(backup_intro_ts)
-            if(closest_backup_intro_ts > consolidated_intros[-1] and closest_backup_intro_ts > news_reports[-1]):
-                #raise "chafa"
-                consolidated_intros.append(closest_backup_intro_ts)
+            dist=find_nearest_distance_forward(backup_intro_ts,news_reports[-1])
+            if dist is not None:
+                closest_backup_intro_ts = news_reports[-1] + dist
+                if(closest_backup_intro_ts > consolidated_intros[-1] and closest_backup_intro_ts > news_reports[-1]):
+                    #raise "chafa"
+                    consolidated_intros.append(closest_backup_intro_ts)
 
     for ts in consolidated_intros:
         if ts > total_time:
