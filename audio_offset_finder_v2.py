@@ -237,20 +237,30 @@ def experimental_non_repeating_correlation(clip, audio_section, sr, index, secon
         #print(f"{section_label} ratio: {ratio}")
         #print(f"---")
 
+    #height = 0.7
+    #distance = clip_length
+    # find the peaks in the spectrogram
+    #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
+
+    #wlen = max(int(sr/2), int(clip_length))
+    wlen = int(clip_length)
+    distance = int(clip_length/16)
 
     if percentile > 0.3:
         if debug_mode:
             print(f"skipping {section_ts} due to high correlation percentile {percentile}")
             print(f"---")
         return []
+    elif percentile > 0.2:
+        peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, int(clip_length)],
+                                       height=0.5, prominence=0.4, rel_height=1)
+        if len(peaks) > 2:
+            if debug_mode:
+                print(f"skipping {section_ts} due to more than 0.2 correlation percentile {percentile} too many peaks {len(peaks)}")
+                print(f"---")
+            return []
 
-    #height = 0.7
-    #distance = clip_length
-    # find the peaks in the spectrogram
-    #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
-
-    wlen = max(int(sr/2), int(clip_length))
-    peaks,properties = find_peaks(correlation,wlen=wlen,width=[0,int(clip_length)],height=0.7,prominence=0.6,rel_height=1)
+    peaks,properties = find_peaks(correlation,wlen=wlen,distance=distance,width=[0,int(clip_length)],height=0.7,prominence=0.6,rel_height=1)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
