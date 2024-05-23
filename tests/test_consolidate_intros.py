@@ -161,7 +161,24 @@ class TestConsolidateIntros(unittest.TestCase):
                               news_reports=[minutes_to_seconds(40),minutes_to_seconds(70),minutes_to_seconds(100),minutes_to_seconds(130)])
         np.testing.assert_array_equal(result,
                                       [minutes_to_seconds(5),minutes_to_seconds(60),minutes_to_seconds(90),minutes_to_seconds(120)])
-        
+
+    def test_making_up_missing_intro_end(self):
+        result = self.do_test(
+            intros=[minutes_to_seconds(30),minutes_to_seconds(60), minutes_to_seconds(90)],
+            backup_intro_ts=[minutes_to_seconds(120)],
+            news_reports=[minutes_to_seconds(40), minutes_to_seconds(70), minutes_to_seconds(100)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30), minutes_to_seconds(60), minutes_to_seconds(90),minutes_to_seconds(120)])
+
+    def test_not_making_up_missing_intro_end_if_between(self):
+        result = self.do_test(
+            intros=[minutes_to_seconds(30),minutes_to_seconds(60), minutes_to_seconds(90)],
+            backup_intro_ts=[minutes_to_seconds(95)],
+            news_reports=[minutes_to_seconds(40), minutes_to_seconds(70), minutes_to_seconds(100)])
+        np.testing.assert_array_equal(result,
+                                      [minutes_to_seconds(30), minutes_to_seconds(60), minutes_to_seconds(90)])
+
+
 
 if __name__ == '__main__':
     unittest.main()
