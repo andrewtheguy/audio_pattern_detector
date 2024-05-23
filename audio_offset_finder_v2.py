@@ -118,7 +118,8 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
     #correlation[correlation < 0] = 0
     correlation /= np.max(correlation)
 
-    section_label = seconds_to_time(index*60)
+    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+
     if debug_mode:
         graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
         os.makedirs(graph_dir, exist_ok=True)
@@ -130,16 +131,20 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
         plt.xlabel('Lag')
         plt.ylabel('Correlation coefficient')
         plt.savefig(
-            f'{graph_dir}/{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.png')
+            f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
         plt.close()
 
     max_sample = len(audio) - samples_skip_end
     #trim placeholder clip
     correlation = correlation[:max_sample]
+
     if debug_mode:
-        print(f"{section_label} percentile", np.percentile(correlation, 99))
-        print(f"{section_label} max correlation: {max(correlation)}")
-        print(f"{section_label} ratio: {np.percentile(correlation, 99)/max(correlation)}")
+        percentile = np.percentile(correlation, 99)
+        max_correlation = max(correlation)
+        ratio = percentile / max_correlation
+        print(f"{section_ts} percentile", percentile)
+        print(f"{section_ts} max correlation: {max_correlation}")
+        print(f"{section_ts} ratio: {ratio}")
         print(f"---")
 
     height = threshold
@@ -147,7 +152,6 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
     # find the peaks in the spectrogram
     peaks, properties = find_peaks(correlation, height=height, distance=distance)
 
-    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
@@ -171,13 +175,133 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     return peak_times
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    #if index != 108:
+    #    return []
+
+    clip_length = len(clip)
+
+    # Cross-correlate and normalize correlation
+    correlation = correlate(audio_section, clip, mode='full', method='fft')
+    # abs
+    correlation = np.abs(correlation)
+    # alternative to replace negative values with zero in array instead of above
+    #correlation[correlation < 0] = 0
+    correlation /= np.max(correlation)
+
+    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+
+    if debug_mode:
+        graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
+
+        #Optional: plot the correlation graph to visualize
+        plt.figure(figsize=(10, 4))
+        plt.plot(correlation)
+        plt.title('Cross-correlation between the audio clip and full track before slicing')
+        plt.xlabel('Lag')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(
+            f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
+        plt.close()
+
+
+    percentile = np.percentile(correlation, 99)
+
+
+    #max_correlation = max(correlation)
+    #ratio = percentile/max_correlation
+
+    if debug_mode:
+        print(f"{section_ts} percentile", percentile)
+        #print(f"{section_label} max correlation: {max_correlation}")
+        #print(f"{section_label} ratio: {ratio}")
+        #print(f"---")
+
+    #height = 0.7
+    #distance = clip_length
+    # find the peaks in the spectrogram
+    #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
+
+    #wlen = max(int(sr/2), int(clip_length))
+    #print("clip_length",clip_length)
+
+    width = int(max(clip_length,1*sr)/512)
+    #wlen = width
+    distance = int(clip_length)
+
+    hard_percentile = 0.3
+    conditional_percentile = 0.2
+
+    if percentile > hard_percentile:
+        if debug_mode:
+            print(f"skipping {section_ts} due to high correlation percentile {percentile} > {hard_percentile}")
+            print(f"---")
+        return []
+    #elif percentile > 0.2:
+        # peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, width],
+        #                                height=0.5, prominence=0.4, rel_height=1)
+        # if len(peaks) > 2:
+        #     if debug_mode:
+        #         print(f"skipping {section_ts} due to more than 0.2 correlation percentile {percentile} too many peaks {len(peaks)}")
+        #         print(f"---")
+        #     return []
+
+    peaks,properties = find_peaks(correlation,distance=distance,width=[0,width],prominence=0.4)
+
+    if debug_mode:
+        peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
+        os.makedirs(peak_dir, exist_ok=True)
+        peaks_test=[]
+        for i,item in enumerate(peaks):
+            #plot_test_x=np.append(plot_test_x, index)
+            #plot_test_y=np.append(plot_test_y, item)
+            peaks_test.append([int(item),item/sr,correlation[item]])
+        peaks_test.append({"properties":properties})
+        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+
+
+    if percentile > conditional_percentile:
+        #print(len(peaks),peaks)
+        if len(peaks) > 1:
+            if debug_mode:
+                print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
+                print(f"---")
+            return []
+
+    sharp_peaks = []
+    for i,peak in enumerate(peaks):
+        if properties["prominences"][i] >= 0.95:
+            sharp_peaks.append(peak)
+
+    if len(sharp_peaks) == 0:
+        if debug_mode:
+            print(f"skipping {section_ts} due to no sharp peaks")
+            print(f"---")
+        return []
+    elif len(sharp_peaks) > 1:
+        if debug_mode:
+            print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
+            print(f"---")
+        return []
+
+    peak_time = sharp_peaks[0] / sr
+
+    return [peak_time]
+
 
 
 # sliding_window: for previous_chunk in seconds from end
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
 def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, seconds_per_chunk, clip_name,
-                  method,correlation_threshold):
+                  method,correlation_threshold=None):
     clip_length = len(clip)
     new_seconds = len(chunk) / sr
     # Concatenate previous chunk for continuity in processing
@@ -189,8 +313,6 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
             audio_section = np.concatenate((audio_section_temp, np.array([])))
         else:
             subtract_seconds = sliding_window
-            #print("sliding_window", sliding_window)
-            #print("sr", sr)
             audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk, np.array([])))
     else:
         subtract_seconds = 0
@@ -230,13 +352,20 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
             audio_section, sr)
 
     if method == "correlation":
+        if correlation_threshold is None:
+            raise ValueError("correlation_threshold is required for correlation method")
         # samples_skip_end does not skip results from being included yet
         peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk,
-                                        clip_name=clip_name,threshold=correlation_threshold)
-    elif method == "advanced_correlation":
-        raise ValueError("disabled")
-        peak_times = advanced_correlation_method(clip, audio=audio_section, sr=sr, index=index,
+                                        clip_name=clip_name,
+                                        threshold=correlation_threshold)
+    elif method == "non_repeating_correlation":
+    #    peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
+    #                                    seconds_per_chunk=seconds_per_chunk,
+    #                                    clip_name=clip_name,
+    #                                    threshold=correlation_threshold,repeating=False)
+    #elif method == "experimental_non_repeating_correlation":
+        peak_times = non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     else:
         raise ValueError("unknown method")
@@ -328,7 +457,7 @@ def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
     return sliding_window
 
 # could cause issues with small overlap when intro is followed right by news report
-def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method,correlation_threshold):
+def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method,correlation_threshold=None):
     for clip_path in clip_paths:
         if not os.path.exists(clip_path):
             raise ValueError(f"Clip {clip_path} does not exist")
