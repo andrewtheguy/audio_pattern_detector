@@ -100,7 +100,7 @@ def max_distance(sorted_data):
     return max_dist
 
 
-def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_name,threshold,repeating=False):
+def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_name,threshold,repeating=True):
 
     clip_length = len(clip)
 
@@ -243,7 +243,9 @@ def experimental_non_repeating_correlation(clip, audio_section, sr, index, secon
     #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
 
     #wlen = max(int(sr/2), int(clip_length))
-    wlen = int(clip_length)
+
+    width = int(min(clip_length,0.5*sr))
+    wlen = width
     distance = int(clip_length/16)
 
     if percentile > 0.3:
@@ -252,7 +254,7 @@ def experimental_non_repeating_correlation(clip, audio_section, sr, index, secon
             print(f"---")
         return []
     elif percentile > 0.2:
-        peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, int(clip_length)],
+        peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, width],
                                        height=0.5, prominence=0.4, rel_height=1)
         if len(peaks) > 2:
             if debug_mode:
@@ -260,7 +262,7 @@ def experimental_non_repeating_correlation(clip, audio_section, sr, index, secon
                 print(f"---")
             return []
 
-    peaks,properties = find_peaks(correlation,wlen=wlen,distance=distance,width=[0,int(clip_length)],height=0.7,prominence=0.6,rel_height=1)
+    peaks,properties = find_peaks(correlation,wlen=wlen,distance=distance,width=[0,width],height=0.7,prominence=0.6,rel_height=1)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
