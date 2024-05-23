@@ -277,7 +277,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     sharp_peaks = []
     for i,peak in enumerate(peaks):
-        if properties["prominences"][i] >= 0.6:
+        if properties["prominences"][i] >= 0.95:
             sharp_peaks.append(peak)
 
     if len(sharp_peaks) == 0:
