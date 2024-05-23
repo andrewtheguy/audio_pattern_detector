@@ -245,9 +245,12 @@ def experimental_non_repeating_correlation(clip, audio_section, sr, index, secon
         return []
 
     #height = 0.7
-    distance = clip_length
+    #distance = clip_length
     # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
+    #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
+
+    wlen = max(int(sr/2), int(clip_length))
+    peaks,properties = find_peaks(correlation,wlen=wlen,width=[0,int(clip_length)],height=0.7,prominence=0.6,rel_height=1)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -338,11 +341,11 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
                                         clip_name=clip_name,
                                         threshold=correlation_threshold)
     elif method == "non_repeating_correlation":
-        peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
-                                        seconds_per_chunk=seconds_per_chunk,
-                                        clip_name=clip_name,
-                                        threshold=correlation_threshold,repeating=False)
-    elif method == "experimental_non_repeating_correlation":
+    #    peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
+    #                                    seconds_per_chunk=seconds_per_chunk,
+    #                                    clip_name=clip_name,
+    #                                    threshold=correlation_threshold,repeating=False)
+    #elif method == "experimental_non_repeating_correlation":
         peak_times = experimental_non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
     else:
