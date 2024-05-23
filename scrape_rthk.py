@@ -55,7 +55,7 @@ streams={
         "news_report_strategy_expected_count":4,
     },
     "KnowledgeCo": {
-        "introclips": ["rthk2theme_new.wav","knowledgecointro.wav"],
+        "introclips": ["knowledgecointro.wav"],
         "backupintroclips": ["rthk2theme.wav","rthk2theme_new.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",

@@ -182,6 +182,8 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    #if index != 26:
+    #    return []
 
     clip_length = len(clip)
 
@@ -228,26 +230,30 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
 
     #wlen = max(int(sr/2), int(clip_length))
+    #print("clip_length",clip_length)
 
-    width = int(min(clip_length,0.5*sr))
-    wlen = width
-    distance = int(clip_length/16)
+    width = int(sr/512)
+    #wlen = width
+    distance = int(clip_length)
 
-    if percentile > 0.3:
+    hard_percentile = 0.3
+    conditional_percentile = 0.2
+
+    if percentile > hard_percentile:
         if debug_mode:
-            print(f"skipping {section_ts} due to high correlation percentile {percentile}")
+            print(f"skipping {section_ts} due to high correlation percentile {percentile} > {hard_percentile}")
             print(f"---")
         return []
-    elif percentile > 0.2:
-        peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, width],
-                                       height=0.5, prominence=0.4, rel_height=1)
-        if len(peaks) > 2:
-            if debug_mode:
-                print(f"skipping {section_ts} due to more than 0.2 correlation percentile {percentile} too many peaks {len(peaks)}")
-                print(f"---")
-            return []
+    #elif percentile > 0.2:
+        # peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, width],
+        #                                height=0.5, prominence=0.4, rel_height=1)
+        # if len(peaks) > 2:
+        #     if debug_mode:
+        #         print(f"skipping {section_ts} due to more than 0.2 correlation percentile {percentile} too many peaks {len(peaks)}")
+        #         print(f"---")
+        #     return []
 
-    peaks,properties = find_peaks(correlation,wlen=wlen,distance=distance,width=[0,width],height=0.7,prominence=0.6,rel_height=1)
+    peaks,properties = find_peaks(correlation,distance=distance,width=[0,width],prominence=0.4)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -260,18 +266,31 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         peaks_test.append({"properties":properties})
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
-    if len(peaks) == 0:
+
+    if percentile > conditional_percentile:
+        if len(peaks) > 2:
+            if debug_mode:
+                print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
+                print(f"---")
+            return []
+
+    sharp_peaks = []
+    for i,peak in enumerate(peaks):
+        if properties["prominences"][i] >= 0.6:
+            sharp_peaks.append(peak)
+
+    if len(sharp_peaks) == 0:
         if debug_mode:
-            print(f"skipping {section_ts} due to no peaks")
+            print(f"skipping {section_ts} due to no sharp peaks")
             print(f"---")
         return []
-    elif len(peaks) > 1:
+    elif len(sharp_peaks) > 1:
         if debug_mode:
-            print(f"skipping {section_ts} due to multiple peaks {peaks}")
+            print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
             print(f"---")
         return []
 
-    peak_time = peaks[0] / sr
+    peak_time = sharp_peaks[0] / sr
 
     return [peak_time]
 
