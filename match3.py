@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--pattern-file', metavar='pattern file', required=True, type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, required=True, help='audio file to find pattern')
     parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default=DEFAULT_METHOD)
-    parser.add_argument('--correlation-threshold', metavar='pattern match method', type=float, help='pattern match method',
+    parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
                         default=0.4)
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
