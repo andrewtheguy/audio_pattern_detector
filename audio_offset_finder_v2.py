@@ -375,49 +375,6 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
 
     return peak_times_final
 
-# only for testing
-def cleanup_peak_times(peak_times):
-    # freq = {}
-
-    # for peak in peak_times:
-    #     i = math.floor(peak)
-    #     cur = freq.get(i, 0)
-    #     freq[i] = cur + 1
-
-    #print(freq)
-
-    #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
-
-    #print('before consolidate',peak_times)
-
-    # deduplicate by seconds
-    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
-
-    peak_times_clean2 = deque(sorted(peak_times_clean))
-    #print('before remove close',peak_times_clean2)
-
-    peak_times_final = []
-
-    # skip those less than 10 seconds in between like beep, beep, beep
-    # already doing that in process timestamp, just doing again to
-    # make it look clean
-    skip_second_between = 10
-
-    prevItem = None
-    while peak_times_clean2:
-        item = peak_times_clean2.popleft()
-        if (prevItem is None):
-            peak_times_final.append(item)
-            prevItem = item
-        elif item - prevItem < skip_second_between:
-            logger.debug(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
-            prevItem = item
-        else:
-            peak_times_final.append(item)
-            prevItem = item
-
-    return peak_times_final
-
 
 def convert_audio_arr_to_float(audio):
     #raise "chafa"

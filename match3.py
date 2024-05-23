@@ -14,8 +14,53 @@ import matplotlib.pyplot as plt
 import ffmpeg
 import librosa
 import soundfile as sf
-from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD, cleanup_peak_times, set_debug_mode
+from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD, set_debug_mode
 from andrew_utils import seconds_to_time
+
+
+# only for testing
+def cleanup_peak_times(peak_times):
+    # freq = {}
+
+    # for peak in peak_times:
+    #     i = math.floor(peak)
+    #     cur = freq.get(i, 0)
+    #     freq[i] = cur + 1
+
+    #print(freq)
+
+    #print({k: v for k, v in sorted(freq.items(), key=lambda item: item[1])})
+
+    #print('before consolidate',peak_times)
+
+    # deduplicate by seconds
+    peak_times_clean = list(dict.fromkeys([math.floor(peak) for peak in peak_times]))
+
+    peak_times_clean2 = deque(sorted(peak_times_clean))
+    #print('before remove close',peak_times_clean2)
+
+    peak_times_final = []
+
+    # skip those less than 10 seconds in between like beep, beep, beep
+    # already doing that in process timestamp, just doing again to
+    # make it look clean
+    skip_second_between = 10
+
+    prevItem = None
+    while peak_times_clean2:
+        item = peak_times_clean2.popleft()
+        if (prevItem is None):
+            peak_times_final.append(item)
+            prevItem = item
+        elif item - prevItem < skip_second_between:
+            logger.debug(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
+            prevItem = item
+        else:
+            peak_times_final.append(item)
+            prevItem = item
+
+    return peak_times_final
+
 
 def main():
     set_debug_mode(True)
