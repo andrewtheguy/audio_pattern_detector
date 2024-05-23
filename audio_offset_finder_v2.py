@@ -182,7 +182,7 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
-    #if index != 26:
+    #if index != 108:
     #    return []
 
     clip_length = len(clip)
@@ -232,7 +232,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #wlen = max(int(sr/2), int(clip_length))
     #print("clip_length",clip_length)
 
-    width = int(sr/512)
+    width = int(max(clip_length,1*sr)/512)
     #wlen = width
     distance = int(clip_length)
 
@@ -268,7 +268,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
 
     if percentile > conditional_percentile:
-        if len(peaks) > 2:
+        print(len(peaks),peaks)
+        if len(peaks) > 1:
             if debug_mode:
                 print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
                 print(f"---")
