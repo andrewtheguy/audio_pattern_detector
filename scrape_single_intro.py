@@ -103,7 +103,8 @@ def scrape_single_intro(input_file,stream_name,recorded):
         program_intro_peak_times=[]
 
 
-        peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file,method=DEFAULT_METHOD,correlation_threshold=correlation_threshold_intro)
+        peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file, method=DEFAULT_METHOD,
+                                               threshold=correlation_threshold_intro)
         for c in intro_clips:
             clip_path=f'./audio_clips/{c}'
             intros=peaks_all[clip_path]
