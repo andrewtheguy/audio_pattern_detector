@@ -302,7 +302,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
 def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, seconds_per_chunk, clip_name,
-                  method,correlation_threshold=None):
+                  method, threshold=None):
     clip_length = len(clip)
     new_seconds = len(chunk) / sr
     # Concatenate previous chunk for continuity in processing
@@ -353,18 +353,18 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
             audio_section, sr)
 
     if method == "correlation":
-        if correlation_threshold is None:
-            raise ValueError("correlation_threshold is required for correlation method")
+        if threshold is None:
+            raise ValueError("threshold is required for correlation method")
         # samples_skip_end does not skip results from being included yet
         peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk,
                                         clip_name=clip_name,
-                                        threshold=correlation_threshold)
+                                        threshold=threshold)
     elif method == "non_repeating_correlation":
     #    peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
     #                                    seconds_per_chunk=seconds_per_chunk,
     #                                    clip_name=clip_name,
-    #                                    threshold=correlation_threshold,repeating=False)
+    #                                    threshold=threshold,repeating=False)
     #elif method == "experimental_non_repeating_correlation":
         peak_times = non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
@@ -458,7 +458,7 @@ def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
     return sliding_window
 
 # could cause issues with small overlap when intro is followed right by news report
-def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method,correlation_threshold=None):
+def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method, threshold=None):
     for clip_path in clip_paths:
         if not os.path.exists(clip_path):
             raise ValueError(f"Clip {clip_path} does not exist")
@@ -536,7 +536,7 @@ def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method,correlation
                                             sliding_window=sliding_window,
                                             seconds_per_chunk=seconds_per_chunk, 
                                             method=method,
-                                            correlation_threshold = correlation_threshold,
+                                            threshold=threshold,
                                     )
     
             all_peak_times[clip_path].extend(peak_times)
@@ -550,8 +550,8 @@ def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method,correlation
     return all_peak_times
 
 
-def _find_clip_in_chunk(clip,clip_name,clip_seconds,index,previous_chunk,chunk,
-                        sliding_window,seconds_per_chunk,method,correlation_threshold):
+def _find_clip_in_chunk(clip, clip_name, clip_seconds, index, previous_chunk, chunk,
+                        sliding_window, seconds_per_chunk, method, threshold):
 
     unwind_clip_ts = True
 
@@ -560,13 +560,13 @@ def _find_clip_in_chunk(clip,clip_name,clip_seconds,index,previous_chunk,chunk,
     all_peak_times = []
 
     peak_times = process_chunk(chunk=chunk, clip=clip, sr=target_sample_rate,
-                                previous_chunk=previous_chunk,
-                                sliding_window=sliding_window,
-                                index=index,
-                                clip_name=clip_name,
-                                seconds_per_chunk=seconds_per_chunk, method=method,
-                                correlation_threshold = correlation_threshold
-                                )
+                               previous_chunk=previous_chunk,
+                               sliding_window=sliding_window,
+                               index=index,
+                               clip_name=clip_name,
+                               seconds_per_chunk=seconds_per_chunk, method=method,
+                               threshold=threshold
+                               )
     if len(peak_times):
         peak_times_from_beginning = [time + (index * seconds_per_chunk) for time in peak_times]
         if unwind_clip_ts:

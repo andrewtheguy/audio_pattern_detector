@@ -89,10 +89,10 @@ def get_by_news_report_strategy_beep(input_file):
     # especially with the longer beep2
     correlation_threshold_news_report = 0.3
     news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
-                                                        full_audio_path=input_file,
-                                                        method=DEFAULT_METHOD,
-                                                        correlation_threshold = correlation_threshold_news_report,
-                                                        )
+                                                               full_audio_path=input_file,
+                                                               method=DEFAULT_METHOD,
+                                                               threshold= correlation_threshold_news_report,
+                                                               )
 
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
     audio_name,_ = os.path.splitext(os.path.basename(input_file))
@@ -129,10 +129,10 @@ def get_single_beep(input_file):
     # higher threshold because it is a short beep
     correlation_threshold_news_report = 0.6
     news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
-                                                        full_audio_path=input_file,
-                                                        method=DEFAULT_METHOD,
-                                                        correlation_threshold = correlation_threshold_news_report,
-                                                        )
+                                                               full_audio_path=input_file,
+                                                               method=DEFAULT_METHOD,
+                                                               threshold= correlation_threshold_news_report,
+                                                               )
     
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
     
@@ -281,10 +281,10 @@ def scrape(input_file,stream_name,always_reprocess=False):
 
         # Find clip occurrences in the full audio
         intro_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_intros+backup_intro_clip_paths,
-                                                           full_audio_path=input_file,
-                                                           method=DEFAULT_METHOD,
-                                                           correlation_threshold = correlation_threshold_intro,
-                                                           )
+                                                             full_audio_path=input_file,
+                                                             method=DEFAULT_METHOD,
+                                                             threshold= correlation_threshold_intro,
+                                                             )
         
         program_intro_peak_times=[]
         #program_intro_peak_times_debug=[]

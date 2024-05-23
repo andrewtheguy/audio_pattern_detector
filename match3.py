@@ -30,7 +30,8 @@ def main():
     #print(args.method)
 
     # Find clip occurrences in the full audio
-    peak_times = find_clip_in_audio_in_chunks(clip_paths=[args.pattern_file], full_audio_path=args.audio_file, method=args.match_method,correlation_threshold=args.correlation_threshold)
+    peak_times = find_clip_in_audio_in_chunks(clip_paths=[args.pattern_file], full_audio_path=args.audio_file, method=args.match_method,
+                                              threshold=args.threshold)
     print(peak_times)
     peak_times_clean = cleanup_peak_times(peak_times[args.pattern_file])
     print(peak_times_clean)
