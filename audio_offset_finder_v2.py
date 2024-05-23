@@ -147,10 +147,11 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
         print(f"{section_ts} ratio: {ratio}")
         print(f"---")
 
-    height = threshold
+    #height = threshold
     distance = clip_length
+    width = int(max(clip_length, 1 * sr) / 512)
     # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation, height=height, distance=distance)
+    peaks, properties = find_peaks(correlation, prominence=threshold, width=[0,width], distance=distance)
 
 
     if debug_mode:
