@@ -18,7 +18,7 @@ import ffmpeg
 import numpy as np
 import pytz
 
-from audio_offset_finder_v2 import cleanup_peak_times, convert_audio_to_clip_format, find_clip_in_audio_in_chunks, DEFAULT_METHOD
+from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD
 #from database import save_debug_info_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
