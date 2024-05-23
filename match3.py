@@ -53,7 +53,7 @@ def cleanup_peak_times(peak_times):
             peak_times_final.append(item)
             prevItem = item
         elif item - prevItem < skip_second_between:
-            logger.debug(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
+            #logger.debug(f'skip {item} less than {skip_second_between} seconds from {prevItem}')
             prevItem = item
         else:
             peak_times_final.append(item)
@@ -77,7 +77,7 @@ def main():
     # Find clip occurrences in the full audio
     peak_times = find_clip_in_audio_in_chunks(clip_paths=[args.pattern_file], full_audio_path=args.audio_file, method=args.match_method,
                                               threshold=args.threshold)
-    print(peak_times)
+    print(peak_times[args.pattern_file])
     peak_times_clean = cleanup_peak_times(peak_times[args.pattern_file])
     print(peak_times_clean)
 
