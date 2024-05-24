@@ -400,23 +400,21 @@ def convert_audio_to_clip_format(audio_path, output_path):
     sf.write(output_path, clip, target_sample_rate)
 
 def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
+    sliding_window = math.ceil(clip_seconds)
 
-    sliding_window = 5
-
-    if (sliding_window < clip_seconds + 5):
-        # need to extend the sliding window to overlap the clip
-        sliding_window = clip_seconds + 5
-        print(f"adjusted sliding_window to {sliding_window} for {clip_name}")
-    #print(sliding_window)
+    if (sliding_window != clip_seconds):
+        print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}")
+    # sliding_window = 5
+    #
+    # if (sliding_window < clip_seconds + 5):
+    #     # need to extend the sliding window to overlap the clip
+    #     sliding_window = clip_seconds + 5
+    #     print(f"adjusted sliding_window to {sliding_window} for {clip_name}")
 
     # this should not happen anyways because the seconds per chunk is too small
     if (seconds_per_chunk < sliding_window * 2):
         seconds_per_chunk = sliding_window * 10
         raise ValueError(f"seconds_per_chunk {seconds_per_chunk} is too small")
-        #print(f"adjusted seconds_per_chunk to {seconds_per_chunk}")
-    #print(seconds_per_chunk)
-
-    #exit(1)
 
     return sliding_window
 
