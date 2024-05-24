@@ -20,7 +20,10 @@ from process_timestamps import process_timestamps_simple
 from scrape import concatenate_audio, get_sec, split_audio_by_time_sequences
 from upload_utils import sftp
 
-streams={
+# clips should be non-repeating because I am using the non-repeat method, too much headache to deal with repeating clips
+
+# for those I grabbed myself
+ripped_streams={
     "1810加油站": {
         "introclips": ["am1430/1810_add_oil_intro.wav","am1430/1810_add_oil_end.wav"],
         #"endingclips": ["am1430/1810_add_oil_end.wav"],
@@ -45,7 +48,7 @@ streams={
         "expected_num_segments": 1,
     },
     "置業興家": {
-        "introclips": ["am1430/置業興家intro.wav"],
+        "introclips": ["am1430/置業興家intro2.wav"],
         "endingclips": ["am1430/opinion_only.wav"],
         "ends_with_intro": False,
         "expected_num_segments": 1,
@@ -55,7 +58,16 @@ streams={
         "endingclips": ["am1430/programsponsoredby.wav","am1430/thankyouwatchingsunset.wav"],
         #"endingclips": [],
         "ends_with_intro": False,
+        "min_duration": 60 * 60 * 2,  # guard against short recordings which resulted from failure
         #"expected_num_segments": 5,
+    },
+    "受之有道": {
+        "introclips": ["am1430/受之有道intro.wav"],
+        "endingclips": ["am1430/受之有道outro.wav"],
+        "ends_with_intro": False,
+        "expected_num_segments": 3,
+        "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
+        # "expected_num_segments": 5,
     },
 }
 
@@ -69,7 +81,7 @@ recorded_streams={
     },
 }
 
-correlation_threshold_intro = 0.4
+#correlation_threshold_intro = 0.4
 
 def scrape_single_intro(input_file,stream_name,recorded):
     print(input_file)
@@ -88,10 +100,12 @@ def scrape_single_intro(input_file,stream_name,recorded):
     logger.debug("total_time",total_time,"---")
     #exit(1)
     if not tsformatted:
-        target_streams = streams if not recorded else recorded_streams
+        target_streams = ripped_streams if not recorded else recorded_streams
         stream = target_streams[stream_name]
+        min_duration = stream.get("min_duration",None)
+        if min_duration and total_time<min_duration:
+            raise ValueError(f"total_time {total_time} is less than min_duration {min_duration}")
         intro_clips = stream["introclips"]
-        ending_clips = []
 
         ends_with_intro = stream["ends_with_intro"]
 
@@ -103,8 +117,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         program_intro_peak_times=[]
 
 
-        peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file, method=DEFAULT_METHOD,
-                                               threshold=correlation_threshold_intro)
+        peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file, method='non_repeating_correlation')
         for c in intro_clips:
             clip_path=f'./audio_clips/{c}'
             intros=peaks_all[clip_path]

@@ -1,4 +1,5 @@
 import argparse
+import sys
 from collections import deque
 import copy
 import datetime
@@ -28,6 +29,7 @@ from scipy.signal import resample
 from scipy.signal import find_peaks
 from sklearn.metrics.pairwise import cosine_similarity
 
+from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +376,27 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     #elif method == "experimental_non_repeating_correlation":
         peak_times = non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
+        # peak_times=[]
+        # if(len(peak_times_tentative)<=1):
+        #     peak_times=peak_times_tentative
+        # else:
+        #     if not is_unique_and_sorted(peak_times_tentative):
+        #         raise ValueError(f"peak_times_tentative is not unique and sorted {peak_times_tentative}, maybe clean up first before selecting good ones")
+        #     peak_times_tentative.append(sys.maxsize)
+        #     for i in range(1,len(peak_times_tentative)):
+        #         last_one = i == len(peak_times_tentative) - 1
+        #         peak_time = peak_times_tentative[i]
+        #         prev_peak_time = peak_times_tentative[i-1]
+        #         next_peak_time = peak_times_tentative[i+1]
+        #         #if peak_time is not None:
+        #         #    continue
+        #         if peak_time - prev_peak_time < seconds_per_chunk:
+        #             print(f"skipping {prev_peak_time} due to less than {seconds_per_chunk} has match prev")
+        #             continue
+        #         if not last_one and next_peak_time - peak_time < seconds_per_chunk:
+        #             print(f"skipping {peak_time} due to less than {seconds_per_chunk} has match next")
+        #             continue
+        #         peak_times.append(prev_peak_time)
     else:
         raise ValueError("unknown method")
 
