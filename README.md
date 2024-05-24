@@ -1,8 +1,10 @@
 ## audio pattern detection methods
 
 ### default cross-correlation
-works for repeating patterns that are not too short in an audio section and are prominent enough, it won't work well
-for very short beep or patterns that are not loud enough in the audio section. 
+Works well with repeating or non-repeating patterns that are loud enough within the audio section because it adds the normalized clip
+at the end of the audio section, which helps to eliminate false positives that are relatively softer than the clip,
+which happens often.
+won't work well for patterns that are too short or not loud enough within the audio section. 
 
 ### non-repeating cross-correlation
 Works well for a pattern that is guaranteed not to be repeating within the time frame and again that is long enough,
