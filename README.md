@@ -14,3 +14,7 @@ being too high or multiple patterns within the same time frame.
 While it works slightly better than the default cross-correlation for very short clips, it still returns false positives for these when
 there are exactly one false positive found in the audio section and it is not possible to distinguish without listening because the peak
 looks about the same as the real one.
+
+### limitations
+overall, both method don't work well for patterns that are too short because of too many false positives, and patterns that are not loud enough are more likely to fail,
+especially with the default method that allows repeats.
