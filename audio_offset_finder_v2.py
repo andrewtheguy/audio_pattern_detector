@@ -241,12 +241,15 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #wlen = max(int(sr/2), int(clip_length))
     #print("clip_length",clip_length)
 
-    width = int(max(clip_length,1*sr)/512)
+    width = sr / 256
+    #width_sharp = 10
+    #width = int(max(clip_length,1*sr)/512)
+    #print(width)
     #wlen = width
     distance = int(clip_length)
 
     hard_percentile = 0.3
-    conditional_percentile = 0.2
+    #conditional_percentile = 0.2
 
     if percentile > hard_percentile:
         if debug_mode:
@@ -262,7 +265,13 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
-    peaks,properties = find_peaks(correlation,distance=distance,width=[0,width],prominence=0.4)
+    peaks,properties = find_peaks(correlation,distance=distance,wlen=width,width=[0,width],prominence=0.4,threshold=0)
+
+    sharp_ratios=[]
+    for i, item in enumerate(peaks):
+        # plot_test_x=np.append(plot_test_x, index)
+        # plot_test_y=np.append(plot_test_y, item)
+        sharp_ratios.append(properties["prominences"][i] / properties["widths"][i])
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -271,34 +280,45 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         for i,item in enumerate(peaks):
             #plot_test_x=np.append(plot_test_x, index)
             #plot_test_y=np.append(plot_test_y, item)
-            peaks_test.append([int(item),item/sr,correlation[item]])
+            peaks_test.append([{"index":int(item),"second":item/sr,"cor":correlation[item],
+                                "sharp_ratio":sharp_ratios[i]}])
         peaks_test.append({"properties":properties})
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
 
-    if percentile > conditional_percentile:
-        #print(len(peaks),peaks)
-        if len(peaks) > 1:
-            if debug_mode:
-                print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
-                print(f"---")
+    # if percentile > conditional_percentile:
+    #     #print(len(peaks),peaks)
+    #     if len(peaks) > 1:
+    #         if debug_mode:
+    #             print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
+    #             print(f"---")
+    #         return []
+
+    if len(peaks) > 1:
+        if debug_mode:
+            print(f"skipping {section_ts} due to multiple peaks {peaks}")
+            print(f"---")
             return []
 
     sharp_peaks = []
     for i,peak in enumerate(peaks):
-        if properties["prominences"][i] >= 0.95:
+        sharp_ratio=sharp_ratios[i]
+        #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
+        if sharp_ratio >= 0.1:
             sharp_peaks.append(peak)
+            # no need to continue since it is limited to one peak from above
+            break
 
     if len(sharp_peaks) == 0:
         if debug_mode:
             print(f"skipping {section_ts} due to no sharp peaks")
             print(f"---")
         return []
-    elif len(sharp_peaks) > 1:
-        if debug_mode:
-            print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
-            print(f"---")
-        return []
+    # elif len(sharp_peaks) > 1:
+    #     if debug_mode:
+    #         print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
+    #         print(f"---")
+    #     return []
 
     peak_time = sharp_peaks[0] / sr
 
