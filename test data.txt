@@ -1,0 +1,42 @@
+riluo interlude (repeating)
+Clip occurs at the following times (in seconds): 00:36:44.209
+Clip occurs at the following times (in seconds): 00:50:48.750
+Clip occurs at the following times (in seconds): 01:32:41.539
+
+riluo small
+Clip occurs at the following times (in seconds): 00:13:21.186
+Clip occurs at the following times (in seconds): 01:12:05.259
+
+
+法律天地
+Clip occurs at the following times (in seconds): 00:00:24.258
+Distances between clips:
+[]
+
+置業興家intro.wav
+[245.90425]
+Clip occurs at the following times (in seconds): 00:04:05.904
+Distances between clips:
+
+KnowledgeCo20240518.m4a --pattern-file ./audio_clips/rthk_news_report_theme.wav:
+Clip occurs at the following times (in seconds): 00:26:11.203
+Clip occurs at the following times (in seconds): 01:22:11.855
+Clip occurs at the following times (in seconds): 02:18:11.199
+
+漫談法律 intro
+[663.95725, 1520.783125, 2401.767625, 2988.6108750000003]
+Clip occurs at the following times (in seconds): 00:11:03.957
+Clip occurs at the following times (in seconds): 00:25:20.783
+Clip occurs at the following times (in seconds): 00:40:01.768
+Clip occurs at the following times (in seconds): 00:49:48.611
+Distances between clips:
+[{'distance': '00:14:16.826',
+  'hour_delta': 0.0,
+  'pair': ['00:11:03.957', '00:25:20.783']},
+ {'distance': '00:14:40.984',
+  'hour_delta': 0.0,
+  'pair': ['00:25:20.783', '00:40:01.768']},
+ {'distance': '00:09:46.843',
+  'hour_delta': 0.0,
+  'pair': ['00:40:01.768', '00:49:48.611']}]
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed/am1430/single/漫談法律

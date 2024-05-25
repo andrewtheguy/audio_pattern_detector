@@ -11,7 +11,7 @@ import time
 import librosa
 import numpy as np
 import scipy
-from scipy.signal import correlate
+from scipy.signal import correlate, savgol_filter
 import math
 import matplotlib.pyplot as plt
 
@@ -27,6 +27,7 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
+from scipy.signal import iirfilter,sosfiltfilt
 from sklearn.metrics.pairwise import cosine_similarity
 
 from utils import is_unique_and_sorted
@@ -198,11 +199,22 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     # Cross-correlate and normalize correlation
     correlation = correlate(audio_section, clip, mode='full', method='fft')
+
     # abs
     correlation = np.abs(correlation)
     # alternative to replace negative values with zero in array instead of above
     #correlation[correlation < 0] = 0
+
+
+
+    # apply a Savitzky-Golay filter
+    #correlation = savgol_filter(correlation, window_length=int(sr/8), polyorder=5)
+    #correlation = downsample(800,correlation)
+
     correlation /= np.max(correlation)
+
+    #correlation = resample(correlation, int(len(correlation) / sr * 256))
+
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
@@ -241,12 +253,15 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #wlen = max(int(sr/2), int(clip_length))
     #print("clip_length",clip_length)
 
-    width = sr / 256
+    #width = sr / 256
+    wlen = clip_length
     #width_sharp = 10
     #width = int(max(clip_length,1*sr)/512)
     #print(width)
     #wlen = width
-    distance = max(1,int(clip_length/2))
+    #distance = max(1,int(clip_length/2))
+    distance = sr
+    #distance = 1
 
     hard_percentile = 0.3
     #conditional_percentile = 0.2
@@ -265,13 +280,14 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
-    peaks,properties = find_peaks(correlation,distance=distance,wlen=sr/125,width=0,prominence=0.4,threshold=0,height=0,rel_height=0.7)
 
-    sharp_ratios=[]
-    for i, item in enumerate(peaks):
-        # plot_test_x=np.append(plot_test_x, index)
-        # plot_test_y=np.append(plot_test_y, item)
-        sharp_ratios.append(properties["prominences"][i] / properties["widths"][i])
+    peaks,properties = find_peaks(correlation,width=0,wlen=wlen,distance=distance,prominence=0.4,threshold=0,height=0,rel_height=1)
+
+    # sharp_ratios=[]
+    # for i, item in enumerate(peaks):
+    #     # plot_test_x=np.append(plot_test_x, index)
+    #     # plot_test_y=np.append(plot_test_y, item)
+    #     sharp_ratios.append(properties["prominences"][i] / properties["widths"][i])
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -280,8 +296,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         for i,item in enumerate(peaks):
             #plot_test_x=np.append(plot_test_x, index)
             #plot_test_y=np.append(plot_test_y, item)
-            peaks_test.append([{"index":int(item),"second":item/sr,"cor":correlation[item],
-                                "sharp_ratio":sharp_ratios[i]}])
+            peaks_test.append([{"index":int(item),"second":item/sr,"height":properties["peak_heights"][i],
+                                "prominence":properties["prominences"][i],"width":properties["widths"][i]}])
         peaks_test.append({"properties":properties})
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
@@ -294,38 +310,40 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #             print(f"---")
     #         return []
 
-    if len(peaks) > 1:
-        if debug_mode:
-            print(f"skipping {section_ts} due to multiple peaks {peaks}")
-            print(f"---")
-        return []
-
-    sharp_peaks = []
-    for i,peak in enumerate(peaks):
-        #sharp_ratio=sharp_ratios[i]
-        #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
-        height = properties["peak_heights"][i]
-        prominence = properties["prominences"][i]
-        if height == 1.0 and prominence > 0.7:  # only consider the highest peak prominent enough
-            #if height - prominence < 0.2:
-            sharp_peaks.append(peak)
-            # no need to continue since it is limited to one peak from above
-            break
-
-    if len(sharp_peaks) == 0:
-        if debug_mode:
-            print(f"skipping {section_ts} due to no sharp peaks")
-            print(f"---")
-        return []
-    # elif len(sharp_peaks) > 1:
+    # if len(peaks) > 1:
     #     if debug_mode:
-    #         print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
+    #         print(f"skipping {section_ts} due to multiple peaks {peaks}")
     #         print(f"---")
     #     return []
 
-    peak_time = sharp_peaks[0] / sr
+    return (peaks / sr).tolist()
 
-    return [peak_time]
+    # sharp_peaks = []
+    # for i,peak in enumerate(peaks):
+    #     #sharp_ratio=sharp_ratios[i]
+    #     #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
+    #     height = properties["peak_heights"][i]
+    #     prominence = properties["prominences"][i]
+    #     if height == 1.0 and prominence > 0.7:  # only consider the highest peak prominent enough
+    #         #if height - prominence < 0.2:
+    #         sharp_peaks.append(peak)
+    #         # no need to continue since it is limited to one peak from above
+    #         break
+    #
+    # if len(sharp_peaks) == 0:
+    #     if debug_mode:
+    #         print(f"skipping {section_ts} due to no sharp peaks")
+    #         print(f"---")
+    #     return []
+    # # elif len(sharp_peaks) > 1:
+    # #     if debug_mode:
+    # #         print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
+    # #         print(f"---")
+    # #     return []
+    #
+    # peak_time = sharp_peaks[0] / sr
+    #
+    # return [peak_time]
 
 
 
@@ -410,15 +428,16 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
         #         last_one = i == len(peak_times_tentative) - 1
         #         peak_time = peak_times_tentative[i]
         #         prev_peak_time = peak_times_tentative[i-1]
-        #         next_peak_time = peak_times_tentative[i+1]
         #         #if peak_time is not None:
         #         #    continue
         #         if peak_time - prev_peak_time < seconds_per_chunk:
         #             print(f"skipping {prev_peak_time} due to less than {seconds_per_chunk} has match prev")
         #             continue
-        #         if not last_one and next_peak_time - peak_time < seconds_per_chunk:
-        #             print(f"skipping {peak_time} due to less than {seconds_per_chunk} has match next")
-        #             continue
+        #         if not last_one:
+        #             next_peak_time = peak_times_tentative[i + 1]
+        #             if next_peak_time - peak_time < seconds_per_chunk:
+        #                 print(f"skipping {peak_time} due to less than {seconds_per_chunk} has match next")
+        #                 continue
         #         peak_times.append(prev_peak_time)
     else:
         raise ValueError("unknown method")
