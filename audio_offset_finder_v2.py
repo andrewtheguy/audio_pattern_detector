@@ -195,6 +195,11 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #if index != 108:
     #    return []
 
+    #clip = downsample(8,clip)
+    #audio_section = downsample(8,audio_section)
+
+    #sr = 1000
+
     clip_length = len(clip)
 
     # Cross-correlate and normalize correlation
@@ -209,7 +214,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     # apply a Savitzky-Golay filter
     #correlation = savgol_filter(correlation, window_length=int(sr/8), polyorder=5)
-    #correlation = downsample(800,correlation)
+    correlation = downsample(8,correlation)
+    sr = int(sr / 8)
 
     correlation /= np.max(correlation)
 
@@ -281,7 +287,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=[0,width],distance=distance,prominence=0.4,threshold=0,height=0)
+    peaks,properties = find_peaks(correlation,width=0,distance=distance,prominence=0.4,threshold=0,height=0,rel_height=0.95)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
@@ -310,12 +316,12 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #             print(f"---")
     #         return []
 
-    # edge case where there are multiple peaks but only one is high while others are relatively low
-    if percentile > conditional_percentile and len(peaks) > 1:
-        if debug_mode:
-            print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
-            print(f"---")
-        return []
+    # # edge case where there are multiple peaks that stand out
+    # if percentile > conditional_percentile and len(peaks) > 1:
+    #     if debug_mode:
+    #         print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
+    #         print(f"---")
+    #     return []
 
     #return (peaks / sr).tolist()
 
