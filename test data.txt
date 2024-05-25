@@ -1,8 +1,10 @@
+日落大道20240523
 riluo interlude (repeating)
 Clip occurs at the following times (in seconds): 00:36:44.209
 Clip occurs at the following times (in seconds): 00:50:48.750
 Clip occurs at the following times (in seconds): 01:32:41.539
 
+日落大道20240523
 riluo small
 Clip occurs at the following times (in seconds): 00:13:21.186
 Clip occurs at the following times (in seconds): 01:12:05.259
@@ -40,3 +42,9 @@ Distances between clips:
   'hour_delta': 0.0,
   'pair': ['00:40:01.768', '00:49:48.611']}]
 (audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed/am1430/single/漫談法律20240519_1000_s_1.m4a
+
+
+繼續有心人friday20240510_1200_s_1.m4a
+Clip occurs at the following times (in seconds): 00:10:26.148
+Clip occurs at the following times (in seconds): 00:17:54.825
+Clip occurs at the following times (in seconds): 00:35:27.898
