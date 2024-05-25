@@ -264,7 +264,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #distance = 1
 
     hard_percentile = 0.3
-    #conditional_percentile = 0.2
+    conditional_percentile = 0.2
 
     if percentile > hard_percentile:
         if debug_mode:
@@ -310,9 +310,10 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #             print(f"---")
     #         return []
 
-    if len(peaks) > 1:
+    # edge case where there are multiple peaks but only one is high while others are relatively low
+    if percentile > conditional_percentile and len(peaks) > 1:
         if debug_mode:
-            print(f"skipping {section_ts} due to multiple peaks {peaks}")
+            print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
             print(f"---")
         return []
 
