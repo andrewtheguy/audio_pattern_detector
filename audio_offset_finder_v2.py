@@ -253,14 +253,14 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #wlen = max(int(sr/2), int(clip_length))
     #print("clip_length",clip_length)
 
-    #width = sr / 256
-    wlen = clip_length
+    width = int(max(clip_length,1*sr)/512)
+    #wlen = clip_length
     #width_sharp = 10
     #width = int(max(clip_length,1*sr)/512)
     #print(width)
     #wlen = width
     #distance = max(1,int(clip_length/2))
-    distance = sr
+    distance = max(sr,int(clip_length))
     #distance = 1
 
     hard_percentile = 0.3
@@ -281,7 +281,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=0,wlen=wlen,distance=distance,prominence=0.4,threshold=0,height=0,rel_height=1)
+    peaks,properties = find_peaks(correlation,width=[0,width],distance=distance,prominence=0.4,threshold=0,height=0)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
@@ -310,40 +310,40 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #             print(f"---")
     #         return []
 
-    # if len(peaks) > 1:
-    #     if debug_mode:
-    #         print(f"skipping {section_ts} due to multiple peaks {peaks}")
-    #         print(f"---")
-    #     return []
+    if len(peaks) > 1:
+        if debug_mode:
+            print(f"skipping {section_ts} due to multiple peaks {peaks}")
+            print(f"---")
+        return []
 
-    return (peaks / sr).tolist()
+    #return (peaks / sr).tolist()
 
-    # sharp_peaks = []
-    # for i,peak in enumerate(peaks):
-    #     #sharp_ratio=sharp_ratios[i]
-    #     #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
-    #     height = properties["peak_heights"][i]
-    #     prominence = properties["prominences"][i]
-    #     if height == 1.0 and prominence > 0.7:  # only consider the highest peak prominent enough
-    #         #if height - prominence < 0.2:
-    #         sharp_peaks.append(peak)
-    #         # no need to continue since it is limited to one peak from above
-    #         break
-    #
-    # if len(sharp_peaks) == 0:
-    #     if debug_mode:
-    #         print(f"skipping {section_ts} due to no sharp peaks")
-    #         print(f"---")
-    #     return []
+    sharp_peaks = []
+    for i,peak in enumerate(peaks):
+        #sharp_ratio=sharp_ratios[i]
+        #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
+        height = properties["peak_heights"][i]
+        prominence = properties["prominences"][i]
+        if height == 1.0 and prominence > 0.8:  # only consider the highest peak prominent enough
+            #if height - prominence < 0.2:
+            sharp_peaks.append(peak)
+            # no need to continue since it is limited to one peak from above
+            break
+
+    if len(sharp_peaks) == 0:
+        if debug_mode:
+            print(f"skipping {section_ts} due to no sharp peaks")
+            print(f"---")
+        return []
     # # elif len(sharp_peaks) > 1:
     # #     if debug_mode:
     # #         print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
     # #         print(f"---")
     # #     return []
-    #
-    # peak_time = sharp_peaks[0] / sr
-    #
-    # return [peak_time]
+
+    peak_time = sharp_peaks[0] / sr
+
+    return [peak_time]
 
 
 
