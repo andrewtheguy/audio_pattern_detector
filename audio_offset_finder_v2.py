@@ -11,7 +11,7 @@ import time
 import librosa
 import numpy as np
 import scipy
-from scipy.signal import correlate, savgol_filter
+from scipy.signal import correlate, savgol_filter, find_peaks_cwt
 import math
 import matplotlib.pyplot as plt
 
@@ -214,8 +214,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     # apply a Savitzky-Golay filter
     #correlation = savgol_filter(correlation, window_length=int(sr/8), polyorder=5)
-    correlation = downsample(8,correlation)
-    sr = int(sr / 8)
+    #correlation = downsample(8,correlation)
+    #sr = int(sr / 8)
 
     correlation /= np.max(correlation)
 
@@ -287,7 +287,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=0,distance=distance,prominence=0.4,threshold=0,height=0,rel_height=0.95)
+    peaks,properties = find_peaks(correlation,width=0,prominence=0.7,threshold=0,height=0,wlen=2*sr,rel_height=0.9)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
@@ -308,6 +308,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
 
+
+
     # if percentile > conditional_percentile:
     #     #print(len(peaks),peaks)
     #     if len(peaks) > 1:
@@ -323,7 +325,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #         print(f"---")
     #     return []
 
-    #return (peaks / sr).tolist()
+    return (peaks / sr).tolist()
 
     sharp_peaks = []
     for i,peak in enumerate(peaks):
