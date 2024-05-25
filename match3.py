@@ -78,8 +78,9 @@ def main():
     peak_times = find_clip_in_audio_in_chunks(clip_paths=[args.pattern_file], full_audio_path=args.audio_file, method=args.match_method,
                                               threshold=args.threshold)
     print(peak_times[args.pattern_file])
-    peak_times_clean = cleanup_peak_times(peak_times[args.pattern_file])
-    print(peak_times_clean)
+    peak_times_clean = peak_times[args.pattern_file]
+    #peak_times_clean = cleanup_peak_times(peak_times[args.pattern_file])
+    #print(peak_times_clean)
 
     for offset in peak_times_clean:
         print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}" )

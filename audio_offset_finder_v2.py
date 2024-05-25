@@ -246,7 +246,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #width = int(max(clip_length,1*sr)/512)
     #print(width)
     #wlen = width
-    distance = int(clip_length)
+    distance = max(1,int(clip_length/2))
 
     hard_percentile = 0.3
     #conditional_percentile = 0.2
@@ -265,7 +265,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
-    peaks,properties = find_peaks(correlation,distance=distance,wlen=width,width=[0,width],prominence=0.4,threshold=0)
+    peaks,properties = find_peaks(correlation,distance=distance,wlen=sr/125,width=0,prominence=0.4,threshold=0,height=0,rel_height=0.7)
 
     sharp_ratios=[]
     for i, item in enumerate(peaks):
@@ -283,7 +283,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
             peaks_test.append([{"index":int(item),"second":item/sr,"cor":correlation[item],
                                 "sharp_ratio":sharp_ratios[i]}])
         peaks_test.append({"properties":properties})
-        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
 
     # if percentile > conditional_percentile:
@@ -302,9 +302,12 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     sharp_peaks = []
     for i,peak in enumerate(peaks):
-        sharp_ratio=sharp_ratios[i]
+        #sharp_ratio=sharp_ratios[i]
         #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
-        if sharp_ratio >= 0.1:
+        height = properties["peak_heights"][i]
+        prominence = properties["prominences"][i]
+        if height == 1.0 and prominence > 0.7:  # only consider the highest peak prominent enough
+            #if height - prominence < 0.2:
             sharp_peaks.append(peak)
             # no need to continue since it is limited to one peak from above
             break
