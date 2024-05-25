@@ -96,8 +96,7 @@ def timestamp_sanity_check_rthk(result,total_time,allow_first_short=False):
     return result
 
 def preprocess_ts(peak_times,remove_repeats=False,max_repeat_seconds=None):
-    # deduplicate by seconds
-    # sort: will bug out if not sorted
+    # deduplicate and sort otherwise will bug out other steps
     # TODO maybe require input to be sorted first to prevent
     # sorting inputs that are already sorted again
     #news_report = deque([40,90,300])
