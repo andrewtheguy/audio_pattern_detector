@@ -298,7 +298,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         if debug_mode:
             print(f"skipping {section_ts} due to multiple peaks {peaks}")
             print(f"---")
-            return []
+        return []
 
     sharp_peaks = []
     for i,peak in enumerate(peaks):
