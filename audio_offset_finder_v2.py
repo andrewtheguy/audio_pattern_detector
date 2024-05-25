@@ -324,7 +324,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
         height = properties["peak_heights"][i]
         prominence = properties["prominences"][i]
-        if height == 1.0 and prominence > 0.8:  # only consider the highest peak prominent enough
+        if height == 1.0 and prominence > 0.95:  # only consider the highest peak prominent enough
             #if height - prominence < 0.2:
             sharp_peaks.append(peak)
             # no need to continue since it is limited to one peak from above
