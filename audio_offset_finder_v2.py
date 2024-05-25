@@ -182,6 +182,77 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     return peak_times
 
+def smooth_preserve_peaks(data, window_size, threshold=0.1):
+  """
+  Smooths data while preserving sharp peaks.
+
+  Args:
+    data: The input data as a 1D numpy array.
+    window_size: The size of the smoothing window.
+    threshold: The threshold for peak detection (between 0 and 1). Higher values
+               result in more peaks preserved.
+
+  Returns:
+    The smoothed data as a 1D numpy array.
+  """
+
+  # Calculate the rolling average
+  smoothed_data = np.convolve(data, np.ones(window_size), 'same') / window_size
+
+  # Find potential peaks
+  peaks = np.where(np.diff(np.sign(np.diff(data))) < 0)[0] + 1
+
+  # Preserve peaks based on threshold
+  for peak in peaks:
+    peak_value = data[peak]
+    # Calculate the difference between the peak and the smoothed value
+    diff = peak_value - smoothed_data[peak]
+    # If the difference is above the threshold, preserve the peak
+    if diff > threshold * peak_value:
+      smoothed_data[peak - window_size // 2 : peak + window_size // 2] = peak_value
+
+  return smoothed_data
+
+def smooth_preserve_peaks_dist(data, window_size, threshold=0.1, peak_distance=3):
+  """
+  Smooths data while preserving sharp peaks and removing small peaks.
+
+  Args:
+    data: The input data as a 1D numpy array.
+    window_size: The size of the smoothing window.
+    threshold: The threshold for peak detection (between 0 and 1). Higher values
+               result in more peaks preserved.
+    peak_distance: Minimum distance between peaks to consider them separate.
+
+  Returns:
+    The smoothed data as a 1D numpy array.
+  """
+
+  # Calculate the rolling average
+  smoothed_data = np.convolve(data, np.ones(window_size), 'same') / window_size
+
+  # Find potential peaks
+  peaks = np.where(np.diff(np.sign(np.diff(data))) < 0)[0] + 1
+
+  # Remove small peaks based on distance and threshold
+  valid_peaks = []
+  for i, peak in enumerate(peaks):
+    # Check if this peak is close to another peak
+    if i > 0 and abs(peak - peaks[i-1]) < peak_distance:
+      continue
+
+    peak_value = data[peak]
+    # Calculate the difference between the peak and the smoothed value
+    diff = peak_value - smoothed_data[peak]
+    # If the difference is above the threshold, preserve the peak
+    if diff > threshold * peak_value:
+      valid_peaks.append(peak)
+
+  # Preserve valid peaks
+  for peak in valid_peaks:
+    smoothed_data[peak - window_size // 2 : peak + window_size // 2] = data[peak]
+
+  return smoothed_data
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -192,8 +263,8 @@ class NumpyEncoder(json.JSONEncoder):
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
-    #if index != 10:
-    #    return []
+    if index not in [13,14]:
+        return []
 
     #clip = downsample(8,clip)
     #audio_section = downsample(8,audio_section)
@@ -219,7 +290,9 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     #correlation = savgol_filter(correlation, window_length=128, polyorder=1)
 
-    correlation = savgol_filter(correlation, window_length=8, polyorder=1)
+    #correlation = savgol_filter(correlation, window_length=512, polyorder=5)
+
+    correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/25), threshold=0.9,peak_distance=int(sr))
 
     #correlation = savgol_filter(correlation, window_length=int(2*sr), polyorder=1)
     correlation /= np.max(correlation)
@@ -293,7 +366,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=[0,128],distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.8)
+    peaks,properties = find_peaks(correlation,width=[0,128],distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.5)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
