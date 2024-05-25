@@ -192,7 +192,7 @@ class NumpyEncoder(json.JSONEncoder):
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
-    #if index != 108:
+    #if index != 10:
     #    return []
 
     #clip = downsample(8,clip)
@@ -217,7 +217,13 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #correlation = downsample(8,correlation)
     #sr = int(sr / 8)
 
+    #correlation = savgol_filter(correlation, window_length=128, polyorder=1)
+
+    correlation = savgol_filter(correlation, window_length=8, polyorder=1)
+
+    #correlation = savgol_filter(correlation, window_length=int(2*sr), polyorder=1)
     correlation /= np.max(correlation)
+
 
     #correlation = resample(correlation, int(len(correlation) / sr * 256))
 
@@ -272,7 +278,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     hard_percentile = 0.3
     conditional_percentile = 0.2
 
-    if percentile > hard_percentile:
+    if False and percentile > hard_percentile:
         if debug_mode:
             print(f"skipping {section_ts} due to high correlation percentile {percentile} > {hard_percentile}")
             print(f"---")
@@ -287,7 +293,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=0,prominence=0.7,threshold=0,height=0,wlen=2*sr,rel_height=0.9)
+    peaks,properties = find_peaks(correlation,width=[0,128],distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.8)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
@@ -324,6 +330,12 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #         print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
     #         print(f"---")
     #     return []
+
+    if len(peaks) > 1:
+        if debug_mode:
+            print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
+            print(f"---")
+        return []
 
     return (peaks / sr).tolist()
 
