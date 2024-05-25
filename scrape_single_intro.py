@@ -69,6 +69,14 @@ ripped_streams={
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
         # "expected_num_segments": 5,
     },
+    "繼續有心人friday": {
+        "introclips": ["am1430/繼續有心人intro.wav"],
+        "endingclips": ["am1430/thankyouwatching繼續有心人.wav"],
+        "ends_with_intro": False,
+        "expected_num_segments": 3,
+        "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
+        # "expected_num_segments": 5,
+    },
 }
 
 recorded_streams={
