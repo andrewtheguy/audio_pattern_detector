@@ -39,4 +39,4 @@ Distances between clips:
  {'distance': '00:09:46.843',
   'hour_delta': 0.0,
   'pair': ['00:40:01.768', '00:49:48.611']}]
-(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed/am1430/single/漫談法律
+(audio-offset-finder-py3.12) it3@it3s-MacBook-Pro-2 audio_offset_finder % python match3.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed/am1430/single/漫談法律20240519_1000_s_1.m4a
