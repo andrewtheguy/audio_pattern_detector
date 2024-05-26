@@ -292,7 +292,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     #correlation = savgol_filter(correlation, window_length=512, polyorder=5)
 
-    correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/25), threshold=0.9,peak_distance=int(sr))
+    correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/256), threshold=0.1,peak_distance=int(sr))
 
     #correlation = savgol_filter(correlation, window_length=int(2*sr), polyorder=1)
     correlation /= np.max(correlation)
@@ -366,7 +366,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=0,distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.5)
+    peaks,properties = find_peaks(correlation,width=0,distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.9)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
