@@ -366,7 +366,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #     return []
 
 
-    peaks,properties = find_peaks(correlation,width=[0,128],distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.5)
+    peaks,properties = find_peaks(correlation,width=0,distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.5)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
