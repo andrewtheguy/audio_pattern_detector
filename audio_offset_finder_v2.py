@@ -362,9 +362,9 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         if clip_name == "漫談法律intro" and index == 11:
             plt.plot(correlation[61400:61500])
         elif clip_name == "日落大道smallinterlude" and index == 13:
-            plt.plot(correlation[244300:244400])
+            plt.plot(correlation[244100:244700])
         elif clip_name == "日落大道smallinterlude" and index == 14:
-            plt.plot(correlation[28400:28800])
+            plt.plot(correlation[28300:28900])
         elif clip_name == "繼續有心人intro" and index == 10:
             plt.plot(correlation[440900:441000])
         else:
