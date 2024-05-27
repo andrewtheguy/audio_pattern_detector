@@ -444,7 +444,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     # correlation= np.nan_to_num(correlation)
 
-    wlen = int(sr/factor)+1
+    wlen = min(int(sr/factor),3)
 
     print("wlen",wlen)
 
