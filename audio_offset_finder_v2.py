@@ -60,9 +60,15 @@ def load_audio_file(file_path, sr=None):
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
 
+# def condense(values, factor):
+#     x = np.arange(len(values))
+#     y = values
+#     x_condensed = x[::factor]
+#     y_condensed = np.interp(x_condensed, x, y)  # Interpolate to smooth
+#     return y_condensed
+#     #return np.array([np.mean(values[i:i + factor]) for i in range(0, len(values), factor)])
 
-
-def downsample(factor, values):
+def downsample(values,factor):
     buffer_ = deque([], maxlen=factor)
     downsampled_values = []
     for i, value in enumerate(values):
@@ -70,7 +76,11 @@ def downsample(factor, values):
         if (i - 1) % factor == 0:
             # Take max value out of buffer
             # or you can take higher value if their difference is too big, otherwise just average
-            downsampled_values.append(max(buffer_))
+            max_value = max(buffer_)
+            #if max_value > 0.2:
+            downsampled_values.append(max_value)
+            #else:
+            #downsampled_values.append(np.mean(buffer_))
     return np.array(downsampled_values)
 
 
@@ -337,16 +347,22 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #correlation = savgol_filter(correlation, window_length=512, polyorder=5)
 
     #correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/256), threshold=0.1,peak_distance=100)
-    #correlation = smooth_preserve_peaks(correlation, window_size=int(sr/256), threshold=0.1)
+    #correlation = smooth_preserve_peaks(correlation, window_size=int(sr), threshold=1)
 
     #correlation = savgol_filter(correlation, window_length=int(2*sr), polyorder=1)
     correlation /= np.max(correlation)
 
-    #correlation = savgol_filter(correlation, window_length=int(sr/1024), polyorder=1)
+    #correlation = np.nan_to_num(correlation)
+
+    #correlation = savgol_filter(correlation, window_length=int(sr/256), polyorder=1)
 
     #correlation = merge_peaks(correlation, threshold=0.9, window_size=int(sr))
 
     #correlation = resample(correlation, int(len(correlation) / sr * 256))
+
+    factor = sr/10
+
+    correlation = downsample(correlation,int(factor))
 
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
@@ -357,18 +373,19 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
         #Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
-        #if clip_name == "漫談法律intro" and index == 10:
-        #    plt.plot(correlation[454000:454100])
-        if clip_name == "漫談法律intro" and index == 11:
-            plt.plot(correlation[61400:61500])
-        elif clip_name == "日落大道smallinterlude" and index == 13:
-            plt.plot(correlation[244100:244700])
-        elif clip_name == "日落大道smallinterlude" and index == 14:
-            plt.plot(correlation[28300:28900])
-        elif clip_name == "繼續有心人intro" and index == 10:
-            plt.plot(correlation[440900:441000])
-        else:
-            plt.plot(correlation)
+        # if clip_name == "漫談法律intro" and index == 10:
+        #     plt.plot(correlation[454000:454100])
+        # elif clip_name == "漫談法律intro" and index == 11:
+        #     plt.plot(correlation[50000:70000])
+        # elif clip_name == "日落大道smallinterlude" and index == 13:
+        #     plt.plot(correlation[244100:244700])
+        # elif clip_name == "日落大道smallinterlude" and index == 14:
+        #     plt.plot(correlation[28300:28900])
+        # elif clip_name == "繼續有心人intro" and index == 10:
+        #     plt.plot(correlation[440900:441000])
+        # else:
+        #     plt.plot(correlation)
+        plt.plot(correlation)
 
         plt.title('Cross-correlation between the audio clip and full track before slicing')
         plt.xlabel('Lag')
@@ -425,10 +442,14 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
-   # correlation= np.nan_to_num(correlation)
+    # correlation= np.nan_to_num(correlation)
+
+    wlen = int(sr/factor)+1
+
+    print("wlen",wlen)
 
     #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0.8,prominence=0.4,wlen=20,rel_height=1)
-    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, prominence=0.4, rel_height=1)
+    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, wlen=wlen, prominence=0.4, rel_height=1)
 
 
     #prominences,left_bases,right_bases = peak_prominences(correlation, peaks,wlen=sr)
