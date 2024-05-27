@@ -11,7 +11,7 @@ import time
 import librosa
 import numpy as np
 import scipy
-from scipy.signal import correlate, savgol_filter, find_peaks_cwt
+from scipy.signal import correlate, savgol_filter, find_peaks_cwt, peak_prominences
 import math
 import matplotlib.pyplot as plt
 
@@ -253,6 +253,46 @@ def smooth_preserve_peaks_dist(data, window_size, threshold=0.1, peak_distance=3
     smoothed_data[peak - window_size // 2 : peak + window_size // 2] = data[peak]
 
   return smoothed_data
+
+
+# def merge_peaks(data, threshold, window_size):
+#     """
+#     Merges small peaks in a data array into a single large peak, replacing only lower values with the maximum.
+#
+#     Args:
+#         data (np.array): The input data array.
+#         threshold (float): The minimum peak height to be considered for merging.
+#         window_size (int): The size of the window to search for peaks.
+#
+#     Returns:
+#         np.array: The data array with merged peaks.
+#     """
+#
+#     merged_data = data.copy()
+#     peaks = np.zeros_like(data, dtype=bool)
+#
+#     # Find peaks
+#     for i in range(window_size, len(data) - window_size):
+#         if data[i] > data[i-window_size:i+window_size].max():
+#             peaks[i] = True
+#
+#     # Merge peaks
+#     for i in range(len(data)):
+#         if peaks[i] and data[i] < threshold:
+#             # Find the start and end of the peak
+#             start = i
+#             end = i
+#             while start > 0 and peaks[start-1]:
+#                 start -= 1
+#             while end < len(data) - 1 and peaks[end+1]:
+#                 end += 1
+#
+#             # Replace only lower values within the peak
+#             max_value = data[start:end+1].max()
+#             merged_data[start:end+1] = np.where(data[start:end+1] < max_value, max_value, data[start:end+1])
+#
+#     return merged_data
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -263,7 +303,11 @@ class NumpyEncoder(json.JSONEncoder):
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
-    if index not in [13,14]:
+    if clip_name == "日落大道smallinterlude" and index not in [13,14]:
+        return []
+    if clip_name == "漫談法律intro" and index not in [10,11]:
+        return []
+    if clip_name == "繼續有心人intro" and index not in [10]:
         return []
 
     #clip = downsample(8,clip)
@@ -288,15 +332,19 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #correlation = downsample(8,correlation)
     #sr = int(sr / 8)
 
-    #correlation = savgol_filter(correlation, window_length=128, polyorder=1)
+    #correlation = savgol_filter(correlation, window_length=50, polyorder=1)
 
     #correlation = savgol_filter(correlation, window_length=512, polyorder=5)
 
-    correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/256), threshold=0.1,peak_distance=int(sr))
+    #correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/256), threshold=0.1,peak_distance=100)
+    #correlation = smooth_preserve_peaks(correlation, window_size=int(sr/256), threshold=0.1)
 
     #correlation = savgol_filter(correlation, window_length=int(2*sr), polyorder=1)
     correlation /= np.max(correlation)
 
+    #correlation = savgol_filter(correlation, window_length=int(sr/1024), polyorder=1)
+
+    #correlation = merge_peaks(correlation, threshold=0.9, window_size=int(sr))
 
     #correlation = resample(correlation, int(len(correlation) / sr * 256))
 
@@ -309,7 +357,19 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
         #Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
-        plt.plot(correlation)
+        #if clip_name == "漫談法律intro" and index == 10:
+        #    plt.plot(correlation[454000:454100])
+        if clip_name == "漫談法律intro" and index == 11:
+            plt.plot(correlation[61400:61500])
+        elif clip_name == "日落大道smallinterlude" and index == 13:
+            plt.plot(correlation[244300:244400])
+        elif clip_name == "日落大道smallinterlude" and index == 14:
+            plt.plot(correlation[28400:28800])
+        elif clip_name == "繼續有心人intro" and index == 10:
+            plt.plot(correlation[440900:441000])
+        else:
+            plt.plot(correlation)
+
         plt.title('Cross-correlation between the audio clip and full track before slicing')
         plt.xlabel('Lag')
         plt.ylabel('Correlation coefficient')
@@ -365,8 +425,13 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
+   # correlation= np.nan_to_num(correlation)
 
-    peaks,properties = find_peaks(correlation,width=0,distance=distance,prominence=0.5,threshold=0,height=0,rel_height=0.9)
+    #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0.8,prominence=0.4,wlen=20,rel_height=1)
+    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, prominence=0.4, rel_height=1)
+
+
+    #prominences,left_bases,right_bases = peak_prominences(correlation, peaks,wlen=sr)
 
     # sharp_ratios=[]
     # for i, item in enumerate(peaks):
@@ -381,8 +446,11 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         for i,item in enumerate(peaks):
             #plot_test_x=np.append(plot_test_x, index)
             #plot_test_y=np.append(plot_test_y, item)
-            peaks_test.append([{"index":int(item),"second":item/sr,"height":properties["peak_heights"][i],
-                                "prominence":properties["prominences"][i],"width":properties["widths"][i]}])
+            peaks_test.append([{"index":int(item),"second":item/sr,
+                                "height":properties["peak_heights"][i],
+                                "prominence":properties["prominences"][i],
+                                "width":properties["widths"][i],
+                               }])
         peaks_test.append({"properties":properties})
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
