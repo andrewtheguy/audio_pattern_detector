@@ -192,137 +192,77 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     return peak_times
 
-def smooth_preserve_peaks(data, window_size, threshold=0.1):
-  """
-  Smooths data while preserving sharp peaks.
+def verify_peak(sr,max_index,correlation,audio_section,section_ts,clip_name,index,debug_mode):
+    factor = sr/10
 
-  Args:
-    data: The input data as a 1D numpy array.
-    window_size: The size of the smoothing window.
-    threshold: The threshold for peak detection (between 0 and 1). Higher values
-               result in more peaks preserved.
+    print(max_index)
 
-  Returns:
-    The smoothed data as a 1D numpy array.
-  """
+    #wlen = max(int(sr/2), int(clip_length))
+    padding = sr*4
 
-  # Calculate the rolling average
-  smoothed_data = np.convolve(data, np.ones(window_size), 'same') / window_size
+    beg = max(int(max_index-padding), 0)
+    end = min(len(audio_section),int(max_index+padding))
+    #print("chafa")
+    #print(beg,end)
+    #exit(1)
 
-  # Find potential peaks
-  peaks = np.where(np.diff(np.sign(np.diff(data))) < 0)[0] + 1
+    correlation = correlation[beg:end]
+    correlation = downsample(correlation,int(factor))
 
-  # Preserve peaks based on threshold
-  for peak in peaks:
-    peak_value = data[peak]
-    # Calculate the difference between the peak and the smoothed value
-    diff = peak_value - smoothed_data[peak]
-    # If the difference is above the threshold, preserve the peak
-    if diff > threshold * peak_value:
-      smoothed_data[peak - window_size // 2 : peak + window_size // 2] = peak_value
+    if debug_mode:
+        graph_dir = f"./tmp/graph/resampled/{clip_name}"
+        os.makedirs(graph_dir, exist_ok=True)
 
-  return smoothed_data
+        #Optional: plot the correlation graph to visualize
+        plt.figure(figsize=(10, 4))
+        # if clip_name == "漫談法律intro" and index == 10:
+        #     plt.plot(correlation[454000:454100])
+        # elif clip_name == "漫談法律intro" and index == 11:
+        #     plt.plot(correlation[50000:70000])
+        # elif clip_name == "日落大道smallinterlude" and index == 13:
+        #     plt.plot(correlation[244100:244700])
+        # elif clip_name == "日落大道smallinterlude" and index == 14:
+        #     plt.plot(correlation[28300:28900])
+        # elif clip_name == "繼續有心人intro" and index == 10:
+        #     plt.plot(correlation[440900:441000])
+        # else:
+        #     plt.plot(correlation)
+        plt.plot(correlation)
 
-def smooth_preserve_peaks_dist(data, window_size, threshold=0.1, peak_distance=3):
-  """
-  Smooths data while preserving sharp peaks and removing small peaks.
+        plt.title('Cross-correlation between the audio clip and full track before slicing')
+        plt.xlabel('Lag')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(
+            f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
+        plt.close()
 
-  Args:
-    data: The input data as a 1D numpy array.
-    window_size: The size of the smoothing window.
-    threshold: The threshold for peak detection (between 0 and 1). Higher values
-               result in more peaks preserved.
-    peak_distance: Minimum distance between peaks to consider them separate.
-
-  Returns:
-    The smoothed data as a 1D numpy array.
-  """
-
-  # Calculate the rolling average
-  smoothed_data = np.convolve(data, np.ones(window_size), 'same') / window_size
-
-  # Find potential peaks
-  peaks = np.where(np.diff(np.sign(np.diff(data))) < 0)[0] + 1
-
-  # Remove small peaks based on distance and threshold
-  valid_peaks = []
-  for i, peak in enumerate(peaks):
-    # Check if this peak is close to another peak
-    if i > 0 and abs(peak - peaks[i-1]) < peak_distance:
-      continue
-
-    peak_value = data[peak]
-    # Calculate the difference between the peak and the smoothed value
-    diff = peak_value - smoothed_data[peak]
-    # If the difference is above the threshold, preserve the peak
-    if diff > threshold * peak_value:
-      valid_peaks.append(peak)
-
-  # Preserve valid peaks
-  for peak in valid_peaks:
-    smoothed_data[peak - window_size // 2 : peak + window_size // 2] = data[peak]
-
-  return smoothed_data
+    peaks, properties = find_peaks(correlation, width=0, threshold=0, wlen=10, height=0, prominence=0.2, rel_height=1)
+    if debug_mode:
+        peak_dir = f"./tmp/peaks/resampled/{clip_name}"
+        os.makedirs(peak_dir, exist_ok=True)
+        peaks_test=[]
+        for i,item in enumerate(peaks):
+            #plot_test_x=np.append(plot_test_x, index)
+            #plot_test_y=np.append(plot_test_y, item)
+            peaks_test.append([{"index":int(item),"second":item/sr,
+                                "height":properties["peak_heights"][i],
+                                "prominence":properties["prominences"][i],
+                                "width":properties["widths"][i],
+                               }])
+        peaks_test.append({"properties":properties})
+        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
 
-def find_closest_troughs(peak_index, data, prominence_threshold=None):
-  """Finds the indices of the closest significant troughs to a given peak.
+    if len(peaks) != 1:
+        print(f"failed verification for {section_ts} due to multiple peaks {peaks} or zero peaks")
+        return False
 
-  Args:
-    peak_index: The index of the peak in the data series.
-    data: The data series as a NumPy array.
-    prominence_threshold: Optional. Minimum prominence required for a peak
-                          to be considered in trough search. Helps ignore
-                          small peaks.
-
-  Returns:
-    A tuple containing the indices of the left and right troughs.
-  """
-  n = len(data)
-  left_trough = peak_index
-  right_trough = peak_index
-
-  # Search for the left trough
-  for i in range(peak_index - 1, -1, -1):
-    if data[i] < data[i + 1] and data[i] < data[i - 1]:
-      # Check prominence if threshold is provided
-      if prominence_threshold is not None:
-        if calculate_peak_prominence(i, data) >= prominence_threshold:
-          left_trough = i
-          break
-      else:
-        left_trough = i
-        break
-
-  # Search for the right trough
-  for i in range(peak_index + 1, n):
-    if data[i] < data[i + 1] and data[i] < data[i - 1]:
-      # Check prominence if threshold is provided
-      if prominence_threshold is not None:
-        if calculate_peak_prominence(i, data) >= prominence_threshold:
-          right_trough = i
-          break
-      else:
-        right_trough = i
-        break
-
-  return left_trough, right_trough
-
-
-def calculate_peak_prominence(peak_index, data):
-  """Calculates the prominence of a peak in a data series.
-
-  Args:
-    peak_index: The index of the peak in the data series.
-    data: The data series as a NumPy array.
-
-  Returns:
-    The prominence of the peak.
-  """
-  left_trough, right_trough = find_closest_troughs(peak_index, data)
-  trough_height = max(data[left_trough], data[right_trough])
-  prominence = data[peak_index] - trough_height
-  return prominence
+    index_final=0
+    #peak = peaks[index_final]
+    passed = properties["peak_heights"][index_final] == 1.0 and properties["prominences"][index_final] > 0.7 and properties["widths"][index_final] <= 10
+    if not passed:
+        print(f"failed verification for {section_ts} due to peak {peaks[index_final]} not meeting requirements")
+    return passed
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -340,11 +280,6 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         return []
     if clip_name == "繼續有心人intro" and index not in [10]:
         return []
-
-    #clip = downsample(8,clip)
-    #audio_section = downsample(8,audio_section)
-
-    #sr = 1000
 
     clip_length = len(clip)
 
@@ -381,23 +316,6 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     #correlation = resample(correlation, int(len(correlation) / sr * 256))
 
-    max_index = np.argmax(correlation)
-
-    factor = sr/10
-
-    print(max_index)
-
-    #wlen = max(int(sr/2), int(clip_length))
-    padding = sr*4
-
-    beg = max(int(max_index-padding), 0)
-    end = min(len(audio_section),int(max_index+padding))
-    #print("chafa")
-    #print(beg,end)
-    #exit(1)
-
-    correlation = correlation[beg:end]
-    correlation = downsample(correlation,int(factor))
 
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
@@ -477,22 +395,22 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
-    max_correlation_index = np.argmax(correlation)
-
-    prominence = calculate_peak_prominence(max_correlation_index,correlation)
-    print(f"{section_ts} prominence",prominence)
-
-    if(prominence > 0.8):
-        return [(max_correlation_index) / (sr / 10)]
-    else:
-        return []
+    #max_correlation_index = np.argmax(correlation)
+    #
+    # prominence = calculate_peak_prominence(max_correlation_index,correlation)
+    # print(f"{section_ts} prominence",prominence)
+    #
+    # if(prominence > 0.8):
+    #     return [(max_correlation_index) / (sr / 10)]
+    # else:
+    #     return []
 
     #wlen = max(int(sr/factor),3)
 
     #print("wlen",wlen)
 
     #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, wlen=wlen, prominence=0.8, rel_height=1)
-    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0,wlen=30, prominence=0.2, rel_height=1)
+    peaks,properties = find_peaks(correlation,width=[0,width],distance=distance,prominence=0.4,threshold=0,height=0)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -532,6 +450,23 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         if debug_mode:
             print(f"skipping {section_ts} due to multiple peaks {peaks}")
             print(f"---")
+        return []
+
+    if(len(peaks)==0):
+        if debug_mode:
+            print(f"skipping {section_ts} due to no peaks")
+            print(f"---")
+        return []
+
+    max_index = np.argmax(correlation)
+    if max_index != peaks[0]:
+        if debug_mode:
+            print(f"skipping {section_ts} due to max_index {max_index} not equal to peaks {peaks}")
+            print(f"---")
+        return []
+
+    # make sure it is sharp enough
+    if not verify_peak(sr,max_index,correlation,audio_section,section_ts,clip_name,index,debug_mode):
         return []
 
     return (peaks / sr).tolist()
