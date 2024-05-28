@@ -317,6 +317,22 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #correlation = resample(correlation, int(len(correlation) / sr * 256))
 
 
+    max_index = np.argmax(correlation)
+
+    # 1/10 of a second
+    factor = sr / 10
+
+    padding = sr + 5
+
+    beg = max(int(max_index-padding), 0)
+    end = min(len(audio_section),int(max_index+padding))
+    #print("chafa")
+    #print(beg,end)
+    #exit(1)
+
+    #correlation = correlation[beg:end]
+
+    correlation = downsample(correlation, int(factor))
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
@@ -409,8 +425,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     #print("wlen",wlen)
 
-    #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, wlen=wlen, prominence=0.8, rel_height=1)
-    peaks,properties = find_peaks(correlation,width=[0,width],distance=distance,prominence=0.4,threshold=0,height=0)
+
+    peaks, properties = find_peaks(correlation, width=0, threshold=0, wlen=11, height=0, prominence=0.4, rel_height=1)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -458,16 +474,15 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
             print(f"---")
         return []
 
-    max_index = np.argmax(correlation)
-    if max_index != peaks[0]:
-        if debug_mode:
-            print(f"skipping {section_ts} due to max_index {max_index} not equal to peaks {peaks}")
-            print(f"---")
-        return []
+    # if max_index != peaks[0]:
+    #     if debug_mode:
+    #         print(f"skipping {section_ts} due to max_index {max_index} not equal to peaks {peaks}")
+    #         print(f"---")
+    #     return []
 
     # make sure it is sharp enough
-    if not verify_peak(sr,max_index,correlation,audio_section,section_ts,clip_name,index,debug_mode):
-        return []
+    #if not verify_peak(sr,max_index,correlation,audio_section,section_ts,clip_name,index,debug_mode):
+    #    return []
 
     return (peaks / sr).tolist()
 
