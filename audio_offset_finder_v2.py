@@ -265,43 +265,64 @@ def smooth_preserve_peaks_dist(data, window_size, threshold=0.1, peak_distance=3
   return smoothed_data
 
 
-# def merge_peaks(data, threshold, window_size):
-#     """
-#     Merges small peaks in a data array into a single large peak, replacing only lower values with the maximum.
-#
-#     Args:
-#         data (np.array): The input data array.
-#         threshold (float): The minimum peak height to be considered for merging.
-#         window_size (int): The size of the window to search for peaks.
-#
-#     Returns:
-#         np.array: The data array with merged peaks.
-#     """
-#
-#     merged_data = data.copy()
-#     peaks = np.zeros_like(data, dtype=bool)
-#
-#     # Find peaks
-#     for i in range(window_size, len(data) - window_size):
-#         if data[i] > data[i-window_size:i+window_size].max():
-#             peaks[i] = True
-#
-#     # Merge peaks
-#     for i in range(len(data)):
-#         if peaks[i] and data[i] < threshold:
-#             # Find the start and end of the peak
-#             start = i
-#             end = i
-#             while start > 0 and peaks[start-1]:
-#                 start -= 1
-#             while end < len(data) - 1 and peaks[end+1]:
-#                 end += 1
-#
-#             # Replace only lower values within the peak
-#             max_value = data[start:end+1].max()
-#             merged_data[start:end+1] = np.where(data[start:end+1] < max_value, max_value, data[start:end+1])
-#
-#     return merged_data
+def find_closest_troughs(peak_index, data, prominence_threshold=None):
+  """Finds the indices of the closest significant troughs to a given peak.
+
+  Args:
+    peak_index: The index of the peak in the data series.
+    data: The data series as a NumPy array.
+    prominence_threshold: Optional. Minimum prominence required for a peak
+                          to be considered in trough search. Helps ignore
+                          small peaks.
+
+  Returns:
+    A tuple containing the indices of the left and right troughs.
+  """
+  n = len(data)
+  left_trough = peak_index
+  right_trough = peak_index
+
+  # Search for the left trough
+  for i in range(peak_index - 1, -1, -1):
+    if data[i] < data[i + 1] and data[i] < data[i - 1]:
+      # Check prominence if threshold is provided
+      if prominence_threshold is not None:
+        if calculate_peak_prominence(i, data) >= prominence_threshold:
+          left_trough = i
+          break
+      else:
+        left_trough = i
+        break
+
+  # Search for the right trough
+  for i in range(peak_index + 1, n):
+    if data[i] < data[i + 1] and data[i] < data[i - 1]:
+      # Check prominence if threshold is provided
+      if prominence_threshold is not None:
+        if calculate_peak_prominence(i, data) >= prominence_threshold:
+          right_trough = i
+          break
+      else:
+        right_trough = i
+        break
+
+  return left_trough, right_trough
+
+
+def calculate_peak_prominence(peak_index, data):
+  """Calculates the prominence of a peak in a data series.
+
+  Args:
+    peak_index: The index of the peak in the data series.
+    data: The data series as a NumPy array.
+
+  Returns:
+    The prominence of the peak.
+  """
+  left_trough, right_trough = find_closest_troughs(peak_index, data)
+  trough_height = max(data[left_trough], data[right_trough])
+  prominence = data[peak_index] - trough_height
+  return prominence
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -362,7 +383,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     max_index = np.argmax(correlation)
 
-    factor = sr
+    factor = sr/10
 
     print(max_index)
 
@@ -375,8 +396,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #print(beg,end)
     #exit(1)
 
-    #correlation = correlation[beg:end]
-    correlation = downsample(correlation[beg:end],int(factor))
+    correlation = correlation[beg:end]
+    correlation = downsample(correlation,int(factor))
 
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
@@ -456,23 +477,22 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         #         print(f"---")
         #     return []
 
-    # correlation= np.nan_to_num(correlation)
+    max_correlation_index = np.argmax(correlation)
+
+    prominence = calculate_peak_prominence(max_correlation_index,correlation)
+    print(f"{section_ts} prominence",prominence)
+
+    if(prominence > 0.8):
+        return [(max_correlation_index) / (sr / 10)]
+    else:
+        return []
 
     #wlen = max(int(sr/factor),3)
 
     #print("wlen",wlen)
 
     #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, wlen=wlen, prominence=0.8, rel_height=1)
-    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0,wlen=9, prominence=0, rel_height=1)
-
-
-    #prominences,left_bases,right_bases = peak_prominences(correlation, peaks,wlen=sr)
-
-    # sharp_ratios=[]
-    # for i, item in enumerate(peaks):
-    #     # plot_test_x=np.append(plot_test_x, index)
-    #     # plot_test_y=np.append(plot_test_y, item)
-    #     sharp_ratios.append(properties["prominences"][i] / properties["widths"][i])
+    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0,wlen=30, prominence=0.2, rel_height=1)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
@@ -488,6 +508,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
                                }])
         peaks_test.append({"properties":properties})
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
+
 
 
 
