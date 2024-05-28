@@ -360,9 +360,23 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     #correlation = resample(correlation, int(len(correlation) / sr * 256))
 
+    max_index = np.argmax(correlation)
+
     factor = sr/10
 
-    correlation = downsample(correlation,int(factor))
+    print(max_index)
+
+    #wlen = max(int(sr/2), int(clip_length))
+    padding = sr
+
+    beg = max(int(max_index-padding), 0)
+    end = min(len(audio_section),int(max_index+padding))
+    #print("chafa")
+    #print(beg,end)
+    #exit(1)
+
+    #correlation = correlation[beg:end]
+    correlation = downsample(correlation[beg:end],int(factor))
 
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
@@ -444,12 +458,12 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     # correlation= np.nan_to_num(correlation)
 
-    wlen = min(int(sr/factor),3)
+    #wlen = max(int(sr/factor),3)
 
-    print("wlen",wlen)
+    #print("wlen",wlen)
 
-    #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0.8,prominence=0.4,wlen=20,rel_height=1)
-    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, wlen=wlen, prominence=0.4, rel_height=1)
+    #peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0, wlen=wlen, prominence=0.8, rel_height=1)
+    peaks, properties = find_peaks(correlation, width=0, threshold=0, height=0,wlen=9, prominence=0.7, rel_height=1)
 
 
     #prominences,left_bases,right_bases = peak_prominences(correlation, peaks,wlen=sr)
