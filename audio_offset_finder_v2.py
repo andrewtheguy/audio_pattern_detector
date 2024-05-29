@@ -30,6 +30,7 @@ from scipy.signal import find_peaks
 from scipy.signal import iirfilter,sosfiltfilt
 from sklearn.metrics.pairwise import cosine_similarity
 
+from test_peak_method import calculate_peak_prominence
 from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
@@ -244,6 +245,10 @@ def verify_peak(sr,max_index,correlation,audio_section,section_ts,clip_name,inde
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
@@ -252,67 +257,95 @@ class NumpyEncoder(json.JSONEncoder):
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
-    if clip_name == "日落大道smallinterlude" and index not in [13,14]:
-        return []
-    if clip_name == "漫談法律intro" and index not in [10,11]:
-        return []
-    if clip_name == "繼續有心人intro" and index not in [10]:
-        return []
+    # if clip_name == "日落大道smallinterlude" and index not in [13,14]:
+    #     return []
+    # if clip_name == "漫談法律intro" and index not in [10,11]:
+    #     return []
+    #if clip_name == "繼續有心人intro" and index not in [10]:
+    #    return []
+
+
+    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+
+
 
     clip_length = len(clip)
+    print("clip_length",clip_length)
+
+    downsample_factor = int(sr / 10)
+
+    #clip_zero_padded = np.concatenate((np.zeros(sr), clip, np.zeros(sr)))
 
     # Cross-correlate and normalize correlation
+    correlation_clip = correlate(clip, clip, mode='full', method='fft')
+    correlation_clip = downsample(correlation_clip, downsample_factor)
+    print("correlation_clip",len(correlation_clip))
+    # abs
+    correlation_clip = np.abs(correlation_clip)
+    correlation_clip /= np.max(correlation_clip)
+
+    if debug_mode:
+        graph_dir = f"./tmp/graph/clip_correlation"
+        os.makedirs(graph_dir, exist_ok=True)
+
+        plt.figure(figsize=(10, 4))
+
+        plt.plot(correlation_clip)
+
+        plt.title('Cross-correlation for clip')
+        plt.xlabel('Lag')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(
+            f'{graph_dir}/{clip_name}.png')
+        plt.close()
+
+    max_index_clip = np.argmax(correlation_clip)
+
+    prominence, left_through, right_through = calculate_peak_prominence(max_index_clip, correlation_clip)
+    prominence_clip = prominence
+    if debug_mode:
+        print(f"{section_ts} prominence",prominence)
+        print(f"{section_ts} left_through",left_through)
+        print(f"{section_ts} right_through",right_through)
+        #print(f"{section_ts} wlen", wlen)
+        peak_dir = f"./tmp/peaks2/non_repeating_cross_correlation_{clip_name}"
+        os.makedirs(peak_dir, exist_ok=True)
+        print(json.dumps({"max_index":max_index_clip,
+                          "prominence":prominence,
+                          "left_through":left_through,
+                          "right_through":right_through,
+                          }, indent=2, cls=NumpyEncoder),
+              file=open(f'{peak_dir}/{clip_name}.txt', 'w'))
+
+    print("audio_section length",len(audio_section))
+    # Cross-correlate and normalize correlation
     correlation = correlate(audio_section, clip, mode='full', method='fft')
+    print("correlation length", len(correlation))
 
     # abs
     correlation = np.abs(correlation)
-    # alternative to replace negative values with zero in array instead of above
-    #correlation[correlation < 0] = 0
-
-
-
-    # apply a Savitzky-Golay filter
-    #correlation = savgol_filter(correlation, window_length=int(sr/8), polyorder=5)
-    #correlation = downsample(8,correlation)
-    #sr = int(sr / 8)
-
-    #correlation = savgol_filter(correlation, window_length=50, polyorder=1)
-
-    #correlation = savgol_filter(correlation, window_length=512, polyorder=5)
-
-    #correlation =smooth_preserve_peaks_dist(correlation, window_size=int(sr/256), threshold=0.1,peak_distance=100)
-    #correlation = smooth_preserve_peaks(correlation, window_size=int(sr), threshold=1)
-
-    #correlation = savgol_filter(correlation, window_length=int(2*sr), polyorder=1)
     correlation /= np.max(correlation)
 
     #correlation = np.nan_to_num(correlation)
 
-    #correlation = savgol_filter(correlation, window_length=int(sr/256), polyorder=1)
-
-    #correlation = merge_peaks(correlation, threshold=0.9, window_size=int(sr))
-
-    #correlation = resample(correlation, int(len(correlation) / sr * 256))
-
-
     max_index = np.argmax(correlation)
 
-    # 1/10 of a second
-    factor = sr / 10
+    padding = clip_length
 
-    padding = sr + 5
-
+    #[(max_index - clip_length): (max_index + clip_length)]
     beg = max(int(max_index-padding), 0)
     end = min(len(audio_section),int(max_index+padding))
     #print("chafa")
     #print(beg,end)
     #exit(1)
 
-    #correlation = correlation[beg:end]
+    max_index_orig = np.argmax(correlation)
 
-    correlation = downsample(correlation, int(factor))
+    correlation = correlation[beg:end]
 
-    section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+    correlation = downsample(correlation, downsample_factor)
+    max_index_downsample = np.argmax(correlation)
+
 
     if debug_mode:
         graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
@@ -342,14 +375,15 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         plt.close()
 
 
-    percentile = np.percentile(correlation, 99)
-
 
     #max_correlation = max(correlation)
     #ratio = percentile/max_correlation
 
     if debug_mode:
-        print(f"{section_ts} percentile", percentile)
+        peaks, _ = find_peaks(correlation)
+        print(f"{section_ts} peaks count", len(peaks))
+        #print(f"{section_ts} peaks 25 percentile", np.percentile(peaks, 25))
+
         #print(f"{section_label} max correlation: {max_correlation}")
         #print(f"{section_label} ratio: {ratio}")
         #print(f"---")
@@ -403,23 +437,29 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     #print("wlen",wlen)
 
+    prominence, left_through, right_through = calculate_peak_prominence(max_index_downsample, correlation)
+    if abs(prominence - prominence_clip) > 0.05:
+        print(f"failed verification for {section_ts} due to prominence {prominence} differing {prominence_clip} by more than 0.05")
+        return []
+    else:
+        return [(max_index_orig) / sr]
 
-    peaks, properties = find_peaks(correlation, width=0, threshold=0, wlen=11, height=0, prominence=0.4, rel_height=1)
-
-    if debug_mode:
-        peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
-        os.makedirs(peak_dir, exist_ok=True)
-        peaks_test=[]
-        for i,item in enumerate(peaks):
-            #plot_test_x=np.append(plot_test_x, index)
-            #plot_test_y=np.append(plot_test_y, item)
-            peaks_test.append([{"index":int(item),"second":item/sr,
-                                "height":properties["peak_heights"][i],
-                                "prominence":properties["prominences"][i],
-                                "width":properties["widths"][i],
-                               }])
-        peaks_test.append({"properties":properties})
-        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
+    # peaks, properties = find_peaks(correlation, width=0, threshold=0, wlen=wlen, height=0, prominence=0.4, rel_height=1)
+    #
+    # if debug_mode:
+    #     peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
+    #     os.makedirs(peak_dir, exist_ok=True)
+    #     peaks_test=[]
+    #     for i,item in enumerate(peaks):
+    #         #plot_test_x=np.append(plot_test_x, index)
+    #         #plot_test_y=np.append(plot_test_y, item)
+    #         peaks_test.append([{"index":int(item),"second":item/sr,
+    #                             "height":properties["peak_heights"][i],
+    #                             "prominence":properties["prominences"][i],
+    #                             "width":properties["widths"][i],
+    #                            }])
+    #     peaks_test.append({"properties":properties})
+    #     print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
 
 

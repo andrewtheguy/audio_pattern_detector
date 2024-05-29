@@ -88,9 +88,13 @@ def find_closest_troughs(peak_index, data, prominence_threshold=None):
   left_trough = peak_index
   right_trough = peak_index
 
+  # not a peak index
+  if peak_index == 0 or peak_index == n - 1:
+    return left_trough, right_trough
+
   # Search for the left trough
   for i in range(peak_index - 1, -1, -1):
-    if data[i] < data[i + 1] and data[i] < data[i - 1]:
+    if data[i] < data[i + 1] and i-1 >=0 and data[i] < data[i - 1]:
       # Check prominence if threshold is provided
       if prominence_threshold is not None:
         if calculate_peak_prominence(i, data) >= prominence_threshold:
@@ -102,7 +106,7 @@ def find_closest_troughs(peak_index, data, prominence_threshold=None):
 
   # Search for the right trough
   for i in range(peak_index + 1, n):
-    if data[i] < data[i + 1] and data[i] < data[i - 1]:
+    if i+1 < len(data) and data[i] < data[i + 1] and data[i] < data[i - 1]:
       # Check prominence if threshold is provided
       if prominence_threshold is not None:
         if calculate_peak_prominence(i, data) >= prominence_threshold:
@@ -128,4 +132,4 @@ def calculate_peak_prominence(peak_index, data):
   left_trough, right_trough = find_closest_troughs(peak_index, data)
   trough_height = max(data[left_trough], data[right_trough])
   prominence = data[peak_index] - trough_height
-  return prominence
+  return prominence,left_trough, right_trough
