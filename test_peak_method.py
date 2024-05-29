@@ -1,3 +1,6 @@
+import logging
+
+
 def smooth_preserve_peaks(data, window_size, threshold=0.1):
   """
   Smooths data while preserving sharp peaks.
@@ -71,15 +74,14 @@ def smooth_preserve_peaks_dist(data, window_size, threshold=0.1, peak_distance=3
   return smoothed_data
 
 
-def find_closest_troughs(peak_index, data, prominence_threshold=None):
+def find_closest_troughs(peak_index, data):
+  raise NotImplementedError("Still need to test.")
   """Finds the indices of the closest significant troughs to a given peak.
 
   Args:
     peak_index: The index of the peak in the data series.
     data: The data series as a NumPy array.
-    prominence_threshold: Optional. Minimum prominence required for a peak
-                          to be considered in trough search. Helps ignore
-                          small peaks.
+
 
   Returns:
     A tuple containing the indices of the left and right troughs.
@@ -90,31 +92,24 @@ def find_closest_troughs(peak_index, data, prominence_threshold=None):
 
   # not a peak index
   if peak_index == 0 or peak_index == n - 1:
+    logging.warning("Peak index is at the edge of the data series.")
     return left_trough, right_trough
 
   # Search for the left trough
   for i in range(peak_index - 1, -1, -1):
-    if data[i] < data[i + 1] and i-1 >=0 and data[i] < data[i - 1]:
-      # Check prominence if threshold is provided
-      if prominence_threshold is not None:
-        if calculate_peak_prominence(i, data) >= prominence_threshold:
-          left_trough = i
-          break
-      else:
+    if data[i] < data[i + 1] and i-1 >= 0 and data[i] < data[i - 1]:
         left_trough = i
         break
+  if left_trough == 1 and data[0] < data[1]:
+    left_trough = 0
 
   # Search for the right trough
   for i in range(peak_index + 1, n):
-    if i+1 < len(data) and data[i] < data[i + 1] and data[i] < data[i - 1]:
-      # Check prominence if threshold is provided
-      if prominence_threshold is not None:
-        if calculate_peak_prominence(i, data) >= prominence_threshold:
-          right_trough = i
-          break
-      else:
+    if i+1 < n and data[i] < data[i + 1] and data[i] < data[i - 1]:
         right_trough = i
         break
+  if right_trough == n - 2 and data[n-1] < data[n-2]:
+    right_trough = n - 1
 
   return left_trough, right_trough
 
