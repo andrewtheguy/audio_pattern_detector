@@ -1,5 +1,8 @@
 import logging
 
+import numpy as np
+from scipy.signal import peak_widths
+
 
 def find_closest_troughs(peak_index, data):
   """Finds the indices of the closest significant troughs to a given peak.
@@ -58,3 +61,12 @@ def calculate_peak_prominence(peak_index, data):
   trough_height = max(data[left_trough], data[right_trough])
   prominence = data[peak_index] - trough_height
   return prominence,left_trough, right_trough
+
+def get_peak_profile(peak_index, data):
+  prominence, left_through, right_through = calculate_peak_prominence(peak_index, data)
+  prominences = (np.array([prominence], dtype="float64"), np.array([left_through]), np.array([right_through]))
+  print("through diff", right_through- left_through)
+  width_100 = peak_widths(data, [peak_index], rel_height=1, prominence_data=prominences)[0]
+  width_75 = peak_widths(data, [peak_index], rel_height=0.75, prominence_data=prominences)[0]
+  width_50 = peak_widths(data, [peak_index], rel_height=0.5, prominence_data=prominences)[0]
+  return {"width_100": width_100, "width_75": width_75, "width_50": width_50,"prominence":prominence}

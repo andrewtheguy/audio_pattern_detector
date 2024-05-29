@@ -27,10 +27,9 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
-from scipy.signal import iirfilter,sosfiltfilt
-from sklearn.metrics.pairwise import cosine_similarity
 
-from test_peak_method import calculate_peak_prominence
+
+from peak_methods import get_peak_profile
 from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
@@ -253,6 +252,12 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
+def get_diff_ratio(control,value):
+    diff = np.abs(control - value)
+    #max_value = max(input1,input2)
+    ratio = diff / control
+    return ratio
+
 # won't work well if there are multiple occurrences of the same clip
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
@@ -261,7 +266,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #     return []
     # if clip_name == "漫談法律intro" and index not in [10,11]:
     #     return []
-    #if clip_name == "繼續有心人intro" and index not in [10]:
+    # if clip_name == "繼續有心人intro" and index not in [10]:
     #    return []
 
 
@@ -297,30 +302,22 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         plt.close()
 
     max_index_clip = np.argmax(correlation_clip)
+    profile_clip = get_peak_profile(max_index_clip, correlation_clip)
 
-    prominence, left_through, right_through = calculate_peak_prominence(max_index_clip, correlation_clip)
-    prominence_clip = prominence
-    width_clip = right_through - left_through
-    prominences = (np.array([prominence_clip],dtype="float64"), np.array([left_through]), np.array([right_through]))
-    print("prominences",prominences)
-    results_whole = peak_widths(correlation_clip, [max_index_clip], rel_height=1, prominence_data=prominences)
-    results_half = peak_widths(correlation_clip, [max_index_clip], rel_height=0.5,prominence_data=prominences)
-    #width_middle = int((right_through-prominence_clip)/2 + (prominence_clip-left_through)/2)
     if debug_mode:
-        print(f"{section_ts} prominence",prominence)
-        print(f"{section_ts} left_through",left_through)
-        print(f"{section_ts} right_through",right_through)
-        print(f"{section_ts} width_clip",width_clip)
-        print(f"{section_ts} width_clip_whole",results_whole)
-        print(f"{section_ts} width_clip_half",results_half)
+        print(f"{section_ts} prominence_width_clip",profile_clip["prominence"])
+        #print(f"{section_ts} left_through",left_through)
+        #print(f"{section_ts} right_through",right_through)
+        #print(f"{section_ts} width_clip",profile["width_100"])
+        print(f"{section_ts} width_clip_whole",profile_clip["width_100"])
+        print(f"{section_ts} width_clip_75",profile_clip["width_75"])
+        print(f"{section_ts} width_clip_half",profile_clip["width_50"])
         #print(f"{section_ts} width_middle",width_middle)
         #print(f"{section_ts} wlen", wlen)
-        peak_dir = f"./tmp/peaks2/non_repeating_cross_correlation_{clip_name}"
+        peak_dir = f"./tmp/peaks_clip/non_repeating_cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
         print(json.dumps({"max_index":max_index_clip,
-                          "prominence":prominence,
-                          "left_through":left_through,
-                          "right_through":right_through,
+                          "profile":profile_clip
                           }, indent=2, cls=NumpyEncoder),
               file=open(f'{peak_dir}/{clip_name}.txt', 'w'))
 
@@ -348,10 +345,18 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     max_index_orig = np.argmax(correlation)
 
+    # slice
     correlation = correlation[beg:end]
 
     correlation = downsample(correlation, downsample_factor)
     max_index_downsample = np.argmax(correlation)
+
+    profile_section = get_peak_profile(max_index_downsample, correlation)
+
+    diff_prominence_ratio = get_diff_ratio(profile_clip["prominence"],profile_section["prominence"])
+    diff_width_100_ratio = get_diff_ratio(profile_clip["width_100"],profile_section["width_100"])
+    diff_width_75_ratio = get_diff_ratio(profile_clip["width_75"],profile_section["width_75"])
+    diff_width_50_ratio = get_diff_ratio(profile_clip["width_50"],profile_section["width_50"])
 
 
     if debug_mode:
@@ -381,75 +386,36 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
             f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
         plt.close()
 
+        print(f"{section_ts} prominence",profile_section["prominence"])
+        print(f"{section_ts} width_100",profile_section["width_100"])
+        print(f"{section_ts} width_75",profile_section["width_75"])
+        print(f"{section_ts} width_half",profile_section["width_50"])
+        peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
+        os.makedirs(peak_dir, exist_ok=True)
+        print(json.dumps({"max_index":max_index_downsample,
+                          "profile":profile_section
+                          }, indent=2, cls=NumpyEncoder),
+              file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
+    qualified = True
+    if diff_prominence_ratio > 0.1:
+        print(f"failed verification for {section_ts} due to prominence ratio {diff_prominence_ratio}")
+        qualified = False
+    #if diff_width_100_ratio > 0.1:
+    #    print(f"failed verification for {section_ts} due to width_100 ratio {diff_width_100_ratio}")
+    #    qualified = False
+    if diff_width_75_ratio > 0.1:
+        print(f"failed verification for {section_ts} due to width_75 ratio {diff_width_75_ratio}")
+        qualified = False
+    if diff_width_50_ratio > 0.1:
+        print(f"failed verification for {section_ts} due to width_50 ratio {diff_width_50_ratio}")
+        qualified = False
 
-    #max_correlation = max(correlation)
-    #ratio = percentile/max_correlation
-
-    if debug_mode:
-        peaks, _ = find_peaks(correlation)
-        print(f"{section_ts} peaks count", len(peaks))
-        #print(f"{section_ts} peaks 25 percentile", np.percentile(peaks, 25))
-
-        #print(f"{section_label} max correlation: {max_correlation}")
-        #print(f"{section_label} ratio: {ratio}")
-        #print(f"---")
-
-    #height = 0.7
-    #distance = clip_length
-    # find the peaks in the spectrogram
-    #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
-
-    #wlen = max(int(sr/2), int(clip_length))
-    #print("clip_length",clip_length)
-
-    width = int(max(clip_length,1*sr)/512)
-    #wlen = clip_length
-    #width_sharp = 10
-    #width = int(max(clip_length,1*sr)/512)
-    #print(width)
-    #wlen = width
-    #distance = max(1,int(clip_length/2))
-    distance = max(sr,int(clip_length))
-    #distance = 1
-
-    hard_percentile = 0.3
-    conditional_percentile = 0.2
-
-    if False and percentile > hard_percentile:
-        if debug_mode:
-            print(f"skipping {section_ts} due to high correlation percentile {percentile} > {hard_percentile}")
-            print(f"---")
-        return []
-    #elif percentile > 0.2:
-        # peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, width],
-        #                                height=0.5, prominence=0.4, rel_height=1)
-        # if len(peaks) > 2:
-        #     if debug_mode:
-        #         print(f"skipping {section_ts} due to more than 0.2 correlation percentile {percentile} too many peaks {len(peaks)}")
-        #         print(f"---")
-        #     return []
-
-    #max_correlation_index = np.argmax(correlation)
-    #
-    # prominence = calculate_peak_prominence(max_correlation_index,correlation)
-    # print(f"{section_ts} prominence",prominence)
-    #
-    # if(prominence > 0.8):
-    #     return [(max_correlation_index) / (sr / 10)]
-    # else:
-    #     return []
-
-    #wlen = max(int(sr/factor),3)
-
-    #print("wlen",wlen)
-
-    prominence, left_through, right_through = calculate_peak_prominence(max_index_downsample, correlation)
-    if abs(prominence - prominence_clip) > 0.05:
-        print(f"failed verification for {section_ts} due to prominence {prominence} differing {prominence_clip} by more than 0.05")
+    if not qualified:
+        print(f"failed verification for {section_ts}")
         return []
     else:
-        return [(max_index_orig) / sr]
+        return [max_index_orig / sr]
 
     # peaks, properties = find_peaks(correlation, width=0, threshold=0, wlen=wlen, height=0, prominence=0.4, rel_height=1)
     #
