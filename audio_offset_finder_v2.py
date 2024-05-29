@@ -83,28 +83,6 @@ def downsample(values,factor):
             #downsampled_values.append(np.mean(buffer_))
     return np.array(downsampled_values)
 
-
-
-
-def compute_mod_z_score(data):
-    """
-    Calculates the modified z-score for a 1D array of data.
-
-    Args:
-      data: A 1D numpy array of numerical data.
-
-    Returns:
-      A 1D numpy array containing the modified z-scores for each data point.
-    """
-    median = np.median(data)
-    median_absolute_deviation = np.median(np.abs(data - median))
-
-    if median_absolute_deviation == 0:
-        return np.zeros_like(data)  # Avoid division by zero
-
-    modified_z_scores = 0.6745 * (data - median) / median_absolute_deviation
-    return modified_z_scores
-
 def max_distance(sorted_data):
     max_dist = 0
     for i in range(1, len(sorted_data)):
@@ -455,7 +433,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     #             print(f"---")
     #         return []
 
-    # # edge case where there are multiple peaks that stand out
+    # # edge case where there are multiple peaks but relatively low percentile
     # if percentile > conditional_percentile and len(peaks) > 1:
     #     if debug_mode:
     #         print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
