@@ -62,7 +62,7 @@ def load_audio_file(file_path, sr=None):
 
 
 
-def downsample(factor, values):
+def downsample(values,factor):
     buffer_ = deque([], maxlen=factor)
     downsampled_values = []
     for i, value in enumerate(values):
@@ -70,30 +70,12 @@ def downsample(factor, values):
         if (i - 1) % factor == 0:
             # Take max value out of buffer
             # or you can take higher value if their difference is too big, otherwise just average
-            downsampled_values.append(max(buffer_))
+            max_value = max(buffer_)
+            #if max_value > 0.2:
+            downsampled_values.append(max_value)
+            #else:
+            #downsampled_values.append(np.mean(buffer_))
     return np.array(downsampled_values)
-
-
-
-
-def compute_mod_z_score(data):
-    """
-    Calculates the modified z-score for a 1D array of data.
-
-    Args:
-      data: A 1D numpy array of numerical data.
-
-    Returns:
-      A 1D numpy array containing the modified z-scores for each data point.
-    """
-    median = np.median(data)
-    median_absolute_deviation = np.median(np.abs(data - median))
-
-    if median_absolute_deviation == 0:
-        return np.zeros_like(data)  # Avoid division by zero
-
-    modified_z_scores = 0.6745 * (data - median) / median_absolute_deviation
-    return modified_z_scores
 
 def max_distance(sorted_data):
     max_dist = 0
