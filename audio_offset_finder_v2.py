@@ -267,24 +267,21 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
-
-
     clip_length = len(clip)
-    print("clip_length",clip_length)
 
     downsample_factor = int(sr / 10)
-
-    #clip_zero_padded = np.concatenate((np.zeros(sr), clip, np.zeros(sr)))
 
     # Cross-correlate and normalize correlation
     correlation_clip = correlate(clip, clip, mode='full', method='fft')
     correlation_clip = downsample(correlation_clip, downsample_factor)
-    print("correlation_clip",len(correlation_clip))
+
     # abs
     correlation_clip = np.abs(correlation_clip)
     correlation_clip /= np.max(correlation_clip)
 
     if debug_mode:
+        print("clip_length", clip_length)
+        print("correlation_clip_length", len(correlation_clip))
         graph_dir = f"./tmp/graph/clip_correlation"
         os.makedirs(graph_dir, exist_ok=True)
 
