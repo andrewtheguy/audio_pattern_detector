@@ -11,7 +11,7 @@ import time
 import librosa
 import numpy as np
 import scipy
-from scipy.signal import correlate, savgol_filter, find_peaks_cwt, peak_prominences
+from scipy.signal import correlate, savgol_filter, find_peaks_cwt, peak_prominences, peak_widths
 import math
 import matplotlib.pyplot as plt
 
@@ -303,10 +303,20 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     prominence, left_through, right_through = calculate_peak_prominence(max_index_clip, correlation_clip)
     prominence_clip = prominence
+    width_clip = right_through - left_through
+    prominences = (np.array([prominence_clip],dtype="float64"), np.array([left_through]), np.array([right_through]))
+    print("prominences",prominences)
+    results_whole = peak_widths(correlation_clip, [max_index_clip], rel_height=1, prominence_data=prominences)
+    results_half = peak_widths(correlation_clip, [max_index_clip], rel_height=0.5,prominence_data=prominences)
+    #width_middle = int((right_through-prominence_clip)/2 + (prominence_clip-left_through)/2)
     if debug_mode:
         print(f"{section_ts} prominence",prominence)
         print(f"{section_ts} left_through",left_through)
         print(f"{section_ts} right_through",right_through)
+        print(f"{section_ts} width_clip",width_clip)
+        print(f"{section_ts} width_clip_whole",results_whole)
+        print(f"{section_ts} width_clip_half",results_half)
+        #print(f"{section_ts} width_middle",width_middle)
         #print(f"{section_ts} wlen", wlen)
         peak_dir = f"./tmp/peaks2/non_repeating_cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
