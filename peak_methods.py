@@ -26,6 +26,10 @@ def find_closest_troughs(peak_index, data):
 
   # Search for the left trough
   for i in range(peak_index - 1, -1, -1):
+    # plateaus
+    if data[i] == data[i+1]:
+        left_trough = i
+        continue
     if data[i] < data[i + 1] and i-1 >= 0 and data[i] < data[i - 1]:
         left_trough = i
         break
@@ -36,6 +40,10 @@ def find_closest_troughs(peak_index, data):
 
   # Search for the right trough
   for i in range(peak_index + 1, n):
+    # plateaus
+    if data[i] == data[i-1]:
+        right_trough = i
+        continue
     if i+1 < n and data[i] < data[i + 1] and data[i] < data[i - 1]:
         right_trough = i
         break
@@ -69,4 +77,5 @@ def get_peak_profile(peak_index, data):
   width_100 = right_through - left_through
   width_75 = peak_widths(data, [peak_index], rel_height=0.75, prominence_data=prominences)[0]
   width_50 = peak_widths(data, [peak_index], rel_height=0.5, prominence_data=prominences)[0]
-  return {"width_100": width_100, "width_75": width_75, "width_50": width_50,"prominence":prominence}
+  return {"width_100": width_100, "width_75": width_75, "width_50": width_50,"prominence":prominence,
+          "left_through":left_through,"right_through":right_through}

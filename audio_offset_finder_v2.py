@@ -241,6 +241,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     if debug_mode:
         print("clip_length", clip_length)
+        #print("correlation_clip", [float(c) for c in correlation_clip])
+        #raise "chafa"
         print("correlation_clip_length", len(correlation_clip))
         graph_dir = f"./tmp/graph/clip_correlation"
         os.makedirs(graph_dir, exist_ok=True)
@@ -355,7 +357,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
         print(json.dumps({"max_index":max_index_downsample,
-                          "profile":profile_section
+                          "profile":profile_section,
+                          "similarity":similarity,
                           }, indent=2, cls=NumpyEncoder),
               file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
