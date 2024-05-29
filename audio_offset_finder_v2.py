@@ -186,18 +186,33 @@ def get_diff_ratio(control,value):
     ratio = diff / control
     return ratio
 
+def calculate_similarity(arr1, arr2):
+  """Calculates the similarity between two normalized arrays
+     using mean squared error.
+
+  Args:
+    arr1: The first normalized array.
+    arr2: The second normalized array.
+
+  Returns:
+    A similarity score (lower is more similar) based on
+    mean squared error.
+  """
+  return np.mean((arr1 - arr2)**2)
+
 # won't work well if there are multiple occurrences of the same clip
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    # if clip_name == "日落大道interlude" and index not in [36,37,50,92]:
+    #     return []
     # if clip_name == "日落大道smallinterlude" and index not in [13,14]:
     #     return []
     # if clip_name == "漫談法律intro" and index not in [10,11]:
     #     return []
-    # if clip_name == "繼續有心人intro" and index not in [10]:
+    # if clip_name == "繼續有心人intro" and index not in [10,11]:
     #    return []
-
-    # if clip_name == "rthk_news_report_theme" and index not in [26]:
+    # if clip_name == "rthk_news_report_theme" and index not in [26,27]:
     #    return []
 
 
@@ -214,6 +229,15 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     # abs
     correlation_clip = np.abs(correlation_clip)
     correlation_clip /= np.max(correlation_clip)
+
+    max_index_clip = np.argmax(correlation_clip)
+    profile_clip = get_peak_profile(max_index_clip, correlation_clip)
+    #bottom_ratio = get_diff_ratio(profile_clip["width_100"],profile_clip["width_75"])
+    #profile_clip["bottom_ratio"] = bottom_ratio
+
+
+    #correlation_clip=savgol_filter(correlation_clip, profile_clip["width_100"], 1)
+
 
     if debug_mode:
         print("clip_length", clip_length)
@@ -232,14 +256,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
             f'{graph_dir}/{clip_name}.png')
         plt.close()
 
-    max_index_clip = np.argmax(correlation_clip)
-    profile_clip = get_peak_profile(max_index_clip, correlation_clip)
-    bottom_ratio = get_diff_ratio(profile_clip["width_100"],profile_clip["width_75"])
-    profile_clip["bottom_ratio"] = bottom_ratio
-
-    if debug_mode:
         print(f"{section_ts} prominence_width_clip",profile_clip["prominence"])
-        print(f"{section_ts} bottom_ratio",profile_clip["bottom_ratio"])
+        #print(f"{section_ts} bottom_ratio",profile_clip["bottom_ratio"])
         #print(f"{section_ts} left_through",left_through)
         #print(f"{section_ts} right_through",right_through)
         #print(f"{section_ts} width_clip",profile["width_100"])
@@ -264,23 +282,24 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     correlation = np.abs(correlation)
     correlation /= np.max(correlation)
 
-    #correlation = np.nan_to_num(correlation)
-
     max_index = np.argmax(correlation)
 
     padding = clip_length
 
-    #[(max_index - clip_length): (max_index + clip_length)]
-    beg = max(int(max_index-padding), 0)
-    end = min(len(audio_section),int(max_index+padding))
-    #print("chafa")
-    #print(beg,end)
-    #exit(1)
+    beg = int(max_index-padding)
+    end = int(max_index+padding)
+
+    if beg < 0:
+        end = end - beg
+        beg = 0
 
     max_index_orig = np.argmax(correlation)
 
+    if end >= len(correlation):
+        correlation = np.pad(correlation, (0, end - len(correlation)), 'constant')
     # slice
     correlation = correlation[beg:end]
+
 
     correlation = downsample(correlation, downsample_factor)
     max_index_downsample = np.argmax(correlation)
@@ -288,16 +307,10 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     profile_section = get_peak_profile(max_index_downsample, correlation)
 
     diff_prominence_ratio = get_diff_ratio(profile_clip["prominence"],profile_section["prominence"])
-    diff_width_100_ratio = get_diff_ratio(profile_clip["width_100"],profile_section["width_100"])
-    diff_width_75_ratio = get_diff_ratio(profile_clip["width_75"],profile_section["width_75"])
-    diff_width_50_ratio = get_diff_ratio(profile_clip["width_50"],profile_section["width_50"])
 
-    bottom_ratio = get_diff_ratio(profile_section["width_100"],profile_section["width_75"])
-    profile_section["bottom_ratio"] = bottom_ratio
+    #print("correlation_clip_len_comp",len(correlation_clip), len(correlation))
 
-    #diff_bottom_ratio = abs(profile_clip["bottom_ratio"]-profile_section["bottom_ratio"])
-
-    diff_bottom_ratio = get_diff_ratio(profile_clip["bottom_ratio"],profile_section["bottom_ratio"])
+    similarity = calculate_similarity(correlation_clip,correlation)
 
     if debug_mode:
         graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
@@ -326,17 +339,18 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
             f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
         plt.close()
 
+        print(f"{section_ts} similarity",similarity)
         print(f"{section_ts} prominence",profile_section["prominence"])
-        print(f"{section_ts} bottom_ratio",profile_section["bottom_ratio"])
-        print(f"{section_ts} diff_bottom_ratio",diff_bottom_ratio)
+        #print(f"{section_ts} bottom_ratio",profile_section["bottom_ratio"])
+        #print(f"{section_ts} diff_bottom_ratio",diff_bottom_ratio)
         print(f"{section_ts} width_100",profile_section["width_100"])
         print(f"{section_ts} width_75",profile_section["width_75"])
         print(f"{section_ts} width_half",profile_section["width_50"])
 
-        print(f"{section_ts} diff_prominence_ratio",diff_prominence_ratio)
-        print(f"{section_ts} diff_width_100_ratio",diff_width_100_ratio)
-        print(f"{section_ts} diff_width_75_ratio",diff_width_75_ratio)
-        print(f"{section_ts} diff_width_50_ratio",diff_width_50_ratio)
+        #print(f"{section_ts} diff_prominence_ratio",diff_prominence_ratio)
+        #print(f"{section_ts} diff_width_100_ratio",diff_width_100_ratio)
+        #print(f"{section_ts} diff_width_75_ratio",diff_width_75_ratio)
+        #print(f"{section_ts} diff_width_50_ratio",diff_width_50_ratio)
 
         peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
         os.makedirs(peak_dir, exist_ok=True)
@@ -349,15 +363,21 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     if diff_prominence_ratio > 0.1:
         print(f"failed verification for {section_ts} due to prominence ratio {diff_prominence_ratio}")
         qualified = False
+    if similarity > 0.01:
+        print(f"failed verification for {section_ts} due to similarity {similarity}")
+        qualified = False
     #if diff_width_100_ratio > 0.1:
     #    print(f"failed verification for {section_ts} due to width_100 ratio {diff_width_100_ratio}")
     #    qualified = False
-    if diff_bottom_ratio > 0.2:
-        print(f"failed verification for {section_ts} due to width_75diff_bottom_ratio ratio {diff_bottom_ratio}")
-        qualified = False
-    if diff_width_50_ratio > 0.1:
-        print(f"failed verification for {section_ts} due to width_50 ratio {diff_width_50_ratio}")
-        qualified = False
+    #if diff_bottom_ratio > 0.2:
+    #    print(f"failed verification for {section_ts} due to width_75diff_bottom_ratio ratio {diff_bottom_ratio}")
+    #    qualified = False
+    #if diff_width_75_ratio > 0.5:
+    #    print(f"failed verification for {section_ts} due to width_75 ratio {diff_width_75_ratio}")
+    #    qualified = False
+    #if diff_width_50_ratio > 0.1:
+    #    print(f"failed verification for {section_ts} due to width_50 ratio {diff_width_50_ratio}")
+    #    qualified = False
 
     if not qualified:
         print(f"failed verification for {section_ts}")
