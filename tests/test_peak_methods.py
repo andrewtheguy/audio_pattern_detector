@@ -83,5 +83,17 @@ class TestPeakMethods(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [2,len(data)-2])
 
+    def test_flat(self):
+        data = [10,10,15,28,30,50,40,30,25,20,20,21]
+        result = find_closest_troughs(peak_index=np.argmax(data),data=data)
+        np.testing.assert_array_equal(result,
+                                      [0,len(data)-2])
+
+    def test_flat2(self):
+        data = [22, 21, 20, 20, 25, 30, 40, 50, 30, 28, 15, 10, 10]
+        result = find_closest_troughs(peak_index=np.argmax(data),data=data)
+        np.testing.assert_array_equal(result,
+                                      [2,len(data)-1])
+
 if __name__ == '__main__':
     unittest.main()
