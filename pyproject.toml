@@ -23,7 +23,6 @@ python-dotenv = "^1.0.1"
 upload_utils= { git = "https://github.com/andrewtheguy/upload_utils.git", branch = "main" }
 andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
 setuptools = "^69.5.1"
-pymongo = {extras = ["srv"], version = "^4.7.1"}
 feedparser = "^6.0.11"
 boto3 = "^1.34.103"
 
