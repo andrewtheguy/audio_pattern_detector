@@ -77,10 +77,7 @@ def get_by_news_report_strategy_beep(input_file):
 
     beep_pattern_repeat_seconds = 7
 
-    # use beep2 instead to reduce false positives, might
-    # live stream whole programs instead for easier processing
-    # with another unique news report clip
-    news_report_clip='rthk_beep2.wav'
+    news_report_clip='rthk_beep.wav'
     news_report_clip_path=f'./audio_clips/{news_report_clip}'
 
     clip_paths_news_report=[news_report_clip_path]
