@@ -224,7 +224,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     # Cross-correlate and normalize correlation
     correlation_clip = correlate(clip, clip, mode='full', method='fft')
-    correlation_clip = downsample(correlation_clip, downsample_factor)
+    #correlation_clip = downsample(correlation_clip, downsample_factor)
 
     # abs
     correlation_clip = np.abs(correlation_clip)
@@ -286,10 +286,10 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     max_index = np.argmax(correlation)
 
-    padding = clip_length
+    padding = len(correlation_clip)/2
 
-    beg = int(max_index-padding)
-    end = int(max_index+padding)
+    beg = int(max_index-math.floor(padding))
+    end = int(max_index+math.ceil(padding))
 
     if beg < 0:
         end = end - beg
@@ -303,7 +303,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     correlation = correlation[beg:end]
 
 
-    correlation = downsample(correlation, downsample_factor)
+    #correlation = downsample(correlation, downsample_factor)
     max_index_downsample = np.argmax(correlation)
 
     profile_section = get_peak_profile(max_index_downsample, correlation)
@@ -363,10 +363,10 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
               file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
     qualified = True
-    if diff_prominence_ratio > 0.1:
-        print(f"failed verification for {section_ts} due to prominence ratio {diff_prominence_ratio}")
-        qualified = False
-    if similarity > 0.01:
+    #if diff_prominence_ratio > 0.1:
+    #    print(f"failed verification for {section_ts} due to prominence ratio {diff_prominence_ratio}")
+    #    qualified = False
+    if similarity > 0.002:
         print(f"failed verification for {section_ts} due to similarity {similarity}")
         qualified = False
     #if diff_width_100_ratio > 0.1:
