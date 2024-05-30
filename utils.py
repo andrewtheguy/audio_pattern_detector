@@ -58,6 +58,14 @@ def find_nearest_distance_forward(array, value):
         return None
     return arr2.min()
 
+
+def get_diff_ratio(control, value):
+    diff = np.abs(control - value)
+    # max_value = max(input1,input2)
+    ratio = diff / control
+    return ratio
+
+
 def slicing_with_zero_padding(array,width,middle_index):
     padding = width/2
 
@@ -76,19 +84,46 @@ def slicing_with_zero_padding(array,width,middle_index):
     # slice
     return np.array(array[beg:end])
 
-if __name__ == '__main__':
-  array1 = [1, 2, 3, 4, 5]  # Unique and sorted
-  array2 = [1, 2, 2, 4, 5]  # Not unique
-  array3 = [1, 4, 2, 3, 5]  # Unique but not sorted
-  array4 = [1, 2, 4, 2, 5]  # Not unique
-
-  assert(is_unique_and_sorted(array1)==True)  # Output: True
-  assert(is_unique_and_sorted(array2)==False)  # Output: False
-  assert(is_unique_and_sorted(array3)==False)  # Output: False
-  assert(is_unique_and_sorted(array4)==False)  # Output: False
-
-  def list_get(my_list, index, default):
+def list_get(my_list, index, default):
     try:
         return my_list[index]
     except IndexError:
         return default
+
+
+def downsample(values,factor):
+    buffer_ = deque([], maxlen=factor)
+    downsampled_values = []
+    for i, value in enumerate(values):
+        buffer_.appendleft(value)
+        if (i - 1) % factor == 0:
+            # Take max value out of buffer
+            # or you can take higher value if their difference is too big, otherwise just average
+            max_value = max(buffer_)
+            #if max_value > 0.2:
+            downsampled_values.append(max_value)
+            #else:
+            #downsampled_values.append(np.mean(buffer_))
+    return np.array(downsampled_values)
+
+def max_distance(sorted_data):
+    max_dist = 0
+    for i in range(1, len(sorted_data)):
+        dist = sorted_data[i] - sorted_data[i - 1]
+        max_dist = max(max_dist, dist)
+    return max_dist
+
+
+def calculate_similarity(arr1, arr2):
+  """Calculates the similarity between two normalized arrays
+     using mean squared error.
+
+  Args:
+    arr1: The first normalized array.
+    arr2: The second normalized array.
+
+  Returns:
+    A similarity score (lower is more similar) based on
+    mean squared error.
+  """
+  return np.mean((arr1 - arr2)**2)
