@@ -15,3 +15,6 @@ While it works slightly better than the default cross-correlation for very short
 ### limitations
 overall, both method don't work well for patterns that are too short because of too many false positives, and patterns that are not loud enough are more likely to fail,
 especially with the default method that allows repeats.
+
+## testing
+use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.

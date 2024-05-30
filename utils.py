@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import subprocess
 
@@ -56,6 +57,24 @@ def find_nearest_distance_forward(array, value):
     if len(arr2)==0:
         return None
     return arr2.min()
+
+def slicing_with_zero_padding(array,width,middle_index):
+    padding = width/2
+
+    beg = int(middle_index-math.floor(padding))
+    end = int(middle_index+math.ceil(padding))
+
+    if beg < 0:
+        end = end - beg
+        #middle_index = middle_index - beg
+        array = np.pad(array, (-beg, 0), 'constant')
+        beg = beg - beg
+
+
+    if end > len(array):
+        array = np.pad(array, (0, end - len(array)), 'constant')
+    # slice
+    return np.array(array[beg:end])
 
 if __name__ == '__main__':
   array1 = [1, 2, 3, 4, 5]  # Unique and sorted
