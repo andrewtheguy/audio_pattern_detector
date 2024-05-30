@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import ffmpeg
 import librosa
 import soundfile as sf
-from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD, set_debug_mode
+from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 from andrew_utils import seconds_to_time
 
 
@@ -63,20 +63,18 @@ def cleanup_peak_times(peak_times):
 
 
 def main():
-    set_debug_mode(True)
+    #set_debug_mode(True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', required=True, type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, required=True, help='audio file to find pattern')
     parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method',default=DEFAULT_METHOD)
-    parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
-                        default=0.4)
-    #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
+    #parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
+    #                    default=0.4)
     args = parser.parse_args()
     #print(args.method)
 
     # Find clip occurrences in the full audio
-    peak_times = find_clip_in_audio_in_chunks(clip_paths=[args.pattern_file], full_audio_path=args.audio_file, method=args.match_method,
-                                              threshold=args.threshold)
+    peak_times = AudioOffsetFinder(method=args.match_method,debug_mode=True,clip_paths=[args.pattern_file]).find_clip_in_audio(full_audio_path=args.audio_file)
     print(peak_times[args.pattern_file])
     peak_times_clean = peak_times[args.pattern_file]
     #peak_times_clean = cleanup_peak_times(peak_times[args.pattern_file])
