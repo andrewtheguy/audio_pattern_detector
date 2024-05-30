@@ -25,6 +25,19 @@ Clip occurs at the following times (in seconds): 00:26:11.203
 Clip occurs at the following times (in seconds): 01:22:11.855
 Clip occurs at the following times (in seconds): 02:18:11.199
 
+rthk_beep.wav:
+Clip occurs at the following times (in seconds): 00:25:59.185
+Clip occurs at the following times (in seconds): 00:26:03.184
+Clip occurs at the following times (in seconds): 00:55:59.184
+Clip occurs at the following times (in seconds): 00:55:59.184
+Clip occurs at the following times (in seconds): 01:21:59.718
+Clip occurs at the following times (in seconds): 01:22:03.722
+Clip occurs at the following times (in seconds): 01:51:58.719
+Clip occurs at the following times (in seconds): 01:51:59.719
+Clip occurs at the following times (in seconds): 02:17:59.280
+Clip occurs at the following times (in seconds): 02:47:59.280
+Clip occurs at the following times (in seconds): 02:47:59.280
+
 漫談法律 intro
 [663.95725, 1520.783125, 2401.767625, 2988.6108750000003]
 Clip occurs at the following times (in seconds): 00:11:03.957

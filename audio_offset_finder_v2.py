@@ -11,7 +11,7 @@ import time
 import librosa
 import numpy as np
 import scipy
-from scipy.signal import correlate, savgol_filter
+from scipy.signal import correlate, savgol_filter, find_peaks_cwt, peak_prominences, peak_widths
 import math
 import matplotlib.pyplot as plt
 
@@ -27,9 +27,9 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
-from scipy.signal import iirfilter,sosfiltfilt
-from sklearn.metrics.pairwise import cosine_similarity
 
+
+from peak_methods import get_peak_profile
 from utils import is_unique_and_sorted
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,13 @@ def load_audio_file(file_path, sr=None):
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
 
-
+# def condense(values, factor):
+#     x = np.arange(len(values))
+#     y = values
+#     x_condensed = x[::factor]
+#     y_condensed = np.interp(x_condensed, x, y)  # Interpolate to smooth
+#     return y_condensed
+#     #return np.array([np.mean(values[i:i + factor]) for i in range(0, len(values), factor)])
 
 def downsample(values,factor):
     buffer_ = deque([], maxlen=factor)
@@ -166,39 +172,81 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
+def get_diff_ratio(control,value):
+    diff = np.abs(control - value)
+    #max_value = max(input1,input2)
+    ratio = diff / control
+    return ratio
+
+def calculate_similarity(arr1, arr2):
+  """Calculates the similarity between two normalized arrays
+     using mean squared error.
+
+  Args:
+    arr1: The first normalized array.
+    arr2: The second normalized array.
+
+  Returns:
+    A similarity score (lower is more similar) based on
+    mean squared error.
+  """
+  return np.mean((arr1 - arr2)**2)
+
 # won't work well if there are multiple occurrences of the same clip
-# within the same audio_section because it inflates percentile
-# and triggers multiple peaks elimination fallback
-def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
-    #if index != 108:
+# because it only picks the loudest one or the most matching one
+def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name,correlation_clip):
+    # if clip_name == "日落大道interlude" and index not in [36,37,50,92]:
+    #     return []
+    # if clip_name == "日落大道smallinterlude" and index not in [13,14]:
+    #     return []
+    # if clip_name == "漫談法律intro" and index not in [10,11]:
+    #     return []
+    # if clip_name == "繼續有心人intro" and index not in [10,11]:
     #    return []
-
-    clip_length = len(clip)
-
-    # Cross-correlate and normalize correlation
-    correlation = correlate(audio_section, clip, mode='full', method='fft')
-
-    # abs
-    correlation = np.abs(correlation)
-    # alternative to replace negative values with zero in array instead of above
-    #correlation[correlation < 0] = 0
-
-
-
-    # apply a Savitzky-Golay filter
-    #correlation = savgol_filter(correlation, window_length=int(sr/8), polyorder=5)
-    #correlation = downsample(800,correlation)
-
-    correlation /= np.max(correlation)
-
-    #correlation = resample(correlation, int(len(correlation) / sr * 256))
+    # if clip_name == "rthk_news_report_theme" and index not in [26,27]:
+    #    return []
 
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+
+    if debug_mode:
+        # audio section
+        print("audio_section length",len(audio_section))
+    # Cross-correlate and normalize correlation
+    correlation = correlate(audio_section, clip, mode='full', method='fft')
+    if debug_mode:
+        print("correlation length", len(correlation))
+
+    # abs
+    correlation = np.abs(correlation)
+    correlation /= np.max(correlation)
+
+    max_index = np.argmax(correlation)
+
+    padding = len(correlation_clip)/2
+
+    beg = int(max_index-math.floor(padding))
+    end = int(max_index+math.ceil(padding))
+
+    if beg < 0:
+        end = end - beg
+        beg = 0
+
+
+    if end >= len(correlation):
+        correlation = np.pad(correlation, (0, end - len(correlation)), 'constant')
+    # slice
+    correlation = correlation[beg:end]
+
+    similarity = calculate_similarity(correlation_clip,correlation)
 
     if debug_mode:
         graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
@@ -206,7 +254,20 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
         #Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
+        # if clip_name == "漫談法律intro" and index == 10:
+        #     plt.plot(correlation[454000:454100])
+        # elif clip_name == "漫談法律intro" and index == 11:
+        #     plt.plot(correlation[50000:70000])
+        # elif clip_name == "日落大道smallinterlude" and index == 13:
+        #     plt.plot(correlation[244100:244700])
+        # elif clip_name == "日落大道smallinterlude" and index == 14:
+        #     plt.plot(correlation[28300:28900])
+        # elif clip_name == "繼續有心人intro" and index == 10:
+        #     plt.plot(correlation[440900:441000])
+        # else:
+        #     plt.plot(correlation)
         plt.plot(correlation)
+
         plt.title('Cross-correlation between the audio clip and full track before slicing')
         plt.xlabel('Lag')
         plt.ylabel('Correlation coefficient')
@@ -214,121 +275,23 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
             f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
         plt.close()
 
+        print(f"{section_ts} similarity",similarity)
 
-    percentile = np.percentile(correlation, 99)
+        debug_dir = f"./tmp/debug/non_repeating_cross_correlation_{clip_name}"
+        os.makedirs(debug_dir, exist_ok=True)
+        print(json.dumps({"max_index":max_index,
+                          "similarity":similarity,
+                          }, indent=2, cls=NumpyEncoder),
+              file=open(f'{debug_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
+    similarity_threshold = 0.002
 
-    #max_correlation = max(correlation)
-    #ratio = percentile/max_correlation
-
-    if debug_mode:
-        print(f"{section_ts} percentile", percentile)
-        #print(f"{section_label} max correlation: {max_correlation}")
-        #print(f"{section_label} ratio: {ratio}")
-        #print(f"---")
-
-    #height = 0.7
-    #distance = clip_length
-    # find the peaks in the spectrogram
-    #peaks, properties = find_peaks(correlation, distance=distance, width=[0,clip_length],wlen=clip_length,prominence=0.4)
-
-    #wlen = max(int(sr/2), int(clip_length))
-    #print("clip_length",clip_length)
-
-    width = int(max(clip_length,1*sr)/512)
-    #wlen = clip_length
-    #width_sharp = 10
-    #width = int(max(clip_length,1*sr)/512)
-    #print(width)
-    #wlen = width
-    #distance = max(1,int(clip_length/2))
-    distance = max(sr,int(clip_length))
-    #distance = 1
-
-    hard_percentile = 0.3
-    conditional_percentile = 0.2
-
-    if percentile > hard_percentile:
+    if similarity > similarity_threshold:
         if debug_mode:
-            print(f"skipping {section_ts} due to high correlation percentile {percentile} > {hard_percentile}")
-            print(f"---")
+            print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
         return []
-    #elif percentile > 0.2:
-        # peaks, properties = find_peaks(correlation, wlen=wlen, distance=distance, width=[0, width],
-        #                                height=0.5, prominence=0.4, rel_height=1)
-        # if len(peaks) > 2:
-        #     if debug_mode:
-        #         print(f"skipping {section_ts} due to more than 0.2 correlation percentile {percentile} too many peaks {len(peaks)}")
-        #         print(f"---")
-        #     return []
-
-
-    peaks,properties = find_peaks(correlation,width=[0,width],distance=distance,prominence=0.4,threshold=0,height=0)
-
-    # sharp_ratios=[]
-    # for i, item in enumerate(peaks):
-    #     # plot_test_x=np.append(plot_test_x, index)
-    #     # plot_test_y=np.append(plot_test_y, item)
-    #     sharp_ratios.append(properties["prominences"][i] / properties["widths"][i])
-
-    if debug_mode:
-        peak_dir = f"./tmp/peaks/non_repeating_cross_correlation_{clip_name}"
-        os.makedirs(peak_dir, exist_ok=True)
-        peaks_test=[]
-        for i,item in enumerate(peaks):
-            #plot_test_x=np.append(plot_test_x, index)
-            #plot_test_y=np.append(plot_test_y, item)
-            peaks_test.append([{"index":int(item),"second":item/sr,"height":properties["peak_heights"][i],
-                                "prominence":properties["prominences"][i],"width":properties["widths"][i]}])
-        peaks_test.append({"properties":properties})
-        print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
-
-
-    # if percentile > conditional_percentile:
-    #     #print(len(peaks),peaks)
-    #     if len(peaks) > 1:
-    #         if debug_mode:
-    #             print(f"skipping {section_ts} due to {percentile} between {conditional_percentile} and {hard_percentile} correlation percentile and have too many peaks {len(peaks)}")
-    #             print(f"---")
-    #         return []
-
-    # edge case where there are multiple peaks but relatively low percentile
-    if percentile > conditional_percentile and len(peaks) > 1:
-        if debug_mode:
-            print(f"skipping {section_ts} due to multiple peaks {peaks} and percentile {percentile} between {conditional_percentile} and {hard_percentile}")
-            print(f"---")
-        return []
-
-    #return (peaks / sr).tolist()
-
-    sharp_peaks = []
-    for i,peak in enumerate(peaks):
-        #sharp_ratio=sharp_ratios[i]
-        #if properties["prominences"][i] >= 0.7 and properties["widths"][i] <= width_sharp:
-        height = properties["peak_heights"][i]
-        prominence = properties["prominences"][i]
-        if height == 1.0 and prominence > 0.95:  # only consider the highest peak prominent enough
-            #if height - prominence < 0.2:
-            sharp_peaks.append(peak)
-            # no need to continue since it is limited to one peak from above
-            break
-
-    if len(sharp_peaks) == 0:
-        if debug_mode:
-            print(f"skipping {section_ts} due to no sharp peaks")
-            print(f"---")
-        return []
-    # # elif len(sharp_peaks) > 1:
-    # #     if debug_mode:
-    # #         print(f"skipping {section_ts} due to multiple sharp peaks {sharp_peaks}")
-    # #         print(f"---")
-    # #     return []
-
-    peak_time = sharp_peaks[0] / sr
-
-    return [peak_time]
-
-
+    else:
+        return [max_index / sr]
 
 # sliding_window: for previous_chunk in seconds from end
 # index: for debugging by saving a file for audio_section
@@ -398,8 +361,34 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
     #                                    clip_name=clip_name,
     #                                    threshold=threshold,repeating=False)
     #elif method == "experimental_non_repeating_correlation":
+
+        # Cross-correlate and normalize correlation
+        correlation_clip = correlate(clip, clip, mode='full', method='fft')
+
+        # abs
+        correlation_clip = np.abs(correlation_clip)
+        correlation_clip /= np.max(correlation_clip)
+
+        if debug_mode:
+            print("clip_length", len(clip))
+            # print("correlation_clip", [float(c) for c in correlation_clip])
+            # raise "chafa"
+            print("correlation_clip_length", len(correlation_clip))
+            graph_dir = f"./tmp/graph/clip_correlation"
+            os.makedirs(graph_dir, exist_ok=True)
+
+            plt.figure(figsize=(10, 4))
+
+            plt.plot(correlation_clip)
+            plt.title('Cross-correlation of the audio clip itself')
+            plt.xlabel('Lag')
+            plt.ylabel('Correlation coefficient')
+            plt.savefig(
+                f'{graph_dir}/{clip_name}.png')
+            plt.close()
+
         peak_times = non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
-                                        seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
+                                        seconds_per_chunk=seconds_per_chunk, clip_name=clip_name,correlation_clip=correlation_clip)
         # peak_times=[]
         # if(len(peak_times_tentative)<=1):
         #     peak_times=peak_times_tentative
