@@ -131,6 +131,7 @@ def consolidate_close_by(news_reports,max_seconds):
             #print("add current and reset")
             new_ones.append(cur_news_report)
         else:
+            # remove repeat
             #print("cur_news_report",cur_news_report)
             #print("cur_first",cur_first)
             #print("cur_news_report - cur_first",cur_news_report - cur_first)

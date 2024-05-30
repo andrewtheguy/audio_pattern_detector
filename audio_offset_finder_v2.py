@@ -59,10 +59,13 @@ def load_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
+correlation_cache_correlation_method={}
 
 # won't work well for very short clips like single beep
-# because it gives too many false positives
-def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_name,threshold):
+# because it is more likely to have false positives
+def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    correlation_clip = get_clip_correlation_cached(clip,clip_name,correlation_cache_correlation_method)
+    threshold = 0.25
 
     clip_length = len(clip)
 
@@ -111,10 +114,10 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     #height = threshold
     distance = clip_length
-    width = int(max(clip_length, 1 * sr) / 512)
+    #width = int(max(clip_length, 1 * sr) / 512)
     # find the peaks in the spectrogram
-    peaks, properties = find_peaks(correlation, prominence=threshold, width=[0,width], distance=distance)
-
+    #peaks, properties = find_peaks(correlation, prominence=threshold, width=[0,width], distance=distance)
+    peaks, properties = find_peaks(correlation, height=threshold, distance=distance)
 
     if debug_mode:
         peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
@@ -127,23 +130,48 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
         peaks_test.append({"properties":properties})
         print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
-    #peaks = np.where(correlation > threshold)[0]
+    peaks_final = []
+    for peak in peaks:
+        # slice
+        correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
+        correlation_slice = correlation_slice/np.max(correlation_slice)
 
-    peak_times = np.array(peaks) / sr
+        if debug_mode:
+            graph_dir = f"./tmp/graph/cross_correlation/slice/{clip_name}"
+            os.makedirs(graph_dir, exist_ok=True)
 
-    #
-    # max_time = ((len(audio) - 1) - samples_skip_end) / sr
-    #
-    # # Array operation to filter peak_times
-    # peak_times2 = peak_times[(peak_times >= 0) & (peak_times <= max_time)]
+            # Optional: plot the correlation graph to visualize
+            plt.figure(figsize=(10, 4))
+            plt.plot(correlation_slice)
+            plt.title('Cross-correlation between the audio clip and full track before slicing')
+            plt.xlabel('Lag')
+            plt.ylabel('Correlation coefficient')
+            plt.savefig(
+                f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
+            plt.close()
+
+        similarity = calculate_similarity(correlation_clip,correlation_slice)
+
+        similarity_threshold = 0.002
+
+        if similarity > similarity_threshold:
+            if debug_mode:
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+            #return []
+        else:
+            peaks_final.append(peak)
+            #return [max_index / sr]
+
+    peak_times = np.array(peaks_final) / sr
 
     return peak_times
 
-
+correlation_cache_non_repeating_correlation_method={}
+# faster than repeat method and picks up those soft ones
 # won't work well if there are multiple occurrences of the same clip
 # because it only picks the loudest one or the most matching one
-def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name,correlation_clip):
-
+def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    correlation_clip = get_clip_correlation_cached(clip, clip_name, correlation_cache_non_repeating_correlation_method)
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
     if debug_mode:
@@ -171,18 +199,7 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
         #Optional: plot the correlation graph to visualize
         plt.figure(figsize=(10, 4))
-        # if clip_name == "漫談法律intro" and index == 10:
-        #     plt.plot(correlation[454000:454100])
-        # elif clip_name == "漫談法律intro" and index == 11:
-        #     plt.plot(correlation[50000:70000])
-        # elif clip_name == "日落大道smallinterlude" and index == 13:
-        #     plt.plot(correlation[244100:244700])
-        # elif clip_name == "日落大道smallinterlude" and index == 14:
-        #     plt.plot(correlation[28300:28900])
-        # elif clip_name == "繼續有心人intro" and index == 10:
-        #     plt.plot(correlation[440900:441000])
-        # else:
-        #     plt.plot(correlation)
+
         plt.plot(correlation)
 
         plt.title('Cross-correlation between the audio clip and full track before slicing')
@@ -210,11 +227,47 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
     else:
         return [max_index / sr]
 
+def get_clip_correlation(clip,clip_name):
+    # Cross-correlate and normalize correlation
+    correlation_clip = correlate(clip, clip, mode='full', method='fft')
+
+    # abs
+    correlation_clip = np.abs(correlation_clip)
+    correlation_clip /= np.max(correlation_clip)
+
+    if debug_mode:
+        print("clip_length", len(clip))
+        # print("correlation_clip", [float(c) for c in correlation_clip])
+        # raise "chafa"
+        print("correlation_clip_length", len(correlation_clip))
+        graph_dir = f"./tmp/graph/clip_correlation"
+        os.makedirs(graph_dir, exist_ok=True)
+
+        plt.figure(figsize=(10, 4))
+
+        plt.plot(correlation_clip)
+        plt.title('Cross-correlation of the audio clip itself')
+        plt.xlabel('Lag')
+        plt.ylabel('Correlation coefficient')
+        plt.savefig(
+            f'{graph_dir}/{clip_name}.png')
+        plt.close()
+    return correlation_clip
+
+
+def get_clip_correlation_cached(clip,clip_name,correlation_clip_cache):
+    if clip_name in correlation_clip_cache:
+        return correlation_clip_cache[clip_name]
+    else:
+        correlation_clip = get_clip_correlation(clip,clip_name)
+        correlation_clip_cache[clip_name] = correlation_clip
+        return correlation_clip
+
 # sliding_window: for previous_chunk in seconds from end
 # index: for debugging by saving a file for audio_section
 # seconds_per_chunk: default seconds_per_chunk
 def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, seconds_per_chunk, clip_name,
-                  method, threshold=None):
+                  method):
     clip_length = len(clip)
     new_seconds = len(chunk) / sr
     # Concatenate previous chunk for continuity in processing
@@ -265,47 +318,13 @@ def process_chunk(chunk, clip, sr, previous_chunk, sliding_window, index, second
             audio_section, sr)
 
     if method == "correlation":
-        if threshold is None:
-            raise ValueError("threshold is required for correlation method")
         # samples_skip_end does not skip results from being included yet
         peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
                                         seconds_per_chunk=seconds_per_chunk,
-                                        clip_name=clip_name,
-                                        threshold=threshold)
+                                        clip_name=clip_name)
     elif method == "non_repeating_correlation":
-    #    peak_times = correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
-    #                                    seconds_per_chunk=seconds_per_chunk,
-    #                                    clip_name=clip_name,
-    #                                    threshold=threshold,repeating=False)
-    #elif method == "experimental_non_repeating_correlation":
-
-        # Cross-correlate and normalize correlation
-        correlation_clip = correlate(clip, clip, mode='full', method='fft')
-
-        # abs
-        correlation_clip = np.abs(correlation_clip)
-        correlation_clip /= np.max(correlation_clip)
-
-        if debug_mode:
-            print("clip_length", len(clip))
-            # print("correlation_clip", [float(c) for c in correlation_clip])
-            # raise "chafa"
-            print("correlation_clip_length", len(correlation_clip))
-            graph_dir = f"./tmp/graph/clip_correlation"
-            os.makedirs(graph_dir, exist_ok=True)
-
-            plt.figure(figsize=(10, 4))
-
-            plt.plot(correlation_clip)
-            plt.title('Cross-correlation of the audio clip itself')
-            plt.xlabel('Lag')
-            plt.ylabel('Correlation coefficient')
-            plt.savefig(
-                f'{graph_dir}/{clip_name}.png')
-            plt.close()
-
         peak_times = non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
-                                        seconds_per_chunk=seconds_per_chunk, clip_name=clip_name,correlation_clip=correlation_clip)
+                                        seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
         # peak_times=[]
         # if(len(peak_times_tentative)<=1):
         #     peak_times=peak_times_tentative
@@ -373,7 +392,7 @@ def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
     return sliding_window
 
 # could cause issues with small overlap when intro is followed right by news report
-def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method, threshold=None):
+def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method):
     for clip_path in clip_paths:
         if not os.path.exists(clip_path):
             raise ValueError(f"Clip {clip_path} does not exist")
@@ -451,7 +470,6 @@ def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method, threshold=
                                             sliding_window=sliding_window,
                                             seconds_per_chunk=seconds_per_chunk, 
                                             method=method,
-                                            threshold=threshold,
                                     )
     
             all_peak_times[clip_path].extend(peak_times)
@@ -466,7 +484,7 @@ def find_clip_in_audio_in_chunks(clip_paths, full_audio_path, method, threshold=
 
 
 def _find_clip_in_chunk(clip, clip_name, clip_seconds, index, previous_chunk, chunk,
-                        sliding_window, seconds_per_chunk, method, threshold):
+                        sliding_window, seconds_per_chunk, method):
 
     unwind_clip_ts = True
 
@@ -480,7 +498,6 @@ def _find_clip_in_chunk(clip, clip_name, clip_seconds, index, previous_chunk, ch
                                index=index,
                                clip_name=clip_name,
                                seconds_per_chunk=seconds_per_chunk, method=method,
-                               threshold=threshold
                                )
     if len(peak_times):
         peak_times_from_beginning = [time + (index * seconds_per_chunk) for time in peak_times]
