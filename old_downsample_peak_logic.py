@@ -1,6 +1,21 @@
 # won't work well if there are multiple occurrences of the same clip
 # within the same audio_section because it inflates percentile
 # and triggers multiple peaks elimination fallback
+import json
+import math
+import os
+
+import numpy as np
+from andrew_utils import seconds_to_time
+from matplotlib import pyplot as plt
+from scipy.signal import correlate
+
+from audio_offset_finder_v2 import debug_mode
+from numpy_encoder import NumpyEncoder
+from peak_methods import get_peak_profile
+from utils import calculate_similarity, get_diff_ratio
+
+
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name):
     # if clip_name == "日落大道interlude" and index not in [36,37,50,92]:
     #     return []
