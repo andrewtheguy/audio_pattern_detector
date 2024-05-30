@@ -28,9 +28,9 @@ from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
 
-
+from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile
-from utils import is_unique_and_sorted
+from utils import is_unique_and_sorted, calculate_similarity
 
 logger = logging.getLogger(__name__)
 
@@ -58,37 +58,6 @@ def load_audio_file(file_path, sr=None):
     process.wait()
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
-
-
-# def condense(values, factor):
-#     x = np.arange(len(values))
-#     y = values
-#     x_condensed = x[::factor]
-#     y_condensed = np.interp(x_condensed, x, y)  # Interpolate to smooth
-#     return y_condensed
-#     #return np.array([np.mean(values[i:i + factor]) for i in range(0, len(values), factor)])
-
-def downsample(values,factor):
-    buffer_ = deque([], maxlen=factor)
-    downsampled_values = []
-    for i, value in enumerate(values):
-        buffer_.appendleft(value)
-        if (i - 1) % factor == 0:
-            # Take max value out of buffer
-            # or you can take higher value if their difference is too big, otherwise just average
-            max_value = max(buffer_)
-            #if max_value > 0.2:
-            downsampled_values.append(max_value)
-            #else:
-            #downsampled_values.append(np.mean(buffer_))
-    return np.array(downsampled_values)
-
-def max_distance(sorted_data):
-    max_dist = 0
-    for i in range(1, len(sorted_data)):
-        dist = sorted_data[i] - sorted_data[i - 1]
-        max_dist = max(max_dist, dist)
-    return max_dist
 
 
 # won't work well for very short clips like single beep
@@ -170,35 +139,6 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 
     return peak_times
 
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-
-def get_diff_ratio(control,value):
-    diff = np.abs(control - value)
-    #max_value = max(input1,input2)
-    ratio = diff / control
-    return ratio
-
-def calculate_similarity(arr1, arr2):
-  """Calculates the similarity between two normalized arrays
-     using mean squared error.
-
-  Args:
-    arr1: The first normalized array.
-    arr2: The second normalized array.
-
-  Returns:
-    A similarity score (lower is more similar) based on
-    mean squared error.
-  """
-  return np.mean((arr1 - arr2)**2)
 
 # won't work well if there are multiple occurrences of the same clip
 # because it only picks the loudest one or the most matching one
