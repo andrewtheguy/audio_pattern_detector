@@ -12,7 +12,7 @@ from venv import logger
 
 import ffmpeg
 
-from audio_offset_finder_v2 import DEFAULT_METHOD, find_clip_in_audio_in_chunks
+from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 
 from andrew_utils import seconds_to_time
 from file_upload.upload_utils2 import upload_file
@@ -124,8 +124,10 @@ def scrape_single_intro(input_file,stream_name,recorded):
 
         program_intro_peak_times=[]
 
+        peaks_all = AudioOffsetFinder(method="non_repeating_correlation", debug_mode=False,
+                                       clip_paths=clip_paths).find_clip_in_audio(
+            full_audio_path=input_file)
 
-        peaks_all=find_clip_in_audio_in_chunks(clip_paths, input_file, method='non_repeating_correlation')
         for c in intro_clips:
             clip_path=f'./audio_clips/{c}'
             intros=peaks_all[clip_path]
