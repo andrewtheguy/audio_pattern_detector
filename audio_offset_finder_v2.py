@@ -30,7 +30,7 @@ from scipy.signal import find_peaks
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile
-from utils import is_unique_and_sorted, calculate_similarity
+from utils import is_unique_and_sorted, calculate_similarity, slicing_with_zero_padding
 
 logger = logging.getLogger(__name__)
 
@@ -143,17 +143,6 @@ def correlation_method(clip, audio_section, sr, index, seconds_per_chunk, clip_n
 # won't work well if there are multiple occurrences of the same clip
 # because it only picks the loudest one or the most matching one
 def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk, clip_name,correlation_clip):
-    # if clip_name == "日落大道interlude" and index not in [36,37,50,92]:
-    #     return []
-    # if clip_name == "日落大道smallinterlude" and index not in [13,14]:
-    #     return []
-    # if clip_name == "漫談法律intro" and index not in [10,11]:
-    #     return []
-    # if clip_name == "繼續有心人intro" and index not in [10,11]:
-    #    return []
-    # if clip_name == "rthk_news_report_theme" and index not in [26,27]:
-    #    return []
-
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
@@ -171,20 +160,8 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     max_index = np.argmax(correlation)
 
-    padding = len(correlation_clip)/2
-
-    beg = int(max_index-math.floor(padding))
-    end = int(max_index+math.ceil(padding))
-
-    if beg < 0:
-        end = end - beg
-        beg = 0
-
-
-    if end >= len(correlation):
-        correlation = np.pad(correlation, (0, end - len(correlation)), 'constant')
     # slice
-    correlation = correlation[beg:end]
+    correlation = slicing_with_zero_padding(correlation, len(correlation_clip), max_index)
 
     similarity = calculate_similarity(correlation_clip,correlation)
 
