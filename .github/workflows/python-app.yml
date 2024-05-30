@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install poetry
-      run: pipx install poetry=1.8.2
+      run: pipx install poetry==1.8.2
               #&& poetry config virtualenvs.create false
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
