@@ -82,7 +82,7 @@ def get_by_news_report_strategy_beep(input_file):
 
     clip_paths_news_report=[news_report_clip_path]
 
-    news_report_clip_peak_times = AudioOffsetFinder(method="correlation", debug_mode=False,
+    news_report_clip_peak_times = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
                                    clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
 
 
@@ -106,7 +106,7 @@ def get_by_news_report_strategy_beep(input_file):
 # can tolerate some inaccuracies
 def get_single_beep(input_file):
 
-    # use beep2 instead to reduce false positives, might
+    # might
     # live stream whole programs instead for easier processing
     # with another unique news report clip
     news_report_clip='rthk_beep.wav'
@@ -119,7 +119,7 @@ def get_single_beep(input_file):
     clip_paths_news_report=[news_report_clip_path]
 
 
-    news_report_clip_peak_times = AudioOffsetFinder(method="correlation", debug_mode=False,
+    news_report_clip_peak_times = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
                                    clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
     
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
@@ -142,8 +142,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     #print("cleanup_single_beep_ts single beep",cleanup_single_beep_ts,"---")
     #print("clip_length_second single beep",clip_length_second,"---")
 
-    # use beep2 instead to reduce false positives, might
-    # live stream whole programs instead for easier processing
+    # might live stream whole programs instead for easier processing
     # with another unique news report clip
     #news_report_clip='rthk_news_report_theme.wav'
     news_report_clip_path=f'./audio_clips/rthk_news_report_theme.wav'
@@ -151,10 +150,9 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     clip_paths_news_report=[news_report_clip_path]
 
     #correlation_threshold_news_report = 0.7
-    news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
-                                                        full_audio_path=input_file,
-                                                        method="non_repeating_correlation",
-                                                        )
+    news_report_clip_peak_times = AudioOffsetFinder(clip_paths=clip_paths_news_report,
+                                                    method="non_repeating_correlation",
+                                                    ).find_clip_in_audio(full_audio_path=input_file)
 
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
 
@@ -267,12 +265,9 @@ def scrape(input_file,stream_name,always_reprocess=False):
         clip_paths_intros=[f'./audio_clips/{clip}' for clip in intro_clips]
         backup_intro_clip_paths=[f'./audio_clips/{clip}' for clip in backup_intro_clips]
 
-        # Find clip occurrences in the full audio
-        intro_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_intros+backup_intro_clip_paths,
-                                                             full_audio_path=input_file,
-                                                             method=DEFAULT_METHOD,
-                                                             threshold= correlation_threshold_intro,
-                                                             )
+        intro_clip_peak_times = AudioOffsetFinder(clip_paths=clip_paths_intros+backup_intro_clip_paths,
+                                                        method=DEFAULT_METHOD,
+                                                        ).find_clip_in_audio(full_audio_path=input_file)
         
         program_intro_peak_times=[]
         #program_intro_peak_times_debug=[]

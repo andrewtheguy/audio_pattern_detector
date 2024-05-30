@@ -125,7 +125,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         program_intro_peak_times=[]
 
         peaks_all = AudioOffsetFinder(method="non_repeating_correlation", debug_mode=False,
-                                       clip_paths=[args.pattern_file]).find_clip_in_audio(
+                                       clip_paths=clip_paths).find_clip_in_audio(
             full_audio_path=input_file)
 
         for c in intro_clips:
