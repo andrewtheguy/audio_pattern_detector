@@ -18,7 +18,7 @@ import ffmpeg
 import numpy as np
 import pytz
 
-from audio_offset_finder_v2 import find_clip_in_audio_in_chunks, DEFAULT_METHOD
+from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 #from database import save_debug_info_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
@@ -82,14 +82,9 @@ def get_by_news_report_strategy_beep(input_file):
 
     clip_paths_news_report=[news_report_clip_path]
 
-    # news report is not always prominent
-    # especially with the longer beep2
-    correlation_threshold_news_report = 0.3
-    news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
-                                                               full_audio_path=input_file,
-                                                               method=DEFAULT_METHOD,
-                                                               threshold= correlation_threshold_news_report,
-                                                               )
+    news_report_clip_peak_times = AudioOffsetFinder(method="correlation", debug_mode=False,
+                                   clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
+
 
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
     audio_name,_ = os.path.splitext(os.path.basename(input_file))
@@ -123,13 +118,9 @@ def get_single_beep(input_file):
 
     clip_paths_news_report=[news_report_clip_path]
 
-    # higher threshold because it is a short beep
-    correlation_threshold_news_report = 0.6
-    news_report_clip_peak_times = find_clip_in_audio_in_chunks(clip_paths=clip_paths_news_report,
-                                                               full_audio_path=input_file,
-                                                               method=DEFAULT_METHOD,
-                                                               threshold= correlation_threshold_news_report,
-                                                               )
+
+    news_report_clip_peak_times = AudioOffsetFinder(method="correlation", debug_mode=False,
+                                   clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
     
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
     
