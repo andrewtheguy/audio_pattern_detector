@@ -1,3 +1,14 @@
+import os
+
+import librosa
+import numpy as np
+import scipy
+from andrew_utils import seconds_to_time
+from matplotlib import pyplot as plt
+from scipy.signal import find_peaks
+
+from audio_offset_finder_v2 import debug_mode
+
 
 # sample rate needs to be the same for both or bugs will happen
 def chroma_method(clip, audio, sr, index, seconds_per_chunk, clip_name):
