@@ -102,7 +102,7 @@ def get_by_news_report_strategy_beep(input_file):
         news_report_peak_times = news_report_peak_times_filtered   
     return news_report_peak_times 
 
-# only used for helping get_by_news_report_theme_clip for now
+# only used for helping get_by_news_report_theme_clip for now, doesn't do blacklisting
 # can tolerate some inaccuracies
 def get_single_beep(input_file):
 
