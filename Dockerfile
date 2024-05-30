@@ -5,7 +5,7 @@ COPY ../pyproject.toml ../poetry.lock /tmp/
 
 RUN pip3 install poetry==1.8.* poetry-plugin-export
 
-RUN cd /tmp && poetry export --without test,docs --without-hashes -f requirements.txt -o requirements.txt
+RUN cd /tmp && poetry export --without test --without-hashes -f requirements.txt -o requirements.txt
 
 
 FROM rclone/rclone:1.66 as rclone
