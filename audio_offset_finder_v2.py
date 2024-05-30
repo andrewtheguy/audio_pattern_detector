@@ -217,12 +217,13 @@ def non_repeating_correlation(clip, audio_section, sr, index, seconds_per_chunk,
 
     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
-
-    # audio section
-    print("audio_section length",len(audio_section))
+    if debug_mode:
+        # audio section
+        print("audio_section length",len(audio_section))
     # Cross-correlate and normalize correlation
     correlation = correlate(audio_section, clip, mode='full', method='fft')
-    print("correlation length", len(correlation))
+    if debug_mode:
+        print("correlation length", len(correlation))
 
     # abs
     correlation = np.abs(correlation)
