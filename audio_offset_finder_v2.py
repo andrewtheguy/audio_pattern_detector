@@ -13,7 +13,7 @@ from operator import itemgetter
 import librosa
 import numpy as np
 import scipy
-from scipy.signal import correlate, savgol_filter, find_peaks_cwt, peak_prominences, peak_widths
+from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
 
@@ -32,7 +32,7 @@ from scipy.signal import find_peaks
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile
-from utils import is_unique_and_sorted, calculate_similarity, slicing_with_zero_padding
+from utils import calculate_similarity, slicing_with_zero_padding, downsample
 
 logger = logging.getLogger(__name__)
 
@@ -144,13 +144,54 @@ class AudioOffsetFinder:
 
             correlation_clip = self._get_clip_correlation(clip, clip_name)
 
+            if self.debug_mode:
+                print("clip_length", len(clip))
+                print("correlation_clip_length", len(correlation_clip))
+                graph_dir = f"./tmp/graph/clip_correlation"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                plt.figure(figsize=(10, 4))
+
+                plt.plot(correlation_clip)
+                plt.title('Cross-correlation of the audio clip itself')
+                plt.xlabel('Lag')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}.png')
+                plt.close()
+
+            if self.method == "correlation":
+                downsampling_factor = int(len(correlation_clip) / 200)
+            else: # does not support downsampling yet
+                downsampling_factor = 1
+
+            if downsampling_factor > 1:
+                downsampled_correlation_clip = downsample(correlation_clip, downsampling_factor)
+
+                if self.debug_mode:
+                    print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+                    graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+                    os.makedirs(graph_dir, exist_ok=True)
+
+                    plt.figure(figsize=(10, 4))
+
+                    plt.plot(downsampled_correlation_clip)
+                    plt.title('Cross-correlation of the audio clip itself')
+                    plt.xlabel('Lag')
+                    plt.ylabel('Correlation coefficient')
+                    plt.savefig(
+                        f'{graph_dir}/{clip_name}.png')
+                    plt.close()
+            else:
+                downsampled_correlation_clip = None
             #downsampled_correlation_clip = downsample(correlation_clip, int(len(correlation_clip) / 100))
 
             clip_datas[clip_path] = {"clip":clip,
                                      "clip_name":clip_name,
                                      "sliding_window":sliding_window,
                                      "correlation_clip":correlation_clip,
-                                     #"downsampled_correlation_clip":downsampled_correlation_clip,
+                                     "downsampling_factor":downsampling_factor,
+                                     "downsampled_correlation_clip":downsampled_correlation_clip,
                                      }
 
 
@@ -214,9 +255,9 @@ class AudioOffsetFinder:
 
                 for index,arr in enumerate(self.similarity_debug_repeat[clip_name]):
                     for item in arr:
-                        if item <= 0.02:
-                            x_coords.append(index)
-                            y_coords.append(item)
+                        #if item <= 0.02:
+                        x_coords.append(index)
+                        y_coords.append(item)
 
 
                 # Optional: plot the correlation graph to visualize
@@ -243,23 +284,6 @@ class AudioOffsetFinder:
         correlation_clip = np.abs(correlation_clip)
         correlation_clip /= np.max(correlation_clip)
 
-        if self.debug_mode:
-            print("clip_length", len(clip))
-            # print("correlation_clip", [float(c) for c in correlation_clip])
-            # raise "chafa"
-            print("correlation_clip_length", len(correlation_clip))
-            graph_dir = f"./tmp/graph/clip_correlation"
-            os.makedirs(graph_dir, exist_ok=True)
-
-            plt.figure(figsize=(10, 4))
-
-            plt.plot(correlation_clip)
-            plt.title('Cross-correlation of the audio clip itself')
-            plt.xlabel('Lag')
-            plt.ylabel('Correlation coefficient')
-            plt.savefig(
-                f'{graph_dir}/{clip_name}.png')
-            plt.close()
         return correlation_clip
 
 
@@ -357,7 +381,8 @@ class AudioOffsetFinder:
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
-        clip, clip_name, sliding_window, correlation_clip = itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data)
+        clip, clip_name, sliding_window, correlation_clip, downsampling_factor, downsampled_correlation_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip", "downsampling_factor","downsampled_correlation_clip")(clip_data))
         debug_mode = self.debug_mode
         threshold = 0.25
 
@@ -424,46 +449,55 @@ class AudioOffsetFinder:
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
             correlation_slice = correlation_slice/np.max(correlation_slice)
 
-            #correlation_slice = downsample(correlation_slice, int(len(correlation_clip) / 100))
+            clip_compare = correlation_clip
 
-            if debug_mode:
-                graph_dir = f"./tmp/graph/cross_correlation/slice/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
+            if downsampling_factor > 1:
+                correlation_slice = downsample(correlation_slice, downsampling_factor)
+                clip_compare = downsampled_correlation_clip
 
-                # Optional: plot the correlation graph to visualize
-                plt.figure(figsize=(10, 4))
-                plt.plot(correlation_slice)
-                plt.title('Cross-correlation between the audio clip and full track before slicing')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-                plt.close()
-
-            similarity = calculate_similarity(correlation_clip,correlation_slice)
+            similarity = calculate_similarity(clip_compare,correlation_slice)
             if debug_mode:
                 print("similarity", similarity)
+                #if similarity <= 0.01:
                 similarities.append(similarity)
-                #self.similarity_debug[clip_name].append(similarity)
 
             if similarity > self.similarity_threshold:
                 if debug_mode:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
-                #return []
             else:
                 peaks_final.append(peak)
-                #return [max_index / sr]
 
         if debug_mode:
-            peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
-            os.makedirs(peak_dir, exist_ok=True)
-            seconds=[]
-            for i,item in enumerate(peaks):
-                seconds.append(item/sr)
-            #peaks_test.append()
-            print(json.dumps({"peaks":peaks,"seconds":seconds,"properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+            filtered_similarity = []
+            for ipeak,peak in enumerate(peaks):
+                similarity = similarities[ipeak]
+                if similarity <= 0.01:
+                    filtered_similarity.append(similarity)
+                    graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
+                    os.makedirs(graph_dir, exist_ok=True)
+
+                    # Optional: plot the correlation graph to visualize
+                    plt.figure(figsize=(10, 4))
+                    plt.plot(correlation_slice)
+                    plt.title('Cross-correlation between the audio clip and full track before slicing')
+                    plt.xlabel('Lag')
+                    plt.ylabel('Correlation coefficient')
+                    plt.savefig(
+                        f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
+                    plt.close()
+
+            if len(filtered_similarity) > 0:
+                peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
+                os.makedirs(peak_dir, exist_ok=True)
+                seconds=[]
+                for i,item in enumerate(peaks):
+                    seconds.append(item/sr)
+                #peaks_test.append()
+                print(json.dumps({"peaks":peaks,"seconds":seconds,"properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+            self.similarity_debug_repeat[clip_name].append(filtered_similarity)
+
+        if debug_mode:
             print(f"---")
-            self.similarity_debug_repeat[clip_name].append(similarities)
 
         peak_times = np.array(peaks_final) / sr
 
