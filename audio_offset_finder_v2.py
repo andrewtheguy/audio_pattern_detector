@@ -137,7 +137,7 @@ class AudioOffsetFinder:
 
             sliding_window = get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
 
-            clip_datas[clip_path] = {"clip":clip,"clip_name":clip_name,"clip_seconds":clip_seconds,"sliding_window":sliding_window}
+            clip_datas[clip_path] = {"clip":clip,"clip_name":clip_name,"sliding_window":sliding_window}
 
         # Process audio in chunks
         while True:
@@ -156,19 +156,16 @@ class AudioOffsetFinder:
 
                 clip = clip_data["clip"]
                 clip_name = clip_data["clip_name"]
-                clip_seconds = clip_data["clip_seconds"]
+                #clip_seconds = clip_data["clip_seconds"]
                 sliding_window = clip_data["sliding_window"]
 
-                peak_times = self._find_clip_in_chunk(
-                                                clip=clip,
-                                                clip_name=clip_name,
-                                                clip_seconds=clip_seconds,
-                                                index=i,
-                                                previous_chunk=previous_chunk,
-                                                chunk=chunk,
-                                                sliding_window=sliding_window,
-                                                seconds_per_chunk=seconds_per_chunk,
-                                        )
+                peak_times = self._process_chunk(chunk=chunk, clip=clip, sr=self.target_sample_rate,
+                                   previous_chunk=previous_chunk,
+                                   sliding_window=sliding_window,
+                                   index=i,
+                                   clip_name=clip_name,
+                                   seconds_per_chunk=seconds_per_chunk,
+                                   )
 
                 all_peak_times[clip_path].extend(peak_times)
 
@@ -214,36 +211,6 @@ class AudioOffsetFinder:
             correlation_clip_cache[clip_name] = correlation_clip
             return correlation_clip
 
-    def _find_clip_in_chunk(self, clip, clip_name, clip_seconds, index, previous_chunk, chunk,
-                            sliding_window, seconds_per_chunk):
-
-        unwind_clip_ts = True
-
-        all_peak_times = []
-
-        peak_times = self._process_chunk(chunk=chunk, clip=clip, sr=self.target_sample_rate,
-                                   previous_chunk=previous_chunk,
-                                   sliding_window=sliding_window,
-                                   index=index,
-                                   clip_name=clip_name,
-                                   seconds_per_chunk=seconds_per_chunk,
-                                   )
-        if len(peak_times):
-            peak_times_from_beginning = [time + (index * seconds_per_chunk) for time in peak_times]
-            if unwind_clip_ts:
-                peak_times_from_beginning_new = []
-                for time in peak_times_from_beginning:
-                    new_time = time - clip_seconds
-                    if new_time >= 0:
-                        peak_times_from_beginning_new.append(new_time)
-                    else:
-                        peak_times_from_beginning_new.append(time)
-                peak_times_from_beginning = peak_times_from_beginning_new
-            #print(f"Found occurrences at: {peak_times} seconds, chunk {i}")
-            all_peak_times.extend(peak_times_from_beginning)
-            #all_correlation.extend(correlation)
-
-        return all_peak_times
 
 
     # sliding_window: for previous_chunk in seconds from end
@@ -252,6 +219,7 @@ class AudioOffsetFinder:
     def _process_chunk(self, chunk, clip, sr, previous_chunk, sliding_window, index, seconds_per_chunk, clip_name):
         debug_mode = self.debug_mode
         clip_length = len(clip)
+        clip_seconds = len(clip) / sr
         new_seconds = len(chunk) / sr
         # Concatenate previous chunk for continuity in processing
         if previous_chunk is not None:
@@ -308,32 +276,25 @@ class AudioOffsetFinder:
         elif self.method == "non_repeating_correlation":
             peak_times = self._non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
                                             seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
-            # peak_times=[]
-            # if(len(peak_times_tentative)<=1):
-            #     peak_times=peak_times_tentative
-            # else:
-            #     if not is_unique_and_sorted(peak_times_tentative):
-            #         raise ValueError(f"peak_times_tentative is not unique and sorted {peak_times_tentative}, maybe clean up first before selecting good ones")
-            #     peak_times_tentative.append(sys.maxsize)
-            #     for i in range(1,len(peak_times_tentative)):
-            #         last_one = i == len(peak_times_tentative) - 1
-            #         peak_time = peak_times_tentative[i]
-            #         prev_peak_time = peak_times_tentative[i-1]
-            #         #if peak_time is not None:
-            #         #    continue
-            #         if peak_time - prev_peak_time < seconds_per_chunk:
-            #             print(f"skipping {prev_peak_time} due to less than {seconds_per_chunk} has match prev")
-            #             continue
-            #         if not last_one:
-            #             next_peak_time = peak_times_tentative[i + 1]
-            #             if next_peak_time - peak_time < seconds_per_chunk:
-            #                 print(f"skipping {peak_time} due to less than {seconds_per_chunk} has match next")
-            #                 continue
-            #         peak_times.append(prev_peak_time)
         else:
             raise ValueError("unknown method")
 
-        peak_times_final = [peak_time - subtract_seconds for peak_time in peak_times]
+        # subtract sliding window seconds from peak times
+        peak_times = [peak_time - subtract_seconds for peak_time in peak_times]
+
+        # move timestamp to be before the clip
+        if len(peak_times):
+            peak_times_from_beginning = [time + (index * seconds_per_chunk) for time in peak_times]
+            peak_times_from_beginning_new = []
+            for time in peak_times_from_beginning:
+                new_time = time - clip_seconds
+                if new_time >= 0:
+                    peak_times_from_beginning_new.append(new_time)
+                else:
+                    peak_times_from_beginning_new.append(0)
+            peak_times_final = peak_times_from_beginning_new
+        else:
+            peak_times_final = []
 
         return peak_times_final
 
