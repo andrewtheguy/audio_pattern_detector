@@ -202,6 +202,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     #print("news_report_final",news_report_final,"---")
     return news_report_final
 
+# will cause issues if upload_json is True and the json file is the same as upload dest file
 def scrape(input_file, stream_name, upload_json=False):
     save_segments = False
     print(input_file)
