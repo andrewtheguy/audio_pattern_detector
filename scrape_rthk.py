@@ -22,13 +22,13 @@ from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 #from database import save_debug_info_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
-from scrape import concatenate_audio, download, get_sec, split_audio_by_time_sequences, url_ok
+from scrape_utils import concatenate_audio, split_audio_by_time_sequences
 from time_sequence_error import TimeSequenceError
 from file_upload.upload_utils2 import upload_file
 logger = logging.getLogger(__name__)
 
-from andrew_utils import seconds_to_time
-from utils import extract_prefix, find_nearest_distance_backwards, get_ffprobe_info
+from andrew_utils import seconds_to_time, time_to_seconds
+from utils import extract_prefix, find_nearest_distance_backwards, get_ffprobe_info, url_ok, download
 
 streams={
     "itsahappyday": {
@@ -65,28 +65,18 @@ streams={
     },
 }
 
-# intro is almost always prominent
-correlation_threshold_intro = 0.4
 
 def get_by_news_report_strategy_beep(input_file):
     news_report_blacklist_ts = {
-        #"morningsuite20240424":[5342], # fake one 1 hr 29 min 2 sec
-        #"morningsuite20240502":[12538], # 3 hrs 28 min 58 sec causing trouble
-        "KnowledgeCo20240511":[6176], # missing intro after 01:42:56
+        #"morningsuite20240424": [5342], # fake one 1 hr 29 min 2 sec
+        #"morningsuite20240502": [12538], # 3 hrs 28 min 58 sec causing trouble
+        "KnowledgeCo20240511": [6176], # missing intro after 01:42:56
     }
 
     beep_pattern_repeat_seconds = 7
 
-    news_report_clip='rthk_beep.wav'
-    news_report_clip_path=f'./audio_clips/{news_report_clip}'
+    news_report_peak_times, clip_length_second = get_single_beep(input_file)
 
-    clip_paths_news_report=[news_report_clip_path]
-
-    news_report_clip_peak_times = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
-                                   clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
-
-
-    news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
     audio_name,_ = os.path.splitext(os.path.basename(input_file))
     exclude_ts = news_report_blacklist_ts.get(audio_name,None)
     
@@ -102,22 +92,17 @@ def get_by_news_report_strategy_beep(input_file):
         news_report_peak_times = news_report_peak_times_filtered   
     return news_report_peak_times 
 
-# only used for helping get_by_news_report_theme_clip for now, doesn't do blacklisting
-# can tolerate some inaccuracies
-def get_single_beep(input_file):
 
-    # might
-    # live stream whole programs instead for easier processing
-    # with another unique news report clip
+# get timestamp of rthk single beep for news report
+def get_single_beep(input_file):
+    # might live stream whole programs instead for easier processing
+    # to guarantee the beep is there
     news_report_clip='rthk_beep.wav'
     news_report_clip_path=f'./audio_clips/{news_report_clip}'
 
     clip_length_second = float(get_ffprobe_info(news_report_clip_path)['format']['duration'])
-    #pprint.pprint(metadata)
-    #raise "chafa"
 
     clip_paths_news_report=[news_report_clip_path]
-
 
     news_report_clip_peak_times = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
                                    clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
@@ -302,7 +287,7 @@ def scrape(input_file,stream_name,always_reprocess=False):
             #print(content)
             f.write(content)
 
-    pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
+    pair = [[time_to_seconds(t) for t in sublist] for sublist in tsformatted]
     
     upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
     

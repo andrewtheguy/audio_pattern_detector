@@ -1,54 +1,14 @@
-
-import argparse
-
 import logging
 import os
-import shutil
 import subprocess
-import tempfile
 
 import ffmpeg
-import requests
-
-from audio_offset_finder_v2 import convert_audio_to_clip_format, DEFAULT_METHOD
 
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
-from utils import extract_prefix, get_ffprobe_info
+from utils import extract_prefix
 
-
-def url_ok(url):
- 
- 
-    r = requests.get(url, stream=True)
-
-    if r.ok:
-        #content = next(r.iter_content(10))
-        return True
-    else:
-        logger.error(f"HTTP Error {r.status_code} - {r.reason}")
-        return False
-
-def download(url,target_file):
-    if(os.path.exists(target_file)):
-        logger.info(f"file {target_file} already exists,skipping")
-        return
-    print(f'downloading {url}')
-    clip_length_second_stream = float(get_ffprobe_info(url)['format']['duration'])
-    with tempfile.TemporaryDirectory() as tmpdir:
-        basename,extension = os.path.splitext(os.path.basename(target_file))
-        tmp_file = os.path.join(tmpdir,f"download{extension}")
-        (
-        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="error")
-              .run()
-        )
-        clip_length_second_file = float(get_ffprobe_info(tmp_file)['format']['duration'])
-        second_tolerate=0.5
-        if abs(clip_length_second_file - clip_length_second_stream) > second_tolerate:
-            raise ValueError(f"downloaded file duration {clip_length_second_file} does not match stream duration {clip_length_second_stream} by {second_tolerate} seconds")
-        shutil.move(tmp_file,target_file)
-    print(f'downloaded to {target_file}')
 
 def split_audio(input_file, output_file, start_time, end_time,total_time,artist,album,title):
 
@@ -122,11 +82,6 @@ title={title}\n"""
         raise RuntimeError("ffmpeg failed")
 
 
-def get_sec(time_str):
-    """Get seconds from time."""
-    h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + float(s)
-
 def split_audio_by_time_sequences(input_file,total_time,pair,output_dir):
     splits=[]
     dirname,date_str = extract_prefix(input_file)
@@ -147,17 +102,3 @@ def split_audio_by_time_sequences(input_file,total_time,pair,output_dir):
                         "end_time": end_time,})
     return splits
 
-if __name__ == '__main__':
-    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    parser = argparse.ArgumentParser()
-    parser.add_argument('action')
-    parser.add_argument('--pattern-file', metavar='audio file', type=str, help='audio file to convert')
-    parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
-    #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
-    args = parser.parse_args()
-    if(args.action == 'convert'):
-        # python scrape.py convert --pattern-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
-        input_file = args.pattern_file
-        convert_audio_to_clip_format(input_file,args.dest_file)
-    else:
-        raise ValueError(f"unknown action {args.action}")
