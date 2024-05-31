@@ -8,7 +8,7 @@ RUN pip3 install poetry==1.8.* poetry-plugin-export
 RUN cd /tmp && poetry export --without test --without-hashes -f requirements.txt -o requirements.txt
 
 
-FROM rclone/rclone:1.66 as rclone
+#FROM rclone/rclone:1.66 as rclone
 
 FROM python:3.12-slim-bookworm
 
