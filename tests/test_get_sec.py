@@ -1,4 +1,5 @@
-from scrape import get_sec
+from utils import get_sec
+
 
 def test_get_sec():
     assert get_sec('00:59:59') == 3599
