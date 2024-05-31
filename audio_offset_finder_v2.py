@@ -8,6 +8,8 @@ import logging
 import os
 import pdb
 import time
+from operator import itemgetter
+
 import librosa
 import numpy as np
 import scipy
@@ -85,7 +87,7 @@ class AudioOffsetFinder:
         self.clip_paths = clip_paths
         self.method = method
         self.debug_mode = debug_mode
-        self.correlation_cache_correlation_method = {}
+        #self.correlation_cache_correlation_method = {}
         self.target_sample_rate = 8000
         self.similarity_threshold = 0.005
         self.similarity_debug=defaultdict(list)
@@ -140,7 +142,18 @@ class AudioOffsetFinder:
 
             sliding_window = get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
 
-            clip_datas[clip_path] = {"clip":clip,"clip_name":clip_name,"sliding_window":sliding_window}
+            correlation_clip = self._get_clip_correlation(clip, clip_name)
+
+            #downsampled_correlation_clip = downsample(correlation_clip, int(len(correlation_clip) / 100))
+
+            clip_datas[clip_path] = {"clip":clip,
+                                     "clip_name":clip_name,
+                                     "sliding_window":sliding_window,
+                                     "correlation_clip":correlation_clip,
+                                     #"downsampled_correlation_clip":downsampled_correlation_clip,
+                                     }
+
+
 
         # Process audio in chunks
         while True:
@@ -157,18 +170,14 @@ class AudioOffsetFinder:
             for clip_path in clip_paths:
                 clip_data = clip_datas[clip_path]
 
-                clip = clip_data["clip"]
-                clip_name = clip_data["clip_name"]
-                #clip_seconds = clip_data["clip_seconds"]
-                sliding_window = clip_data["sliding_window"]
 
-                peak_times = self._process_chunk(chunk=chunk, clip=clip, sr=self.target_sample_rate,
-                                   previous_chunk=previous_chunk,
-                                   sliding_window=sliding_window,
-                                   index=i,
-                                   clip_name=clip_name,
-                                   seconds_per_chunk=seconds_per_chunk,
-                                   )
+                peak_times = self._process_chunk(chunk=chunk,
+                                                 sr=self.target_sample_rate,
+                                                 previous_chunk=previous_chunk,
+                                                 index=i,
+                                                 clip_data=clip_data,
+                                                 seconds_per_chunk=seconds_per_chunk,
+                                                 )
 
                 all_peak_times[clip_path].extend(peak_times)
 
@@ -253,21 +262,13 @@ class AudioOffsetFinder:
             plt.close()
         return correlation_clip
 
-    def _get_clip_correlation_cached(self, clip, clip_name, correlation_clip_cache):
-        if clip_name in correlation_clip_cache:
-            return correlation_clip_cache[clip_name]
-        else:
-            correlation_clip = self._get_clip_correlation(clip, clip_name)
-            correlation_clip_cache[clip_name] = correlation_clip
-            return correlation_clip
-
-
 
     # sliding_window: for previous_chunk in seconds from end
     # index: for debugging by saving a file for audio_section
     # seconds_per_chunk: default seconds_per_chunk
-    def _process_chunk(self, chunk, clip, sr, previous_chunk, sliding_window, index, seconds_per_chunk, clip_name):
+    def _process_chunk(self, chunk, clip_data, sr, previous_chunk, index, seconds_per_chunk):
         debug_mode = self.debug_mode
+        clip, clip_name, sliding_window, correlation_clip = itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data)
         clip_length = len(clip)
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
@@ -312,20 +313,24 @@ class AudioOffsetFinder:
             # loudness normalize audio to -12 dB LUFS
             clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
-        if debug_mode:
-            os.makedirs("./tmp/audio", exist_ok=True)
-            sf.write(
-                f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.wav",
-                audio_section, sr)
+        # if debug_mode:
+        #     os.makedirs("./tmp/audio", exist_ok=True)
+        #     sf.write(
+        #         f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.wav",
+        #         audio_section, sr)
 
         if self.method == "correlation":
             # samples_skip_end does not skip results from being included yet
-            peak_times = self._correlation_method(clip, audio_section=audio_section, sr=sr, index=index,
+            peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
                                             seconds_per_chunk=seconds_per_chunk,
-                                            clip_name=clip_name)
+
+                                                  )
         elif self.method == "non_repeating_correlation":
             peak_times = self._non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
-                                            seconds_per_chunk=seconds_per_chunk, clip_name=clip_name)
+                                                        seconds_per_chunk=seconds_per_chunk,
+
+                                                         )
+
         else:
             raise ValueError("unknown method")
 
@@ -351,9 +356,9 @@ class AudioOffsetFinder:
 
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives
-    def _correlation_method(self, clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
+        clip, clip_name, sliding_window, correlation_clip = itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data)
         debug_mode = self.debug_mode
-        correlation_clip = self._get_clip_correlation_cached(clip,clip_name,self.correlation_cache_correlation_method)
         threshold = 0.25
 
         clip_length = len(clip)
@@ -419,6 +424,8 @@ class AudioOffsetFinder:
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
             correlation_slice = correlation_slice/np.max(correlation_slice)
 
+            #correlation_slice = downsample(correlation_slice, int(len(correlation_clip) / 100))
+
             if debug_mode:
                 graph_dir = f"./tmp/graph/cross_correlation/slice/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
@@ -435,6 +442,7 @@ class AudioOffsetFinder:
 
             similarity = calculate_similarity(correlation_clip,correlation_slice)
             if debug_mode:
+                print("similarity", similarity)
                 similarities.append(similarity)
                 #self.similarity_debug[clip_name].append(similarity)
 
@@ -454,7 +462,7 @@ class AudioOffsetFinder:
                 seconds.append(item/sr)
             #peaks_test.append()
             print(json.dumps({"peaks":peaks,"seconds":seconds,"properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
-
+            print(f"---")
             self.similarity_debug_repeat[clip_name].append(similarities)
 
         peak_times = np.array(peaks_final) / sr
@@ -464,9 +472,13 @@ class AudioOffsetFinder:
     # faster than repeat method and picks up those soft ones
     # won't work well if there are multiple occurrences of the same clip
     # because it only picks the loudest one or the most matching one
-    def _non_repeating_correlation(self, clip, audio_section, sr, index, seconds_per_chunk, clip_name):
+    def _non_repeating_correlation(self, clip_data, audio_section, sr, index, seconds_per_chunk):
+        clip, clip_name, sliding_window, correlation_clip = itemgetter("clip",
+                                                                     "clip_name",
+                                                                     "sliding_window",
+                                                                     "correlation_clip",
+                                                                     )(clip_data)
         debug_mode = self.debug_mode
-        correlation_clip = self._get_clip_correlation_cached(clip, clip_name, self.correlation_cache_correlation_method)
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
