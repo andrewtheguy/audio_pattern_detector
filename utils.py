@@ -1,10 +1,17 @@
 import json
 import math
+import os
 import re
+import shutil
 import subprocess
+import tempfile
 from collections import deque
 
+import ffmpeg
 import numpy as np
+import requests
+
+from scrape import logger
 
 
 # return a tuple of prefix and date
@@ -128,3 +135,43 @@ def calculate_similarity(arr1, arr2):
     mean squared error.
   """
   return np.mean((arr1 - arr2)**2)
+
+
+def url_ok(url):
+
+
+    r = requests.get(url, stream=True)
+
+    if r.ok:
+        #content = next(r.iter_content(10))
+        return True
+    else:
+        logger.error(f"HTTP Error {r.status_code} - {r.reason}")
+        return False
+
+
+def download(url,target_file):
+    if(os.path.exists(target_file)):
+        logger.info(f"file {target_file} already exists,skipping")
+        return
+    print(f'downloading {url}')
+    clip_length_second_stream = float(get_ffprobe_info(url)['format']['duration'])
+    with tempfile.TemporaryDirectory() as tmpdir:
+        basename,extension = os.path.splitext(os.path.basename(target_file))
+        tmp_file = os.path.join(tmpdir,f"download{extension}")
+        (
+        ffmpeg.input(url).output(tmp_file, **{'bsf:a': 'aac_adtstoasc'}, c='copy', loglevel="error")
+              .run()
+        )
+        clip_length_second_file = float(get_ffprobe_info(tmp_file)['format']['duration'])
+        second_tolerate=0.5
+        if abs(clip_length_second_file - clip_length_second_stream) > second_tolerate:
+            raise ValueError(f"downloaded file duration {clip_length_second_file} does not match stream duration {clip_length_second_stream} by {second_tolerate} seconds")
+        shutil.move(tmp_file,target_file)
+    print(f'downloaded to {target_file}')
+
+
+def get_sec(time_str):
+    """Get seconds from time."""
+    h, m, s = time_str.split(':')
+    return int(h) * 3600 + int(m) * 60 + float(s)

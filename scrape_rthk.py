@@ -22,13 +22,13 @@ from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 #from database import save_debug_info_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
-from scrape import concatenate_audio, download, get_sec, split_audio_by_time_sequences, url_ok
+from scrape import concatenate_audio, split_audio_by_time_sequences
 from time_sequence_error import TimeSequenceError
 from file_upload.upload_utils2 import upload_file
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
-from utils import extract_prefix, find_nearest_distance_backwards, get_ffprobe_info
+from utils import extract_prefix, find_nearest_distance_backwards, get_ffprobe_info, url_ok, download, get_sec
 
 streams={
     "itsahappyday": {

@@ -17,7 +17,8 @@ from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 from andrew_utils import seconds_to_time
 from file_upload.upload_utils2 import upload_file
 from process_timestamps import process_timestamps_simple
-from scrape import concatenate_audio, get_sec, split_audio_by_time_sequences
+from scrape import concatenate_audio, split_audio_by_time_sequences
+from utils import get_sec
 from upload_utils import sftp
 
 # clips should be non-repeating because I am using the non-repeat method, too much headache to deal with repeating clips
