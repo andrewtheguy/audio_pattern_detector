@@ -202,10 +202,12 @@ class AudioOffsetFinder:
 
                 x_coords = []
                 y_coords = []
+
                 for index,arr in enumerate(self.similarity_debug_repeat[clip_name]):
                     for item in arr:
-                        x_coords.append(index)
-                        y_coords.append(item)
+                        if item <= 0.02:
+                            x_coords.append(index)
+                            y_coords.append(item)
 
 
                 # Optional: plot the correlation graph to visualize
