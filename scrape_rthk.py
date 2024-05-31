@@ -92,22 +92,17 @@ def get_by_news_report_strategy_beep(input_file):
         news_report_peak_times = news_report_peak_times_filtered   
     return news_report_peak_times 
 
-# only used for helping get_by_news_report_theme_clip for now, doesn't do blacklisting
-# can tolerate some inaccuracies
-def get_single_beep(input_file):
 
-    # might
-    # live stream whole programs instead for easier processing
-    # with another unique news report clip
+# get timestamp of rthk single beep for news report
+def get_single_beep(input_file):
+    # might live stream whole programs instead for easier processing
+    # to guarantee the beep is there
     news_report_clip='rthk_beep.wav'
     news_report_clip_path=f'./audio_clips/{news_report_clip}'
 
     clip_length_second = float(get_ffprobe_info(news_report_clip_path)['format']['duration'])
-    #pprint.pprint(metadata)
-    #raise "chafa"
 
     clip_paths_news_report=[news_report_clip_path]
-
 
     news_report_clip_peak_times = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
                                    clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
