@@ -202,7 +202,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     #print("news_report_final",news_report_final,"---")
     return news_report_final
 
-def scrape(input_file, stream_name, always_reprocess=False, upload_json=False):
+def scrape(input_file, stream_name, upload_json=False):
     save_segments = False
     print(input_file)
     #exit(1)
@@ -220,7 +220,7 @@ def scrape(input_file, stream_name, always_reprocess=False, upload_json=False):
     
 
     jsonfile = f'{input_file}.json'
-    if (not always_reprocess) and os.path.exists(jsonfile):
+    if os.path.exists(jsonfile):
         with open(jsonfile,'r') as f:
             tsformatted=json.load(f)['tsformatted']
     else:
@@ -363,7 +363,7 @@ def download_and_scrape(download_only=False):
                 upload_file(dest_file,f"/rthk/original/{key}/{os.path.basename(dest_file)}",skip_if_exists=True)
                 if(download_only):
                     continue
-                output_dir_trimmed,output_file_trimmed = scrape(dest_file, stream_name=key, always_reprocess=False,
+                output_dir_trimmed,output_file_trimmed = scrape(dest_file, stream_name=key,
                                                                 upload_json=True)
                 podcasts_publish.append(output_dir_trimmed)
             except Exception as e:
@@ -413,11 +413,11 @@ if __name__ == '__main__':
         if audio_folder:
             for input_file in glob.glob(os.path.join(audio_folder, "*.m4a")):
                 stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
-                scrape(input_file, stream_name=stream_name, always_reprocess=True, upload_json=False)
+                scrape(input_file, stream_name=stream_name, upload_json=False)
         else:        
             input_file = args.audio_file
             stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
-            scrape(input_file, stream_name=stream_name, always_reprocess=True, upload_json=False)
+            scrape(input_file, stream_name=stream_name, upload_json=False)
     elif(args.action == 'download'):
         download_and_scrape(download_only=True)
     elif(args.action == 'download_and_scrape'):
