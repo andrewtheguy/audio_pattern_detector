@@ -14,11 +14,10 @@ import ffmpeg
 
 from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 
-from andrew_utils import seconds_to_time
+from andrew_utils import seconds_to_time, time_to_seconds
 from file_upload.upload_utils2 import upload_file
 from process_timestamps import process_timestamps_simple
-from scrape import concatenate_audio, get_sec, split_audio_by_time_sequences
-from upload_utils import sftp
+from scrape_utils import concatenate_audio, split_audio_by_time_sequences
 
 # clips should be non-repeating because I am using the non-repeat method, too much headache to deal with repeating clips
 
@@ -152,7 +151,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
 
     else:
-        pair = [[get_sec(t) for t in sublist] for sublist in tsformatted]
+        pair = [[time_to_seconds(t) for t in sublist] for sublist in tsformatted]
         #print("pair after rehydration",pair)
     print("tsformatted",tsformatted)
     duration = [seconds_to_time(t[1]-t[0]) for t in pair]

@@ -13,7 +13,7 @@ develop = false
 type = "git"
 url = "https://github.com/andrewtheguy/andrew_utils.git"
 reference = "main"
-resolved_reference = "5a0d60139c339db7f3fdcc530aa69062730b4b40"
+resolved_reference = "482931b44e4ec876a711cc042755e703617cb5f3"
 
 [[package]]
 name = "anyio"
