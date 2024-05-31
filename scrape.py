@@ -10,8 +10,6 @@ import tempfile
 import ffmpeg
 import requests
 
-from audio_offset_finder_v2 import convert_audio_to_clip_format, DEFAULT_METHOD
-
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time
@@ -147,17 +145,3 @@ def split_audio_by_time_sequences(input_file,total_time,pair,output_dir):
                         "end_time": end_time,})
     return splits
 
-if __name__ == '__main__':
-    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    parser = argparse.ArgumentParser()
-    parser.add_argument('action')
-    parser.add_argument('--pattern-file', metavar='audio file', type=str, help='audio file to convert')
-    parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
-    #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
-    args = parser.parse_args()
-    if(args.action == 'convert'):
-        # python scrape.py convert --pattern-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
-        input_file = args.pattern_file
-        convert_audio_to_clip_format(input_file,args.dest_file)
-    else:
-        raise ValueError(f"unknown action {args.action}")

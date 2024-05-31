@@ -39,8 +39,6 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 
 DEFAULT_METHOD="correlation"
 
-target_sample_rate = 8000
-
 plot_test_x = np.array([])
 plot_test_y = np.array([])
 
@@ -62,17 +60,6 @@ def convert_audio_arr_to_float(audio):
     return librosa.util.buf_to_float(audio,n_bytes=2, dtype='float32')
 
 
-def convert_audio_to_clip_format(audio_path, output_path):
-    if not os.path.exists(audio_path):
-        raise ValueError(f"Audio {audio_path} does not exist")
-    
-    # Load the audio clip
-    clip = load_audio_file(audio_path, sr=target_sample_rate)
-
-    # convert to float
-    clip = convert_audio_arr_to_float(clip)
-
-    sf.write(output_path, clip, target_sample_rate)
 
 def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
     sliding_window = math.ceil(clip_seconds)
@@ -99,6 +86,7 @@ class AudioOffsetFinder:
         self.method = method
         self.debug_mode = debug_mode
         self.correlation_cache_correlation_method = {}
+        self.target_sample_rate = 8000
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -115,7 +103,7 @@ class AudioOffsetFinder:
 
         # 2 bytes per channel on every sample for 16 bits (int16)
         # times two because it is (int16, mono)
-        chunk_size = (seconds_per_chunk * target_sample_rate) * 2
+        chunk_size = (seconds_per_chunk * self.target_sample_rate) * 2
 
         # Initialize parameters
 
@@ -128,7 +116,7 @@ class AudioOffsetFinder:
         process = (
             ffmpeg
             .input(full_audio_path)
-            .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=target_sample_rate, loglevel="error")
+            .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=self.target_sample_rate, loglevel="error")
             .run_async(pipe_stdout=True)
         )
         #audio_size = 0
@@ -139,13 +127,13 @@ class AudioOffsetFinder:
 
         for clip_path in clip_paths:
             # Load the audio clip
-            clip = load_audio_file(clip_path, sr=target_sample_rate)
+            clip = load_audio_file(clip_path, sr=self.target_sample_rate)
             # convert to float
             clip = convert_audio_arr_to_float(clip)
 
             clip_name, _ = os.path.splitext(os.path.basename(clip_path))
 
-            clip_seconds = len(clip) / target_sample_rate
+            clip_seconds = len(clip) / self.target_sample_rate
 
             sliding_window = get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
 
@@ -233,7 +221,7 @@ class AudioOffsetFinder:
 
         all_peak_times = []
 
-        peak_times = self._process_chunk(chunk=chunk, clip=clip, sr=target_sample_rate,
+        peak_times = self._process_chunk(chunk=chunk, clip=clip, sr=self.target_sample_rate,
                                    previous_chunk=previous_chunk,
                                    sliding_window=sliding_window,
                                    index=index,

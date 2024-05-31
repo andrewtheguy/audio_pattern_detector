@@ -1,11 +1,9 @@
-import librosa
-from dtw import dtw
-
-import librosa
-import matplotlib.pyplot as plt
-from dtw import dtw
 
 if __name__ == "__main__":
+    import librosa
+    import matplotlib.pyplot as plt
+    from dtw import dtw
+
     #Loading audio files
     y1, sr1 = librosa.load(librosa.ex('pistachio'))
     y2, sr2 = librosa.load(librosa.ex('pistachio'), offset=10)
