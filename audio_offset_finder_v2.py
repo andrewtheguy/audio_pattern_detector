@@ -220,12 +220,12 @@ class AudioOffsetFinder:
         debug_mode = self.debug_mode
         clip_length = len(clip)
         clip_seconds = len(clip) / sr
-        new_seconds = len(chunk) / sr
+        chunk_seconds = len(chunk) / sr
         # Concatenate previous chunk for continuity in processing
         if previous_chunk is not None:
-            if new_seconds < seconds_per_chunk:  # too small
+            if chunk_seconds < seconds_per_chunk:  # too small
                 # no need for sliding window since it is the last piece
-                subtract_seconds = -(new_seconds - seconds_per_chunk)
+                subtract_seconds = -(chunk_seconds - seconds_per_chunk)
                 audio_section_temp = np.concatenate((previous_chunk, chunk))[(-seconds_per_chunk * sr):]
                 audio_section = np.concatenate((audio_section_temp, np.array([])))
             else:
