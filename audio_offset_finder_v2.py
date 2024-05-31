@@ -1,6 +1,6 @@
 import argparse
 import sys
-from collections import deque
+from collections import deque, defaultdict
 import copy
 import datetime
 import json
@@ -87,6 +87,9 @@ class AudioOffsetFinder:
         self.debug_mode = debug_mode
         self.correlation_cache_correlation_method = {}
         self.target_sample_rate = 8000
+        self.similarity_threshold = 0.005
+        self.similarity_debug=defaultdict(list)
+        self.similarity_debug_repeat=defaultdict(list)
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -172,6 +175,51 @@ class AudioOffsetFinder:
             # Update previous_chunk to current chunk
             previous_chunk = chunk
             i = i + 1
+
+        if self.debug_mode and self.method == "non_repeating_correlation":
+            for clip_path in clip_paths:
+                clip_name, _ = os.path.splitext(os.path.basename(clip_path))
+                print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
+                graph_dir = f"./tmp/graph/{self.method}_similarity"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                # Optional: plot the correlation graph to visualize
+                plt.figure(figsize=(10, 4))
+                plt.plot(self.similarity_debug[clip_name])
+                plt.title('similarity')
+                plt.xlabel('index')
+                plt.ylabel('value')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}.png')
+                plt.close()
+
+        if self.debug_mode and self.method == "correlation":
+            for clip_path in clip_paths:
+                clip_name, _ = os.path.splitext(os.path.basename(clip_path))
+                print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
+                graph_dir = f"./tmp/graph/{self.method}_similarity"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                x_coords = []
+                y_coords = []
+                for index,arr in enumerate(self.similarity_debug_repeat[clip_name]):
+                    for item in arr:
+                        x_coords.append(index)
+                        y_coords.append(item)
+
+
+                # Optional: plot the correlation graph to visualize
+                plt.figure(figsize=(10, 4))
+                # Create scatter plot
+                plt.scatter(x_coords, y_coords)
+
+                # Adding titles and labels
+                plt.title('Scatter Plot for Given Array')
+                plt.xlabel('Value')
+                plt.ylabel('Sublist Index')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}.png')
+                plt.close()
 
         process.wait()
 
@@ -358,18 +406,12 @@ class AudioOffsetFinder:
         #peaks, properties = find_peaks(correlation, prominence=threshold, width=[0,width], distance=distance)
         peaks, properties = find_peaks(correlation, height=threshold, distance=distance)
 
-        if debug_mode:
-            peak_dir = f"./tmp/peaks/cross_correlation_{clip_name}"
-            os.makedirs(peak_dir, exist_ok=True)
-            peaks_test=[]
-            for i,item in enumerate(peaks):
-                #plot_test_x=np.append(plot_test_x, index)
-                #plot_test_y=np.append(plot_test_y, item)
-                peaks_test.append([int(item),item/sr,correlation[item]])
-            peaks_test.append({"properties":properties})
-            print(json.dumps(peaks_test, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
         peaks_final = []
+
+        # for debugging
+        similarities = []
+
         for peak in peaks:
             # slice
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
@@ -390,16 +432,28 @@ class AudioOffsetFinder:
                 plt.close()
 
             similarity = calculate_similarity(correlation_clip,correlation_slice)
+            if debug_mode:
+                similarities.append(similarity)
+                #self.similarity_debug[clip_name].append(similarity)
 
-            similarity_threshold = 0.002
-
-            if similarity > similarity_threshold:
+            if similarity > self.similarity_threshold:
                 if debug_mode:
-                    print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                    print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
                 #return []
             else:
                 peaks_final.append(peak)
                 #return [max_index / sr]
+
+        if debug_mode:
+            peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
+            os.makedirs(peak_dir, exist_ok=True)
+            seconds=[]
+            for i,item in enumerate(peaks):
+                seconds.append(item/sr)
+            #peaks_test.append()
+            print(json.dumps({"peaks":peaks,"seconds":seconds,"properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+
+            self.similarity_debug_repeat[clip_name].append(similarities)
 
         peak_times = np.array(peaks_final) / sr
 
@@ -433,6 +487,8 @@ class AudioOffsetFinder:
         similarity = calculate_similarity(correlation_clip,correlation)
 
         if debug_mode:
+            self.similarity_debug[clip_name].append(similarity)
+
             graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
 
@@ -457,11 +513,9 @@ class AudioOffsetFinder:
                               }, indent=2, cls=NumpyEncoder),
                   file=open(f'{debug_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
 
-        similarity_threshold = 0.002
-
-        if similarity > similarity_threshold:
+        if similarity > self.similarity_threshold:
             if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
             return []
         else:
             return [max_index / sr]
