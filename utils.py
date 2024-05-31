@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import os
 import re
@@ -11,8 +12,7 @@ import ffmpeg
 import numpy as np
 import requests
 
-from scrape import logger
-
+logger = logging.getLogger(__name__)
 
 # return a tuple of prefix and date
 # happydaily20220430 will return ("happydaily","20220430")
@@ -169,9 +169,3 @@ def download(url,target_file):
             raise ValueError(f"downloaded file duration {clip_length_second_file} does not match stream duration {clip_length_second_stream} by {second_tolerate} seconds")
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')
-
-
-def get_sec(time_str):
-    """Get seconds from time."""
-    h, m, s = time_str.split(':')
-    return int(h) * 3600 + int(m) * 60 + float(s)

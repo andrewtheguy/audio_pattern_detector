@@ -294,8 +294,8 @@ class AudioOffsetFinder:
             # loudness normalize audio to -12 dB LUFS
             clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
-        os.makedirs("./tmp/audio", exist_ok=True)
         if debug_mode:
+            os.makedirs("./tmp/audio", exist_ok=True)
             sf.write(
                 f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.wav",
                 audio_section, sr)
