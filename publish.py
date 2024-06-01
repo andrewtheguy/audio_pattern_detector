@@ -145,27 +145,27 @@ def publish_podcast(folder,title,inputs,dest_dir):
     suffix = hashlib.md5(f"{title_clean}{salt}".encode("utf-8")).hexdigest()
     remote_name = f"{title_clean}_{suffix}"
     data = {"key":remote_name,"xml":feed}
-    #upload_cloudflare(data)
-    print(f"simulate upload feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
+    upload_cloudflare(data)
+    print(f"uploaded feed to cloudflare as {base_endpoint}/feeds/{remote_name}.xml")
 
-    # paginator = s3.get_paginator('list_objects_v2')
-    #
-    # file_del = []
-    # files_keep = [os.path.basename(obj['file']) for obj in inputs]
-    # for page in paginator.paginate(Bucket=bucket_name, Prefix=dest_dir):
-    #     if "Contents" in page:
-    #         for object_info in page["Contents"]:
-    #             file_name = object_info["Key"]
-    #             if file_name.endswith("/"):  # Filter out folders
-    #                 continue
-    #             check,_,f = file_name.rpartition('/')
-    #             f=None if len(check)==0 else f
-    #             if f not in files_keep:
-    #                 file_del.append(file_name)
-    #
-    # for key in file_del:
-    #     logger.info(f"deleting {key}")
-    #     s3.delete_object(Bucket=bucket_name, Key=key)
+    paginator = s3.get_paginator('list_objects_v2')
+
+    file_del = []
+    files_keep = [os.path.basename(obj['file']) for obj in inputs]
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=dest_dir):
+        if "Contents" in page:
+            for object_info in page["Contents"]:
+                file_name = object_info["Key"]
+                if file_name.endswith("/"):  # Filter out folders
+                    continue
+                check,_,f = file_name.rpartition('/')
+                f=None if len(check)==0 else f
+                if f not in files_keep:
+                    file_del.append(file_name)
+
+    for key in file_del:
+        logger.info(f"deleting {key}")
+        s3.delete_object(Bucket=bucket_name, Key=key)
 
 def extract_folder(path):
   """
