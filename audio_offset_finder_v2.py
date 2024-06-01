@@ -194,7 +194,9 @@ class AudioOffsetFinder:
             self.similarity_threshold = 0.005
             # for very short clip
             self.very_short_clip_similarity_threshold = 0.01
-            self.very_short_clip_similarity_threshold_conditional = 0.005
+            # lower threshold for conditional check on very short clip because the higher likelihood of false positives
+            # check for area difference
+            self.very_short_clip_similarity_threshold_conditional = 0.003
         elif self.similarity_method == "mae": #median_absolute_error, a bit better for news report beep
             self.similarity_threshold = 0.02
         else:
