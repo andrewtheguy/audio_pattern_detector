@@ -21,6 +21,14 @@ def stat(remote_path):
             return None
         raise e
 
+def remote_exists(remote_path):
+    return stat(remote_path) is not None
+
+def download_file(remote_path,local_path):
+    print("downloading",remote_path,"to",local_path)
+    cmd = ["rclone", "--config", rclone_config_file, "copyto", f"{rclone_backend}:{remote_path}", local_path]
+    subprocess.run(cmd, check=True)
+
 def upload_file(file,dest_path,skip_if_exists=False):
     if skip_if_exists and stat(dest_path):
         print(f'upload_file: file {dest_path} already exists,skipping')

@@ -343,7 +343,7 @@ class AudioOffsetFinder:
             previous_chunk = chunk
             i = i + 1
 
-        if self.debug_mode and self.method == "correlation" or self.method == "non_repeating_correlation":
+        if self.debug_mode and (self.method == "correlation" or self.method == "non_repeating_correlation"):
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
                 #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])

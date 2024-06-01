@@ -2,7 +2,7 @@
 import argparse
 import fcntl
 import glob
-from collections import deque
+from collections import deque, defaultdict
 import datetime
 import json
 import logging
@@ -24,7 +24,8 @@ from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from scrape_utils import concatenate_audio, split_audio_by_time_sequences
 from time_sequence_error import TimeSequenceError
-from file_upload.upload_utils2 import upload_file
+from file_upload.upload_utils2 import upload_file, remote_exists, download_file
+
 logger = logging.getLogger(__name__)
 
 from andrew_utils import seconds_to_time, time_to_seconds
@@ -36,12 +37,16 @@ streams={
         "backupintroclips": ["rthk1theme_new.wav"],
         "allow_first_short": True,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/itsahappyday/m4a/{date}.m4a/master.m3u8",
+        "news_report_strategy":"theme_clip",
+        "news_report_strategy_expected_count":2,
         "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
     },
     "healthpedia": {
         "introclips": ["healthpedia_intro.wav","healthpediapriceless.wav","healthpediamiddleintro.wav"],
         "allow_first_short": False,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/master.m3u8",
+        "news_report_strategy":"theme_clip",
+        "news_report_strategy_expected_count":2,
         "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
     },
     # rthk2 needs a different strategy for news report because it is less consistent
@@ -203,7 +208,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     return news_report_final
 
 # will cause issues if upload_json is True and the json file is the same as upload dest file
-def scrape(input_file, stream_name, upload_json=False):
+def scrape(input_file, stream_name, output_dir_trimmed, upload_json=False):
     save_segments = False
     print(input_file)
     #exit(1)
@@ -295,8 +300,7 @@ def scrape(input_file, stream_name, upload_json=False):
     
     #save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
-    output_dir_trimmed= os.path.abspath(os.path.join(f"./tmp","trimmed",stream_name))
-    output_file_trimmed= os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
+    output_file_trimmed = os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
 
     os.makedirs(output_dir_trimmed, exist_ok=True)
 
@@ -317,83 +321,113 @@ def scrape(input_file, stream_name, upload_json=False):
                 save_path=f"{dirname_segment}/{filename_segment}"
                 shutil.move(item["file_path"],save_path)
             #upload_file(item["file_path"],upload_path,skip_if_exists=True)
-    return output_dir_trimmed,output_file_trimmed
+    return output_file_trimmed
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
   return current_time > target_time
 
-def download_and_scrape(download_only=False):
+num_podcast_to_keep = 3
+
+def download_rthk():
+    max_go_back_days = 7
     try:
         lockfile = open(f'./tmp/lockfile', "a+")
         fcntl.lockf(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError as e:
-        raise RuntimeError('can only run one download_and_scrape at a time')
+        raise RuntimeError('can only run one instance at a time')
+
+    #original_base_dir = os.path.abspath(f"./tmp/original")
+    #shutil.rmtree(original_base_dir, ignore_errors=True)
+
+    local_path_downloaded = defaultdict(list)
+
+    num_to_download = num_podcast_to_keep
+    if num_to_download < 1:
+        raise ValueError("num_to_download must be greater than or equal to 1")
+    for key, stream in streams.items():
+        num_downloaded = 0
+        original_dir = os.path.abspath(f"./tmp/original/{key}")
+        os.makedirs(original_dir, exist_ok=True)
+
+        for glob_pattern in ["*.m4a","*.m4a.json"]:
+            files_del = sorted(glob.glob(os.path.join(original_dir, glob_pattern)),reverse=True)[num_to_download:]
+            for file_del in files_del:
+                print(f"deleting {file_del}")
+                Path(file_del).unlink(missing_ok=True)
+
+        for days_ago in range(max_go_back_days):
+            if num_downloaded >= num_to_download:
+                break
+            date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong')) - datetime.timedelta(days=days_ago)
+            date_str = date.strftime("%Y%m%d")
+            dest_file = os.path.join(original_dir, f"{key}{date_str}.m4a")
+            dest_remote_path = f"/rthk/original/{key}/{os.path.basename(dest_file)}"
+            if remote_exists(dest_remote_path):
+                print(f'file {dest_remote_path} already exists,downloading from {date_str} instead')
+                download_file(dest_remote_path, dest_file)
+                #num_downloaded += 1
+            elif not os.path.exists(dest_file):
+                url_template = stream['url']
+                url = url_template.format(date=date_str)
+                # print(key)
+                schedule = stream['schedule']
+                end_time_hour = schedule["end"]
+                weekdays_human = schedule["weekdays_human"]
+                if date.weekday() + 1 not in weekdays_human:
+                    logger.info(f"skipping {key} because it is not scheduled for today's weekday")
+                    continue
+                if days_ago == 0 and not is_time_after(date.time(), end_time_hour + 1):
+                    logger.info(f"skipping {key} because it is not yet from {end_time_hour} + 1 hour")
+                    continue
+                elif not url_ok(url):
+                    logger.warning(f"skipping {key} because url {url} is not ok")
+                    print(f"skipping {key} because url {url} is not ok")
+                    continue
+                download(url, dest_file)
+                upload_file(dest_file, dest_remote_path, skip_if_exists=True)
+            remote_jsonfile = f'{dest_remote_path}.json'
+            jsonfile = f'{dest_file}.json'
+            if remote_exists(remote_jsonfile) and not os.path.exists(jsonfile):
+                download_file(remote_jsonfile, jsonfile)
+            local_path_downloaded[key].append(dest_file)
+            num_downloaded += 1
+    return local_path_downloaded
+
+def process_podcasts():
+    try:
+        lockfile = open(f'./tmp/lockfile', "a+")
+        fcntl.lockf(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as e:
+        raise RuntimeError('can only run one instance at a time')
    
     failed_scrape_files=[]
-    days_to_keep=3
-    if days_to_keep < 1:
-        raise ValueError("days_to_keep must be greater than or equal to 1")
-    for key, stream in streams.items():
-        error_occurred_scraping = False
-        podcasts_publish=[] # should only be one per stream
-        original_dir = os.path.abspath(f"./tmp/original/{key}")
-        for days_ago in range(days_to_keep):
-            date = datetime.datetime.now(pytz.timezone('Asia/Hong_Kong'))- datetime.timedelta(days=days_ago)
-            date_str=date.strftime("%Y%m%d")
-            url_template = stream['url']
-            url = url_template.format(date=date_str)
-            #print(key)
-            schedule=stream['schedule']
-            end_time_hour = schedule["end"]
-            weekdays_human = schedule["weekdays_human"]
-            if date.weekday()+1 not in weekdays_human:
-                logger.info(f"skipping {key} because it is not scheduled for today's weekday")
-                continue
-            if days_ago == 0 and not is_time_after(date.time(),end_time_hour+1):
-                logger.info(f"skipping {key} because it is not yet from {end_time_hour} + 1 hour")
-                continue
-            elif not url_ok(url):
-                logger.warning(f"skipping {key} because url {url} is not ok")
-                print(f"skipping {key} because url {url} is not ok")
-                continue
-            dest_file = os.path.join(original_dir,f"{key}{date_str}.m4a")
-            os.makedirs(original_dir, exist_ok=True)
+
+    error_occurred = False
+
+    local_path_downloaded=download_rthk()
+    podcasts_publish = []
+    for stream_name, dest_files in local_path_downloaded.items(): # one stream at a time
+        for dest_file in dest_files:
             try:
-                download(url,dest_file)
-                upload_file(dest_file,f"/rthk/original/{key}/{os.path.basename(dest_file)}",skip_if_exists=True)
-                if(download_only):
-                    continue
-                output_dir_trimmed,output_file_trimmed = scrape(dest_file, stream_name=key,
-                                                                upload_json=True)
+                output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
+                output_file_trimmed = scrape(dest_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name,
+                                                            upload_json=True)
                 podcasts_publish.append(output_dir_trimmed)
             except Exception as e:
-                print(f"error happened when processing for {key}",e)
+                print(f"error happened when processing for {stream_name}",e)
                 print(traceback.format_exc())
-                error_occurred_scraping = True
+                error_occurred = True
                 failed_scrape_files.append({"file":dest_file,"error":str(e)})
                 continue
-        if error_occurred_scraping:
-            print(f"error happened when processing, skipping publishing podcasts")
-        elif not download_only:
-            num_to_publish=3
-            podcasts_publish = list(dict.fromkeys(podcasts_publish))
-            for podcast in podcasts_publish:
-                print(f"publishing podcast {podcast} after scraping")
-                # assuming one per day
-                publish_folder(podcast,files_to_publish=num_to_publish,delete_old_files=True)
-            m4a_files_all = sorted(glob.glob(os.path.join(original_dir, "*.m4a")))
-            # only keep last days_to_keep number of files, 
-            # TODO: should account for weekends
-            n = len(m4a_files_all) - days_to_keep
-            n = 0 if n < 0 else n
-            files_excluded = m4a_files_all[:n]
-            #print(files_excluded)
-            for file in files_excluded:
-                print(f"deleting {file} and its jsons")
-                Path(file).unlink(missing_ok=True)
-                Path(f"{file}.json").unlink(missing_ok=True)
-                #Path(f"{file}.separated.json").unlink(missing_ok=True)
+        if error_occurred:
+            print(f"error happened when processing, skipping publishing podcasts for {stream_name}")
+            continue
+    num_to_publish = num_podcast_to_keep
+    for podcast in podcasts_publish:
+        print(f"publishing podcast {podcast} after scraping")
+        # assuming one per day
+        publish_folder(podcast,files_to_publish=num_to_publish,delete_old_files=True)
 
     if failed_scrape_files:
         print(f"failed to scrape the following files:")
@@ -401,6 +435,7 @@ def download_and_scrape(download_only=False):
             print("file",hash["file"],"error",hash["error"],"---")
 
 if __name__ == '__main__':
+    os.makedirs(f'./tmp', exist_ok=True)
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
     parser.add_argument('action')
@@ -414,15 +449,17 @@ if __name__ == '__main__':
         if audio_folder:
             for input_file in glob.glob(os.path.join(audio_folder, "*.m4a")):
                 stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
-                scrape(input_file, stream_name=stream_name, upload_json=False)
+                output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
+                scrape(input_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name, upload_json=False)
         else:        
             input_file = args.audio_file
             stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
-            scrape(input_file, stream_name=stream_name, upload_json=False)
+            output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
+            scrape(input_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name, upload_json=False)
     elif(args.action == 'download'):
-        download_and_scrape(download_only=True)
-    elif(args.action == 'download_and_scrape'):
-        download_and_scrape()
+        download_rthk()
+    elif(args.action == 'process_podcasts'):
+        process_podcasts()
     else:
         raise ValueError(f"unknown action {args.action}")
 
