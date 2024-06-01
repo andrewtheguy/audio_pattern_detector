@@ -460,6 +460,9 @@ class AudioOffsetFinder:
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
             correlation_slice = correlation_slice/np.max(correlation_slice)
 
+            if np.argmax(correlation_slice) != np.argmax(correlation_clip):
+                raise ValueError("peak not aligned with the original clip, potential bug in the middle of the chain")
+
             similarity = self._calculate_similarity(correlation_slice=correlation_slice, correlation_clip=correlation_clip)
 
             if debug_mode:
@@ -525,16 +528,18 @@ class AudioOffsetFinder:
                 areas = []
                 #distances = []
 
-                # peak_profiles=[]
+                pdc = get_peak_profile(np.argmax(downsampled_correlation_clip), downsampled_correlation_clip)
+
+                peak_profiles=[]
                 for i,item in enumerate(peaks):
                     seconds.append(item / sr)
                     correlation_slice = correlation_slices[i]
                     # #area_of_overlap = area_of_overlap_ratio(correlation_clip, correlation_slice)
 
-                    #downsampled_correlation_clip_peak = np.argmax(downsampled_correlation_clip)
+
                     # print("downsampled_correlation_clip_peak",downsampled_correlation_clip_peak)
                     #
-                    # #pdc = get_peak_profile(np.argmax(downsampled_correlation_clip), downsampled_correlation_clip)
+
                     # #print(pdc["left_trough"],pdc["right_trough"])
                     #
                     # #max_width = max(downsampled_correlation_clip_peak-pdc["left_trough"],pdc["right_trough"]-downsampled_correlation_clip_peak)
@@ -547,6 +552,11 @@ class AudioOffsetFinder:
                     downsampled_correlation_slice = downsample(correlation_slice, downsampling_factor)
                     area_of_overlap = self._calculate_area_of_overlap_ratio(downsampled_correlation_clip,
                                                                             downsampled_correlation_slice)
+
+                    # downsampled_correlation_clip_peak = np.argmax(downsampled_correlation_clip)
+
+                    pds = get_peak_profile(np.argmax(downsampled_correlation_slice), downsampled_correlation_slice)
+                    peak_profiles.append({"pds":pds})
 
                     graph_dir = f"./tmp/graph/cross_correlation_slice_downsampled/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
@@ -578,13 +588,13 @@ class AudioOffsetFinder:
 
                 print(json.dumps({"peaks":peaks,"seconds":seconds,
                                   "areas":areas,
-                                  #"pdc":pdc,
+                                  "pdc":pdc,
+                                  "peak_profiles":peak_profiles,
                                   #"pds":pds,
                                   #"properties":properties,
                                   "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
             self.similarity_debug[clip_name].append(filtered_similarity)
 
-        if debug_mode:
             print(f"---")
 
         peak_times = np.array(peaks_final) / sr
