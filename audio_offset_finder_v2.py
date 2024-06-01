@@ -246,7 +246,7 @@ class AudioOffsetFinder:
         if self.debug_mode and self.method == "non_repeating_correlation":
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
-                print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
+                #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
                 graph_dir = f"./tmp/graph/{self.method}_similarity"
                 os.makedirs(graph_dir, exist_ok=True)
 
@@ -310,7 +310,7 @@ class AudioOffsetFinder:
     # seconds_per_chunk: default seconds_per_chunk
     def _process_chunk(self, chunk, clip_data, sr, previous_chunk, index, seconds_per_chunk):
         debug_mode = self.debug_mode
-        clip, clip_name, sliding_window, correlation_clip = itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data)
+        clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
         clip_length = len(clip)
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
@@ -355,9 +355,8 @@ class AudioOffsetFinder:
 
                                                   )
         elif self.method == "non_repeating_correlation":
-            peak_times = self._non_repeating_correlation(clip, audio_section=audio_section, sr=sr, index=index,
+            peak_times = self._non_repeating_correlation(clip_data, audio_section=audio_section, sr=sr, index=index,
                                                         seconds_per_chunk=seconds_per_chunk,
-
                                                          )
 
         else:
@@ -523,13 +522,8 @@ class AudioOffsetFinder:
         debug_mode = self.debug_mode
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
-        if debug_mode:
-            # audio section
-            print("audio_section length",len(audio_section))
         # Cross-correlate and normalize correlation
         correlation = correlate(audio_section, clip, mode='full', method='fft')
-        if debug_mode:
-            print("correlation length", len(correlation))
 
         # abs
         correlation = np.abs(correlation)
@@ -537,14 +531,11 @@ class AudioOffsetFinder:
 
         max_index = np.argmax(correlation)
 
-        # slice
-        correlation = slicing_with_zero_padding(correlation, len(correlation_clip), max_index)
-
-        similarity = calculate_similarity(correlation_clip,correlation)
-
         if debug_mode:
-            self.similarity_debug[clip_name].append(similarity)
+            # audio section
+            print("audio_section length", len(audio_section))
 
+            print("correlation length", len(correlation))
             graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
 
@@ -559,6 +550,28 @@ class AudioOffsetFinder:
             plt.savefig(
                 f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
             plt.close()
+
+
+        # slice
+        correlation = slicing_with_zero_padding(correlation, len(correlation_clip), max_index)
+
+        similarity = calculate_similarity(correlation_clip,correlation)
+
+        if debug_mode:
+            graph_dir = f"./tmp/graph/non_repeat_cross_correlation_slice/{clip_name}"
+            os.makedirs(graph_dir, exist_ok=True)
+
+            # Optional: plot the correlation graph to visualize
+            plt.figure(figsize=(10, 4))
+            plt.plot(correlation)
+            plt.title('Cross-correlation between the audio clip and full track before slicing')
+            plt.xlabel('Lag')
+            plt.ylabel('Correlation coefficient')
+            plt.savefig(
+                f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
+            plt.close()
+
+            self.similarity_debug[clip_name].append(similarity if similarity <= 0.01 else 0)
 
             print(f"{section_ts} similarity",similarity)
 
