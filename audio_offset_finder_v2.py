@@ -10,6 +10,7 @@ import pdb
 import time
 from operator import itemgetter
 
+from dtaidistance import dtw
 import librosa
 import numpy as np
 import scipy
@@ -29,10 +30,11 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile
-from utils import calculate_similarity, slicing_with_zero_padding, downsample
+from utils import slicing_with_zero_padding, downsample
 
 logger = logging.getLogger(__name__)
 
@@ -82,17 +84,27 @@ def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
 
     return sliding_window
 
+def dtw_distance(series1, series2):
+    d = dtw.distance(series1, series2)
+    return d
+
 class AudioOffsetFinder:
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
         self.clip_paths = clip_paths
         self.method = method
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
+        self.normalize = True
         self.target_sample_rate = 8000
-        self.similarity_threshold = 0.005
         self.similarity_debug=defaultdict(list)
         self.similarity_debug_repeat=defaultdict(list)
-        self.normalize = True
+        self.similarity_method = "mse"
+        if self.similarity_method == "mse":
+            self.similarity_threshold = 0.005
+        elif self.similarity_method == "mae":
+            self.similarity_threshold = 0.05
+        else:
+            raise ValueError("unknown similarity method")
         self.downsample = False
 
     # could cause issues with small overlap when intro is followed right by news report
@@ -250,7 +262,7 @@ class AudioOffsetFinder:
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
                 #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
-                graph_dir = f"./tmp/graph/{self.method}_similarity"
+                graph_dir = f"./tmp/graph/{self.method}_similarity_{self.similarity_method}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 # Optional: plot the correlation graph to visualize
@@ -267,7 +279,7 @@ class AudioOffsetFinder:
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
                 #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
-                graph_dir = f"./tmp/graph/{self.method}_similarity"
+                graph_dir = f"./tmp/graph/{self.method}_similarity_{self.similarity_method}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 x_coords = []
@@ -384,6 +396,15 @@ class AudioOffsetFinder:
 
         return peak_times_final
 
+    def _calculate_similarity(self, correlation_clip, correlation_slice):
+
+        if self.similarity_method == "mae":
+            similarity = mean_absolute_error(correlation_clip, correlation_slice)
+        elif self.similarity_method == "mse":
+            similarity = mean_squared_error(correlation_clip, correlation_slice)
+        else:
+            raise ValueError("unknown similarity method")
+        return similarity
 
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives
@@ -465,7 +486,8 @@ class AudioOffsetFinder:
                 correlation_slice = downsample(correlation_slice, downsampling_factor)
                 clip_compare = downsampled_correlation_clip
 
-            similarity = calculate_similarity(clip_compare,correlation_slice)
+            similarity = self._calculate_similarity(correlation_slice=correlation_slice, correlation_clip=clip_compare)
+
             if debug_mode:
                 print("similarity", similarity)
                 #if similarity <= 0.01:
@@ -483,7 +505,8 @@ class AudioOffsetFinder:
             for ipeak,peak in enumerate(peaks):
                 similarity = similarities[ipeak]
                 correlation_slice = correlation_slices[ipeak]
-                if similarity <= 0.01:
+                threshold = 0.01 if self.similarity_method == "mse" else 0.1
+                if similarity <= threshold:
                     filtered_similarity.append(similarity)
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
@@ -558,9 +581,9 @@ class AudioOffsetFinder:
 
 
         # slice
-        correlation = slicing_with_zero_padding(correlation, len(correlation_clip), max_index)
+        correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), max_index)
 
-        similarity = calculate_similarity(correlation_clip,correlation)
+        similarity = self._calculate_similarity(correlation_slice=correlation_slice, correlation_clip=correlation_clip)
 
         if debug_mode:
             graph_dir = f"./tmp/graph/non_repeat_cross_correlation_slice/{clip_name}"
@@ -568,7 +591,7 @@ class AudioOffsetFinder:
 
             # Optional: plot the correlation graph to visualize
             plt.figure(figsize=(10, 4))
-            plt.plot(correlation)
+            plt.plot(correlation_slice)
             plt.title('Cross-correlation between the audio clip and full track before slicing')
             plt.xlabel('Lag')
             plt.ylabel('Correlation coefficient')
@@ -576,7 +599,7 @@ class AudioOffsetFinder:
                 f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
             plt.close()
 
-            self.similarity_debug[clip_name].append(similarity if similarity <= 0.01 else 0)
+            self.similarity_debug[clip_name].append(similarity)
 
             print(f"{section_ts} similarity",similarity)
 

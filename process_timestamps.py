@@ -71,7 +71,7 @@ def timestamp_sanity_check_rthk(result,total_time,allow_first_short=False):
         
         # TODO: still need to account for 1 hour interval news report at night time
         short_allowance_special = 5
-        short_allowance_normal = 15
+        short_allowance_normal = 12
         
         allow_short_interval = allow_first_short and beginning
         # allow first short if intro starts in 2 minutes
