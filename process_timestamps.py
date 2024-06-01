@@ -90,8 +90,8 @@ def timestamp_sanity_check_rthk(result,total_time,allow_first_short=False):
         if(gap < 0):
             raise ValueError(f"start time {cur_start_time} is less than previous end time {prev_end_time}")
         # news report and commercial time should not be 15 minutes or longer
-        elif(gap >= 15*60):
-            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 15 minutes or longer")
+        elif(gap >= 18*60):
+            raise TimeSequenceError(f"gap between {cur_start_time} and {prev_end_time} is 18 minutes or longer")
         
     return result
 
