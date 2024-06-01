@@ -93,6 +93,7 @@ class AudioOffsetFinder:
         self.similarity_debug=defaultdict(list)
         self.similarity_debug_repeat=defaultdict(list)
         self.normalize = True
+        self.downsample = False
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -178,7 +179,9 @@ class AudioOffsetFinder:
 
             if self.method == "correlation":
                 downsampling_factor = 1
-                #downsampling_factor = int(len(correlation_clip) / 200)
+                # need this for some clips like single beep
+                if self.downsample:
+                    downsampling_factor = int(len(correlation_clip) / 200)
             else: # does not support downsampling yet
                 downsampling_factor = 1
 
