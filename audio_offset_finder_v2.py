@@ -381,6 +381,13 @@ class AudioOffsetFinder:
             raise ValueError("unknown similarity method")
         return similarity
 
+    def _calculate_area_of_overlap_ratio(self, downsampled_correlation_clip, downsampled_correlation_slice):
+        # downsampled_correlation_clip_peak = np.argmax(downsampled_correlation_clip)
+        # print("very_short_clip downsampled_correlation_clip_peak", downsampled_correlation_clip_peak)
+        area_of_overlap = area_of_overlap_ratio(downsampled_correlation_clip,
+                                                downsampled_correlation_slice)
+        return area_of_overlap
+
     #     # repeating = False faster than repeat method and picks up those soft ones
     #     # won't work well if there are multiple occurrences of the same clip
     #     # because it only picks the loudest one or the most matching one
@@ -467,10 +474,8 @@ class AudioOffsetFinder:
                         print(f"failed verification for {section_ts} due to similarity {similarity} > {self.very_short_clip_similarity_threshold}")
                 elif self.similarity_method == "mse" and similarity > self.very_short_clip_similarity_threshold_conditional:
                     downsampled_correlation_slice = downsample(correlation_slice, downsampling_factor)
-                    #downsampled_correlation_clip_peak = np.argmax(downsampled_correlation_clip)
-                    #print("very_short_clip downsampled_correlation_clip_peak", downsampled_correlation_clip_peak)
-                    area_of_overlap = area_of_overlap_ratio(downsampled_correlation_clip,
-                                                            downsampled_correlation_slice)
+                    area_of_overlap = self._calculate_area_of_overlap_ratio(downsampled_correlation_clip,
+                                                                            downsampled_correlation_slice)
 
                     if area_of_overlap < 0.07:
                         peaks_final.append(peak)
@@ -524,7 +529,7 @@ class AudioOffsetFinder:
                     seconds.append(item / sr)
                     correlation_slice = correlation_slices[i]
                     # #area_of_overlap = area_of_overlap_ratio(correlation_clip, correlation_slice)
-                    downsampled_correlation_slice = downsample(correlation_slice, downsampling_factor)
+
                     #downsampled_correlation_clip_peak = np.argmax(downsampled_correlation_clip)
                     # print("downsampled_correlation_clip_peak",downsampled_correlation_clip_peak)
                     #
@@ -538,11 +543,10 @@ class AudioOffsetFinder:
                     #
                     # #clip_within_peak = downsampled_correlation_clip[new_left:new_right]
                     # #correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-                    area_of_overlap = area_of_overlap_ratio(downsampled_correlation_clip,
-                                                            downsampled_correlation_slice)
-                    #
-                    # seconds.append(item/sr)
-                    #
+                    downsampled_correlation_slice = downsample(correlation_slice, downsampling_factor)
+                    area_of_overlap = self._calculate_area_of_overlap_ratio(downsampled_correlation_clip,
+                                                                            downsampled_correlation_slice)
+
                     graph_dir = f"./tmp/graph/cross_correlation_slice_downsampled/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
 
