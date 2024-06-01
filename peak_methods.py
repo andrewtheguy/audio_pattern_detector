@@ -71,11 +71,16 @@ def calculate_peak_prominence(peak_index, data):
   return prominence,left_trough, right_trough
 
 def get_peak_profile(peak_index, data):
-  prominence, left_through, right_through = calculate_peak_prominence(peak_index, data)
-  prominences = (np.array([prominence], dtype="float64"), np.array([left_through]), np.array([right_through]))
-  print("through diff", right_through - left_through)
-  width_100 = right_through - left_through
-  width_75 = peak_widths(data, [peak_index], rel_height=0.75, prominence_data=prominences)[0]
-  width_50 = peak_widths(data, [peak_index], rel_height=0.5, prominence_data=prominences)[0]
+  prominence, left_trough, right_trough = calculate_peak_prominence(peak_index, data)
+  prominences = (np.array([prominence], dtype="float64"), np.array([left_trough]), np.array([right_trough]))
+  #print("prominences", prominences)
+  width_100 =  right_trough - left_trough
+  if width_100 == 0:
+    logging.warning(f"Peak index {peak_index} is at the edge of the data series.")
+    width_75 = 0
+    width_50 = 0
+  else:
+    width_75 = peak_widths(data, [peak_index], rel_height=0.75, prominence_data=prominences)[0]
+    width_50 = peak_widths(data, [peak_index], rel_height=0.5, prominence_data=prominences)[0]
   return {"width_100": width_100, "width_75": width_75, "width_50": width_50,"prominence":prominence,
-          "left_through":left_through,"right_through":right_through}
+          "left_trough":left_trough,"right_trough":right_trough}
