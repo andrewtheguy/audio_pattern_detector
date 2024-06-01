@@ -55,7 +55,7 @@ class TestDurationAndGaps(unittest.TestCase):
 
     def test_too_short(self):
         with self.assertRaises(TimeSequenceError):
-            result = self.check([[1,minutes_to_seconds(14)]])
+            result = self.check([[1,minutes_to_seconds(10)]])
 
     def test_allow_first_short(self):
         #with self.assertRaises(TimeSequenceError):
