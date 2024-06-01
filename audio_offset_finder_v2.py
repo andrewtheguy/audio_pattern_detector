@@ -97,7 +97,6 @@ class AudioOffsetFinder:
         self.normalize = True
         self.target_sample_rate = 8000
         self.similarity_debug=defaultdict(list)
-        self.similarity_debug_repeat=defaultdict(list)
         self.similarity_method = "mse"
         if self.similarity_method == "mse":
             self.similarity_threshold = 0.005
@@ -250,24 +249,7 @@ class AudioOffsetFinder:
             previous_chunk = chunk
             i = i + 1
 
-        if self.debug_mode and self.method == "non_repeating_correlation":
-            for clip_path in clip_paths:
-                clip_name, _ = os.path.splitext(os.path.basename(clip_path))
-                #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
-                graph_dir = f"./tmp/graph/{self.method}_similarity_{self.similarity_method}"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                # Optional: plot the correlation graph to visualize
-                plt.figure(figsize=(10, 4))
-                plt.plot(self.similarity_debug[clip_name])
-                plt.title('similarity')
-                plt.xlabel('index')
-                plt.ylabel('value')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}.png')
-                plt.close()
-
-        if self.debug_mode and self.method == "correlation":
+        if self.debug_mode and self.method == "correlation" or self.method == "non_repeating_correlation":
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
                 #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
@@ -277,7 +259,7 @@ class AudioOffsetFinder:
                 x_coords = []
                 y_coords = []
 
-                for index,arr in enumerate(self.similarity_debug_repeat[clip_name]):
+                for index,arr in enumerate(self.similarity_debug[clip_name]):
                     for item in arr:
                         #if item <= 0.02:
                         x_coords.append(index)
@@ -356,14 +338,15 @@ class AudioOffsetFinder:
         #         audio_section, sr)
 
         if self.method == "correlation":
+
             # samples_skip_end does not skip results from being included yet
             peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                            seconds_per_chunk=seconds_per_chunk,
+                                            seconds_per_chunk=seconds_per_chunk,repeating=True
 
                                                   )
         elif self.method == "non_repeating_correlation":
-            peak_times = self._non_repeating_correlation(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                        seconds_per_chunk=seconds_per_chunk,
+            peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
+                                                        seconds_per_chunk=seconds_per_chunk,repeating=False
                                                          )
 
         else:
@@ -398,23 +381,29 @@ class AudioOffsetFinder:
             raise ValueError("unknown similarity method")
         return similarity
 
+    #     # repeating = False faster than repeat method and picks up those soft ones
+    #     # won't work well if there are multiple occurrences of the same clip
+    #     # because it only picks the loudest one or the most matching one
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives
-    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
+    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk,repeating=True):
         clip, clip_name, sliding_window, correlation_clip, downsampling_factor, downsampled_correlation_clip = (
             itemgetter("clip","clip_name","sliding_window","correlation_clip", "downsampling_factor","downsampled_correlation_clip")(clip_data))
         debug_mode = self.debug_mode
-        graph_max = 0.25
 
         clip_length = len(clip)
 
         very_short_clip = len(clip) < 0.5 * sr
 
-        zeroes_second_pad = 1
-        # pad zeros between audio and clip
-        zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
-        audio = np.concatenate((audio_section, zeroes, clip))
-        samples_skip_end = zeroes_second_pad * sr + clip_length
+        if repeating: #eliminate obviously bad ones by comparing with original clip and select by certain threshold
+            zeroes_second_pad = 1
+            # pad zeros between audio and clip
+            zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
+            audio = np.concatenate((audio_section, zeroes, clip))
+            samples_skip_end = zeroes_second_pad * sr + clip_length
+        else:
+            audio = audio_section
+            samples_skip_end = 0
 
         # Cross-correlate and normalize correlation
         correlation = correlate(audio, clip, mode='full', method='fft')
@@ -446,22 +435,12 @@ class AudioOffsetFinder:
         #trim placeholder clip
         correlation = correlation[:max_sample]
 
-        # if debug_mode:
-        #     percentile = np.percentile(correlation, 99)
-        #     max_correlation = max(correlation)
-        #     ratio = percentile / max_correlation
-        #     print(f"{section_ts} percentile", percentile)
-        #     print(f"{section_ts} max correlation: {max_correlation}")
-        #     print(f"{section_ts} ratio: {ratio}")
-        #     print(f"---")
-
-        #height = threshold
-        distance = clip_length
-        #width = int(max(clip_length, 1 * sr) / 512)
-        # find the peaks in the spectrogram
-        #peaks, properties = find_peaks(correlation, prominence=threshold, width=[0,width], distance=distance)
-        peaks, properties = find_peaks(correlation, height=graph_max, distance=distance)
-
+        if repeating:
+            distance = clip_length
+            height_max = 0.25
+            peaks, _ = find_peaks(correlation, height=height_max, distance=distance)
+        else:
+            peaks = [np.argmax(correlation)]
 
         peaks_final = []
 
@@ -596,9 +575,9 @@ class AudioOffsetFinder:
                                   "areas":areas,
                                   #"pdc":pdc,
                                   #"pds":pds,
-                                  "properties":properties,
+                                  #"properties":properties,
                                   "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
-            self.similarity_debug_repeat[clip_name].append(filtered_similarity)
+            self.similarity_debug[clip_name].append(filtered_similarity)
 
         if debug_mode:
             print(f"---")
@@ -607,83 +586,4 @@ class AudioOffsetFinder:
 
         return peak_times
 
-    # faster than repeat method and picks up those soft ones
-    # won't work well if there are multiple occurrences of the same clip
-    # because it only picks the loudest one or the most matching one
-    def _non_repeating_correlation(self, clip_data, audio_section, sr, index, seconds_per_chunk):
-        clip, clip_name, sliding_window, correlation_clip = itemgetter("clip",
-                                                                     "clip_name",
-                                                                     "sliding_window",
-                                                                     "correlation_clip",
-                                                                     )(clip_data)
-        debug_mode = self.debug_mode
-        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
-        # Cross-correlate and normalize correlation
-        correlation = correlate(audio_section, clip, mode='full', method='fft')
-
-        # abs
-        correlation = np.abs(correlation)
-        correlation /= np.max(correlation)
-
-        max_index = np.argmax(correlation)
-
-        if debug_mode:
-            # audio section
-            print("audio_section length", len(audio_section))
-
-            print("correlation length", len(correlation))
-            graph_dir = f"./tmp/graph/non_repeating_cross_correlation/{clip_name}"
-            os.makedirs(graph_dir, exist_ok=True)
-
-            #Optional: plot the correlation graph to visualize
-            plt.figure(figsize=(10, 4))
-
-            plt.plot(correlation)
-
-            plt.title('Cross-correlation between the audio clip and full track before slicing')
-            plt.xlabel('Lag')
-            plt.ylabel('Correlation coefficient')
-            plt.savefig(
-                f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
-            plt.close()
-
-
-        # slice
-        correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), max_index)
-
-        similarity = self._calculate_similarity(correlation_slice=correlation_slice, correlation_clip=correlation_clip)
-
-        if debug_mode:
-            graph_dir = f"./tmp/graph/non_repeat_cross_correlation_slice/{clip_name}"
-            os.makedirs(graph_dir, exist_ok=True)
-
-            # Optional: plot the correlation graph to visualize
-            plt.figure(figsize=(10, 4))
-            plt.plot(correlation_slice)
-            plt.title('Cross-correlation between the audio clip and full track before slicing')
-            plt.xlabel('Lag')
-            plt.ylabel('Correlation coefficient')
-            plt.savefig(
-                f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
-            plt.close()
-
-            self.similarity_debug[clip_name].append(similarity)
-
-            print(f"{section_ts} similarity",similarity)
-
-            debug_dir = f"./tmp/debug/non_repeating_cross_correlation_{clip_name}"
-            os.makedirs(debug_dir, exist_ok=True)
-            print(json.dumps({
-                "max_index":max_index,
-                "max_second":max_index/sr,
-                              "similarity":similarity,
-                              }, indent=2, cls=NumpyEncoder),
-                  file=open(f'{debug_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
-
-        if similarity > self.similarity_threshold:
-            if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
-            return []
-        else:
-            return [max_index / sr]
