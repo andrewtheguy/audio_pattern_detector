@@ -266,7 +266,7 @@ class AudioOffsetFinder:
         if self.debug_mode and self.method == "correlation":
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
-                print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
+                #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
                 graph_dir = f"./tmp/graph/{self.method}_similarity"
                 os.makedirs(graph_dir, exist_ok=True)
 
@@ -412,6 +412,8 @@ class AudioOffsetFinder:
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
+            print(f"---")
+            print(f"section_ts: {section_ts}")
             graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
 
@@ -429,14 +431,14 @@ class AudioOffsetFinder:
         #trim placeholder clip
         correlation = correlation[:max_sample]
 
-        if debug_mode:
-            percentile = np.percentile(correlation, 99)
-            max_correlation = max(correlation)
-            ratio = percentile / max_correlation
-            print(f"{section_ts} percentile", percentile)
-            print(f"{section_ts} max correlation: {max_correlation}")
-            print(f"{section_ts} ratio: {ratio}")
-            print(f"---")
+        # if debug_mode:
+        #     percentile = np.percentile(correlation, 99)
+        #     max_correlation = max(correlation)
+        #     ratio = percentile / max_correlation
+        #     print(f"{section_ts} percentile", percentile)
+        #     print(f"{section_ts} max correlation: {max_correlation}")
+        #     print(f"{section_ts} ratio: {ratio}")
+        #     print(f"---")
 
         #height = threshold
         distance = clip_length
