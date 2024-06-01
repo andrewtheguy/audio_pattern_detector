@@ -484,6 +484,36 @@ files = [
 ]
 
 [[package]]
+name = "dtaidistance"
+version = "2.3.11"
+description = "Distance measures for time series (Dynamic Time Warping, fast C implementation)"
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "dtaidistance-2.3.11-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:ae49e46a84b8ab5563b13871cdb6fa78fe05991ab11a15dde36939f5463a4ca0"},
+    {file = "dtaidistance-2.3.11-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f489bcf5776303b52207807eb173bff11b8b5e7a355830c6fd80be36f007fd8b"},
+    {file = "dtaidistance-2.3.11-cp310-cp310-win_amd64.whl", hash = "sha256:32bf75498fec2e89de294309698ab6e4a420a21bb030628b04e5b124648c2a66"},
+    {file = "dtaidistance-2.3.11-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:bbb15caee33f175c37346fa303cfb66ad1ae1bfcc6192840ba8b8b7f75c71937"},
+    {file = "dtaidistance-2.3.11-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d84e738ab3ce12f912554dc5777232547443fbd1005d53a2309726f7525c9ead"},
+    {file = "dtaidistance-2.3.11-cp38-cp38-macosx_11_0_x86_64.whl", hash = "sha256:06fa79fed8430e243859afa13c80b5c6e323d962cf4fd17c7c34da91edb79b71"},
+    {file = "dtaidistance-2.3.11-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ed866da77b2377c5820350d767fd7d8097a84701d43c23e66b7e255bd6833c90"},
+    {file = "dtaidistance-2.3.11-cp38-cp38-win_amd64.whl", hash = "sha256:e1011080168078e80952c96003629ce8048dc5d451801a1d38012ee09ae90fd8"},
+    {file = "dtaidistance-2.3.11-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:6deec549e9aa14cc222d9eb73811b291ea4501183db6d1ee8476dc2a2234b989"},
+    {file = "dtaidistance-2.3.11-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:44f6934f7458b97411c958238806db853c246f6a0e8e056f0a412ae879921533"},
+    {file = "dtaidistance-2.3.11-cp39-cp39-win_amd64.whl", hash = "sha256:b7b056399c31aa2d27228fc995c2a3b52425e1c5f69a6fcb03a23556cdd0870f"},
+    {file = "dtaidistance-2.3.11.tar.gz", hash = "sha256:a3e471dd1ed5b22eff3f5dd4b285e6df1ba5a28be3322f51eef9e6571ea7090b"},
+]
+
+[package.dependencies]
+numpy = "*"
+
+[package.extras]
+all = ["matplotlib (>=3.0.0)", "numpy", "scipy"]
+dev = ["matplotlib (>=3.0.0)", "numpy", "pytest", "pytest-benchmark", "scipy", "sphinx", "sphinx-rtd-theme"]
+numpy = ["numpy", "scipy"]
+vis = ["matplotlib (>=3.0.0)"]
+
+[[package]]
 name = "feedparser"
 version = "6.0.11"
 description = "Universal feed parser, handles RSS 0.9x, RSS 1.0, RSS 2.0, CDF, Atom 0.3, and Atom 1.0 feeds"
@@ -1846,4 +1876,4 @@ tests = ["cheroot", "colorama", "pytest", "pytest-cov", "pytest-xdist", "typing-
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "cd1d2868c7239c26569f15d4e90faf19537405e53f1222cf155a78025fe1b7a2"
+content-hash = "e252c7ac82d78fcfae6be80d57231caf2540859c786734c77c60bb8514871cb7"
