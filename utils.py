@@ -189,14 +189,14 @@ def area_of_overlap_ratio(y1, y2):
     area_y2 = simps(y2, x)
 
     # To find the overlapping area, take the minimum at each point
-    #min_curve = np.minimum(y1, y2)
+    min_curve = np.minimum(y1, y2)
     diff_curve = np.abs(y1 - y2)
     #overlapping_area = np.trapz(min_curve, dx=dx)
-    #overlapping_area = simps(min_curve, x)
+    overlapping_area = simps(min_curve, x)
     diff_area = simps(diff_curve, x)
 
     # Calculate percentage overlap with respect to each curve
     #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
     #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
     print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
-    return (diff_area,area_y1,area_y2, diff_area/max(area_y1,area_y2))
+    return diff_area/overlapping_area
