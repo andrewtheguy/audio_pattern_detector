@@ -25,7 +25,8 @@ def upload_file(file,dest_path,skip_if_exists=False):
     if skip_if_exists and stat(dest_path):
         print(f'upload_file: file {dest_path} already exists,skipping')
         return
-    cmd = ["rclone","-v", "--config", rclone_config_file, "copy", file, f"{rclone_backend}:{dest_path}"]
+    print("uploading",file,"to",dest_path)
+    cmd = ["rclone","-v", "--config", rclone_config_file, "copyto", file, f"{rclone_backend}:{dest_path}"]
     subprocess.run(cmd, check=True)
 
 
