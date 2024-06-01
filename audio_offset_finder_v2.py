@@ -92,6 +92,7 @@ class AudioOffsetFinder:
         self.similarity_threshold = 0.005
         self.similarity_debug=defaultdict(list)
         self.similarity_debug_repeat=defaultdict(list)
+        self.normalize = True
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -142,6 +143,21 @@ class AudioOffsetFinder:
 
             sliding_window = get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
 
+            if self.normalize:
+                clip_length = len(clip)
+                sr = self.target_sample_rate
+                #clip_second = clip_length / sr
+
+                # normalize loudness
+                if clip_seconds < 0.5:
+                    meter = pyln.Meter(sr, block_size=clip_seconds)
+                else:
+                    meter = pyln.Meter(sr)  # create BS.1770 meter
+                loudness = meter.integrated_loudness(clip)
+
+                # loudness normalize audio to -12 dB LUFS
+                clip = pyln.normalize.loudness(clip, loudness, -12.0)
+
             correlation_clip = self._get_clip_correlation(clip, clip_name)
 
             if self.debug_mode:
@@ -161,7 +177,8 @@ class AudioOffsetFinder:
                 plt.close()
 
             if self.method == "correlation":
-                downsampling_factor = int(len(correlation_clip) / 200)
+                downsampling_factor = 1
+                #downsampling_factor = int(len(correlation_clip) / 200)
             else: # does not support downsampling yet
                 downsampling_factor = 1
 
@@ -276,6 +293,7 @@ class AudioOffsetFinder:
         process.wait()
 
         return all_peak_times
+
     def _get_clip_correlation(self, clip, clip_name):
         # Cross-correlate and normalize correlation
         correlation_clip = correlate(clip, clip, mode='full', method='fft')
@@ -310,9 +328,7 @@ class AudioOffsetFinder:
             subtract_seconds = 0
             audio_section = np.concatenate((chunk, np.array([])))
 
-        normalize = True
-
-        if normalize:
+        if self.normalize:
             audio_section_seconds = len(audio_section) / sr
             #normalize loudness
             if audio_section_seconds < 0.5:
@@ -325,17 +341,6 @@ class AudioOffsetFinder:
             # loudness normalize audio to -12 dB LUFS
             audio_section = pyln.normalize.loudness(audio_section, loudness, -12.0)
 
-            clip_second = clip_length / sr
-
-            # normalize loudness
-            if clip_second < 0.5:
-                meter = pyln.Meter(sr, block_size=clip_second)
-            else:
-                meter = pyln.Meter(sr)  # create BS.1770 meter
-            loudness = meter.integrated_loudness(clip)
-
-            # loudness normalize audio to -12 dB LUFS
-            clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
         # if debug_mode:
         #     os.makedirs("./tmp/audio", exist_ok=True)
@@ -443,6 +448,7 @@ class AudioOffsetFinder:
 
         # for debugging
         similarities = []
+        correlation_slices = []
 
         for peak in peaks:
             # slice
@@ -460,6 +466,7 @@ class AudioOffsetFinder:
                 print("similarity", similarity)
                 #if similarity <= 0.01:
                 similarities.append(similarity)
+                correlation_slices.append(correlation_slice)
 
             if similarity > self.similarity_threshold:
                 if debug_mode:
@@ -471,6 +478,7 @@ class AudioOffsetFinder:
             filtered_similarity = []
             for ipeak,peak in enumerate(peaks):
                 similarity = similarities[ipeak]
+                correlation_slice = correlation_slices[ipeak]
                 if similarity <= 0.01:
                     filtered_similarity.append(similarity)
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
