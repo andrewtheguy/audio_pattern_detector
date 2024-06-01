@@ -10,7 +10,6 @@ import pdb
 import time
 from operator import itemgetter
 
-from dtaidistance import dtw
 import librosa
 import numpy as np
 import scipy
@@ -84,9 +83,10 @@ def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
 
     return sliding_window
 
-def dtw_distance(series1, series2):
-    d = dtw.distance(series1, series2)
-    return d
+# def dtw_distance(series1, series2):
+#     distance, path = fastdtw(series1, series2, dist=2)
+#     return distance
+#     #return d
 
 class AudioOffsetFinder:
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
@@ -523,6 +523,7 @@ class AudioOffsetFinder:
                 os.makedirs(peak_dir, exist_ok=True)
                 seconds=[]
                 areas = []
+                #distances = []
 
                 # peak_profiles=[]
                 for i,item in enumerate(peaks):
