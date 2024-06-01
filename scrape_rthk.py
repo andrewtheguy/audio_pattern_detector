@@ -337,8 +337,8 @@ def download_rthk():
     except BlockingIOError as e:
         raise RuntimeError('can only run one instance at a time')
 
-    original_base_dir = os.path.abspath(f"./tmp/original")
-    shutil.rmtree(original_base_dir, ignore_errors=True)
+    #original_base_dir = os.path.abspath(f"./tmp/original")
+    #shutil.rmtree(original_base_dir, ignore_errors=True)
 
     local_path_downloaded = defaultdict(list)
 
@@ -349,6 +349,13 @@ def download_rthk():
         num_downloaded = 0
         original_dir = os.path.abspath(f"./tmp/original/{key}")
         os.makedirs(original_dir, exist_ok=True)
+
+        for glob_pattern in ["*.m4a","*.m4a.json"]:
+            files_del = sorted(glob.glob(os.path.join(original_dir, glob_pattern)),reverse=True)[num_to_download:]
+            for file_del in files_del:
+                print(f"deleting {file_del}")
+                Path(file_del).unlink(missing_ok=True)
+
         for days_ago in range(max_go_back_days):
             if num_downloaded >= num_to_download:
                 break
