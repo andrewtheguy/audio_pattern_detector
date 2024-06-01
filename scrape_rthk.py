@@ -37,16 +37,16 @@ streams={
         "backupintroclips": ["rthk1theme_new.wav"],
         "allow_first_short": True,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/itsahappyday/m4a/{date}.m4a/master.m3u8",
-        #"news_report_strategy":"theme_clip",
-        #"news_report_strategy_expected_count":2,
+        "news_report_strategy":"theme_clip",
+        "news_report_strategy_expected_count":2,
         "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
     },
     "healthpedia": {
         "introclips": ["healthpedia_intro.wav","healthpediapriceless.wav","healthpediamiddleintro.wav"],
         "allow_first_short": False,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/master.m3u8",
-        #"news_report_strategy":"theme_clip",
-        #"news_report_strategy_expected_count":2,
+        "news_report_strategy":"theme_clip",
+        "news_report_strategy_expected_count":2,
         "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
     },
     # rthk2 needs a different strategy for news report because it is less consistent
@@ -379,6 +379,10 @@ def download_rthk():
                     continue
                 download(url, dest_file)
                 upload_file(dest_file, dest_remote_path, skip_if_exists=True)
+            remote_jsonfile = f'{dest_remote_path}.json'
+            jsonfile = f'{dest_file}.json'
+            if remote_exists(remote_jsonfile) and not os.path.exists(jsonfile):
+                download_file(remote_jsonfile, jsonfile)
             local_path_downloaded[key].append(dest_file)
             num_downloaded += 1
     return local_path_downloaded
