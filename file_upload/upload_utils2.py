@@ -31,4 +31,4 @@ def upload_file(file,dest_path,skip_if_exists=False):
 
 
 if __name__ == '__main__':
-    upload_file("test data.txt","/chilo/chjafhtfhfga2/chafa1.txt", skip_if_exists=True)
+    upload_file("test data.txt","/chilo/chjafhtfhfga2/ggggg/chafa2.txt", skip_if_exists=True)
