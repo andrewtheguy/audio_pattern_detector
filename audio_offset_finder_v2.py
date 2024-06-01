@@ -525,9 +525,13 @@ class AudioOffsetFinder:
                 peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
                 os.makedirs(peak_dir, exist_ok=True)
                 seconds=[]
-                for i,item in enumerate(peaks):
-                    seconds.append(item/sr)
-                #peaks_test.append()
+                # peak_profiles=[]
+                # for i,item in enumerate(peaks):
+                #     correlation_slice = correlation_slices[i]
+                #     peak_profile_slice = get_peak_profile(np.argmax(correlation_slice), correlation_slice)
+                #     peak_profiles.append(peak_profile_slice)
+                #     seconds.append(item/sr)
+                # #peaks_test.append()
                 print(json.dumps({"peaks":peaks,"seconds":seconds,"properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
             self.similarity_debug_repeat[clip_name].append(filtered_similarity)
 
