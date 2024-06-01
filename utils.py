@@ -11,6 +11,7 @@ from collections import deque
 import ffmpeg
 import numpy as np
 import requests
+from scipy.integrate import trapz, simps
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +170,25 @@ def download(url,target_file):
             raise ValueError(f"downloaded file duration {clip_length_second_file} does not match stream duration {clip_length_second_stream} by {second_tolerate} seconds")
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')
+
+def area_of_overlap_ratio(y1, y2):
+    #y1 = control
+    #y2 = variable
+    # Define the x-axis range based on the indices of the input arrays
+    #x = np.arange(len(y1))
+
+    dx=1
+
+    # Calculate the area under each curve
+    area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
+    area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
+
+    # To find the overlapping area, take the minimum at each point
+    min_curve = np.minimum(y1, y2)
+    overlapping_area = np.trapz(min_curve, dx=dx)
+
+    # Calculate percentage overlap with respect to each curve
+    #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
+    #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
+    print(f"overlapping_area {overlapping_area} area_y1 {area_y1} area_y2 {area_y2}")
+    return (overlapping_area,area_y1,area_y2, overlapping_area/max(area_y1,area_y2))
