@@ -520,12 +520,24 @@ class AudioOffsetFinder:
                     correlation_slice = correlation_slices[i]
                     #area_of_overlap = area_of_overlap_ratio(correlation_clip, correlation_slice)
                     downsampled_correlation_slice = downsample(correlation_slice, downsampling_factor)
-                    print("downsampled_correlation_clip",np.argmax(downsampled_correlation_clip))
-                    print(np.argmax(downsampled_correlation_slice))
+                    downsampled_correlation_clip_peak = np.argmax(downsampled_correlation_clip)
+                    print("downsampled_correlation_clip_peak",downsampled_correlation_clip_peak)
+                    #print(np.argmax(downsampled_correlation_slice))
                     pdc = get_peak_profile(np.argmax(downsampled_correlation_clip), downsampled_correlation_clip)
-                    pds = get_peak_profile(np.argmax(downsampled_correlation_slice), downsampled_correlation_slice)
-                    area_of_overlap = area_of_overlap_ratio(downsampled_correlation_clip[pdc["left_trough"]:pdc["right_trough"]],
-                                                            downsampled_correlation_slice[pds["left_trough"]:pds["right_trough"]])
+                    print(pdc["left_trough"],pdc["right_trough"])
+
+                    max_width = max(downsampled_correlation_clip_peak-pdc["left_trough"],pdc["right_trough"]-downsampled_correlation_clip_peak)
+
+                    new_left = max(0,downsampled_correlation_clip_peak-max_width)
+                    new_right = min(len(downsampled_correlation_clip),downsampled_correlation_clip_peak+max_width+1)
+
+                    clip_within_peak = downsampled_correlation_clip[new_left:new_right]
+                    correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
+                    area_of_overlap = area_of_overlap_ratio(clip_within_peak,
+                                                            correlation_slice_within_peak)
+                    # area_of_overlap = area_of_overlap_ratio(
+                    #     downsampled_correlation_clip,
+                    #     downsampled_correlation_slice)
                     # area.append(area_of_overlap)
                     #
                     # seconds.append(item/sr)
@@ -533,21 +545,35 @@ class AudioOffsetFinder:
                     graph_dir = f"./tmp/graph/cross_correlation_slice_downsampled/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
 
-                    # Optional: plot the correlation graph to visualize
                     plt.figure(figsize=(10, 4))
                     plt.plot(downsampled_correlation_slice)
+                    plt.plot(downsampled_correlation_clip)
                     plt.title('Cross-correlation between the audio clip and full track before slicing')
                     plt.xlabel('Lag')
                     plt.ylabel('Correlation coefficient')
                     plt.savefig(
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{item}.png')
                     plt.close()
+
+                    graph_dir = f"./tmp/graph/cross_correlation_slice_downsampled_clipped/{clip_name}"
+                    os.makedirs(graph_dir, exist_ok=True)
+
+                    plt.figure(figsize=(10, 4))
+                    plt.plot(correlation_slice_within_peak)
+                    plt.plot(clip_within_peak)
+                    plt.title('Cross-correlation between the audio clip and full track before slicing')
+                    plt.xlabel('Lag')
+                    plt.ylabel('Correlation coefficient')
+                    plt.savefig(
+                        f'{graph_dir}/{clip_name}_{index}_{section_ts}_{item}.png')
+                    plt.close()
+
                     area.append(area_of_overlap)
 
                 print(json.dumps({"peaks":peaks,"seconds":seconds,
                                   "area":area,
                                   "pdc":pdc,
-                                  "pds":pds,
+                                  #"pds":pds,
                                   "properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
             self.similarity_debug_repeat[clip_name].append(filtered_similarity)
 
