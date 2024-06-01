@@ -30,7 +30,7 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, median_absolute_error
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile
@@ -101,8 +101,8 @@ class AudioOffsetFinder:
         self.similarity_method = "mse"
         if self.similarity_method == "mse":
             self.similarity_threshold = 0.005
-        elif self.similarity_method == "mae":
-            self.similarity_threshold = 0.05
+        elif self.similarity_method == "mae": #median_absolute_error, a bit better for news report beep
+            self.similarity_threshold = 0.02
         else:
             raise ValueError("unknown similarity method")
         self.downsample = False
@@ -399,7 +399,7 @@ class AudioOffsetFinder:
     def _calculate_similarity(self, correlation_clip, correlation_slice):
 
         if self.similarity_method == "mae":
-            similarity = mean_absolute_error(correlation_clip, correlation_slice)
+            similarity = median_absolute_error(correlation_clip, correlation_slice)
         elif self.similarity_method == "mse":
             similarity = mean_squared_error(correlation_clip, correlation_slice)
         else:
@@ -412,7 +412,7 @@ class AudioOffsetFinder:
         clip, clip_name, sliding_window, correlation_clip, downsampling_factor, downsampled_correlation_clip = (
             itemgetter("clip","clip_name","sliding_window","correlation_clip", "downsampling_factor","downsampled_correlation_clip")(clip_data))
         debug_mode = self.debug_mode
-        threshold = 0.25
+        graph_max = 0.25
 
         clip_length = len(clip)
 
@@ -466,7 +466,7 @@ class AudioOffsetFinder:
         #width = int(max(clip_length, 1 * sr) / 512)
         # find the peaks in the spectrogram
         #peaks, properties = find_peaks(correlation, prominence=threshold, width=[0,width], distance=distance)
-        peaks, properties = find_peaks(correlation, height=threshold, distance=distance)
+        peaks, properties = find_peaks(correlation, height=graph_max, distance=distance)
 
 
         peaks_final = []
@@ -505,8 +505,14 @@ class AudioOffsetFinder:
             for ipeak,peak in enumerate(peaks):
                 similarity = similarities[ipeak]
                 correlation_slice = correlation_slices[ipeak]
-                threshold = 0.01 if self.similarity_method == "mse" else 0.1
-                if similarity <= threshold:
+
+                if self.similarity_method == "mse":
+                    graph_max = 0.02
+                elif self.similarity_method == "mae":
+                    graph_max = 0.05
+                else:
+                    raise ValueError("unknown similarity method")
+                if graph_max is None or similarity <= graph_max:
                     filtered_similarity.append(similarity)
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
