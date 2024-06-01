@@ -193,7 +193,7 @@ class AudioOffsetFinder:
                 downsampling_factor = 1
                 # need this for some clips like single beep
                 if self.downsample:
-                    downsampling_factor = int(len(correlation_clip) / 200)
+                    downsampling_factor = int(len(correlation_clip) / 50)
             else: # does not support downsampling yet
                 downsampling_factor = 1
 
@@ -526,11 +526,11 @@ class AudioOffsetFinder:
                 os.makedirs(peak_dir, exist_ok=True)
                 seconds=[]
                 # peak_profiles=[]
-                # for i,item in enumerate(peaks):
+                for i,item in enumerate(peaks):
                 #     correlation_slice = correlation_slices[i]
                 #     peak_profile_slice = get_peak_profile(np.argmax(correlation_slice), correlation_slice)
                 #     peak_profiles.append(peak_profile_slice)
-                #     seconds.append(item/sr)
+                     seconds.append(item/sr)
                 # #peaks_test.append()
                 print(json.dumps({"peaks":peaks,"seconds":seconds,"properties":properties,"similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
             self.similarity_debug_repeat[clip_name].append(filtered_similarity)
@@ -609,7 +609,9 @@ class AudioOffsetFinder:
 
             debug_dir = f"./tmp/debug/non_repeating_cross_correlation_{clip_name}"
             os.makedirs(debug_dir, exist_ok=True)
-            print(json.dumps({"max_index":max_index,
+            print(json.dumps({
+                "max_index":max_index,
+                "max_second":max_index/sr,
                               "similarity":similarity,
                               }, indent=2, cls=NumpyEncoder),
                   file=open(f'{debug_dir}/{clip_name}_{index}_{section_ts}.txt', 'w'))
