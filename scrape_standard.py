@@ -1,23 +1,30 @@
 
 
 import argparse
+import datetime
+import fcntl
 import glob
 import json
 import math
 import os
+import traceback
+from collections import defaultdict
 from pathlib import Path
 import shutil
 import tempfile
 from venv import logger
 
 import ffmpeg
+import pytz
 
 from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 
 from andrew_utils import seconds_to_time, time_to_seconds
-from file_upload.upload_utils2 import upload_file
+from file_upload.upload_utils2 import upload_file, remote_exists, download_file
 from process_timestamps import process_timestamps_simple
+from publish import publish_folder
 from scrape_utils import concatenate_audio, split_audio_by_time_sequences
+from utils import get_ffprobe_info
 
 # clips should be non-repeating because I am using the non-repeat method, too much headache to deal with repeating clips
 
@@ -59,6 +66,8 @@ ripped_streams={
         "ends_with_intro": False,
         "min_duration": 60 * 60 * 2,  # guard against short recordings which resulted from failure
         #"expected_num_segments": 5,
+        "time":"1600",
+        "publish": True,
     },
     "受之有道": {
         "introclips": ["am1430/受之有道intro.wav"],
@@ -182,20 +191,137 @@ def scrape_single_intro(input_file,stream_name,recorded):
         
     return output_dir_trimmed,output_file_trimmed
 
-if __name__ == '__main__':
-    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    parser = argparse.ArgumentParser()
 
+num_podcast_to_keep = 3
+
+def download_am1430():
+    max_go_back_days = 7
+    try:
+        lockfile = open(f'./tmp/lockfile', "a+")
+        fcntl.lockf(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as e:
+        raise RuntimeError('can only run one instance at a time')
+
+    #original_base_dir = os.path.abspath(f"./tmp/original")
+    #shutil.rmtree(original_base_dir, ignore_errors=True)
+
+    local_path_downloaded = defaultdict(list)
+
+    num_to_download = num_podcast_to_keep
+    if num_to_download < 1:
+        raise ValueError("num_to_download must be greater than or equal to 1")
+    for key, stream in ripped_streams.items():
+        if ("publish" not in stream) or (not stream["publish"]):
+            print(f"skipping {key} because publish is not set to True")
+            continue
+        else:
+            print(f"downloading {key}")
+
+        time = stream["time"]
+        num_downloaded = 0
+        original_dir = os.path.abspath(f"./tmp/original/{key}")
+        os.makedirs(original_dir, exist_ok=True)
+
+        for glob_pattern in ["*.m4a","*.m4a.json"]:
+            files_del = sorted(glob.glob(os.path.join(original_dir, glob_pattern)),reverse=True)[num_to_download:]
+            for file_del in files_del:
+                print(f"deleting {file_del}")
+                Path(file_del).unlink(missing_ok=True)
+
+        for days_ago in range(max_go_back_days):
+            if num_downloaded >= num_to_download:
+                break
+            #raise "cahjfa"
+            date = datetime.datetime.now(pytz.timezone('America/Los_Angeles')) - datetime.timedelta(days=days_ago)
+            date_str = date.strftime("%Y%m%d")
+            file_name = f"{key}{date_str}_{time}_s_1.m4a"
+            dest_file = os.path.join(original_dir, file_name)
+            dest_remote_path = f"/grabradiostreamed/am1430/multiple/{key}/{file_name}"
+            if remote_exists(dest_remote_path):
+                print(f'file {dest_remote_path} already exists,downloading from {date_str} instead')
+                download_file(dest_remote_path, dest_file)
+                #num_downloaded += 1
+            elif not os.path.exists(dest_file):
+                print(f'file {dest_remote_path} does not exist and local neither, skipping')
+                continue
+            #clip_length_second_stream = float(get_ffprobe_info(url)['format']['duration'])
+            remote_jsonfile = f'{dest_remote_path}.json'
+            jsonfile = f'{dest_file}.json'
+            if remote_exists(remote_jsonfile) and not os.path.exists(jsonfile):
+                download_file(remote_jsonfile, jsonfile)
+            local_path_downloaded[key].append(dest_file)
+            num_downloaded += 1
+    return local_path_downloaded
+
+
+def process_podcasts():
+    try:
+        lockfile = open(f'./tmp/lockfile', "a+")
+        fcntl.lockf(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as e:
+        raise RuntimeError('can only run one instance at a time')
+
+    failed_scrape_files = []
+
+    error_occurred = False
+
+    local_path_downloaded = download_am1430()
+    podcasts_publish = []
+    for stream_name, dest_files in local_path_downloaded.items():  # one stream at a time
+        num_success = 0
+        output_dir_trimmed = None
+        for dest_file in dest_files:
+            try:
+                output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
+                output_file_trimmed = scrape_single_intro(dest_file, stream_name=stream_name, recorded=False)
+                #podcasts_publish.append(output_dir_trimmed)
+                num_success += 1
+            except Exception as e:
+                print(f"error happened when processing for {stream_name}", e)
+                print(traceback.format_exc())
+                error_occurred = True
+                failed_scrape_files.append({"file": dest_file, "error": str(e)})
+                #continue
+        if num_success <= 0:
+            print(f"error happened when processing all files, skipping publishing podcasts for {stream_name}")
+            continue
+        else:
+            podcasts_publish.append(output_dir_trimmed)
+    num_to_publish = num_podcast_to_keep
+    for podcast in podcasts_publish:
+        print(f"publishing podcast {podcast} after scraping")
+        # assuming one per day
+        publish_folder(podcast, files_to_publish=num_to_publish, delete_old_files=True)
+
+    if failed_scrape_files:
+        print(f"failed to scrape the following files:")
+        for hash in failed_scrape_files:
+            print("file", hash["file"], "error", hash["error"], "---")
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('action')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
 
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
 
-    input_file = args.audio_file
-    input_dir = os.path.dirname(input_file)
-    #stream_name,date_str = extract_prefix(os.path.basename(input_file))
-    recorded = "recorded" in input_dir
+    if(args.action == 'scrape'):
+        input_file = args.audio_file
+        input_dir = os.path.dirname(input_file)
+        # stream_name,date_str = extract_prefix(os.path.basename(input_file))
+        recorded = "recorded" in input_dir
 
-    stream_name = os.path.basename(input_dir)
-    #print(stream_name)
-    scrape_single_intro(input_file,stream_name=stream_name,recorded=recorded)
+        stream_name = os.path.basename(input_dir)
+        # print(stream_name)
+        scrape_single_intro(input_file, stream_name=stream_name, recorded=recorded)
+    elif(args.action == 'download'):
+        download_am1430()
+    elif(args.action == 'process_podcasts'):
+        process_podcasts()
+    else:
+        raise ValueError(f"unknown action {args.action}")
+
+
