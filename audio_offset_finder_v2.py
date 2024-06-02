@@ -285,30 +285,27 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}.png')
                 plt.close()
 
-            downsampling_factor = 101
-            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, downsampling_factor)
 
-            if self.debug_mode:
-                print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
-                graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-                os.makedirs(graph_dir, exist_ok=True)
 
-                plt.figure(figsize=(10, 4))
-
-                plt.plot(downsampled_correlation_clip)
-                plt.title('Cross-correlation of the audio clip itself')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}.png')
-                plt.close()
+            # if self.debug_mode:
+            #     print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+            #     graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+            #     os.makedirs(graph_dir, exist_ok=True)
+            #
+            #     plt.figure(figsize=(10, 4))
+            #
+            #     plt.plot(downsampled_correlation_clip)
+            #     plt.title('Cross-correlation of the audio clip itself')
+            #     plt.xlabel('Lag')
+            #     plt.ylabel('Correlation coefficient')
+            #     plt.savefig(
+            #         f'{graph_dir}/{clip_name}.png')
+            #     plt.close()
 
             clip_datas[clip_path] = {"clip":clip,
                                      "clip_name":clip_name,
                                      "sliding_window":sliding_window,
-                                     "correlation_clip":correlation_clip,
-                                     "downsampling_factor":downsampling_factor,
-                                     "downsampled_correlation_clip":downsampled_correlation_clip,
+                                     "correlation_clip":correlation_clip
                                      }
 
 
@@ -475,7 +472,10 @@ class AudioOffsetFinder:
             raise ValueError("unknown similarity method")
         return similarity
 
-    def _calculate_area_of_overlap_ratio(self, downsampled_correlation_clip, downsampled_correlation_slice):
+    def _calculate_area_of_overlap_ratio(self, correlation_clip, correlation_slice):
+        downsampling_factor = 101
+        downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, downsampling_factor)
+        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, downsampling_factor)
         peak_index = np.argmax(downsampled_correlation_clip)
         peak_index_slice = np.argmax(downsampled_correlation_slice)
         print("len", len(downsampled_correlation_clip))
@@ -521,8 +521,8 @@ class AudioOffsetFinder:
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk,repeating=True):
-        clip, clip_name, sliding_window, correlation_clip, downsampling_factor, downsampled_correlation_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip", "downsampling_factor","downsampled_correlation_clip")(clip_data))
+        clip, clip_name, sliding_window, correlation_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data))
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
@@ -603,9 +603,8 @@ class AudioOffsetFinder:
                     if debug_mode:
                         print(f"failed verification for {section_ts} due to similarity {similarity} > {self.very_short_clip_similarity_threshold}")
                 elif self.similarity_method == "mse" and similarity > self.very_short_clip_similarity_threshold_conditional:
-                    downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, downsampling_factor)
-                    area_of_overlap,_ = self._calculate_area_of_overlap_ratio(downsampled_correlation_clip,
-                                                                            downsampled_correlation_slice)
+                    area_of_overlap,_ = self._calculate_area_of_overlap_ratio(correlation_clip,
+                                                                            correlation_slice)
 
                     if area_of_overlap < 0.07:
                         peaks_final.append(peak)
@@ -655,8 +654,6 @@ class AudioOffsetFinder:
                 areas = []
                 #distances = []
 
-                #pdc = get_peak_profile(np.argmax(downsampled_correlation_clip), downsampled_correlation_clip)
-
                 peak_profiles=[]
                 for i,item in enumerate(peaks):
                     seconds.append(item / sr)
@@ -664,21 +661,8 @@ class AudioOffsetFinder:
                     # #area_of_overlap = area_of_overlap_ratio(correlation_clip, correlation_slice)
 
 
-                    # print("downsampled_correlation_clip_peak",downsampled_correlation_clip_peak)
-                    #
-
-                    # #print(pdc["left_trough"],pdc["right_trough"])
-                    #
-                    # #max_width = max(downsampled_correlation_clip_peak-pdc["left_trough"],pdc["right_trough"]-downsampled_correlation_clip_peak)
-                    #
-                    # #new_left = max(0,downsampled_correlation_clip_peak-max_width)
-                    # #new_right = min(len(downsampled_correlation_clip),downsampled_correlation_clip_peak+max_width+1)
-                    #
-                    # #clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-                    # #correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-                    downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, downsampling_factor)
-                    area_of_overlap,props = self._calculate_area_of_overlap_ratio(downsampled_correlation_clip,
-                                                                            downsampled_correlation_slice)
+                    area_of_overlap,props = self._calculate_area_of_overlap_ratio(correlation_clip,
+                                                                            correlation_slice)
 
                     clip_within_peak = props["clip_within_peak"]
                     correlation_slice_within_peak = props["correlation_slice_within_peak"]
@@ -695,20 +679,7 @@ class AudioOffsetFinder:
                     plt.savefig(
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{item}.png')
                     plt.close()
-                    #
-                    # graph_dir = f"./tmp/graph/cross_correlation_slice_downsampled_clipped/{clip_name}"
-                    # os.makedirs(graph_dir, exist_ok=True)
-                    #
-                    # plt.figure(figsize=(10, 4))
-                    # plt.plot(downsampled_correlation_slice)
-                    # plt.plot(downsampled_correlation_clip)
-                    # plt.title('Cross-correlation between the audio clip and full track before slicing')
-                    # plt.xlabel('Lag')
-                    # plt.ylabel('Correlation coefficient')
-                    # plt.savefig(
-                    #     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{item}.png')
-                    # plt.close()
-                    #
+
                     areas.append(area_of_overlap)
 
                 print(json.dumps({"peaks":peaks,"seconds":seconds,
