@@ -482,9 +482,12 @@ class AudioOffsetFinder:
         print("peak_index", peak_index)
         #raise "chafa"
         if(peak_index != peak_index_slice):
-            raise ValueError(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
+            logger.warning(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
         left_trough, right_trough = find_closest_troughs(peak_index, downsampled_correlation_clip)
         max_width = max(peak_index-left_trough,right_trough-peak_index)
+
+        if max_width < 10:
+            max_width = 10
 
         #scale = downsampled_correlation_clip[left_trough] / downsampled_correlation_slice[left_trough]
 
@@ -527,7 +530,7 @@ class AudioOffsetFinder:
 
         clip_length = len(clip)
 
-        very_short_clip = len(clip) < 0.5 * sr
+        very_short_clip = len(clip) < 0.75 * sr
 
         if repeating: #eliminate obviously bad ones by comparing with original clip and select by certain threshold
             zeroes_second_pad = 1
