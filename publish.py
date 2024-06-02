@@ -12,6 +12,8 @@ import boto3
 from botocore.client import Config
 import botocore
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pypinyin import lazy_pinyin
+
 from utils import extract_prefix
 from dotenv import load_dotenv
 from andrew_utils import get_md5sum_file
@@ -141,7 +143,7 @@ def publish_podcast(folder,title,inputs,dest_dir):
         f.write(feed)
     # no need to be super secure for now    
     salt="fdsgdfgfdgfdgfdgdfdsfsd"
-    title_clean=re.sub('[^0-9a-zA-Z]+', '*', title)
+    title_clean=re.sub('[^0-9a-zA-Z]+', '*', "".join(lazy_pinyin(title)))
     suffix = hashlib.md5(f"{title_clean}{salt}".encode("utf-8")).hexdigest()
     remote_name = f"{title_clean}_{suffix}"
     data = {"key":remote_name,"xml":feed}

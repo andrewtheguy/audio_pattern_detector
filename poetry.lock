@@ -1482,6 +1482,17 @@ files = [
 diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
+name = "pypinyin"
+version = "0.51.0"
+description = "汉字拼音转换模块/工具."
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*, <4"
+files = [
+    {file = "pypinyin-0.51.0-py2.py3-none-any.whl", hash = "sha256:ae8878f08fee15d0c5c11053a737e68a4158c22c63dc632b4de060af5c95bf84"},
+    {file = "pypinyin-0.51.0.tar.gz", hash = "sha256:cede34fc35a79ef6c799f161e2c280e7b6755ee072fb741cae5ce2a60c4ae0c5"},
+]
+
+[[package]]
 name = "pytest"
 version = "8.2.1"
 description = "pytest: simple powerful testing with Python"
@@ -1876,4 +1887,4 @@ tests = ["cheroot", "colorama", "pytest", "pytest-cov", "pytest-xdist", "typing-
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "e252c7ac82d78fcfae6be80d57231caf2540859c786734c77c60bb8514871cb7"
+content-hash = "1cc4db68834f75550c6e3d5557ad62ad6f694a5bf38ba99c1a0d5de0f4d1f61e"
