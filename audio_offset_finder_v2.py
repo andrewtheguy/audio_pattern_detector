@@ -189,9 +189,11 @@ class AudioOffsetFinder:
         self.normalize = True
         self.target_sample_rate = 8000
         self.similarity_debug=defaultdict(list)
+        self.areas_debug=defaultdict(list)
         self.similarity_method = "mse"
         if self.similarity_method == "mse":
             self.similarity_threshold = 0.005
+            self.area_threshold=0.085
             # for very short clip
             self.very_short_clip_similarity_threshold = 0.01
             # lower threshold for conditional check on very short clip because the higher likelihood of false positives
@@ -343,7 +345,8 @@ class AudioOffsetFinder:
         if self.debug_mode and (self.method == "correlation" or self.method == "non_repeating_correlation"):
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
-                #print("self.similarity_debug[clip_name]",self.similarity_debug[clip_name])
+
+                # similarity debug
                 graph_dir = f"./tmp/graph/{self.method}_similarity_{self.similarity_method}"
                 os.makedirs(graph_dir, exist_ok=True)
 
@@ -356,14 +359,37 @@ class AudioOffsetFinder:
                         x_coords.append(index)
                         y_coords.append(item)
 
-
-                # Optional: plot the correlation graph to visualize
                 plt.figure(figsize=(10, 4))
                 # Create scatter plot
                 plt.scatter(x_coords, y_coords)
 
                 # Adding titles and labels
-                plt.title('Scatter Plot for Given Array')
+                plt.title('Scatter Plot for Similarity')
+                plt.xlabel('Value')
+                plt.ylabel('Sublist Index')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}.png')
+                plt.close()
+
+                # ares debug
+                graph_dir = f"./tmp/graph/{self.method}_area_{self.similarity_method}"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                x_coords = []
+                y_coords = []
+
+                for index,arr in enumerate(self.areas_debug[clip_name]):
+                    for item in arr:
+                        #if item <= 0.02:
+                        x_coords.append(index)
+                        y_coords.append(item)
+
+                plt.figure(figsize=(10, 4))
+                # Create scatter plot
+                plt.scatter(x_coords, y_coords)
+
+                # Adding titles and labels
+                plt.title('Scatter Plot for Areas')
                 plt.xlabel('Value')
                 plt.ylabel('Sublist Index')
                 plt.savefig(
@@ -485,10 +511,10 @@ class AudioOffsetFinder:
         if(peak_index != peak_index_slice):
             logger.warning(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
         left_trough, right_trough = find_closest_troughs(peak_index, downsampled_correlation_clip)
-        max_width = max(peak_index-left_trough,right_trough-peak_index)
+        max_width_half = max(peak_index-left_trough,right_trough-peak_index)
 
-        if max_width < 10:
-            max_width = 10
+        if max_width_half < 10:
+            max_width_half = 10
 
         #scale = downsampled_correlation_clip[left_trough] / downsampled_correlation_slice[left_trough]
 
@@ -507,8 +533,8 @@ class AudioOffsetFinder:
         #                                         (left_trough, peak_index_slice, right_trough))
 
         #
-        new_left = max(0,peak_index-max_width)
-        new_right = min(len(downsampled_correlation_clip),peak_index+max_width+1)
+        new_left = max(0,peak_index-max_width_half)
+        new_right = min(len(downsampled_correlation_clip),peak_index+max_width_half+1)
         #
         clip_within_peak = downsampled_correlation_clip[new_left:new_right]
         correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
@@ -607,14 +633,14 @@ class AudioOffsetFinder:
                     if debug_mode:
                         print(f"failed verification for {section_ts} due to similarity {similarity} > {self.very_short_clip_similarity_threshold}")
                 elif self.similarity_method == "mse" and similarity > self.very_short_clip_similarity_threshold_conditional:
-                    area_of_overlap,_ = self._calculate_area_of_overlap_ratio(correlation_clip,
+                    area_ratio,_ = self._calculate_area_of_overlap_ratio(correlation_clip,
                                                                             correlation_slice)
 
-                    if area_of_overlap < 0.07:
+                    if area_ratio < self.area_threshold:
                         peaks_final.append(peak)
                     else:
                         if debug_mode:
-                            print(f"failed verification for very short clip {section_ts} due to area_of_overlap {area_of_overlap} > 0.07")
+                            print(f"failed verification for very short clip {section_ts} due to area_of_overlap {area_ratio} >= {self.area_threshold}")
                 else:
                     peaks_final.append(peak)
             else:
@@ -625,7 +651,7 @@ class AudioOffsetFinder:
                     peaks_final.append(peak)
 
         if debug_mode:
-            filtered_similarity = []
+            filtered_similarities = []
             for i,peak in enumerate(peaks):
                 similarity = similarities[i]
                 correlation_slice = correlation_slices[i]
@@ -637,7 +663,7 @@ class AudioOffsetFinder:
                 else:
                     raise ValueError("unknown similarity method")
                 if graph_max is None or similarity <= graph_max:
-                    filtered_similarity.append(similarity)
+                    filtered_similarities.append(similarity)
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
 
@@ -650,12 +676,12 @@ class AudioOffsetFinder:
                     plt.savefig(
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                     plt.close()
+            areas = []
 
-            if len(filtered_similarity) > 0:
+            if len(filtered_similarities) > 0:
                 peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
                 os.makedirs(peak_dir, exist_ok=True)
                 seconds=[]
-                areas = []
                 #distances = []
 
                 peak_profiles=[]
@@ -665,7 +691,7 @@ class AudioOffsetFinder:
                     # #area_of_overlap = area_of_overlap_ratio(correlation_clip, correlation_slice)
 
 
-                    area_of_overlap,props = self._calculate_area_of_overlap_ratio(correlation_clip,
+                    area_ratio,props = self._calculate_area_of_overlap_ratio(correlation_clip,
                                                                             correlation_slice)
 
                     clip_within_peak = props["clip_within_peak"]
@@ -684,7 +710,7 @@ class AudioOffsetFinder:
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{item}.png')
                     plt.close()
 
-                    areas.append(area_of_overlap)
+                    areas.append(area_ratio)
 
                 print(json.dumps({"peaks":peaks,"seconds":seconds,
                                   "areas":areas,
@@ -693,7 +719,8 @@ class AudioOffsetFinder:
                                   #"pds":pds,
                                   #"properties":properties,
                                   "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
-            self.similarity_debug[clip_name].append(filtered_similarity)
+            self.similarity_debug[clip_name].append(filtered_similarities)
+            self.areas_debug[clip_name].append(areas)
 
             print(f"---")
 
