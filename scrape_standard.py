@@ -61,7 +61,11 @@ ripped_streams={
     },
     "日落大道": {
         "introclips": ["am1430/日落大道intro1.wav","am1430/日落大道intro2.wav"],
-        "endingclips": ["am1430/programsponsoredby.wav","am1430/thankyouwatchingsunset.wav"],
+        "endingclips": ["am1430/programsponsoredby.wav",
+                        "am1430/programsponsoredby2.wav",
+                        "am1430/programsponsoredby3.wav",
+                        "am1430/programsponsoredby4.wav",
+                        "am1430/thankyouwatchingsunset.wav"],
         #"endingclips": [],
         "ends_with_intro": False,
         "min_duration": 60 * 60 * 2,  # guard against short recordings which resulted from failure
