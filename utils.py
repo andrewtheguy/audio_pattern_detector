@@ -171,16 +171,35 @@ def download(url,target_file):
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')
 
+def trapezoidal_area(y1, y2):
+    """
+    Compute the area between two curves using the trapezoidal rule.
+
+    Args:
+    y1 (array): y-coordinates for the first line
+    y2 (array): y-coordinates for the second line
+
+    Returns:
+    float: The area between the two curves.
+    """
+    n = len(y1)
+    area = 0.0
+    for i in range(n - 1):
+        # Calculate the width of each section, which is always 1
+        h = 1
+        # Calculate the average height of the trapezoid
+        avg_height = (y1[i] + y1[i + 1] + y2[i] + y2[i + 1]) / 2
+        # Calculate the area of the trapezoid
+        area += h * avg_height
+    return area
+
 def area_of_overlap_ratio(y1, y2):
     #y1 = control
     #y2 = variable
     # Define the x-axis range based on the indices of the input arrays
     x = np.arange(len(y1))
 
-    #dx=1
-
-    # Calculate the area under each curve
-    x = np.arange(len(y1))
+    dx=1
 
     #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
     #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
@@ -190,10 +209,9 @@ def area_of_overlap_ratio(y1, y2):
 
     # To find the overlapping area, take the minimum at each point
     min_curve = np.minimum(y1, y2)
-    diff_curve = np.abs(y1 - y2)
     #overlapping_area = np.trapz(min_curve, dx=dx)
     overlapping_area = simps(min_curve, x)
-    diff_area = simps(diff_curve, x)
+    diff_area = area_y1+area_y2-2*overlapping_area
 
     # Calculate percentage overlap with respect to each curve
     #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
