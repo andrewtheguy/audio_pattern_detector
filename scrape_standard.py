@@ -75,7 +75,8 @@ ripped_streams={
         "ends_with_intro": False,
         "expected_num_segments": 3,
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
-        # "expected_num_segments": 5,
+        "time":"1800",
+        "publish": True,
     },
     "繼續有心人friday": {
         "introclips": ["am1430/繼續有心人intro.wav"],
@@ -189,7 +190,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         upload_path_trimmed = f"/am1430/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
         
-    return output_dir_trimmed,output_file_trimmed
+    return output_file_trimmed,jsonfile
 
 
 num_podcast_to_keep = 3
@@ -215,7 +216,8 @@ def download_am1430():
             print(f"skipping {key} because publish is not set to True")
             continue
         else:
-            print(f"downloading {key}")
+            pass
+            #print(f"downloading {key}")
 
         time = stream["time"]
         num_downloaded = 0
@@ -273,7 +275,9 @@ def process_podcasts():
         for dest_file in dest_files:
             try:
                 output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
-                output_file_trimmed = scrape_single_intro(dest_file, stream_name=stream_name, recorded=False)
+                output_file_trimmed,jsonfile = scrape_single_intro(dest_file, stream_name=stream_name, recorded=False)
+                upload_file(jsonfile, f"/grabradiostreamed/am1430/multiple/{stream_name}/{os.path.basename(dest_file)}.json",
+                            skip_if_exists=True)
                 #podcasts_publish.append(output_dir_trimmed)
                 num_success += 1
             except Exception as e:
