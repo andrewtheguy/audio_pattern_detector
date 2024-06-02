@@ -208,7 +208,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     return news_report_final
 
 # will cause issues if upload_json is True and the json file is the same as upload dest file
-def scrape(input_file, stream_name, output_dir_trimmed, upload_json=False):
+def scrape(input_file, stream_name, output_dir_trimmed):
     save_segments = False
     print(input_file)
     #exit(1)
@@ -295,8 +295,8 @@ def scrape(input_file, stream_name, output_dir_trimmed, upload_json=False):
 
     pair = [[time_to_seconds(t) for t in sublist] for sublist in tsformatted]
 
-    if upload_json:
-        upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
+    #if upload_json:
+    #    upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
     
     #save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
@@ -321,7 +321,7 @@ def scrape(input_file, stream_name, output_dir_trimmed, upload_json=False):
                 save_path=f"{dirname_segment}/{filename_segment}"
                 shutil.move(item["file_path"],save_path)
             #upload_file(item["file_path"],upload_path,skip_if_exists=True)
-    return output_file_trimmed
+    return output_file_trimmed,jsonfile
 
 def is_time_after(current_time,hour):
   target_time = datetime.time(hour, 0, 0)  # Set minutes and seconds to 0
@@ -411,8 +411,9 @@ def process_podcasts():
         for dest_file in dest_files:
             try:
                 output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
-                output_file_trimmed = scrape(dest_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name,
-                                                            upload_json=True)
+                output_file_trimmed,jsonfile = scrape(dest_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name)
+                upload_file(jsonfile, f"/rthk/original/{stream_name}/{os.path.basename(input_file)}.json",
+                            skip_if_exists=True)
                 podcasts_publish.append(output_dir_trimmed)
             except Exception as e:
                 print(f"error happened when processing for {stream_name}",e)
