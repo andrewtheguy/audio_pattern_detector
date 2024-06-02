@@ -216,5 +216,5 @@ def area_of_overlap_ratio(y1, y2):
     # Calculate percentage overlap with respect to each curve
     #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
     #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
-    print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
+    #print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
     return diff_area/overlapping_area

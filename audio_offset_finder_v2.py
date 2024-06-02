@@ -478,8 +478,9 @@ class AudioOffsetFinder:
         downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, downsampling_factor)
         peak_index = np.argmax(downsampled_correlation_clip)
         peak_index_slice = np.argmax(downsampled_correlation_slice)
-        print("len", len(downsampled_correlation_clip))
-        print("peak_index", peak_index)
+        if self.debug_mode:
+            print("len", len(downsampled_correlation_clip))
+            print("peak_index", peak_index)
         #raise "chafa"
         if(peak_index != peak_index_slice):
             logger.warning(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
