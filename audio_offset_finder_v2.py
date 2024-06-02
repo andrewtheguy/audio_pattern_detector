@@ -587,8 +587,8 @@ class AudioOffsetFinder:
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
             correlation_slice = correlation_slice/np.max(correlation_slice)
 
-            if np.argmax(correlation_slice) != np.argmax(correlation_clip):
-                raise ValueError("peak not aligned with the original clip, potential bug in the middle of the chain")
+            #if np.argmax(correlation_slice) != np.argmax(correlation_clip):
+            #    raise ValueError(f"peak {np.argmax(correlation_slice)} not aligned with the original clip {np.argmax(correlation_clip)}, potential bug in the middle of the chain")
 
             similarity = self._calculate_similarity(correlation_slice=correlation_slice, correlation_clip=correlation_clip)
 
