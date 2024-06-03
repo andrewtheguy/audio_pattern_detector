@@ -634,12 +634,12 @@ class AudioOffsetFinder:
             after = peak + len(correlation_clip)//2
             before = peak - len(correlation_clip)//2
             if after > len(correlation)-1+2:
-                logger.warning(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
+                logger.info(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
                 similarities.append((1,1,1,1,))
                 correlation_slices.append([])
                 continue
             elif before < -2:
-                logger.warning(f"peak {peak} before is {before} < -2, skipping")
+                logger.info(f"peak {peak} before is {before} < -2, skipping")
                 similarities.append((1,1,1,1,))
                 correlation_slices.append([])
                 continue
