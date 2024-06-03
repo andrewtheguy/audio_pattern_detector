@@ -412,7 +412,7 @@ def process_podcasts():
             try:
                 output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
                 output_file_trimmed,jsonfile = scrape(dest_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name)
-                upload_file(jsonfile, f"/rthk/original/{stream_name}/{os.path.basename(input_file)}.json",
+                upload_file(jsonfile, f"/rthk/original/{stream_name}/{os.path.basename(dest_file)}.json",
                             skip_if_exists=True)
                 podcasts_publish.append(output_dir_trimmed)
             except Exception as e:
