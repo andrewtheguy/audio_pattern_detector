@@ -619,7 +619,7 @@ class AudioOffsetFinder:
             peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
         else:
             distance = len(correlation)-1
-            height_min = 0.5
+            height_min = 0.25
             peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
