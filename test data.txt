@@ -77,3 +77,22 @@ Distances between clips:
 Clip occurs at the following times (in seconds): 00:10:26.148
 Clip occurs at the following times (in seconds): 00:17:54.825
 Clip occurs at the following times (in seconds): 00:35:27.898
+
+rthk morningsuite20240531.m4a --pattern-file ./audio_clips/morningsuitebababa.wav
+
+Clip occurs at the following times (in seconds): 00:11:32.363
+Clip occurs at the following times (in seconds): 00:55:35.929
+
+日落大道20240529
+program sponsored by:
+"00:26:40.264",
+"00:57:08.002"
+
+sponsored by 2:
+"00:41:18.571"
+
+sponsored by 3:
+"00:26:40.236"
+
+sponsored by 4:
+"01:29:07.835"
