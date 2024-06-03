@@ -85,14 +85,14 @@ Clip occurs at the following times (in seconds): 00:55:35.929
 
 日落大道20240529
 program sponsored by:
-00:26:44
-00:57: 9.544875
+"00:26:40.264",
+"00:57:08.002"
 
 sponsored by 2:
-00:41: 20.2235
+"00:41:18.571"
 
 sponsored by 3:
-00:26: 41.790625
+"00:26:40.236"
 
 sponsored by 4:
-01:29: 9.362375
+"01:29:07.835"
