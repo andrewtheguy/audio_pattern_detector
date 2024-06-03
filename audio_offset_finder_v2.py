@@ -270,7 +270,7 @@ class AudioOffsetFinder:
                 # loudness normalize audio to -12 dB LUFS
                 clip = pyln.normalize.loudness(clip, loudness, -12.0)
 
-            correlation_clip = self._get_clip_correlation(clip, clip_name)
+            correlation_clip,absolute_max = self._get_clip_correlation(clip, clip_name)
 
             if self.debug_mode:
                 print(f"clip_length {clip_name}", len(clip))
@@ -311,6 +311,7 @@ class AudioOffsetFinder:
                                      "clip_name":clip_name,
                                      "sliding_window":sliding_window,
                                      "correlation_clip":correlation_clip,
+                                     "correlation_clip_absolute_max":absolute_max,
                                      #"downsampled_correlation_clip":downsampled_correlation_clip,
                                      }
 
@@ -412,9 +413,10 @@ class AudioOffsetFinder:
 
         # abs
         correlation_clip = np.abs(correlation_clip)
-        correlation_clip /= np.max(correlation_clip)
+        absolute_max = np.max(correlation_clip)
+        correlation_clip /= absolute_max
 
-        return correlation_clip
+        return correlation_clip,absolute_max
 
 
     # sliding_window: for previous_chunk in seconds from end
@@ -460,16 +462,11 @@ class AudioOffsetFinder:
         #         f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.wav",
         #         audio_section, sr)
 
-        if self.method == "correlation":
+        if self.method == "correlation" or self.method == "non_repeating_correlation":
 
             # samples_skip_end does not skip results from being included yet
             peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                  seconds_per_chunk=seconds_per_chunk, one_shot=False
-
-                                                  )
-        elif self.method == "non_repeating_correlation":
-            peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                  seconds_per_chunk=seconds_per_chunk, one_shot=True
+                                                  seconds_per_chunk=seconds_per_chunk, one_shot=self.method == "non_repeating_correlation",
                                                   )
 
         else:
@@ -566,27 +563,29 @@ class AudioOffsetFinder:
     # because it is more likely to have false positives or miss good ones
     # one_shot = True will only return the first match
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk, one_shot=False):
-        clip, clip_name, sliding_window, correlation_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data))
+        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
 
         #very_short_clip = len(clip) < 0.75 * sr
 
-        zeroes_second_pad = 1
-        # pad zeros between audio and clip
-        zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
-        audio = np.concatenate((audio_section, zeroes, clip))
-        samples_skip_end = zeroes_second_pad * sr + clip_length
+        # zeroes_second_pad = 1
+        # # pad zeros between audio and clip
+        #zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
+        #audio = np.concatenate((audio_section, zeroes))
+        # samples_skip_end = zeroes_second_pad * sr + clip_length
+
+        audio=audio_section
 
         # Cross-correlate and normalize correlation
         correlation = correlate(audio, clip, mode='full', method='fft')
         # abs
         correlation = np.abs(correlation)
-        # alternative to replace negative values with zero in array instead of above
-        #correlation[correlation < 0] = 0
-        correlation /= np.max(correlation)
+        absolute_max = np.max(correlation)
+        max_choose = max(correlation_clip_absolute_max,absolute_max)
+        correlation /= max_choose
 
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
@@ -606,9 +605,9 @@ class AudioOffsetFinder:
                 f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
             plt.close()
 
-        max_sample = len(audio) - samples_skip_end
+        #max_sample = len(audio) - samples_skip_end
         #trim placeholder clip
-        correlation = correlation[:max_sample]
+        #correlation = correlation[:max_sample]
 
 
         distance = clip_length
@@ -624,6 +623,8 @@ class AudioOffsetFinder:
         for peak in peaks:
             after = peak + len(correlation_clip)//2
             before = peak - len(correlation_clip)//2
+            #print("peak after",after)
+            #print("len(correlation)",len(correlation))
             if after > len(correlation)-1+2:
                 logger.warning(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
                 continue
