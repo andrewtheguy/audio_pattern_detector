@@ -378,29 +378,29 @@ class AudioOffsetFinder:
                 plt.close()
 
                 # ares debug
-                graph_dir = f"./tmp/graph/{self.method}_area_{self.similarity_method}/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                x_coords = []
-                y_coords = []
-
-                for index,arr in enumerate(self.areas_debug[clip_name]):
-                    for item in arr:
-                        #if item <= 0.02:
-                        x_coords.append(index)
-                        y_coords.append(item)
-
-                plt.figure(figsize=(10, 4))
-                # Create scatter plot
-                plt.scatter(x_coords, y_coords)
-
-                # Adding titles and labels
-                plt.title('Scatter Plot for Areas')
-                plt.xlabel('Value')
-                plt.ylabel('Sublist Index')
-                plt.savefig(
-                    f'{graph_dir}/{suffix}.png')
-                plt.close()
+                # graph_dir = f"./tmp/graph/{self.method}_area_{self.similarity_method}/{clip_name}"
+                # os.makedirs(graph_dir, exist_ok=True)
+                #
+                # x_coords = []
+                # y_coords = []
+                #
+                # for index,arr in enumerate(self.areas_debug[clip_name]):
+                #     for item in arr:
+                #         #if item <= 0.02:
+                #         x_coords.append(index)
+                #         y_coords.append(item)
+                #
+                # plt.figure(figsize=(10, 4))
+                # # Create scatter plot
+                # plt.scatter(x_coords, y_coords)
+                #
+                # # Adding titles and labels
+                # plt.title('Scatter Plot for Areas')
+                # plt.xlabel('Value')
+                # plt.ylabel('Sublist Index')
+                # plt.savefig(
+                #     f'{graph_dir}/{suffix}.png')
+                # plt.close()
 
         process.wait()
 
@@ -702,14 +702,8 @@ class AudioOffsetFinder:
             for i,peak in enumerate(peaks):
                 similarity = similarities[i][0]
                 correlation_slice = correlation_slices[i]
-
-                if self.similarity_method == "mse":
-                    graph_max = 0.01
-                elif self.similarity_method == "mae":
-                    graph_max = 0.05
-                else:
-                    raise ValueError("unknown similarity method")
-                if graph_max is None or similarity <= graph_max:
+                graph_max = 0.01
+                if similarity <= graph_max:
                     filtered_similarities.append(similarity)
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
@@ -717,13 +711,13 @@ class AudioOffsetFinder:
                     # Optional: plot the correlation graph to visualize
                     plt.figure(figsize=(10, 4))
                     plt.plot(correlation_slice)
+                    plt.plot(correlation_clip)
                     plt.title('Cross-correlation between the audio clip and full track before slicing')
                     plt.xlabel('Lag')
                     plt.ylabel('Correlation coefficient')
                     plt.savefig(
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                     plt.close()
-            areas = []
 
             if len(filtered_similarities) > 0:
                 peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
@@ -734,7 +728,7 @@ class AudioOffsetFinder:
                 area_props=[]
                 for i,item in enumerate(peaks):
                     seconds.append(item / sr)
-                #     correlation_slice = correlation_slices[i]
+                #    correlation_slice = correlation_slices[i]
                 #
                 #
                 #     area_ratio,props = self._calculate_area_of_overlap_ratio(correlation_clip,
@@ -766,7 +760,7 @@ class AudioOffsetFinder:
                 #     areas.append(area_ratio)
 
                 print(json.dumps({"peaks":peaks,"seconds":seconds,
-                                  "areas":areas,
+                                  #"areas":areas,
                                   "area_props":area_props,
                                   #"pdc":pdc,
                                   #"peak_profiles":peak_profiles,
@@ -776,7 +770,7 @@ class AudioOffsetFinder:
                                   #"new_right":new_right,
                                   "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
             self.similarity_debug[clip_name].append(filtered_similarities)
-            self.areas_debug[clip_name].append(areas)
+            #self.areas_debug[clip_name].append(areas)
 
             print(f"---")
 
