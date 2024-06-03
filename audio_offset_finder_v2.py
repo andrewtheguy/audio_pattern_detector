@@ -577,15 +577,11 @@ class AudioOffsetFinder:
 
         #very_short_clip = len(clip) < 0.75 * sr
 
-        if not one_shot: #eliminate obviously bad ones by comparing with original clip and select by certain threshold
-            zeroes_second_pad = 1
-            # pad zeros between audio and clip
-            zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
-            audio = np.concatenate((audio_section, zeroes, clip))
-            samples_skip_end = zeroes_second_pad * sr + clip_length
-        else:
-            audio = audio_section
-            samples_skip_end = 0
+        zeroes_second_pad = 1
+        # pad zeros between audio and clip
+        zeroes = np.zeros(clip_length + zeroes_second_pad * sr)
+        audio = np.concatenate((audio_section, zeroes, clip))
+        samples_skip_end = zeroes_second_pad * sr + clip_length
 
         # Cross-correlate and normalize correlation
         correlation = correlate(audio, clip, mode='full', method='fft')
@@ -619,10 +615,12 @@ class AudioOffsetFinder:
 
         if not one_shot:
             distance = clip_length
-            height_max = 0.25
-            peaks, _ = find_peaks(correlation, height=height_max, distance=distance)
+            height_min = 0.25
+            peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
         else:
-            peaks = [np.argmax(correlation)]
+            distance = len(correlation)-1
+            height_min = 0.25
+            peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
 
