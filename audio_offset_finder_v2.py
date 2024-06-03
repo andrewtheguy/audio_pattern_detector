@@ -464,12 +464,12 @@ class AudioOffsetFinder:
 
             # samples_skip_end does not skip results from being included yet
             peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                  seconds_per_chunk=seconds_per_chunk, one_shot=True
+                                                  seconds_per_chunk=seconds_per_chunk, one_shot=False
 
                                                   )
         elif self.method == "non_repeating_correlation":
             peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                  seconds_per_chunk=seconds_per_chunk, one_shot=False
+                                                  seconds_per_chunk=seconds_per_chunk, one_shot=True
                                                   )
 
         else:
@@ -568,7 +568,7 @@ class AudioOffsetFinder:
     # because it only picks the best one
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
-    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk, one_shot=True):
+    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk, one_shot=False):
         clip, clip_name, sliding_window, correlation_clip, downsampled_correlation_clip = (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","downsampled_correlation_clip")(clip_data))
         debug_mode = self.debug_mode
@@ -631,6 +631,20 @@ class AudioOffsetFinder:
         correlation_slices = []
 
         for peak in peaks:
+            after = peak + len(correlation_clip)//2
+            before = peak - len(correlation_clip)//2
+            if after > len(correlation)-1+2:
+                logger.warning(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
+                similarities.append((1,1,1,1,))
+                correlation_slices.append([])
+                continue
+            elif before < -2:
+                logger.warning(f"peak {peak} before is {before} < -2, skipping")
+                similarities.append((1,1,1,1,))
+                correlation_slices.append([])
+                continue
+
+
             # slice
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
             correlation_slice = correlation_slice/np.max(correlation_slice)
@@ -654,8 +668,7 @@ class AudioOffsetFinder:
             if debug_mode:
                 print("similarity", similarity)
 
-                similarity_whole = self._calculate_similarity(correlation_slice=correlation_slice,
-                                                        correlation_clip=correlation_clip)
+                similarity_whole = (similarity_left + similarity_right) / 2
 
                 #if similarity <= 0.01:
                 similarities.append((similarity,similarity_whole,similarity_left,similarity_right,))
@@ -719,8 +732,8 @@ class AudioOffsetFinder:
                 #distances = []
 
                 area_props=[]
-                # for i,item in enumerate(peaks):
-                #     seconds.append(item / sr)
+                for i,item in enumerate(peaks):
+                    seconds.append(item / sr)
                 #     correlation_slice = correlation_slices[i]
                 #
                 #
