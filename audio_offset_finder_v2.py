@@ -613,14 +613,10 @@ class AudioOffsetFinder:
         #trim placeholder clip
         correlation = correlation[:max_sample]
 
-        if not one_shot:
-            distance = clip_length
-            height_min = 0.25
-            peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
-        else:
-            distance = len(correlation)-1
-            height_min = 0.25
-            peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
+
+        distance = clip_length
+        height_min = 0.25
+        peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
 
@@ -632,14 +628,10 @@ class AudioOffsetFinder:
             after = peak + len(correlation_clip)//2
             before = peak - len(correlation_clip)//2
             if after > len(correlation)-1+2:
-                logger.info(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
-                similarities.append((1,1,1,1,))
-                correlation_slices.append([])
+                logger.warning(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
                 continue
             elif before < -2:
-                logger.info(f"peak {peak} before is {before} < -2, skipping")
-                similarities.append((1,1,1,1,))
-                correlation_slices.append([])
+                logger.warning(f"peak {peak} before is {before} < -2, skipping")
                 continue
 
 
@@ -676,32 +668,17 @@ class AudioOffsetFinder:
                 similarities.append((similarity,similarity_whole,similarity_left,similarity_middle,similarity_right,))
                 correlation_slices.append(correlation_slice)
 
-            # if very_short_clip:
-            #     if similarity > self.very_short_clip_similarity_threshold:
-            #         if debug_mode:
-            #             print(f"failed verification for {section_ts} due to similarity {similarity} > {self.very_short_clip_similarity_threshold}")
-            #     elif self.similarity_method == "mse" and similarity > self.very_short_clip_similarity_threshold_conditional:
-            #         area_ratio,_ = self._calculate_area_of_overlap_ratio(correlation_clip,
-            #                                                                 correlation_slice,
-            #                                                              downsampled_correlation_clip,)
-            #
-            #         if area_ratio < self.area_threshold:
-            #             peaks_final.append(peak)
-            #         else:
-            #             if debug_mode:
-            #                 print(f"failed verification for very short clip {section_ts} due to area_of_overlap {area_ratio} >= {self.area_threshold}")
-            #     else:
-            #         peaks_final.append(peak)
-            # else:
             if similarity > self.similarity_threshold:
                 if debug_mode:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
             else:
                 peaks_final.append(peak)
+                if one_shot:
+                    break
 
         if debug_mode:
             filtered_similarities = []
-            for i,peak in enumerate(peaks):
+            for i,peak in enumerate(peaks_final):
                 similarity = similarities[i][0]
                 correlation_slice = correlation_slices[i]
                 graph_max = 0.01
