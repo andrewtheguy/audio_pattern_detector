@@ -652,18 +652,22 @@ class AudioOffsetFinder:
             if len(correlation_slice) != len(correlation_clip):
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
-            half = np.argmax(correlation_clip)
+            quarter = len(correlation_clip) // 4
 
             #if np.argmax(correlation_slice) != np.argmax(correlation_clip):
             #    raise ValueError(f"peak {np.argmax(correlation_slice)} not aligned with the original clip {np.argmax(correlation_clip)}, potential bug in the middle of the chain")
 
-            similarity_left = self._calculate_similarity(correlation_slice=correlation_slice[:half],
-                                                         correlation_clip=correlation_clip[:half])
+            similarity_quadrants = []
+            for i in range(4):
+                similarity_quadrants.append(self._calculate_similarity(correlation_slice=correlation_slice[i*quarter:(i+1)*quarter],
+                                                                      correlation_clip=correlation_clip[i*quarter:(i+1)*quarter]))
 
-            similarity_right = self._calculate_similarity(correlation_slice=correlation_slice[half:],
-                                                         correlation_clip=correlation_clip[half:])
+            similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+            similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+            similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
 
-            similarity = min(similarity_left,similarity_right)
+
+            similarity = min(similarity_left,similarity_middle,similarity_right)
 
             if debug_mode:
                 print("similarity", similarity)
@@ -671,7 +675,7 @@ class AudioOffsetFinder:
                 similarity_whole = (similarity_left + similarity_right) / 2
 
                 #if similarity <= 0.01:
-                similarities.append((similarity,similarity_whole,similarity_left,similarity_right,))
+                similarities.append((similarity,similarity_whole,similarity_left,similarity_middle,similarity_right,))
                 correlation_slices.append(correlation_slice)
 
             # if very_short_clip:
