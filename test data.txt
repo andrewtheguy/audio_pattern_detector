@@ -82,3 +82,17 @@ rthk morningsuite20240531.m4a --pattern-file ./audio_clips/morningsuitebababa.wa
 
 Clip occurs at the following times (in seconds): 00:11:32.363
 Clip occurs at the following times (in seconds): 00:55:35.929
+
+日落大道20240529
+program sponsored by:
+00:26:44
+00:57: 9.544875
+
+sponsored by 2:
+00:41: 20.2235
+
+sponsored by 3:
+00:26: 41.790625
+
+sponsored by 4:
+01:29: 9.362375
