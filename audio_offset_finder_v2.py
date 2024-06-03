@@ -623,6 +623,9 @@ class AudioOffsetFinder:
         for peak in peaks:
             after = peak + len(correlation_clip)//2
             before = peak - len(correlation_clip)//2
+            max_height_index = np.argmax(correlation)
+            if one_shot and peak != max_height_index:
+                logger.warning(f"peak {peak} not equal to max_height_index {max_height_index}")
             #print("peak after",after)
             #print("len(correlation)",len(correlation))
             if after > len(correlation)-1+2:
