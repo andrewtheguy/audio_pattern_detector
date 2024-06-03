@@ -1,3 +1,9 @@
+import json
+import os
+from pathlib import Path
+
+from andrew_utils import seconds_to_time
+
 from match import match_pattern
 
 if __name__ == '__main__':
@@ -32,5 +38,18 @@ if __name__ == '__main__':
          "./audio_clips/morningsuitebababa.wav"),
     )
 
+    result_dir = f"./tmp/results"
+
     for pair in pairs:
-        match_pattern(audio_file=pair[0], pattern_file=pair[1], method="correlation")
+        audio_file = pair[0]
+        pattern_file = pair[1]
+        peak_time=match_pattern(audio_file=audio_file, pattern_file=pattern_file, method="correlation")
+        tsformatted=[f"{seconds_to_time(seconds=offset)}" for offset in peak_time]
+        print(tsformatted)
+        for offset in tsformatted:
+            print(f"Clip occurs at the following times (in seconds): {tsformatted}")
+
+        final_dir = f"{result_dir}/{Path(pattern_file).stem}"
+        os.makedirs(final_dir, exist_ok=True)
+        with open(f"{final_dir}/{Path(audio_file).stem}.json", "w") as f:
+            json.dump(tsformatted, f, indent=4)

@@ -65,25 +65,7 @@ def match_pattern(audio_file, pattern_file, method):
     # Find clip occurrences in the full audio
     peak_times = AudioOffsetFinder(method=method, debug_mode=True,
                                    clip_paths=[pattern_file]).find_clip_in_audio(full_audio_path=audio_file)
-    print(peak_times[pattern_file])
-    peak_times_clean = peak_times[pattern_file]
-    # peak_times_clean = cleanup_peak_times(peak_times[args.pattern_file])
-    # print(peak_times_clean)
-
-    for offset in peak_times_clean:
-        print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}")
-    #    #print(f"Offset: {offset}s" )
-
-    # distances = []
-    # for i in range(1, len(peak_times_clean)):
-    #     hour_delta = peak_times_clean[i] // 3600 - peak_times_clean[i - 1] // 3600
-    #     distance = peak_times_clean[i] - peak_times_clean[i - 1]
-    #     distances.append({"distance": seconds_to_time(seconds=distance), "hour_delta": hour_delta,
-    #                       "pair": [seconds_to_time(seconds=peak_times_clean[i - 1]),
-    #                                seconds_to_time(seconds=peak_times_clean[i])]})
-    # print("Distances between clips:")
-    # pprint.pprint(distances)
-
+    return peak_times[pattern_file]
 
 
 def main():
@@ -95,7 +77,11 @@ def main():
     #parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
     #                    default=0.4)
     args = parser.parse_args()
-    match_pattern(args.audio_file, args.pattern_file, args.match_method)
+    peak_time=match_pattern(args.audio_file, args.pattern_file, args.match_method)
+    print(peak_time)
+
+    for offset in peak_time:
+        print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}")
 
 
 if __name__ == '__main__':
