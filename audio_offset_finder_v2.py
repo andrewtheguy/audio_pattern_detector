@@ -290,28 +290,28 @@ class AudioOffsetFinder:
                 plt.close()
 
             #downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
-            downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
+            #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
 
-            if self.debug_mode:
-                print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
-                graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                plt.figure(figsize=(10, 4))
-
-                plt.plot(downsampled_correlation_clip)
-                plt.title('Cross-correlation of the audio clip itself')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}.png')
-                plt.close()
+            # if self.debug_mode:
+            #     print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+            #     graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+            #     os.makedirs(graph_dir, exist_ok=True)
+            #
+            #     plt.figure(figsize=(10, 4))
+            #
+            #     plt.plot(downsampled_correlation_clip)
+            #     plt.title('Cross-correlation of the audio clip itself')
+            #     plt.xlabel('Lag')
+            #     plt.ylabel('Correlation coefficient')
+            #     plt.savefig(
+            #         f'{graph_dir}/{clip_name}.png')
+            #     plt.close()
 
             clip_datas[clip_path] = {"clip":clip,
                                      "clip_name":clip_name,
                                      "sliding_window":sliding_window,
                                      "correlation_clip":correlation_clip,
-                                     "downsampled_correlation_clip":downsampled_correlation_clip,
+                                     #"downsampled_correlation_clip":downsampled_correlation_clip,
                                      }
 
 
@@ -569,8 +569,8 @@ class AudioOffsetFinder:
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk, one_shot=False):
-        clip, clip_name, sliding_window, correlation_clip, downsampled_correlation_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","downsampled_correlation_clip")(clip_data))
+        clip, clip_name, sliding_window, correlation_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data))
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
