@@ -77,3 +77,8 @@ Distances between clips:
 Clip occurs at the following times (in seconds): 00:10:26.148
 Clip occurs at the following times (in seconds): 00:17:54.825
 Clip occurs at the following times (in seconds): 00:35:27.898
+
+rthk morningsuite20240531.m4a --pattern-file ./audio_clips/morningsuitebababa.wav
+
+Clip occurs at the following times (in seconds): 00:11:32.363
+Clip occurs at the following times (in seconds): 00:55:35.929

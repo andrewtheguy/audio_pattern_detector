@@ -193,28 +193,39 @@ def trapezoidal_area(y1, y2):
         area += h * avg_height
     return area
 
-def area_of_overlap_ratio(y1, y2):
-    #y1 = control
-    #y2 = variable
+def area_of_overlap_ratio(control, variable):
+    y2 = variable
     # Define the x-axis range based on the indices of the input arrays
-    x = np.arange(len(y1))
+    x = np.arange(len(control))
 
     dx=1
 
     #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
     #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
 
-    area_y1 = simps(y1, x)
+    area_control = simps(control, x)
     area_y2 = simps(y2, x)
 
     # To find the overlapping area, take the minimum at each point
-    min_curve = np.minimum(y1, y2)
+    min_curve = np.minimum(control, y2)
     #overlapping_area = np.trapz(min_curve, dx=dx)
     overlapping_area = simps(min_curve, x)
-    diff_area = area_y1+area_y2-2*overlapping_area
+    diff_area = area_control+area_y2-2*overlapping_area
+
+    total_area_control = len(control) * max(control)
 
     # Calculate percentage overlap with respect to each curve
     #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
     #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
     #print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
-    return diff_area/overlapping_area
+    props = {
+                "total_area_control":total_area_control,
+                "diff_area":diff_area,
+                "overlapping_area":overlapping_area,
+                "area_control":area_control,
+                "area_y2":area_y2,
+                #"diff_area_ratio":diff_area/total_area_control,
+                #"overlapping_area_ratio":overlapping_area/total_area_control,
+                "percent_control_area":area_control/total_area_control,
+            }
+    return diff_area/overlapping_area, props
