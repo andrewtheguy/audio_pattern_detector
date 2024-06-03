@@ -18,22 +18,13 @@ python scrape_standard.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed
 ```
 
 ## audio pattern detection methods
-it uses cross similarity to eliminate false positives.
+currently only supports cross-correlation
 
 ### default cross-correlation
-Picks all peaks that are above a certain threshold, and then eliminate false positives with cross similarity.
+Picks all peaks that are above a certain threshold, and then eliminate false positives with cross similarity and mean square error.
 Works well with repeating or non-repeating patterns that are loud enough within the audio section because it adds the normalized clip
 at the end of the audio section, which helps to eliminate false positives that are much softer or non-related to the clip.
 won't work well for patterns that are too short or not loud enough within the audio section. 
-
-### non-repeating cross-correlation
-Instead of picking all peaks, it only picks the highest peak.
-Works well for a pattern that is guaranteed not to be repeating within the time frame and again that is long enough, and runs faster than the default cross-correlation.
-and it can detect pattern that is not prominent enough better,
-it won't work well for repeating patterns because it only picks the loudest or the best match instead of going through all potential matches.
-
-### limitations
-overall, both method don't work well for patterns that are too short because of the likelihood for false positives, and patterns that way soft are more likely to fail.
 
 ## testing
 use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.

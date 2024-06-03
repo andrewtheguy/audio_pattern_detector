@@ -562,12 +562,9 @@ class AudioOffsetFinder:
             "area_props":props,
         }
 
-    # one_shot = True will only check the max height,
-    # faster than repeat method and picks up a potential very soft one
-    # won't work well if there are multiple occurrences of the same clip
-    # because it only picks the best one
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
+    # one_shot = True will only return the first match
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk, one_shot=False):
         clip, clip_name, sliding_window, correlation_clip = (
             itemgetter("clip","clip_name","sliding_window","correlation_clip")(clip_data))
