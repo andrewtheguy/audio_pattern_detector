@@ -60,7 +60,13 @@ ripped_streams={
         "expected_num_segments": 1,
     },
     "日落大道": {
-        "introclips": ["am1430/日落大道intro1.wav","am1430/日落大道intro2.wav"],
+        "introclips": ["am1430/日落大道smallinterlude.wav",
+                       "am1430/日落大道interlude.wav",
+                       "am1430/日落大道intro1.wav",
+                       "am1430/日落大道intro2.wav",
+                       "am1430/日落大道interlude3.wav",
+                       "am1430/日落大道interlude4.wav",
+                       ],
         "endingclips": ["am1430/programsponsoredby.wav",
                         "am1430/programsponsoredby2.wav",
                         "am1430/programsponsoredby3.wav",
@@ -159,7 +165,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
 
         pair = process_timestamps_simple(program_intro_peak_times,endings_array,ends_with_intro=ends_with_intro,total_time=total_time,
                                          expected_num_segments=expected_num_segments,
-                                         intro_max_repeat_seconds=60,
+                                         intro_max_repeat_seconds=60, # consolidate close by intros
                                          )
         #print("pair before rehydration",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
