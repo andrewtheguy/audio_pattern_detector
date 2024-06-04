@@ -711,7 +711,7 @@ class AudioOffsetFinder:
                     # Optional: plot the correlation graph to visualize
                     plt.figure(figsize=(10, 4))
                     plt.plot(correlation_slice)
-                    plt.plot(correlation_clip)
+                    plt.plot(correlation_clip, alpha=0.7)
                     plt.title('Cross-correlation between the audio clip and full track before slicing')
                     plt.xlabel('Lag')
                     plt.ylabel('Correlation coefficient')
