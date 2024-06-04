@@ -368,7 +368,7 @@ class AudioOffsetFinder:
                 # Create scatter plot
                 plt.scatter(x_coords, y_coords)
 
-                if np.max(y_coords) > 0.005:
+                if len(y_coords) > 0 and np.max(y_coords) > 0.005:
                     ylimit = max(0.01, np.median(y_coords))
                     # Set the y limits
                     plt.ylim(0, ylimit)
