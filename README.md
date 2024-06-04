@@ -1,7 +1,7 @@
 ## usage
 ```shell
 # detect pattern from audio file with debug
-python match.py --pattern-file ./audio_clips/happydailyfemale2.wav --audio-file file --match-method correlation
+python match.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed/am1430/multiple/日落大道/日落大道20240523_1600_s_1.m4a --pattern-file ./audio_clips/am1430/日落大道interlude.wav
 
 # schedule periodic scraping from rthk
 python schedule.py
