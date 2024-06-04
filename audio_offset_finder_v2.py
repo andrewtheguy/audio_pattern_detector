@@ -44,9 +44,6 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 
 DEFAULT_METHOD="correlation"
 
-plot_test_x = np.array([])
-plot_test_y = np.array([])
-
 def load_audio_file(file_path, sr=None):
     # Create ffmpeg process
     process = (
@@ -65,66 +62,11 @@ def convert_audio_arr_to_float(audio):
     return librosa.util.buf_to_float(audio,n_bytes=2, dtype='float32')
 
 
-
-def get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk):
-    sliding_window = math.ceil(clip_seconds)
-
-    if (sliding_window != clip_seconds):
-        print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}")
-    # sliding_window = 5
-    #
-    # if (sliding_window < clip_seconds + 5):
-    #     # need to extend the sliding window to overlap the clip
-    #     sliding_window = clip_seconds + 5
-    #     print(f"adjusted sliding_window to {sliding_window} for {clip_name}")
-
-    # this should not happen anyways because the seconds per chunk is too small
-    if (seconds_per_chunk < sliding_window * 2):
-        seconds_per_chunk = sliding_window * 10
-        raise ValueError(f"seconds_per_chunk {seconds_per_chunk} is too small")
-
-    return sliding_window
-
 # def dtw_distance(series1, series2):
 #     distance, path = fastdtw(series1, series2, dist=2)
 #     return distance
 #     #return d
 
-
-def stretch_target(reference, target, ref_peak_info, target_peak_info):
-    ref_left_trough, ref_peak, ref_right_trough = ref_peak_info
-    target_left_trough, target_peak, target_right_trough = target_peak_info
-
-    # Segments to stretch
-    segments = [
-        (0, target_left_trough),
-        (target_left_trough, target_peak),
-        (target_peak, target_right_trough),
-        (target_right_trough, len(target) - 1)
-    ]
-
-    # Corresponding reference segment lengths
-    ref_lengths = [
-        ref_left_trough,
-        ref_peak - ref_left_trough,
-        ref_right_trough - ref_peak,
-        len(reference) - 1 - ref_right_trough
-    ]
-
-    stretched_target = []
-
-    # Apply proportional stretching to each segment
-    for (start, end), ref_length in zip(segments, ref_lengths):
-        target_segment = target[start:end + 1]
-        if len(target_segment) > 1:
-            target_indices = np.linspace(start, end, len(target_segment))
-            stretched_indices = np.linspace(0, ref_length, len(target_segment))
-            stretched_segment = np.interp(stretched_indices, np.arange(ref_length + 1), target_segment)
-            stretched_target.extend(stretched_segment)
-        else:
-            stretched_target.append(target[start])
-
-    return np.array(stretched_target)
 
 # Normalize the curves to the same scale
 def normalize_curve(curve):
@@ -257,7 +199,7 @@ class AudioOffsetFinder:
 
             clip_seconds = len(clip) / self.target_sample_rate
 
-            sliding_window = get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
+            sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
 
             if self.normalize:
                 clip_length = len(clip)
@@ -418,6 +360,25 @@ class AudioOffsetFinder:
         process.wait()
 
         return all_peak_times
+
+    def _get_chunking_timing_info(self, clip_name, clip_seconds, seconds_per_chunk):
+        sliding_window = math.ceil(clip_seconds)
+
+        if (sliding_window != clip_seconds):
+            print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}")
+        # sliding_window = 5
+        #
+        # if (sliding_window < clip_seconds + 5):
+        #     # need to extend the sliding window to overlap the clip
+        #     sliding_window = clip_seconds + 5
+        #     print(f"adjusted sliding_window to {sliding_window} for {clip_name}")
+
+        # this should not happen anyways because the seconds per chunk is too small
+        if (seconds_per_chunk < sliding_window * 2):
+            seconds_per_chunk = sliding_window * 10
+            raise ValueError(f"seconds_per_chunk {seconds_per_chunk} is too small")
+
+        return sliding_window
 
     def _get_clip_correlation(self, clip, clip_name):
         # Cross-correlate and normalize correlation
