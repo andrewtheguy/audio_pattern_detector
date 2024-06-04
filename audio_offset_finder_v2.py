@@ -31,7 +31,7 @@ from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
 from scipy.signal import resample
 from scipy.signal import find_peaks
-from sklearn.metrics import mean_absolute_error, mean_squared_error, median_absolute_error
+from sklearn.metrics import mean_squared_error, median_absolute_error, mean_absolute_error
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile, find_closest_troughs
@@ -182,6 +182,9 @@ def downsample_preserve_maxima(curve, num_samples):
     return np.array(compressed_curve)
 
 class AudioOffsetFinder:
+    SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
+    SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR = "mean_absolute_error"
+    SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
         self.clip_paths = clip_paths
         self.method = method
@@ -192,19 +195,16 @@ class AudioOffsetFinder:
         self.target_num_sample_after_resample = 101
         self.similarity_debug=defaultdict(list)
         self.areas_debug=defaultdict(list)
-        self.similarity_method = "mse"
-        if self.similarity_method == "mse":
-            self.similarity_threshold = 0.002
-            # for very short clip
-            #self.area_threshold=0.085
-            #self.very_short_clip_similarity_threshold = 0.01
-            ## lower threshold for conditional check on very short clip because the higher likelihood of false positives
-            ## check for area difference
-            #self.very_short_clip_similarity_threshold_conditional = 0.003
-        elif self.similarity_method == "mae": #median_absolute_error, a bit better for news report beep
-            self.similarity_threshold = 0.02
-        else:
-            raise ValueError("unknown similarity method")
+        self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
+        match self.similarity_method:
+            case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
+                self.similarity_threshold = 0.002
+            case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
+                self.similarity_threshold = 0.02
+            case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR: #median_absolute_error, a bit better for news report beep
+                self.similarity_threshold = 0.02
+            case _:
+                raise ValueError("unknown similarity method")
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -494,16 +494,6 @@ class AudioOffsetFinder:
 
         return peak_times_final
 
-    def _calculate_similarity(self, correlation_clip, correlation_slice):
-
-        if self.similarity_method == "mae":
-            similarity = median_absolute_error(correlation_clip, correlation_slice)
-        elif self.similarity_method == "mse":
-            similarity = mean_squared_error(correlation_clip, correlation_slice)
-        else:
-            raise ValueError("unknown similarity method")
-        return similarity
-
     def _calculate_area_of_overlap_ratio(self, correlation_clip, correlation_slice, downsampled_correlation_clip):
         downsampled_correlation_slice = downsample(correlation_slice, len(correlation_clip)//500)
 
@@ -650,25 +640,44 @@ class AudioOffsetFinder:
 
             quarter = len(correlation_clip) // 4
 
-            #if np.argmax(correlation_slice) != np.argmax(correlation_clip):
-            #    raise ValueError(f"peak {np.argmax(correlation_slice)} not aligned with the original clip {np.argmax(correlation_clip)}, potential bug in the middle of the chain")
+            if self.similarity_method == self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
 
-            similarity_quadrants = []
-            for i in range(4):
-                similarity_quadrants.append(self._calculate_similarity(correlation_slice=correlation_slice[i*quarter:(i+1)*quarter],
-                                                                      correlation_clip=correlation_clip[i*quarter:(i+1)*quarter]))
+                similarity_quadrants = []
+                for i in range(4):
+                    similarity_quadrants.append(mean_squared_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
 
-            similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
-            similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
-            similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                similarity_whole = (similarity_left + similarity_right) / 2
+                # clip the fat tails
+                if similarity_middle < similarity_whole:
+                    similarity = similarity_middle
+                else:
+                    similarity = similarity_whole
+                #similarity = min(similarity_left,similarity_middle,similarity_right)
+                #similarity = similarity_whole = (similarity_left + similarity_right)/2
+            elif self.similarity_method == self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
+                similarity_quadrants = []
+                for i in range(4):
+                    similarity_quadrants.append(mean_absolute_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
 
-
-            similarity = min(similarity_left,similarity_middle,similarity_right)
+                similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                similarity = similarity_whole = (similarity_left + similarity_right) / 2
+                #similarity = min(similarity_left,similarity_middle,similarity_right)
+            elif self.similarity_method == self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR:
+                similarity = median_absolute_error(correlation_slice,correlation_clip)
+                similarity_whole = similarity
+                similarity_left = 0
+                similarity_middle = 0
+                similarity_right = 0
+            else:
+                raise ValueError("unknown similarity method")
 
             if debug_mode:
                 print("similarity", similarity)
-
-                similarity_whole = (similarity_left + similarity_right) / 2
 
                 #if similarity <= 0.01:
                 similarities.append((similarity,{"whole":similarity_whole,
