@@ -217,10 +217,10 @@ class AudioOffsetFinder:
                 # loudness normalize audio to -16 dB LUFS
                 clip = pyln.normalize.loudness(clip, loudness, -16.0)
 
-                if self.debug_mode:
-                    audio_test_dir = f"./tmp/clip_audio_normalized"
-                    os.makedirs(audio_test_dir, exist_ok=True)
-                    sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
+                # if self.debug_mode:
+                #     audio_test_dir = f"./tmp/clip_audio_normalized"
+                #     os.makedirs(audio_test_dir, exist_ok=True)
+                #     sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
 
             correlation_clip,absolute_max = self._get_clip_correlation(clip, clip_name)
 
