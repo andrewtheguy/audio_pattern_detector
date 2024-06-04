@@ -202,25 +202,25 @@ class AudioOffsetFinder:
             sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
 
             if self.normalize:
-                max_loudness = np.max(np.abs(clip))
-                clip = clip / max_loudness
-                # clip_length = len(clip)
-                # sr = self.target_sample_rate
-                # #clip_second = clip_length / sr
-                #
-                # # normalize loudness
-                # if clip_seconds < 0.5:
-                #     meter = pyln.Meter(sr, block_size=clip_seconds)
-                # else:
-                #     meter = pyln.Meter(sr)  # create BS.1770 meter
-                # loudness = meter.integrated_loudness(clip)
-                #
-                # # loudness normalize audio to -16 dB LUFS
-                # clip = pyln.normalize.loudness(clip, loudness, -16.0)
-                #
-                audio_test_dir = f"./tmp/clip_audio_normalized"
-                os.makedirs(audio_test_dir, exist_ok=True)
-                sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
+                # max_loudness = np.max(np.abs(clip))
+                # clip = clip / max_loudness
+                sr = self.target_sample_rate
+                #clip_second = clip_length / sr
+
+                # normalize loudness
+                if clip_seconds < 0.5:
+                    meter = pyln.Meter(sr, block_size=clip_seconds)
+                else:
+                    meter = pyln.Meter(sr)  # create BS.1770 meter
+                loudness = meter.integrated_loudness(clip)
+
+                # loudness normalize audio to -16 dB LUFS
+                clip = pyln.normalize.loudness(clip, loudness, -16.0)
+
+                if self.debug_mode:
+                    audio_test_dir = f"./tmp/clip_audio_normalized"
+                    os.makedirs(audio_test_dir, exist_ok=True)
+                    sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
 
             correlation_clip,absolute_max = self._get_clip_correlation(clip, clip_name)
 
@@ -422,19 +422,26 @@ class AudioOffsetFinder:
             audio_section = np.concatenate((chunk, np.array([])))
 
         if self.normalize:
-            max_loudness = np.max(np.abs(audio_section))
-            audio_section = audio_section / max_loudness
-            # audio_section_seconds = len(audio_section) / sr
-            # #normalize loudness
-            # if audio_section_seconds < 0.5:
-            #     meter = pyln.Meter(sr, block_size=audio_section_seconds)
-            # else:
-            #     meter = pyln.Meter(sr)  # create BS.1770 meter
-            #
-            # loudness = meter.integrated_loudness(audio_section)
-            #
-            # # loudness normalize audio to -16 dB LUFS
-            # audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+            #max_loudness = np.max(np.abs(audio_section))
+            #audio_section = audio_section / max_loudness
+            audio_section_seconds = len(audio_section) / sr
+            #normalize loudness
+            if audio_section_seconds < 0.5:
+                # not sure if there are valid use cases for this
+                #raise ValueError("audio_section_seconds < 0.5 second")
+                meter = pyln.Meter(sr, block_size=audio_section_seconds)
+            else:
+                meter = pyln.Meter(sr)  # create BS.1770 meter
+
+            loudness = meter.integrated_loudness(audio_section)
+
+            # loudness normalize audio to -16 dB LUFS
+            audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+            # if self.debug_mode:
+            #     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+            #     audio_test_dir = f"./tmp/audio_section_normalized"
+            #     os.makedirs(audio_test_dir, exist_ok=True)
+            #     sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}.wav", audio_section, self.target_sample_rate)
 
 
         # if debug_mode:
