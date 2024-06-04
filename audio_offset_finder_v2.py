@@ -360,15 +360,18 @@ class AudioOffsetFinder:
                 x_coords = []
                 y_coords = []
 
-                for index,arr in enumerate(self.similarity_debug[clip_name]):
-                    for item in arr:
-                        #if item <= 0.02:
-                        x_coords.append(index)
-                        y_coords.append(item)
+                for index,similarity in self.similarity_debug[clip_name]:
+                    x_coords.append(index)
+                    y_coords.append(similarity)
 
                 plt.figure(figsize=(10, 4))
                 # Create scatter plot
                 plt.scatter(x_coords, y_coords)
+
+                if np.max(y_coords) > 0.005:
+                    ylimit = max(0.01, np.median(y_coords))
+                    # Set the y limits
+                    plt.ylim(0, ylimit)
 
                 # Adding titles and labels
                 plt.title('Scatter Plot for Similarity')
@@ -618,7 +621,9 @@ class AudioOffsetFinder:
 
         # for debugging
         similarities = []
+        peaks_debug=[]
         correlation_slices = []
+        seconds = []
 
         for peak in peaks:
             after = peak + len(correlation_clip)//2
@@ -666,7 +671,13 @@ class AudioOffsetFinder:
                 similarity_whole = (similarity_left + similarity_right) / 2
 
                 #if similarity <= 0.01:
-                similarities.append((similarity,similarity_whole,similarity_left,similarity_middle,similarity_right,))
+                similarities.append((similarity,{"whole":similarity_whole,
+                                                 "left":similarity_left,
+                                                 "middle":similarity_middle,
+                                                 "right":similarity_right,
+                                                 "left_right_diff": abs(similarity_left-similarity_right),
+                                                 }))
+                peaks_debug.append(peak)
                 correlation_slices.append(correlation_slice)
 
             if similarity > self.similarity_threshold:
@@ -677,14 +688,14 @@ class AudioOffsetFinder:
                 if one_shot:
                     break
 
-        if debug_mode:
-            filtered_similarities = []
-            for i,peak in enumerate(peaks_final):
+        if debug_mode and len(peaks_debug) > 0:
+            for i,peak in enumerate(peaks_debug):
                 similarity = similarities[i][0]
                 correlation_slice = correlation_slices[i]
+                seconds.append(peak / sr)
+                self.similarity_debug[clip_name].append((index,similarity,))
                 graph_max = 0.01
                 if similarity <= graph_max:
-                    filtered_similarities.append(similarity)
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
 
@@ -699,58 +710,12 @@ class AudioOffsetFinder:
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                     plt.close()
 
-            if len(filtered_similarities) > 0:
-                peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
-                os.makedirs(peak_dir, exist_ok=True)
-                seconds=[]
-                #distances = []
+            peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
+            os.makedirs(peak_dir, exist_ok=True)
 
-                area_props=[]
-                for i,item in enumerate(peaks):
-                    seconds.append(item / sr)
-                #    correlation_slice = correlation_slices[i]
-                #
-                #
-                #     area_ratio,props = self._calculate_area_of_overlap_ratio(correlation_clip,
-                #                                                             correlation_slice,
-                #                                                              downsampled_correlation_clip)
-                #
-                #     #clip_within_peak = props["clip_within_peak"]
-                #     #correlation_slice_within_peak = props["correlation_slice_within_peak"]
-                #
-                #     downsampled_correlation_slice = props["downsampled_correlation_slice"]
-                #     area_props.append(props["area_props"])
-                #     new_left = props["new_left"]
-                #     new_right = props["new_right"]
-                #
-                #
-                #     graph_dir = f"./tmp/graph/cross_correlation_slice_downsampled/{clip_name}"
-                #     os.makedirs(graph_dir, exist_ok=True)
-                #
-                #     plt.figure(figsize=(10, 4))
-                #     plt.plot(downsampled_correlation_slice)
-                #     plt.plot(downsampled_correlation_clip)
-                #     plt.title('Cross-correlation between the audio clip and full track after slicing')
-                #     plt.xlabel('Lag')
-                #     plt.ylabel('Correlation coefficient')
-                #     plt.savefig(
-                #         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{item}.png')
-                #     plt.close()
-                #
-                #     areas.append(area_ratio)
-
-                print(json.dumps({"peaks":peaks,"seconds":seconds,
-                                  #"areas":areas,
-                                  "area_props":area_props,
-                                  #"pdc":pdc,
-                                  #"peak_profiles":peak_profiles,
-                                  #"pds":pds,
-                                  #"properties":properties,
-                                  #"new_left":new_left,
-                                  #"new_right":new_right,
-                                  "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
-            self.similarity_debug[clip_name].append(filtered_similarities)
-            #self.areas_debug[clip_name].append(areas)
+            print(json.dumps({"peaks":peaks,"seconds":seconds,
+                              #"area_props":area_props,
+                              "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
             print(f"---")
 
