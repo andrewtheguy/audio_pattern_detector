@@ -353,7 +353,7 @@ class AudioOffsetFinder:
 
         suffix = Path(full_audio_path).stem
 
-        if self.debug_mode and (self.method == "correlation" or self.method == "non_repeating_correlation"):
+        if self.debug_mode and self.method == "correlation":
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
 
@@ -474,11 +474,11 @@ class AudioOffsetFinder:
         #         f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.wav",
         #         audio_section, sr)
 
-        if self.method == "correlation" or self.method == "non_repeating_correlation":
+        if self.method == "correlation":
 
             # samples_skip_end does not skip results from being included yet
             peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                  seconds_per_chunk=seconds_per_chunk, one_shot=self.method == "non_repeating_correlation",
+                                                  seconds_per_chunk=seconds_per_chunk,
                                                   )
 
         else:
@@ -563,8 +563,7 @@ class AudioOffsetFinder:
 
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
-    # one_shot = True will only return the first match
-    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk, one_shot=False):
+    def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max = (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
         debug_mode = self.debug_mode
@@ -709,8 +708,6 @@ class AudioOffsetFinder:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
             else:
                 peaks_final.append(peak)
-                if one_shot:
-                    break
 
         if debug_mode and len(peaks_debug) > 0:
             for i,peak in enumerate(peaks_debug):

@@ -141,7 +141,7 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
 
     #correlation_threshold_news_report = 0.7
     news_report_clip_peak_times = AudioOffsetFinder(clip_paths=clip_paths_news_report,
-                                                    method="non_repeating_correlation",
+                                                    method=DEFAULT_METHOD,
                                                     ).find_clip_in_audio(full_audio_path=input_file)
 
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
