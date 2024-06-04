@@ -26,7 +26,7 @@ from publish import publish_folder
 from scrape_utils import concatenate_audio, split_audio_by_time_sequences
 from utils import get_ffprobe_info
 
-# clips should be non-repeating because I am using the non-repeat method, too much headache to deal with repeating clips
+# clips should be non-repeating
 
 # for those I grabbed myself
 ripped_streams={
@@ -143,7 +143,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
 
         program_intro_peak_times=[]
 
-        peaks_all = AudioOffsetFinder(method="non_repeating_correlation", debug_mode=False,
+        peaks_all = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
                                        clip_paths=clip_paths).find_clip_in_audio(
             full_audio_path=input_file)
 
