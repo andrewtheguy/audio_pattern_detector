@@ -185,6 +185,7 @@ class AudioOffsetFinder:
     SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
     SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR = "mean_absolute_error"
     SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"
+    #SIMILARITY_METHOD_TEST = "test"
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
         self.clip_paths = clip_paths
         self.method = method
@@ -203,6 +204,9 @@ class AudioOffsetFinder:
                 self.similarity_threshold = 0.02
             case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR: #median_absolute_error, a bit better for news report beep
                 self.similarity_threshold = 0.02
+            # case self.SIMILARITY_METHOD_TEST:
+            #     #test
+            #     self.similarity_threshold = 0.02
             case _:
                 raise ValueError("unknown similarity method")
 
@@ -368,10 +372,15 @@ class AudioOffsetFinder:
                 # Create scatter plot
                 plt.scatter(x_coords, y_coords)
 
-                if len(y_coords) > 0 and np.max(y_coords) > 0.005:
+                if self.similarity_method == self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR and len(y_coords) > 0 and np.max(y_coords) > 0.005:
                     ylimit = max(0.01, np.median(y_coords))
                     # Set the y limits
                     plt.ylim(0, ylimit)
+                elif len(y_coords) > 10:
+                    ylimit = np.median(y_coords)
+                    # Set the y limits
+                    plt.ylim(0, ylimit)
+
 
                 # Adding titles and labels
                 plt.title('Scatter Plot for Similarity')
@@ -640,41 +649,47 @@ class AudioOffsetFinder:
 
             quarter = len(correlation_clip) // 4
 
-            if self.similarity_method == self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
+            match self.similarity_method:
+                case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
+                    similarity_quadrants = []
+                    for i in range(4):
+                        similarity_quadrants.append(mean_squared_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
 
-                similarity_quadrants = []
-                for i in range(4):
-                    similarity_quadrants.append(mean_squared_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
+                    similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                    similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                    similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                    similarity_whole = (similarity_left + similarity_right) / 2
+                    # clip the fat tails
+                    if similarity_middle < similarity_whole:
+                        similarity = similarity_middle
+                    else:
+                        similarity = similarity_whole
+                    #similarity = min(similarity_left,similarity_middle,similarity_right)
+                    #similarity = similarity_whole = (similarity_left + similarity_right)/2
+                case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
+                    similarity_quadrants = []
+                    for i in range(4):
+                        similarity_quadrants.append(mean_absolute_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
 
-                similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
-                similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
-                similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
-                similarity_whole = (similarity_left + similarity_right) / 2
-                # clip the fat tails
-                if similarity_middle < similarity_whole:
-                    similarity = similarity_middle
-                else:
-                    similarity = similarity_whole
-                #similarity = min(similarity_left,similarity_middle,similarity_right)
-                #similarity = similarity_whole = (similarity_left + similarity_right)/2
-            elif self.similarity_method == self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
-                similarity_quadrants = []
-                for i in range(4):
-                    similarity_quadrants.append(mean_absolute_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
-
-                similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
-                similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
-                similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
-                similarity = similarity_whole = (similarity_left + similarity_right) / 2
-                #similarity = min(similarity_left,similarity_middle,similarity_right)
-            elif self.similarity_method == self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR:
-                similarity = median_absolute_error(correlation_slice,correlation_clip)
-                similarity_whole = similarity
-                similarity_left = 0
-                similarity_middle = 0
-                similarity_right = 0
-            else:
-                raise ValueError("unknown similarity method")
+                    similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                    similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                    similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                    similarity = similarity_whole = (similarity_left + similarity_right) / 2
+                    #similarity = min(similarity_left,similarity_middle,similarity_right)
+                case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR:
+                    similarity = median_absolute_error(correlation_slice,correlation_clip)
+                    similarity_whole = similarity
+                    similarity_left = 0
+                    similarity_middle = 0
+                    similarity_right = 0
+                # case self.SIMILARITY_METHOD_TEST:
+                #     similarity = test_sim(correlation_slice,correlation_clip)
+                #     similarity_whole = similarity
+                #     similarity_left = 0
+                #     similarity_middle = 0
+                #     similarity_right = 0
+                case _:
+                    raise ValueError("unknown similarity method")
 
             if debug_mode:
                 print("similarity", similarity)
