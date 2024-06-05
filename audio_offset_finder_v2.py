@@ -135,7 +135,7 @@ class AudioOffsetFinder:
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = 8000
-        #self.target_num_sample_after_resample = 101
+        self.target_num_sample_after_resample = 1001
         self.similarity_debug=defaultdict(list)
         self.max_distance_debug=defaultdict(list)
         #self.areas_debug=defaultdict(list)
@@ -242,8 +242,10 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}.png')
                 plt.close()
 
-            #downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
+            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
             #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
+            #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
+            #exit(1)
 
             # if self.debug_mode:
             #     print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
@@ -265,7 +267,7 @@ class AudioOffsetFinder:
                                      "sliding_window":sliding_window,
                                      "correlation_clip":correlation_clip,
                                      "correlation_clip_absolute_max":absolute_max,
-                                     #"downsampled_correlation_clip":downsampled_correlation_clip,
+                                     "downsampled_correlation_clip":downsampled_correlation_clip,
                                      }
 
 
@@ -333,30 +335,6 @@ class AudioOffsetFinder:
 
                 # Adding titles and labels
                 plt.title('Scatter Plot for Similarity')
-                plt.xlabel('Value')
-                plt.ylabel('Sublist Index')
-                plt.savefig(
-                    f'{graph_dir}/{suffix}.png')
-                plt.close()
-
-                # distance debug
-                graph_dir = f"./tmp/graph/{self.method}_distance_{self.similarity_method}/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                x_coords = []
-                y_coords = []
-
-                for index,item in self.similarity_debug[clip_name]:
-                        #if item <= 0.02:
-                        x_coords.append(index)
-                        y_coords.append(item)
-
-                plt.figure(figsize=(10, 4))
-                # Create scatter plot
-                plt.scatter(x_coords, y_coords)
-
-                # Adding titles and labels
-                plt.title('Scatter Plot for max distance')
                 plt.xlabel('Value')
                 plt.ylabel('Sublist Index')
                 plt.savefig(
@@ -548,8 +526,10 @@ class AudioOffsetFinder:
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
-        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
+        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max,\
+            downsampled_correlation_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max",
+                       "downsampled_correlation_clip")(clip_data))
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
@@ -632,25 +612,39 @@ class AudioOffsetFinder:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             # downsample
-            factor = len(correlation_clip) // 500
+            downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
 
-            quarter = len(correlation_clip) // 4
+            partition_count = 10
+            partition_size = len(correlation_clip) // partition_count
+            #quarter = len(downsampled_correlation_clip) // 4
 
             match self.similarity_method:
                 case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
-                    similarity_quadrants = []
-                    for i in range(4):
-                        similarity_quadrants.append(mean_squared_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
+                    similarity_partitions=[]
+                    for i in range(partition_count):
+                        similarity_partitions.append(mean_squared_error(correlation_clip[i*partition_size:(i+1)*partition_size],
+                                                                       correlation_slice[i*partition_size:(i+1)*partition_size]))
 
-                    similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
-                    similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
-                    similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
-                    similarity_whole = (similarity_left + similarity_right) / 2
-                    # clip the fat tails
-                    if similarity_middle < similarity_whole:
-                        similarity = similarity_middle
-                    else:
-                        similarity = similarity_whole
+                    # similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                    # similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                    # similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                    # similarity_whole = (similarity_left + similarity_right) / 2
+                    # # clip the fat tails
+                    # if similarity_middle < similarity_whole:
+                    #     similarity = similarity_middle
+                    # else:
+                    #     similarity = similarity_whole
+
+                    # real distortions happen in the middle most of the time except for news report beep
+                    similarity_middle = np.mean(similarity_partitions[4:6])
+                    similarity_whole = np.mean(similarity_partitions)
+                    similarity_left = 0
+                    #similarity_middle = 0
+                    similarity_right = 0
+
+                    similarity = similarity_middle
+                    #similarity = min(similarity_whole,similarity_middle)
+
                     #similarity = min(similarity_left,similarity_middle,similarity_right)
                     #similarity = similarity_whole = (similarity_left + similarity_right)/2
                 case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
@@ -664,7 +658,7 @@ class AudioOffsetFinder:
                     similarity = similarity_whole = (similarity_left + similarity_right) / 2
                     #similarity = min(similarity_left,similarity_middle,similarity_right)
                 case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR:
-                    similarity = median_absolute_error(correlation_slice,correlation_clip)
+                    similarity = median_absolute_error(correlation_clip,correlation_slice)
                     similarity_whole = similarity
                     similarity_left = 0
                     similarity_middle = 0
@@ -689,24 +683,10 @@ class AudioOffsetFinder:
                                                  "left_right_diff": abs(similarity_left-similarity_right),
                                                  }))
                 peaks_debug.append(peak)
-                correlation_slices.append(correlation_slice)
+                correlation_slices.append(downsampled_correlation_slice)
 
             if similarity <= self.similarity_threshold:
                 peaks_final.append(peak)
-            elif is_news_report_beep and self.similarity_method == self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR and similarity <= 0.01:
-                downsampled_correlation_clip = downsample(correlation_clip, factor)
-                downsampled_correlation_slice = downsample(correlation_slice, factor)
-                new_sim = mean_squared_error(downsampled_correlation_clip, downsampled_correlation_slice)
-                #max_distance,max_distance_index = self._get_max_distance(downsampled_correlation_clip, downsampled_correlation_slice)
-                if new_sim < self.similarity_threshold:
-                    if debug_mode:
-                        print(
-                            f"news report beep failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}, but still adding due to new_sim {new_sim} after downsample")
-                    peaks_final.append(peak)
-                else:
-                    if debug_mode:
-                        print(f"news report beep failed verification for {section_ts} due to similarity {similarity} and max_distance {new_sim} >= 0.1")
-
             else:
                 if debug_mode:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
@@ -726,7 +706,7 @@ class AudioOffsetFinder:
                     # Optional: plot the correlation graph to visualize
                     plt.figure(figsize=(10, 4))
                     plt.plot(correlation_slice)
-                    plt.plot(correlation_clip, alpha=0.7)
+                    plt.plot(downsampled_correlation_clip, alpha=0.7)
                     plt.title('Cross-correlation between the audio clip and full track before slicing')
                     plt.xlabel('Lag')
                     plt.ylabel('Correlation coefficient')
