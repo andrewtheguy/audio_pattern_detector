@@ -137,6 +137,7 @@ class AudioOffsetFinder:
         self.target_sample_rate = 8000
         #self.target_num_sample_after_resample = 101
         self.similarity_debug=defaultdict(list)
+        self.max_distance_debug=defaultdict(list)
         #self.areas_debug=defaultdict(list)
         self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
         match self.similarity_method:
@@ -338,30 +339,29 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{suffix}.png')
                 plt.close()
 
-                # ares debug
-                # graph_dir = f"./tmp/graph/{self.method}_area_{self.similarity_method}/{clip_name}"
-                # os.makedirs(graph_dir, exist_ok=True)
-                #
-                # x_coords = []
-                # y_coords = []
-                #
-                # for index,arr in enumerate(self.areas_debug[clip_name]):
-                #     for item in arr:
-                #         #if item <= 0.02:
-                #         x_coords.append(index)
-                #         y_coords.append(item)
-                #
-                # plt.figure(figsize=(10, 4))
-                # # Create scatter plot
-                # plt.scatter(x_coords, y_coords)
-                #
-                # # Adding titles and labels
-                # plt.title('Scatter Plot for Areas')
-                # plt.xlabel('Value')
-                # plt.ylabel('Sublist Index')
-                # plt.savefig(
-                #     f'{graph_dir}/{suffix}.png')
-                # plt.close()
+                # distance debug
+                graph_dir = f"./tmp/graph/{self.method}_distance_{self.similarity_method}/{clip_name}"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                x_coords = []
+                y_coords = []
+
+                for index,item in self.similarity_debug[clip_name]:
+                        #if item <= 0.02:
+                        x_coords.append(index)
+                        y_coords.append(item)
+
+                plt.figure(figsize=(10, 4))
+                # Create scatter plot
+                plt.scatter(x_coords, y_coords)
+
+                # Adding titles and labels
+                plt.title('Scatter Plot for max distance')
+                plt.xlabel('Value')
+                plt.ylabel('Sublist Index')
+                plt.savefig(
+                    f'{graph_dir}/{suffix}.png')
+                plt.close()
 
         process.wait()
 
@@ -537,6 +537,14 @@ class AudioOffsetFinder:
             "area_props":props,
         }
 
+    def _get_max_distance(self, downsampled_correlation_clip, downsampled_correlation_slice,):
+        distances = np.abs(downsampled_correlation_clip-downsampled_correlation_slice)
+        max_distance_index = np.argmax(distances)
+        max_distance = distances[max_distance_index]
+
+        return max_distance,max_distance_index
+
+
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
@@ -614,6 +622,7 @@ class AudioOffsetFinder:
                 logger.warning(f"peak {peak} before is {before} < -2, skipping")
                 continue
 
+            is_news_report_beep = clip_name == "rthk_beep"
 
             # slice
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
@@ -621,6 +630,9 @@ class AudioOffsetFinder:
 
             if len(correlation_slice) != len(correlation_clip):
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
+
+            # downsample
+            factor = len(correlation_clip) // 500
 
             quarter = len(correlation_clip) // 4
 
@@ -679,11 +691,26 @@ class AudioOffsetFinder:
                 peaks_debug.append(peak)
                 correlation_slices.append(correlation_slice)
 
-            if similarity > self.similarity_threshold:
+            if similarity <= self.similarity_threshold:
+                peaks_final.append(peak)
+            elif is_news_report_beep and self.similarity_method == self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR and similarity <= 0.01:
+                downsampled_correlation_clip = downsample(correlation_clip, factor)
+                downsampled_correlation_slice = downsample(correlation_slice, factor)
+                new_sim = mean_squared_error(downsampled_correlation_clip, downsampled_correlation_slice)
+                #max_distance,max_distance_index = self._get_max_distance(downsampled_correlation_clip, downsampled_correlation_slice)
+                if new_sim < self.similarity_threshold:
+                    if debug_mode:
+                        print(
+                            f"news report beep failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}, but still adding due to new_sim {new_sim} after downsample")
+                    peaks_final.append(peak)
+                else:
+                    if debug_mode:
+                        print(f"news report beep failed verification for {section_ts} due to similarity {similarity} and max_distance {new_sim} >= 0.1")
+
+            else:
                 if debug_mode:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
-            else:
-                peaks_final.append(peak)
+
 
         if debug_mode and len(peaks_debug) > 0:
             for i,peak in enumerate(peaks_debug):
