@@ -282,23 +282,11 @@ def scrape(input_file, stream_name, output_dir_trimmed):
 
         pair = process_timestamps_rthk(news_report_peak_times, program_intro_peak_times,total_time,backup_intro_ts=backup_intro_peak_times,allow_first_short=allow_first_short,news_report_second_pad=news_report_second_pad,news_report_strategy=news_report_strategy)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
-        print("final sequences",tsformatted)
-        duration = [seconds_to_time(t[1]-t[0]) for t in pair]
-        distance_endings=[]
-        for i in range(1,len(pair)):
-            distance_endings.append(seconds_to_time(pair[i][1]-pair[i-1][1]))
+        peaks_save = [(clip_name, [seconds_to_time(seconds=t,include_decimals=True) for t in peaks]) for clip_name,peaks in intro_clip_peak_times.items()]
         with open(jsonfile,'w') as f:
-            #print("jsonfile",jsonfile)
-            content = json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"distance_endings":distance_endings}, indent=4)
-            #print(content)
-            f.write(content)
+            f.write(json.dumps({"tsformatted": tsformatted,"intro_clip_peak_times":peaks_save}, indent=4, ensure_ascii=False))
 
     pair = [[time_to_seconds(t) for t in sublist] for sublist in tsformatted]
-
-    #if upload_json:
-    #    upload_file(jsonfile,f"/rthk/original/{show_name}/{os.path.basename(input_file)}.json",skip_if_exists=True)
-    
-    #save_timestamps_to_db(show_name,date_str,segments=tsformatted)
 
     output_file_trimmed = os.path.join(output_dir_trimmed,f"{basename}_trimmed{extension}")
 
@@ -451,12 +439,12 @@ if __name__ == '__main__':
             for input_file in glob.glob(os.path.join(audio_folder, "*.m4a")):
                 stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
                 output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
-                scrape(input_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name, upload_json=False)
+                scrape(input_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name)
         else:        
             input_file = args.audio_file
             stream_name = extract_prefix(os.path.split(input_file)[-1])[0]
             output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
-            scrape(input_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name, upload_json=False)
+            scrape(input_file, output_dir_trimmed=output_dir_trimmed, stream_name=stream_name)
     elif(args.action == 'download'):
         download_rthk()
     elif(args.action == 'process_podcasts'):
