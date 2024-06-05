@@ -129,7 +129,7 @@ class AudioOffsetFinder:
     SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"
     #SIMILARITY_METHOD_TEST = "test"
 
-    # won't work well for short clips
+    # won't work well for short clips because false positives get low similarity
     clip_properties = {
         "受之有道outro": {
             # triangular shape at the bottom occupying large area
@@ -142,6 +142,7 @@ class AudioOffsetFinder:
         "rthk_beep": {
             # won't partition if downsample
             "downsample": True,
+            "no_partition": True,
         },
     }
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
@@ -573,6 +574,7 @@ class AudioOffsetFinder:
         clip_properties = self.clip_properties.get(clip_name, {})
         do_downsample = clip_properties.get("downsample", False)
         mean_squared_error_similarity_threshold = clip_properties.get("mean_square_error_similarity_threshold", self.similarity_threshold)
+        no_partition = clip_properties.get("no_partition", False)
 
         debug_mode = self.debug_mode
 
@@ -654,6 +656,8 @@ class AudioOffsetFinder:
 
             # downsample
             if do_downsample:
+                if not no_partition:
+                    raise ValueError("does not support downsampled clips with partitioning yet")
                 #correlation_clip = downsampled_correlation_clip
                 downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
                 if self.similarity_method != self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
