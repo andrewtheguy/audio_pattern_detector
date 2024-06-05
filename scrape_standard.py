@@ -70,6 +70,8 @@ ripped_streams={
         "endingclips": ["am1430/temple_bell.wav",
                         "am1430/programsponsoredby2.wav",
                         "am1430/programsponsoredby3.wav",
+                        "am1430/trafficendsponsor.wav",
+                        "am1430/wholecityjump.wav",
                         "am1430/thankyouwatchingsunset.wav"],
         #"endingclips": [],
         "ends_with_intro": False,
