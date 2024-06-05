@@ -140,10 +140,50 @@ class TestProcessSingleIntro(unittest.TestCase):
                                         [minutes_to_seconds(30),minutes_to_seconds(40)],
                                        ])
 
+    def test_segment_count_range(self):
+        result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30)],
+                              endings=[minutes_to_seconds(20),minutes_to_seconds(40)],expected_num_segments=[2,3])
+        np.testing.assert_array_equal(result,
+                                      [
+                                        [minutes_to_seconds(3),minutes_to_seconds(20)],
+                                        [minutes_to_seconds(30),minutes_to_seconds(40)],
+                                       ])
+
+        result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30),minutes_to_seconds(50)],
+                              endings=[minutes_to_seconds(20),minutes_to_seconds(40),minutes_to_seconds(60)],expected_num_segments=[2,3])
+        np.testing.assert_array_equal(result,
+                                      [
+                                        [minutes_to_seconds(3),minutes_to_seconds(20)],
+                                        [minutes_to_seconds(30),minutes_to_seconds(40)],
+                                        [minutes_to_seconds(50),minutes_to_seconds(60)],
+                                       ])
+
+        result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30),minutes_to_seconds(50)],
+                              endings=[minutes_to_seconds(20),minutes_to_seconds(40),minutes_to_seconds(60)],expected_num_segments=[2,5])
+        np.testing.assert_array_equal(result,
+                                      [
+                                        [minutes_to_seconds(3),minutes_to_seconds(20)],
+                                        [minutes_to_seconds(30),minutes_to_seconds(40)],
+                                        [minutes_to_seconds(50),minutes_to_seconds(60)],
+                                       ])
+
     def test_unexpected_segment_count(self):
         with self.assertRaises(TimeSequenceError) as cm:
             result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30)],
                                 endings=[minutes_to_seconds(20),minutes_to_seconds(40)],expected_num_segments=3)
+        the_exception = cm.exception
+        self.assertIn("segments, got",str(the_exception))
+
+    def test_unexpected_segment_count_range(self):
+        with self.assertRaises(TimeSequenceError) as cm:
+            result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30)],
+                                endings=[minutes_to_seconds(20),minutes_to_seconds(40)],expected_num_segments=[3,6])
+        the_exception = cm.exception
+        self.assertIn("segments, got",str(the_exception))
+
+        with self.assertRaises(TimeSequenceError) as cm:
+            result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30),minutes_to_seconds(50),minutes_to_seconds(70),minutes_to_seconds(90)],
+                                        endings=[minutes_to_seconds(20),minutes_to_seconds(40),minutes_to_seconds(60),minutes_to_seconds(80),minutes_to_seconds(100)],expected_num_segments=[3,4])
         the_exception = cm.exception
         self.assertIn("segments, got",str(the_exception))
 

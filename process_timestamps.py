@@ -1,3 +1,4 @@
+import numbers
 from collections import deque
 import copy
 import logging
@@ -594,8 +595,16 @@ def process_timestamps_simple(intros,endings,total_time,expected_num_segments=No
 
     #print([[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in time_sequences])
 
-    if(expected_num_segments and len(time_sequences) != expected_num_segments):
-        raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
+    if expected_num_segments:
+        #print("expected_num_segments...............",type(expected_num_segments),isinstance(expected_num_segments, int))
+        if isinstance(expected_num_segments, int):
+            if len(time_sequences) != expected_num_segments:
+                raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
+        elif isinstance(expected_num_segments, list):
+            if len(time_sequences) not in range(expected_num_segments[0],expected_num_segments[1]+1):
+                raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
+        else:
+            raise ValueError("invalid expected_num_segments type")
 
     timestamp_sanity_check(time_sequences,total_time=total_time)
 
