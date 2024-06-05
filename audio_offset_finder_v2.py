@@ -135,9 +135,9 @@ class AudioOffsetFinder:
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = 8000
-        self.target_num_sample_after_resample = 1001
+        self.target_num_sample_after_resample = 101
         self.similarity_debug=defaultdict(list)
-        self.max_distance_debug=defaultdict(list)
+        #self.max_distance_debug=defaultdict(list)
         #self.areas_debug=defaultdict(list)
         self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
         match self.similarity_method:
@@ -336,7 +336,6 @@ class AudioOffsetFinder:
                     # Set the y limits
                     plt.ylim(0, ylimit)
 
-
                 # Adding titles and labels
                 plt.title('Scatter Plot for Similarity')
                 plt.xlabel('Value')
@@ -344,6 +343,29 @@ class AudioOffsetFinder:
                 plt.savefig(
                     f'{graph_dir}/{suffix}.png')
                 plt.close()
+
+                # # distance debug
+                # graph_dir = f"./tmp/graph/{self.method}_distance_{self.similarity_method}/{clip_name}"
+                # os.makedirs(graph_dir, exist_ok=True)
+                #
+                # x_coords = []
+                # y_coords = []
+                #
+                # for index,distance,distance_index in self.max_distance_debug[clip_name]:
+                #     x_coords.append(index)
+                #     y_coords.append(distance)
+                #
+                # plt.figure(figsize=(10, 4))
+                # # Create scatter plot
+                # plt.scatter(x_coords, y_coords)
+                #
+                # # Adding titles and labels
+                # plt.title('Scatter Plot for Distance')
+                # plt.xlabel('Value')
+                # plt.ylabel('Sublist Index')
+                # plt.savefig(
+                #     f'{graph_dir}/{suffix}.png')
+                # plt.close()
 
         process.wait()
 
@@ -588,9 +610,8 @@ class AudioOffsetFinder:
 
         # for debugging
         similarities = []
-        peaks_debug=[]
-        correlation_slices = []
         seconds = []
+        #distances = []
 
         for peak in peaks:
             after = peak + len(correlation_clip)//2
@@ -626,6 +647,9 @@ class AudioOffsetFinder:
                 similarity_left = 0
                 similarity_middle = 0
                 similarity_right = 0
+                #max_distance, max_distance_index = self._get_max_distance(downsampled_correlation_clip, downsampled_correlation_slice)
+                #self.max_distance_debug[clip_name].append((index, max_distance, max_distance_index,))
+                #distances.append((max_distance, max_distance_index,))
             else:
                 partition_count = 10
                 partition_size = len(correlation_clip) // partition_count
@@ -647,6 +671,11 @@ class AudioOffsetFinder:
                         #     similarity = similarity_middle
                         # else:
                         #     similarity = similarity_whole
+
+                        correlation_clip_middle = correlation_clip[4*partition_size:6*partition_size]
+                        section_slice_middle = correlation_slice[4*partition_size:6*partition_size]
+                        #max_distance,max_distance_index = self._get_max_distance(correlation_clip_middle, section_slice_middle)
+                        #self.max_distance_debug[clip_name].append((index, max_distance, max_distance_index,))
 
                         # real distortions happen in the middle most of the time except for news report beep
                         similarity_middle = np.mean(similarity_partitions[4:6])
@@ -728,6 +757,7 @@ class AudioOffsetFinder:
 
             print(json.dumps({"peaks": peaks, "seconds": seconds,
                               # "area_props":area_props,
+                              #"distances": distances,
                               "similarities": similarities}, indent=2, cls=NumpyEncoder),
                   file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
