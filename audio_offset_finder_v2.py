@@ -530,12 +530,10 @@ class AudioOffsetFinder:
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
     def _correlation_method(self, clip_data, audio_section, sr, index, seconds_per_chunk):
-        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
+        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max, downsampled_correlation_clip= (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","downsampled_correlation_clip")(clip_data))
 
         is_news_report_beep = clip_name == "rthk_beep"
-        if is_news_report_beep:
-            return self._correlation_method_single_beep(clip_data, audio_section, sr, index, seconds_per_chunk)
 
         debug_mode = self.debug_mode
 
@@ -617,93 +615,83 @@ class AudioOffsetFinder:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             # downsample
-            #downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
+            if is_news_report_beep:
+                #correlation_clip = downsampled_correlation_clip
+                downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
+                if self.similarity_method != self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
+                    raise ValueError("only mean_squared_error is supported for news report beep")
+                similarity = mean_squared_error(downsampled_correlation_clip, downsampled_correlation_slice)
+                #similarity_middle = np.mean(similarity_partitions[4:6])
+                similarity_whole = similarity
+                similarity_left = 0
+                similarity_middle = 0
+                similarity_right = 0
+            else:
+                partition_count = 10
+                partition_size = len(correlation_clip) // partition_count
+                #quarter = len(downsampled_correlation_clip) // 4
 
-            partition_count = 10
-            partition_size = len(correlation_clip) // partition_count
-            #quarter = len(downsampled_correlation_clip) // 4
+                match self.similarity_method:
+                    case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
+                        similarity_partitions=[]
+                        for i in range(partition_count):
+                            similarity_partitions.append(mean_squared_error(correlation_clip[i*partition_size:(i+1)*partition_size],
+                                                                           correlation_slice[i*partition_size:(i+1)*partition_size]))
 
-            match self.similarity_method:
-                case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
-                    similarity_partitions=[]
-                    for i in range(partition_count):
-                        similarity_partitions.append(mean_squared_error(correlation_clip[i*partition_size:(i+1)*partition_size],
-                                                                       correlation_slice[i*partition_size:(i+1)*partition_size]))
+                        # similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                        # similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                        # similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                        # similarity_whole = (similarity_left + similarity_right) / 2
+                        # # clip the fat tails
+                        # if similarity_middle < similarity_whole:
+                        #     similarity = similarity_middle
+                        # else:
+                        #     similarity = similarity_whole
 
-                    # similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
-                    # similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
-                    # similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
-                    # similarity_whole = (similarity_left + similarity_right) / 2
-                    # # clip the fat tails
-                    # if similarity_middle < similarity_whole:
-                    #     similarity = similarity_middle
-                    # else:
-                    #     similarity = similarity_whole
+                        # real distortions happen in the middle most of the time except for news report beep
+                        similarity_middle = np.mean(similarity_partitions[4:6])
+                        similarity_whole = np.mean(similarity_partitions)
+                        similarity_left = 0
+                        #similarity_middle = 0
+                        similarity_right = 0
 
-                    # real distortions happen in the middle most of the time except for news report beep
-                    similarity_middle = np.mean(similarity_partitions[4:6])
-                    similarity_whole = np.mean(similarity_partitions)
-                    similarity_left = 0
-                    #similarity_middle = 0
-                    similarity_right = 0
+                        #similarity = similarity_middle
+                        similarity = min(similarity_whole,similarity_middle)
 
-                    #similarity = similarity_middle
-                    similarity = min(similarity_whole,similarity_middle)
-
-                    #similarity = min(similarity_left,similarity_middle,similarity_right)
-                    #similarity = similarity_whole = (similarity_left + similarity_right)/2
-                case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
-                    raise NotImplementedError("mean_absolute_error not implemented")
-                    # similarity_quadrants = []
-                    # for i in range(4):
-                    #     similarity_quadrants.append(mean_absolute_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
-                    #
-                    # similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
-                    # similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
-                    # similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
-                    # similarity = similarity_whole = (similarity_left + similarity_right) / 2
-                    #similarity = min(similarity_left,similarity_middle,similarity_right)
-                case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR:
-                    similarity = median_absolute_error(correlation_clip,correlation_slice)
-                    similarity_whole = similarity
-                    similarity_left = 0
-                    similarity_middle = 0
-                    similarity_right = 0
-                # case self.SIMILARITY_METHOD_TEST:
-                #     similarity = test_sim(correlation_slice,correlation_clip)
-                #     similarity_whole = similarity
-                #     similarity_left = 0
-                #     similarity_middle = 0
-                #     similarity_right = 0
-                case _:
-                    raise ValueError("unknown similarity method")
+                        #similarity = min(similarity_left,similarity_middle,similarity_right)
+                        #similarity = similarity_whole = (similarity_left + similarity_right)/2
+                    case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
+                        raise NotImplementedError("mean_absolute_error not implemented")
+                        # similarity_quadrants = []
+                        # for i in range(4):
+                        #     similarity_quadrants.append(mean_absolute_error(correlation_clip[i*quarter:(i+1)*quarter],correlation_slice[i*quarter:(i+1)*quarter]))
+                        #
+                        # similarity_left = (similarity_quadrants[0]+similarity_quadrants[1])/2
+                        # similarity_middle = (similarity_quadrants[1]+similarity_quadrants[2])/2
+                        # similarity_right = (similarity_quadrants[2]+similarity_quadrants[3])/2
+                        # similarity = similarity_whole = (similarity_left + similarity_right) / 2
+                        #similarity = min(similarity_left,similarity_middle,similarity_right)
+                    case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR:
+                        similarity = median_absolute_error(correlation_clip,correlation_slice)
+                        similarity_whole = similarity
+                        similarity_left = 0
+                        similarity_middle = 0
+                        similarity_right = 0
+                    case _:
+                        raise ValueError("unknown similarity method")
 
             if debug_mode:
                 print("similarity", similarity)
-
-                #if similarity <= 0.01:
-                similarities.append((similarity,{"whole":similarity_whole,
-                                                 "left":similarity_left,
-                                                 "middle":similarity_middle,
-                                                 "right":similarity_right,
-                                                 "left_right_diff": abs(similarity_left-similarity_right),
-                                                 }))
-                peaks_debug.append(peak)
-                correlation_slices.append(correlation_slice)
-
-            if similarity <= self.similarity_threshold:
-                peaks_final.append(peak)
-            else:
-                if debug_mode:
-                    print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
-
-
-        if debug_mode and len(peaks_debug) > 0:
-            for i,peak in enumerate(peaks_debug):
-                similarity = similarities[i][0]
-                correlation_slice = correlation_slices[i]
                 seconds.append(peak / sr)
-                self.similarity_debug[clip_name].append((index,similarity,))
+                self.similarity_debug[clip_name].append((index, similarity,))
+
+                if is_news_report_beep:
+                    correlation_slice_graph = downsampled_correlation_slice
+                    correlation_clip_graph = downsampled_correlation_clip
+                else:
+                    correlation_slice_graph = correlation_slice
+                    correlation_clip_graph = correlation_clip
+
                 graph_max = 0.01
                 if similarity <= graph_max:
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
@@ -711,8 +699,8 @@ class AudioOffsetFinder:
 
                     # Optional: plot the correlation graph to visualize
                     plt.figure(figsize=(10, 4))
-                    plt.plot(correlation_slice)
-                    plt.plot(correlation_clip, alpha=0.7)
+                    plt.plot(correlation_slice_graph)
+                    plt.plot(correlation_clip_graph, alpha=0.7)
                     plt.title('Cross-correlation between the audio clip and full track before slicing')
                     plt.xlabel('Lag')
                     plt.ylabel('Correlation coefficient')
@@ -720,74 +708,13 @@ class AudioOffsetFinder:
                         f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                     plt.close()
 
-            peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
-            os.makedirs(peak_dir, exist_ok=True)
+                similarities.append((similarity,{"whole":similarity_whole,
+                                                 "left":similarity_left,
+                                                 "middle":similarity_middle,
+                                                 "right":similarity_right,
+                                                 "left_right_diff": abs(similarity_left-similarity_right),
+                                                 }))
 
-            print(json.dumps({"peaks":peaks,"seconds":seconds,
-                              #"area_props":area_props,
-                              "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
-
-            print(f"---")
-
-        peak_times = np.array(peaks_final) / sr
-
-        return peak_times
-
-    # use for very short single beep with pure tone shape
-    def _correlation_method_single_beep(self, clip_data, audio_section, sr, index, seconds_per_chunk):
-        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max, downsampled_correlation_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max",
-                       "downsampled_correlation_clip"
-                       )(clip_data))
-        debug_mode = self.debug_mode
-
-        clip_length = len(clip)
-
-        audio=audio_section
-
-        # Cross-correlate and normalize correlation
-        correlation = correlate(audio, clip, mode='full', method='fft')
-        # abs
-        correlation = np.abs(correlation)
-        absolute_max = np.max(correlation)
-        max_choose = max(correlation_clip_absolute_max,absolute_max)
-        correlation /= max_choose
-
-        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
-
-        distance = clip_length
-        height_min = 0.25
-        peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
-
-        peaks_final = []
-
-        similarities =[]
-        seconds =[]
-
-        for peak in peaks:
-            after = peak + len(correlation_clip)//2
-            before = peak - len(correlation_clip)//2
-
-            if after > len(correlation)-1+2:
-                logger.warning(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
-                continue
-            elif before < -2:
-                logger.warning(f"peak {peak} before is {before} < -2, skipping")
-                continue
-
-            # slice
-            correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
-            correlation_slice = correlation_slice/np.max(correlation_slice)
-
-            if len(correlation_slice) != len(correlation_clip):
-                raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
-
-            # downsample
-            downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
-            similarity = mean_squared_error(downsampled_correlation_clip, downsampled_correlation_slice)
-
-            similarities.append((similarity,))
-            self.similarity_debug[clip_name].append((index, similarity,))
 
             if similarity <= self.similarity_threshold:
                 peaks_final.append(peak)
@@ -795,17 +722,14 @@ class AudioOffsetFinder:
                 if debug_mode:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
 
-
-        if debug_mode and len(peaks) > 0:
-            for i,peak in enumerate(peaks):
-                seconds.append(peak / sr)
-
+        if debug_mode:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
             os.makedirs(peak_dir, exist_ok=True)
 
-            print(json.dumps({"peaks":peaks,"seconds":seconds,
-                              #"area_props":area_props,
-                              "similarities":similarities}, indent=2,cls=NumpyEncoder), file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
+            print(json.dumps({"peaks": peaks, "seconds": seconds,
+                              # "area_props":area_props,
+                              "similarities": similarities}, indent=2, cls=NumpyEncoder),
+                  file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
             print(f"---")
 
