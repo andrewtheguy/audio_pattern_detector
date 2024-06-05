@@ -647,8 +647,8 @@ class AudioOffsetFinder:
                     #similarity_middle = 0
                     similarity_right = 0
 
-                    similarity = similarity_middle
-                    #similarity = min(similarity_whole,similarity_middle)
+                    #similarity = similarity_middle
+                    similarity = min(similarity_whole,similarity_middle)
 
                     #similarity = min(similarity_left,similarity_middle,similarity_right)
                     #similarity = similarity_whole = (similarity_left + similarity_right)/2
