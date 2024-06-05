@@ -64,7 +64,16 @@ class TestProcessSingleIntro(unittest.TestCase):
                                         [minutes_to_seconds(3),minutes_to_seconds(20)],
                                         [minutes_to_seconds(30),minutes_to_seconds(40)],
                                        ])
-        
+
+    def test_ending_before_intro(self):
+        result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30)],
+                              endings=[minutes_to_seconds(2),minutes_to_seconds(20),minutes_to_seconds(40)])
+        np.testing.assert_array_equal(result,
+                                      [
+                                        [minutes_to_seconds(3),minutes_to_seconds(20)],
+                                        [minutes_to_seconds(30),minutes_to_seconds(40)],
+                                       ])
+
     def test_one_less(self):
         result = self.do_test(intros=      [minutes_to_seconds(3),minutes_to_seconds(30)],
                               endings=[minutes_to_seconds(20)])
