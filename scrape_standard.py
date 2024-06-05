@@ -169,17 +169,18 @@ def scrape_single_intro(input_file,stream_name,recorded):
                                          )
         #print("pair before rehydration",pair)
         tsformatted = [[seconds_to_time(seconds=t,include_decimals=True) for t in sublist] for sublist in pair]
-
+        #duration = [seconds_to_time(t[1]-t[0]) for t in pair]
+        #gaps=[]
+        #for i in range(1,len(pair)):
+        #    gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
+        peaks_save = [(clip_name, [seconds_to_time(seconds=t,include_decimals=True) for t in peaks]) for clip_name,peaks in peaks_all.items()]
+        with open(jsonfile,'w') as f:
+            f.write(json.dumps({"tsformatted": tsformatted,"peaks_all":peaks_save}, indent=4, ensure_ascii=False))
     else:
         pair = [[time_to_seconds(t) for t in sublist] for sublist in tsformatted]
         #print("pair after rehydration",pair)
     print("tsformatted",tsformatted)
-    duration = [seconds_to_time(t[1]-t[0]) for t in pair]
-    gaps=[]
-    for i in range(1,len(pair)):
-        gaps.append(seconds_to_time(pair[i][0]-pair[i-1][1]))
-    with open(jsonfile,'w') as f:
-        f.write(json.dumps({"tsformatted": tsformatted,"ts":pair,"duration":duration,"gaps":gaps}, indent=4))
+
 
     #splits=[]
 
