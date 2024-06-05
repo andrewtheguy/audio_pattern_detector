@@ -672,8 +672,8 @@ class AudioOffsetFinder:
                         # else:
                         #     similarity = similarity_whole
 
-                        correlation_clip_middle = correlation_clip[4*partition_size:6*partition_size]
-                        section_slice_middle = correlation_slice[4*partition_size:6*partition_size]
+                        #correlation_clip_middle = correlation_clip[4*partition_size:6*partition_size]
+                        #section_slice_middle = correlation_slice[4*partition_size:6*partition_size]
                         #max_distance,max_distance_index = self._get_max_distance(correlation_clip_middle, section_slice_middle)
                         #self.max_distance_debug[clip_name].append((index, max_distance, max_distance_index,))
 
