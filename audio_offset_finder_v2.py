@@ -641,10 +641,10 @@ class AudioOffsetFinder:
             #print("peak after",after)
             #print("len(correlation)",len(correlation))
             if after > len(correlation)-1+2:
-                logger.warning(f"peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
+                logger.warning(f"{section_ts} {clip_name} peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
                 continue
             elif before < -2:
-                logger.warning(f"peak {peak} before is {before} < -2, skipping")
+                logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -2, skipping")
                 continue
 
             # slice
