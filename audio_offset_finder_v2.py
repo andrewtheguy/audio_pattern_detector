@@ -722,7 +722,7 @@ class AudioOffsetFinder:
                 if debug_mode:
                     print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
 
-        if debug_mode:
+        if debug_mode and len(peaks) > 0:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
             os.makedirs(peak_dir, exist_ok=True)
 
