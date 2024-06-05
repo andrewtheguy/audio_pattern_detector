@@ -128,6 +128,22 @@ class AudioOffsetFinder:
     SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR = "mean_absolute_error"
     SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"
     #SIMILARITY_METHOD_TEST = "test"
+
+    # won't work well for short clips
+    clip_properties = {
+        "受之有道outro": {
+            # triangular shape at the bottom occupying large area
+            "mean_square_error_similarity_threshold": 0.05,
+        },
+        "temple_bell": {
+            # triangular shape at the bottom occupying large area
+            "mean_square_error_similarity_threshold": 0.01,
+        },
+        "rthk_beep": {
+            # won't partition if downsample
+            "downsample": True,
+        },
+    }
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
         self.clip_paths = clip_paths
         self.method = method
@@ -242,8 +258,8 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}.png')
                 plt.close()
 
-            is_news_report_beep = clip_name == "rthk_beep"
-            if is_news_report_beep:
+            do_downsample = self.clip_properties.get(clip_name, {}).get("downsample", False)
+            if do_downsample:
                 downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
             else:
                 downsampled_correlation_clip = None
@@ -483,8 +499,7 @@ class AudioOffsetFinder:
 
         return peak_times_final
 
-    def _calculate_area_of_overlap_ratio(self, correlation_clip, correlation_slice, downsampled_correlation_clip):
-        downsampled_correlation_slice = downsample(correlation_slice, len(correlation_clip)//500)
+    def _calculate_area_of_overlap_ratio(self, downsampled_correlation_clip, downsampled_correlation_slice):
 
         #
         # peak_index = np.argmax(downsampled_correlation_clip)
@@ -518,26 +533,26 @@ class AudioOffsetFinder:
         # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
         # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
 
-        # static
-        middle = len(downsampled_correlation_clip) // 2
-
-        # mid point of the peak for 1/10th of the downsampled_correlation_clip
-        new_left = middle - len(downsampled_correlation_clip) // 20
-        new_right = middle + len(downsampled_correlation_clip) // 20
-
-        clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-        correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
+        # # static
+        # middle = len(downsampled_correlation_clip) // 2
+        #
+        # # mid point of the peak for 1/10th of the downsampled_correlation_clip
+        # new_left = middle - len(downsampled_correlation_clip) // 20
+        # new_right = middle + len(downsampled_correlation_clip) // 20
+        #
+        # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
+        # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
 
         # clip the tails
-        area_of_overlap, props = area_of_overlap_ratio(clip_within_peak,
-                                                       correlation_slice_within_peak)
+        area_of_overlap, props = area_of_overlap_ratio(downsampled_correlation_clip,
+                                                       downsampled_correlation_slice)
 
         return area_of_overlap,{
             #"clip_within_peak":clip_within_peak,
             #"correlation_slice_within_peak":correlation_slice_within_peak,
-            "downsampled_correlation_slice":downsampled_correlation_slice,
-            "new_left":new_left,
-            "new_right":new_right,
+            #"downsampled_correlation_slice":downsampled_correlation_slice,
+            #"new_left":new_left,
+            #"new_right":new_right,
             "area_props":props,
         }
 
@@ -555,7 +570,9 @@ class AudioOffsetFinder:
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max, downsampled_correlation_clip= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","downsampled_correlation_clip")(clip_data))
 
-        is_news_report_beep = clip_name == "rthk_beep"
+        clip_properties = self.clip_properties.get(clip_name, {})
+        do_downsample = clip_properties.get("downsample", False)
+        mean_squared_error_similarity_threshold = clip_properties.get("mean_square_error_similarity_threshold", self.similarity_threshold)
 
         debug_mode = self.debug_mode
 
@@ -636,11 +653,11 @@ class AudioOffsetFinder:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             # downsample
-            if is_news_report_beep:
+            if do_downsample:
                 #correlation_clip = downsampled_correlation_clip
                 downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
                 if self.similarity_method != self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
-                    raise ValueError("only mean_squared_error is supported for news report beep")
+                    raise ValueError("only mean_squared_error is supported for downsampled clips")
                 similarity = mean_squared_error(downsampled_correlation_clip, downsampled_correlation_slice)
                 #similarity_middle = np.mean(similarity_partitions[4:6])
                 similarity_whole = similarity
@@ -714,7 +731,7 @@ class AudioOffsetFinder:
                 seconds.append(peak / sr)
                 self.similarity_debug[clip_name].append((index, similarity,))
 
-                if is_news_report_beep:
+                if do_downsample:
                     correlation_slice_graph = downsampled_correlation_slice
                     correlation_clip_graph = downsampled_correlation_clip
                 else:
@@ -745,11 +762,11 @@ class AudioOffsetFinder:
                                                  }))
 
 
-            if similarity <= self.similarity_threshold:
+            if similarity <= mean_squared_error_similarity_threshold:
                 peaks_final.append(peak)
             else:
                 if debug_mode:
-                    print(f"failed verification for {section_ts} due to similarity {similarity} > {self.similarity_threshold}")
+                    print(f"failed verification for {section_ts} due to similarity {similarity} > {mean_squared_error_similarity_threshold}")
 
         if debug_mode and len(peaks) > 0:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
