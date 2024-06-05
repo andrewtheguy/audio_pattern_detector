@@ -477,6 +477,7 @@ def process_timestamps_rthk(news_reports,intros,total_time,news_report_second_pa
 
     return time_sequences
 
+# expected_num_segments can be a single number or a list of two numbers with first as minimum and second as maximum
 def process_timestamps_simple(intros,endings,total_time,expected_num_segments=None,ends_with_intro=False,intro_max_repeat_seconds=None):
     marker_intro=0
     marker_ending=1
@@ -601,6 +602,8 @@ def process_timestamps_simple(intros,endings,total_time,expected_num_segments=No
             if len(time_sequences) != expected_num_segments:
                 raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
         elif isinstance(expected_num_segments, list):
+            if len(expected_num_segments) != 2:
+                raise ValueError("expected_num_segments list must have 2 elements")
             if len(time_sequences) not in range(expected_num_segments[0],expected_num_segments[1]+1):
                 raise TimeSequenceError(f"expected {expected_num_segments} segments, got {len(time_sequences)} segments")
         else:
