@@ -640,11 +640,11 @@ class AudioOffsetFinder:
             #     logger.warning(f"peak {peak} not equal to max_height_index {max_height_index}")
             #print("peak after",after)
             #print("len(correlation)",len(correlation))
-            if after > len(correlation)-1+2:
-                logger.warning(f"{section_ts} {clip_name} peak {peak} after is {after} > len(correlation)+2 {len(correlation)+2}, skipping")
+            if after > len(correlation)+5:
+                logger.warning(f"{section_ts} {clip_name} peak {peak} after is {after} > len(correlation)+5 {len(correlation)+5}, skipping")
                 continue
-            elif before < -2:
-                logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -2, skipping")
+            elif before < -5:
+                logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping")
                 continue
 
             # slice
