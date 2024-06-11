@@ -34,7 +34,8 @@ ripped_streams={
         "introclips": ["am1430/1810_add_oil_intro.wav","am1430/1810_add_oil_end.wav"],
         #"endingclips": ["am1430/1810_add_oil_end.wav"],
         "ends_with_intro": True,
-        "expected_num_segments": 4,
+        "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
+        "expected_num_segments": [3,4],
     },
     "天空下的彩虹": {
         "introclips": ["am1430/天空下的彩虹intro.wav"],
