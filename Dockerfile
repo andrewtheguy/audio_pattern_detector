@@ -20,7 +20,7 @@ RUN     apt-get -yqq update && \
 
 COPY --from=builder /tmp/requirements.txt /tmp/requirements.txt
 
-RUN pip3 install -r /tmp/requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
 
 COPY --from=mwader/static-ffmpeg:7.0-1 /ffmpeg /usr/local/bin/
 COPY --from=mwader/static-ffmpeg:7.0-1 /ffprobe /usr/local/bin/
