@@ -11,17 +11,15 @@ import time
 from operator import itemgetter
 from pathlib import Path
 
-import dtaidistance
-import librosa
 import numpy as np
-import scipy
+
+from numpy._typing import DTypeLike
 from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
 
 import ffmpeg
-import librosa
-import soundfile as sf
+
 import pyloudnorm as pyln
 #import pyaudio
 
@@ -57,9 +55,40 @@ def load_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
+# from librosa.util.buf_to_float
+def buf_to_float(
+    x: np.ndarray, *, n_bytes: int = 2, dtype: DTypeLike = np.float32
+) -> np.ndarray:
+    """Convert an integer buffer to floating point values.
+    This is primarily useful when loading integer-valued wav data
+    into numpy arrays.
+
+    Parameters
+    ----------
+    x : np.ndarray [dtype=int]
+        The integer-valued data buffer
+    n_bytes : int [1, 2, 4]
+        The number of bytes per sample in ``x``
+    dtype : numeric type
+        The target output type (default: 32-bit float)
+
+    Returns
+    -------
+    x_float : np.ndarray [dtype=float]
+        The input data buffer cast to floating point
+    """
+    # Invert the scale of the data
+    scale = 1.0 / float(1 << ((8 * n_bytes) - 1))
+
+    # Construct the format string
+    fmt = f"<i{n_bytes:d}"
+
+    # Rescale and format the data buffer
+    return scale * np.frombuffer(x, fmt).astype(dtype)
+
 def convert_audio_arr_to_float(audio):
     #raise "chafa"
-    return librosa.util.buf_to_float(audio,n_bytes=2, dtype='float32')
+    return buf_to_float(audio,n_bytes=2, dtype='float32')
 
 
 # def dtw_distance(series1, series2):
@@ -72,18 +101,18 @@ def convert_audio_arr_to_float(audio):
 def normalize_curve(curve):
     return (curve - np.min(curve)) / (np.max(curve) - np.min(curve))
 
-# Apply DTW and warp the target curve
-def warp_with_dtw(reference, target):
-    # Compute dynamic time warping path
-    path = dtaidistance.dtw.warping_path(reference, target)
-    #print("path",path)
-
-    # Create an array to hold the warped target
-    warped_target = np.zeros_like(reference)
-    for ref_idx, target_idx in path:
-        warped_target[ref_idx] = target[target_idx]
-
-    return warped_target, path
+# # Apply DTW and warp the target curve
+# def warp_with_dtw(reference, target):
+#     # Compute dynamic time warping path
+#     path = dtaidistance.dtw.warping_path(reference, target)
+#     #print("path",path)
+#
+#     # Create an array to hold the warped target
+#     warped_target = np.zeros_like(reference)
+#     for ref_idx, target_idx in path:
+#         warped_target[ref_idx] = target[target_idx]
+#
+#     return warped_target, path
 
 def downsample_preserve_maxima(curve, num_samples):
     n_points = len(curve)
