@@ -37,7 +37,7 @@ streams={
         "backupintroclips": ["rthk1theme_new.wav"],
         "allow_first_short": True,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/itsahappyday/m4a/{date}.m4a/master.m3u8",
-        "news_report_strategy":"theme_clip",
+        "news_report_strategy":"beep",
         "news_report_strategy_expected_count":2,
         "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
     },
