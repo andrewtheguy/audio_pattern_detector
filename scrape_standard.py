@@ -47,6 +47,9 @@ ripped_streams={
         "endingclips": ["am1430/opinion_only2.wav"],
         "ends_with_intro": False,
         "expected_num_segments": 4,
+        "time":"1000",
+        "publish": True,
+        "wday": 6, # 0-6, 0 is Monday
     },
     "法律天地": {
         "introclips": ["am1430/法律天地intro.wav"],
@@ -251,13 +254,21 @@ def download_am1430():
             date_str = date.strftime("%Y%m%d")
             file_name = f"{key}{date_str}_{time}_s_1.m4a"
             dest_file = os.path.join(original_dir, file_name)
-            dest_remote_path = f"/grabradiostreamed/am1430/multiple/{key}/{file_name}"
+            only_this_wday = stream.get("wday",None)
+            if only_this_wday:
+                if date.weekday() != only_this_wday:
+                    print(f"skipping {key} because wday is not {only_this_wday}")
+                    continue
+                folder = "single"
+            else:
+                folder = "multiple"
+            dest_remote_path = f"/grabradiostreamed/am1430/{folder}/{key}/{file_name}"
             if remote_exists(dest_remote_path):
                 print(f'file {dest_remote_path} already exists,downloading from {date_str} instead')
                 download_file(dest_remote_path, dest_file)
                 #num_downloaded += 1
             elif not os.path.exists(dest_file):
-                print(f'file {dest_remote_path} does not exist and local neither, skipping')
+                print(f'file {dest_remote_path} does not exist on remote or local, skipping')
                 continue
             #clip_length_second_stream = float(get_ffprobe_info(url)['format']['duration'])
             remote_jsonfile = f'{dest_remote_path}.json'
