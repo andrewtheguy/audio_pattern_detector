@@ -5,13 +5,13 @@ import subprocess
 #from webdav4.client import Client
 logger = logging.getLogger(__name__)
 
-rclone_config_file = "./rclone.conf"
-rclone_backend = "sftp"
+#rclone_config_file = "./rclone.conf"
+rclone_backend = "remote"
 
 # https://github.com/rclone/rclone/blob/master/bin/config.py
 # https://github.com/rclone/rclone/blob/2257c03391be526011743e2fe80fc7c6b1e23179/docs/content/docs.md for exit codes
 def stat(remote_path):
-    cmd = ["rclone", "--config", rclone_config_file, "lsjson", f"{rclone_backend}:{remote_path}"]
+    cmd = ["rclone", '--config', '/notfound', "lsjson", f"{rclone_backend}:{remote_path}"]
     try:
         result = subprocess.run(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE, check=True)
         return json.loads(result.stdout)
@@ -26,7 +26,7 @@ def remote_exists(remote_path):
 
 def download_file(remote_path,local_path):
     print("downloading",remote_path,"to",local_path)
-    cmd = ["rclone", "--config", rclone_config_file, "copyto", f"{rclone_backend}:{remote_path}", local_path]
+    cmd = ["rclone", '--config', '/notfound', "copyto", f"{rclone_backend}:{remote_path}", local_path]
     subprocess.run(cmd, check=True)
 
 def upload_file(file,dest_path,skip_if_exists=False):
@@ -34,7 +34,7 @@ def upload_file(file,dest_path,skip_if_exists=False):
         print(f'upload_file: file {dest_path} already exists,skipping')
         return
     print("uploading",file,"to",dest_path)
-    cmd = ["rclone","-v", "--config", rclone_config_file, "copyto", file, f"{rclone_backend}:{dest_path}"]
+    cmd = ["rclone","-v", '--config', '/notfound', "copyto", file, f"{rclone_backend}:{dest_path}"]
     subprocess.run(cmd, check=True)
 
 
