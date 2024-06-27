@@ -80,7 +80,7 @@ ripped_streams={
         #"endingclips": [],
         "ends_with_intro": False,
         "min_duration": 60 * 60 * 2,  # guard against short recordings which resulted from failure
-        "expected_num_segments": [4,6],
+        "expected_num_segments": [4,7],
         "time":"1600",
         "publish": True,
     },
