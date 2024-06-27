@@ -41,4 +41,4 @@ COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["python", "schedule.py","all"]
+CMD ["python","-u","schedule.py","all"]
