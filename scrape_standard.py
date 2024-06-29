@@ -332,19 +332,33 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action')
     parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to find pattern')
+    parser.add_argument('--audio-folder', metavar='audio folder', type=str, help='audio folder to find pattern')
 
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
 
     if(args.action == 'scrape'):
-        input_file = args.audio_file
-        input_dir = os.path.dirname(input_file)
-        # stream_name,date_str = extract_prefix(os.path.basename(input_file))
-        recorded = "recorded" in input_dir
+        audio_folder = args.audio_folder
+        if audio_folder:
+            if args.audio_file:
+                raise ValueError("please specify only one of audio-file or folder")
+            for input_file in glob.glob(os.path.join(audio_folder, "*.m4a")):
+                print("processing", input_file)
+                input_dir = os.path.dirname(input_file)
+                recorded = "recorded" in input_dir
+                if recorded:
+                    raise ValueError("recorded not supported for folder yet")
+                stream_name = os.path.basename(input_dir)
+                scrape_single_intro(input_file, stream_name=stream_name, recorded=recorded)
+        else:
+            input_file = args.audio_file
+            input_dir = os.path.dirname(input_file)
+            # stream_name,date_str = extract_prefix(os.path.basename(input_file))
+            recorded = "recorded" in input_dir
 
-        stream_name = os.path.basename(input_dir)
-        # print(stream_name)
-        scrape_single_intro(input_file, stream_name=stream_name, recorded=recorded)
+            stream_name = os.path.basename(input_dir)
+            # print(stream_name)
+            scrape_single_intro(input_file, stream_name=stream_name, recorded=recorded)
     elif(args.action == 'download'):
         download_am1430()
     elif(args.action == 'process_podcasts'):
