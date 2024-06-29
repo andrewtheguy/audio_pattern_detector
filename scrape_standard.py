@@ -349,7 +349,11 @@ if __name__ == '__main__':
                 if recorded:
                     raise ValueError("recorded not supported for folder yet")
                 stream_name = os.path.basename(input_dir)
-                scrape_single_intro(input_file, stream_name=stream_name, recorded=recorded)
+                try:
+                    scrape_single_intro(input_file, stream_name=stream_name, recorded=recorded)
+                except Exception as e:
+                    print(f"error happened when processing for {stream_name}", e)
+                    print(traceback.format_exc())
         else:
             input_file = args.audio_file
             input_dir = os.path.dirname(input_file)
