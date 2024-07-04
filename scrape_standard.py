@@ -206,9 +206,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
         concatenate_audio(splits, output_file_trimmed,tmpdir,channel_name="am1430",total_time=total_time)
         upload_path_trimmed = f"/am1430/trimmed/{dirname}/{filename_trimmed}"
         upload_file(output_file_trimmed,upload_path_trimmed,skip_if_exists=True)
-
-    # will bug out if skip_if_exists is False
-    upload_file(jsonfile, f"/am1430/trimmed/{dirname}/{os.path.basename(jsonfile)}",skip_if_exists=True)
+        
     return output_file_trimmed,jsonfile
 
 
@@ -303,8 +301,12 @@ def process_podcasts():
             try:
                 output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
                 output_file_trimmed,jsonfile = scrape_single_intro(dest_file, stream_name=stream_name, recorded=False)
-                # upload_file(jsonfile, f"/grabradiostreamed/am1430/multiple/{stream_name}/{os.path.basename(dest_file)}.json",
-                #             skip_if_exists=True)
+                if "/multiple/" in dest_file:
+                    folder = "multiple"
+                else:
+                    folder = "single"
+                upload_file(jsonfile, f"/grabradiostreamed/am1430/{folder}/{stream_name}/{os.path.basename(dest_file)}.json",
+                            skip_if_exists=True)
                 #podcasts_publish.append(output_dir_trimmed)
                 num_success += 1
             except Exception as e:
