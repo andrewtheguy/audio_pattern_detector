@@ -36,12 +36,15 @@ ripped_streams={
         "ends_with_intro": True,
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
         "expected_num_segments": [3,4],
+        "publish": True,
+        "wday": 0,  # 0-6, 0 is Monday
     },
     "天空下的彩虹": {
         "introclips": ["am1430/天空下的彩虹intro.wav"],
         "ends_with_intro": True,
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
-        #"expected_num_segments": 3,
+        "publish": True,
+        "wday": 2, # 0-6, 0 is Monday
     },
     "漫談法律": {
         "introclips": ["am1430/漫談法律intro.wav"],
