@@ -37,6 +37,7 @@ ripped_streams={
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
         "expected_num_segments": [3,4],
         "publish": True,
+        "time":"2000",
         "wday": 0,  # 0-6, 0 is Monday
     },
     "天空下的彩虹": {
@@ -44,6 +45,7 @@ ripped_streams={
         "ends_with_intro": True,
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
         "publish": True,
+        "time":"1900",
         "wday": 2, # 0-6, 0 is Monday
     },
     "漫談法律": {
