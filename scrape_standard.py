@@ -106,6 +106,9 @@ ripped_streams={
         "expected_num_segments": 3,
         "min_duration": 60 * 60,  # guard against short recordings which resulted from failure
         # "expected_num_segments": 5,
+        "time": "1200",
+        "publish": True,
+        "wday": 4, # 0-6, 0 is Monday
     },
 }
 
