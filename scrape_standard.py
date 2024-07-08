@@ -62,6 +62,9 @@ ripped_streams={
         "endingclips": ["am1430/opinion_only2.wav"],
         "ends_with_intro": False,
         "expected_num_segments": 1,
+        "time": "1230",
+        "wday": 5, # 0-6, 0 is Monday
+        "publish": True,
     },
     "置業興家": {
         "introclips": ["am1430/置業興家intro2.wav"],
