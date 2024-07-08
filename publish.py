@@ -27,8 +27,8 @@ bucket_name = "podcasts"
 
 s3 = boto3.client('s3',
     endpoint_url='https://s3.filebase.com',
-    aws_access_key_id=os.environ['FIREBASE_ACCESS_KEY'],
-    aws_secret_access_key=os.environ['FIREBASE_SECRET_ACCESS_KEY'],
+    aws_access_key_id=os.environ['FILEBASE_ACCESS_KEY'],
+    aws_secret_access_key=os.environ['FILEBASE_SECRET_ACCESS_KEY'],
     region_name='us-east-1',
     config=boto3.session.Config(signature_version='s3v4'))
 
