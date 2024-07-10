@@ -42,17 +42,26 @@ streams={
         "schedule":{"end":12,"weekdays_human":[1,2,3,4,5]},
     },
     "healthpedia": {
-        "introclips": ["healthpedia_intro.wav","healthpediapriceless.wav","healthpediamiddleintro.wav"],
+        "introclips": ["healthpedia_intro.wav", "healthpediapriceless.wav", "healthpediamiddleintro.wav"],
         "allow_first_short": False,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/healthpedia/m4a/{date}.m4a/master.m3u8",
+        "news_report_strategy": "theme_clip",
+        "news_report_strategy_expected_count": 2,
+        "schedule": {"end": 15, "weekdays_human": [1, 2, 3, 4, 5]},
+    },
+    "Free_as_the_wind": {
+        "introclips": ["freeasthewindtheme.wav"],
+        "allow_first_short": False,
+        "allow_first_late_news_report":True,
+        "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/Free_as_the_wind/m4a/{date}.m4a/master.m3u8",
         "news_report_strategy":"theme_clip",
-        "news_report_strategy_expected_count":2,
-        "schedule":{"end":15,"weekdays_human":[1,2,3,4,5]},
+        "news_report_strategy_expected_count":1,
+        "schedule":{"end":1,"weekdays_human":[2,3,4,5,6]},
     },
     # rthk2 needs a different strategy for news report because it is less consistent
     "morningsuite": {
         "introclips": ["morningsuitethemefemalevoice.wav","morningsuitethememalevoice.wav"],
-        "backupintroclips": ["rthk2theme.wav","rthk2theme_new.wav"],
+        "backupintroclips": ["rthk2theme_new.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/morningsuite/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":10,"weekdays_human":[1,2,3,4,5]},
@@ -61,7 +70,7 @@ streams={
     },
     "KnowledgeCo": {
         "introclips": ["knowledgecointro.wav"],
-        "backupintroclips": ["rthk2theme.wav","rthk2theme_new.wav"],
+        "backupintroclips": ["rthk2theme_new.wav"],
         "allow_first_short": False,
         "url":"https://rthkaod2022.akamaized.net/m4a/radio/archive/radio2/KnowledgeCo/m4a/{date}.m4a/master.m3u8",
         "schedule":{"end":8,"weekdays_human":[6]},
@@ -120,7 +129,7 @@ def get_single_beep(input_file):
 
 
 # it is easier to match using the news report theme clip than beep
-def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count,total_time):
+def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count,total_time,allow_first_late_news_report):
 
     if news_report_strategy_expected_count < 1:
         raise ValueError("news_report_strategy_expected_count must be greater than or equal to 1")
@@ -152,8 +161,8 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
     if len(news_report_peak_times) != news_report_strategy_expected_count:
         raise ValueError(f"expected {news_report_strategy_expected_count} news reports but found {len(news_report_peak_times)}: {[seconds_to_time(t) for t in news_report_peak_times]}")
     
-    if(news_report_peak_times[0] > 30 * 60):
-        raise ValueError("first news report is too late, should not happen unless there is really a valid case for it")
+    if not allow_first_late_news_report and (news_report_peak_times[0] > 30 * 60):
+        raise ValueError("first news report is too late, it could be sign of missing one earlier, set allow_first_late_news_report to True if it is expected")
     
     for i in range(1,len(news_report_peak_times)):
         if news_report_peak_times[i] - news_report_peak_times[i-1] < 45*60:
@@ -236,6 +245,7 @@ def scrape(input_file, stream_name, output_dir_trimmed):
         allow_first_short = stream["allow_first_short"]
         news_report_strategy=stream.get("news_report_strategy","beep")
         news_report_strategy_expected_count=stream.get("news_report_strategy_expected_count",None)
+        allow_first_late_news_report=stream.get("allow_first_late_news_report",False)
 
 
 
@@ -245,7 +255,7 @@ def scrape(input_file, stream_name, output_dir_trimmed):
         elif news_report_strategy == "theme_clip":
             if news_report_strategy_expected_count is None:
                 raise ValueError("news_report_strategy_expected_count must be set when strategy is theme_clip")
-            news_report_peak_times = get_by_news_report_theme_clip(input_file=input_file,news_report_strategy_expected_count=news_report_strategy_expected_count,total_time=total_time)
+            news_report_peak_times = get_by_news_report_theme_clip(input_file=input_file,news_report_strategy_expected_count=news_report_strategy_expected_count,total_time=total_time,allow_first_late_news_report=allow_first_late_news_report)
             news_report_second_pad = 0
         else:
             raise ValueError(f"unknown news report strategy {news_report_strategy}")
