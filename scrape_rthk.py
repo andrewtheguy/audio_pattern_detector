@@ -247,6 +247,8 @@ def scrape(input_file, stream_name, output_dir_trimmed):
 
 
         if news_report_strategy == "beep":
+            if news_report_strategy_expected_count is not None:
+                raise ValueError("news_report_strategy_expected_count must not be set when strategy is beep")
             news_report_peak_times = get_by_news_report_strategy_beep(input_file=input_file)
             news_report_second_pad = 6
         elif news_report_strategy == "theme_clip":
