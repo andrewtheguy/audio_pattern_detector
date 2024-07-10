@@ -54,7 +54,6 @@ streams={
         "allow_first_short": False,
         "url": "https://rthkaod2022.akamaized.net/m4a/radio/archive/radio1/Free_as_the_wind/m4a/{date}.m4a/master.m3u8",
         "news_report_strategy":"beep",
-        "news_report_strategy_expected_count":1,
         "schedule":{"end":1,"weekdays_human":[2,3,4,5,6]},
     },
     # rthk2 needs a different strategy for news report because it is less consistent
