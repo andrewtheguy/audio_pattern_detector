@@ -143,7 +143,7 @@ def publish_podcast(folder,title,inputs,dest_dir):
         f.write(feed)
     # no need to be super secure for now    
     salt="fdsgdfgfdgfdgfdgdfdsfsd"
-    title_clean=re.sub('[^0-9a-zA-Z]+', '*', "".join(lazy_pinyin(title)))
+    title_clean=re.sub('[^0-9a-zA-Z_-]+', '', "".join(lazy_pinyin(title)))
     suffix = hashlib.md5(f"{title}{salt}".encode("utf-8")).hexdigest()
     remote_name = f"{title_clean}_{suffix}"
     data = {"key":remote_name,"xml":feed}
