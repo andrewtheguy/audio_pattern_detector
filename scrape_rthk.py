@@ -223,8 +223,6 @@ def scrape(input_file, stream_name, output_dir_trimmed):
     logger.info(basename)
     #md5=md5file(input_file)  # to get a printable str instead of bytes
 
-    show_name,date_str = extract_prefix(basename)
-
     tsformatted = None
 
 
