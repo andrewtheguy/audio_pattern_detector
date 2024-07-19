@@ -312,10 +312,12 @@ def process_podcasts():
             try:
                 output_dir_trimmed = os.path.abspath(os.path.join(f"./tmp", "trimmed", stream_name))
                 output_file_trimmed,jsonfile = scrape_single_intro(dest_file, stream_name=stream_name, recorded=False)
-                if "/multiple/" in dest_file:
-                    folder = "multiple"
-                else:
+                stream=ripped_streams[stream_name]
+                only_this_wday = stream.get("wday", None)
+                if only_this_wday:
                     folder = "single"
+                else:
+                    folder = "multiple"
                 upload_file(jsonfile, f"/grabradiostreamed/am1430/{folder}/{stream_name}/{os.path.basename(dest_file)}.json",
                             skip_if_exists=True)
                 #podcasts_publish.append(output_dir_trimmed)
