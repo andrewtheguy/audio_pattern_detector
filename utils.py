@@ -11,7 +11,7 @@ from collections import deque
 import ffmpeg
 import numpy as np
 import requests
-from scipy.integrate import trapz, simps
+from scipy.integrate import simpson
 
 logger = logging.getLogger(__name__)
 
@@ -203,13 +203,13 @@ def area_of_overlap_ratio(control, variable):
     #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
     #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
 
-    area_control = simps(control, x)
-    area_y2 = simps(y2, x)
+    area_control = simpson(control, x)
+    area_y2 = simpson(y2, x)
 
     # To find the overlapping area, take the minimum at each point
     min_curve = np.minimum(control, y2)
     #overlapping_area = np.trapz(min_curve, dx=dx)
-    overlapping_area = simps(min_curve, x)
+    overlapping_area = simpson(min_curve, x)
     diff_area = area_control+area_y2-2*overlapping_area
 
     total_area_control = len(control) * max(control)
