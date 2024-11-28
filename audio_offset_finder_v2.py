@@ -288,29 +288,28 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}.png')
                 plt.close()
 
-            do_downsample = self.clip_properties.get(clip_name, {}).get("downsample", False)
-            if do_downsample:
-                downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
-            else:
-                downsampled_correlation_clip = None
+            #do_downsample = self.clip_properties.get(clip_name, {}).get("downsample", False)
+
+            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
+
             #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
             #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
             #exit(1)
 
-            # if self.debug_mode:
-            #     print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
-            #     graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-            #     os.makedirs(graph_dir, exist_ok=True)
-            #
-            #     plt.figure(figsize=(10, 4))
-            #
-            #     plt.plot(downsampled_correlation_clip)
-            #     plt.title('Cross-correlation of the audio clip itself')
-            #     plt.xlabel('Lag')
-            #     plt.ylabel('Correlation coefficient')
-            #     plt.savefig(
-            #         f'{graph_dir}/{clip_name}.png')
-            #     plt.close()
+            if self.debug_mode:
+                print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+                graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                plt.figure(figsize=(10, 4))
+
+                plt.plot(downsampled_correlation_clip)
+                plt.title('Cross-correlation of the audio clip itself')
+                plt.xlabel('Lag')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}.png')
+                plt.close()
 
             clip_datas[clip_path] = {"clip":clip,
                                      "clip_name":clip_name,
