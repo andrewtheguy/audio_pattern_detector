@@ -1,6 +1,7 @@
 import argparse
 import glob
 import json
+import os
 from collections import deque
 import math
 from os.path import basename
@@ -74,6 +75,7 @@ def main():
     if args.audio_folder:
         #basename(args.pattern_file)
         output_file_prefix=Path(args.pattern_file).stem
+        output_file_prefix=f'{os.path.basename(args.audio_folder)}_{output_file_prefix}'
         output_file=f'./tmp/{output_file_prefix}.jsonl'
         with open(output_file, 'w') as f:
             f.truncate(0)
