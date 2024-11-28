@@ -1,6 +1,11 @@
 import argparse
+import glob
+import json
 from collections import deque
 import math
+from os.path import basename
+from pathlib import Path
+
 from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
 from andrew_utils import seconds_to_time
 
@@ -48,9 +53,9 @@ from andrew_utils import seconds_to_time
 
 #     return peak_times_final
 
-def match_pattern(audio_file, pattern_file, method):
+def match_pattern(audio_file, pattern_file, method, debug_mode=False):
     # Find clip occurrences in the full audio
-    peak_times = AudioOffsetFinder(method=method, debug_mode=True,
+    peak_times = AudioOffsetFinder(method=method, debug_mode=debug_mode,
                                    clip_paths=[pattern_file]).find_clip_in_audio(full_audio_path=audio_file)
     return peak_times[pattern_file]
 
@@ -59,16 +64,39 @@ def main():
     #set_debug_mode(True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--pattern-file', metavar='pattern file', required=True, type=str, help='pattern file')
-    parser.add_argument('--audio-file', metavar='audio file', type=str, required=True, help='audio file to find pattern')
+    parser.add_argument('--audio-file', metavar='audio file', type=str, required=False, help='audio file to find pattern')
+    parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
     parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method, currently only correlation',default=DEFAULT_METHOD)
     #parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
     #                    default=0.4)
     args = parser.parse_args()
-    peak_time=match_pattern(args.audio_file, args.pattern_file, args.match_method)
-    print(peak_time)
 
-    for offset in peak_time:
-        print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}")
+    if args.audio_folder:
+        #basename(args.pattern_file)
+        output_file_prefix=Path(args.pattern_file).stem
+        output_file=f'./tmp/{output_file_prefix}.jsonl'
+        with open(output_file, 'w') as f:
+            f.truncate(0)
+        print(f"Finding pattern in audio files in folder {args.audio_folder}...")
+        #peak_time = {}
+        for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
+            print(f"Processing {audio_file}...")
+            peak_times = match_pattern(audio_file, args.pattern_file, args.match_method)
+            if len(peak_times) > 0:
+                peak_times_second = [seconds_to_time(seconds=offset) for offset in peak_times]
+                print(f"Clip occurs with the file {audio_file} at the following times (in seconds): {peak_times_second}")
+                #all_files[audio_file] = peak_times_second
+                with open(output_file, 'a') as f:
+                    print(json.dumps({'audio_file': audio_file, 'peak_times': peak_times_second},ensure_ascii=False), file=f)
+    elif args.audio_file:
+        peak_times=match_pattern(args.audio_file, args.pattern_file, args.match_method, debug_mode=True)
+        print(peak_times)
+
+        for offset in peak_times:
+            print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}")
+    else:
+        print("Please provide either --audio-file or --audio-folder")
+        exit(1)
 
 
 if __name__ == '__main__':
