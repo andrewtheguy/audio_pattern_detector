@@ -739,8 +739,9 @@ class AudioOffsetFinder:
                         similarity_middle = np.mean(similarity_partitions[4:6])
                         similarity_whole = np.mean(similarity_partitions)
                         similarity_left = 0
-                        #similarity_middle = 0
                         similarity_right = 0
+                        #similarity_left = np.mean(similarity_partitions[0:5])
+                        #similarity_right = np.mean(similarity_partitions[5:10])
 
                         #similarity = similarity_middle
                         similarity = min(similarity_whole,similarity_middle)
