@@ -97,9 +97,9 @@ def convert_audio_arr_to_float(audio):
 #     #return d
 
 
-# Normalize the curves to the same scale
-def normalize_curve(curve):
-    return (curve - np.min(curve)) / (np.max(curve) - np.min(curve))
+# # Normalize the curves to the same scale
+# def normalize_curve(curve):
+#     return (curve - np.min(curve)) / (np.max(curve) - np.min(curve))
 
 # # Apply DTW and warp the target curve
 # def warp_with_dtw(reference, target):
@@ -171,7 +171,7 @@ class AudioOffsetFinder:
         "rthk_beep": {
             # won't partition if downsample
             "downsample": True,
-            "no_partition": True,
+            #"no_partition": True,
         },
     }
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
@@ -297,20 +297,25 @@ class AudioOffsetFinder:
             #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
             #exit(1)
 
-            # if self.debug_mode:
-            #     print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
-            #     graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-            #     os.makedirs(graph_dir, exist_ok=True)
-            #
-            #     plt.figure(figsize=(10, 4))
-            #
-            #     plt.plot(downsampled_correlation_clip)
-            #     plt.title('Cross-correlation of the audio clip itself')
-            #     plt.xlabel('Lag')
-            #     plt.ylabel('Correlation coefficient')
-            #     plt.savefig(
-            #         f'{graph_dir}/{clip_name}.png')
-            #     plt.close()
+            if self.debug_mode:
+                if downsampled_correlation_clip is None:
+                    downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip,
+                                                                              self.target_num_sample_after_resample)
+                print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+                graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                plt.figure(figsize=(10, 4))
+
+                plt.plot(downsampled_correlation_clip)
+                plt.title('Cross-correlation of the audio clip itself')
+                plt.xlabel('Lag')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}.png')
+                plt.close()
+
+                downsampled_correlation_clip = None
 
             clip_datas[clip_path] = {"clip":clip,
                                      "clip_name":clip_name,
@@ -606,7 +611,7 @@ class AudioOffsetFinder:
             similarity_threshold = clip_properties.get("mean_squared_error_similarity_threshold", self.similarity_threshold)
         else:
             similarity_threshold = self.similarity_threshold
-        no_partition = clip_properties.get("no_partition", False)
+        #no_partition = clip_properties.get("no_partition", False)
 
         debug_mode = self.debug_mode
 
@@ -688,8 +693,8 @@ class AudioOffsetFinder:
 
             # downsample
             if do_downsample:
-                if not no_partition:
-                    raise ValueError("does not support downsampled clips with partitioning yet")
+                #if not no_partition:
+                #    raise ValueError("does not support downsampled clips with partitioning yet")
                 #correlation_clip = downsampled_correlation_clip
                 downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, self.target_num_sample_after_resample)
                 if self.similarity_method != self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
