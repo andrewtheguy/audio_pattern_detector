@@ -162,11 +162,11 @@ class AudioOffsetFinder:
     clip_properties = {
         "受之有道outro": {
             # triangular shape at the bottom occupying large area
-            "mean_square_error_similarity_threshold": 0.05,
+            "mean_squared_error_similarity_threshold": 0.05,
         },
         "temple_bell": {
             # triangular shape at the bottom occupying large area
-            "mean_square_error_similarity_threshold": 0.01,
+            "mean_squared_error_similarity_threshold": 0.01,
         },
         "rthk_beep": {
             # won't partition if downsample
@@ -602,7 +602,10 @@ class AudioOffsetFinder:
 
         clip_properties = self.clip_properties.get(clip_name, {})
         do_downsample = clip_properties.get("downsample", False)
-        mean_squared_error_similarity_threshold = clip_properties.get("mean_square_error_similarity_threshold", self.similarity_threshold)
+        if self.similarity_method == self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
+            similarity_threshold = clip_properties.get("mean_squared_error_similarity_threshold", self.similarity_threshold)
+        else:
+            similarity_threshold = self.similarity_threshold
         no_partition = clip_properties.get("no_partition", False)
 
         debug_mode = self.debug_mode
@@ -795,11 +798,11 @@ class AudioOffsetFinder:
                                                  }))
 
 
-            if similarity <= mean_squared_error_similarity_threshold:
+            if similarity <= similarity_threshold:
                 peaks_final.append(peak)
             else:
                 if debug_mode:
-                    print(f"failed verification for {section_ts} due to similarity {similarity} > {mean_squared_error_similarity_threshold}")
+                    print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
 
         if debug_mode and len(peaks) > 0:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
