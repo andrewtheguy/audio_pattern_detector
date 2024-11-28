@@ -10,6 +10,7 @@ import pdb
 import time
 from operator import itemgetter
 from pathlib import Path
+from scipy.integrate import simpson
 
 import numpy as np
 
@@ -297,7 +298,17 @@ class AudioOffsetFinder:
             #exit(1)
 
             if self.debug_mode:
-                print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+                control_len = len(downsampled_correlation_clip)
+                x = np.arange(control_len)
+
+                total_area_control = control_len * max(downsampled_correlation_clip)
+
+                downsampled_correlation_clip_area = simpson(downsampled_correlation_clip,x=x)
+
+                print("downsampled_correlation_clip_length", control_len)
+                print("downsampled_correlation_total_area", total_area_control)
+                print("downsampled_correlation_clip_area", downsampled_correlation_clip_area)
+                print("downsampled_correlation_ratio", downsampled_correlation_clip_area/total_area_control)
                 graph_dir = f"./tmp/graph/clip_correlation_downsampled"
                 os.makedirs(graph_dir, exist_ok=True)
 
@@ -774,7 +785,7 @@ class AudioOffsetFinder:
                     correlation_slice_graph = correlation_slice
                     correlation_clip_graph = correlation_clip
 
-                graph_max = 0.01
+                graph_max = 0.1
                 if similarity <= graph_max:
                     graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
