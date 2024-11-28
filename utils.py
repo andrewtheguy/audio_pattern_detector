@@ -209,7 +209,7 @@ def area_of_overlap_ratio(control, variable):
     # To find the overlapping area, take the minimum at each point
     min_curve = np.minimum(control, y2)
     #overlapping_area = np.trapz(min_curve, dx=dx)
-    overlapping_area = simpson(min_curve, x)
+    overlapping_area = simpson(min_curve, x=x)
     diff_area = area_control+area_y2-2*overlapping_area
 
     total_area_control = len(control) * max(control)
