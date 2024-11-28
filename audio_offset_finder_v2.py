@@ -161,17 +161,18 @@ class AudioOffsetFinder:
 
     # won't work well for short clips because false positives get low similarity
     clip_properties = {
-        "受之有道outro": {
-            # triangular shape at the bottom occupying large area
-            "mean_squared_error_similarity_threshold": 0.005,
-        },
-        "temple_bell": {
-            # triangular shape at the bottom occupying large area
-            "mean_squared_error_similarity_threshold": 0.01,
-        },
+        # "受之有道outro": {
+        #     # triangular shape at the bottom occupying large area
+        #     "mean_squared_error_similarity_threshold": 0.005,
+        # },
+        # "temple_bell": {
+        #     # triangular shape at the bottom occupying large area
+        #     "mean_squared_error_similarity_threshold": 0.01,
+        # },
         "rthk_beep": {
             # won't partition if downsample
             "downsample": True,
+            "mean_squared_error_similarity_threshold": 0.002,
             #"no_partition": True,
         },
     }
@@ -189,7 +190,7 @@ class AudioOffsetFinder:
         self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
         match self.similarity_method:
             case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
-                self.similarity_threshold = 0.002
+                self.similarity_threshold = 0.02
             case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
                 self.similarity_threshold = 0.02
             case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR: #median_absolute_error, a bit better for news report beep
@@ -199,6 +200,19 @@ class AudioOffsetFinder:
             #     self.similarity_threshold = 0.02
             case _:
                 raise ValueError("unknown similarity method")
+
+    def debug_clip_area(self, correlation_clip):
+        control_len = len(correlation_clip)
+        x = np.arange(control_len)
+
+        total_area_control = control_len * max(correlation_clip)
+
+        clip_area = simpson(correlation_clip, x=x)
+
+        print("correlation_clip_length", control_len)
+        print("correlation_total_area", total_area_control)
+        print("correlation_clip_area", clip_area)
+        print("correlation_ratio", clip_area / total_area_control)
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -298,17 +312,12 @@ class AudioOffsetFinder:
             #exit(1)
 
             if self.debug_mode:
-                control_len = len(downsampled_correlation_clip)
-                x = np.arange(control_len)
 
-                total_area_control = control_len * max(downsampled_correlation_clip)
+                print("average correlation_clip", np.mean(correlation_clip))
+                print("average downsampled_correlation_clip", np.mean(downsampled_correlation_clip))
 
-                downsampled_correlation_clip_area = simpson(downsampled_correlation_clip,x=x)
+                #self.debug_clip_area(correlation_clip)
 
-                print("downsampled_correlation_clip_length", control_len)
-                print("downsampled_correlation_total_area", total_area_control)
-                print("downsampled_correlation_clip_area", downsampled_correlation_clip_area)
-                print("downsampled_correlation_ratio", downsampled_correlation_clip_area/total_area_control)
                 graph_dir = f"./tmp/graph/clip_correlation_downsampled"
                 os.makedirs(graph_dir, exist_ok=True)
 
@@ -330,7 +339,7 @@ class AudioOffsetFinder:
                                      "downsampled_correlation_clip":downsampled_correlation_clip,
                                      }
 
-
+        exit(1)
 
         # Process audio in chunks
         while True:
