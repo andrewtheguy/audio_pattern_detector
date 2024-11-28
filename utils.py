@@ -203,8 +203,8 @@ def area_of_overlap_ratio(control, variable):
     #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
     #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
 
-    area_control = simpson(control, x)
-    area_y2 = simpson(y2, x)
+    area_control = simpson(control, x=x)
+    area_y2 = simpson(y2, x=x)
 
     # To find the overlapping area, take the minimum at each point
     min_curve = np.minimum(control, y2)
