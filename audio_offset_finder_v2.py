@@ -162,7 +162,7 @@ class AudioOffsetFinder:
     clip_properties = {
         "受之有道outro": {
             # triangular shape at the bottom occupying large area
-            "mean_squared_error_similarity_threshold": 0.05,
+            "mean_squared_error_similarity_threshold": 0.005,
         },
         "temple_bell": {
             # triangular shape at the bottom occupying large area
