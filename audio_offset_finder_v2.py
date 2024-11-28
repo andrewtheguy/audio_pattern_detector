@@ -297,25 +297,20 @@ class AudioOffsetFinder:
             #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
             #exit(1)
 
-            if self.debug_mode:
-                if downsampled_correlation_clip is None:
-                    downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip,
-                                                                              self.target_num_sample_after_resample)
-                print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
-                graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                plt.figure(figsize=(10, 4))
-
-                plt.plot(downsampled_correlation_clip)
-                plt.title('Cross-correlation of the audio clip itself')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}.png')
-                plt.close()
-
-                downsampled_correlation_clip = None
+            # if self.debug_mode:
+            #     print("downsampled_correlation_clip_length", len(downsampled_correlation_clip))
+            #     graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+            #     os.makedirs(graph_dir, exist_ok=True)
+            #
+            #     plt.figure(figsize=(10, 4))
+            #
+            #     plt.plot(downsampled_correlation_clip)
+            #     plt.title('Cross-correlation of the audio clip itself')
+            #     plt.xlabel('Lag')
+            #     plt.ylabel('Correlation coefficient')
+            #     plt.savefig(
+            #         f'{graph_dir}/{clip_name}.png')
+            #     plt.close()
 
             clip_datas[clip_path] = {"clip":clip,
                                      "clip_name":clip_name,
