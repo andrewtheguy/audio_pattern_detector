@@ -34,7 +34,7 @@ from sklearn.metrics import mean_squared_error, median_absolute_error, mean_abso
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile, find_closest_troughs
-from utils import slicing_with_zero_padding, downsample, area_of_overlap_ratio
+from utils import slicing_with_zero_padding, area_of_overlap_ratio
 
 logger = logging.getLogger(__name__)
 
@@ -588,7 +588,6 @@ class AudioOffsetFinder:
         # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
         # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
 
-        # clip the tails
         area_of_overlap, props = area_of_overlap_ratio(correlation_clip,
                                                        correlation_slice)
 
@@ -647,7 +646,7 @@ class AudioOffsetFinder:
 
         if debug_mode:
             print(f"---")
-            print(f"section_ts: {section_ts}")
+            print(f"section_ts: {section_ts}, index {index}")
             graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
 
@@ -727,15 +726,17 @@ class AudioOffsetFinder:
                                                                    correlation_slice[i*partition_size:(i+1)*partition_size]))
 
                 # real distortions happen in the middle most of the time except for news report beep
+                # since we don't partition for news report beep, we only need to check the middle
                 similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
-                similarity_whole = np.mean(similarity_partitions)
+                #similarity_whole = np.mean(similarity_partitions)
+                similarity_whole = 0
                 similarity_left = 0
                 similarity_right = 0
                 #similarity_left = np.mean(similarity_partitions[0:5])
                 #similarity_right = np.mean(similarity_partitions[5:10])
 
-                #similarity = similarity_middle
-                similarity = min(similarity_whole,similarity_middle)
+                similarity = similarity_middle
+                #similarity = min(similarity_whole,similarity_middle)
 
                 #similarity = min(similarity_left,similarity_middle,similarity_right)
                 #similarity = similarity_whole = (similarity_left + similarity_right)/2
