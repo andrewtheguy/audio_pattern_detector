@@ -170,6 +170,8 @@ class AudioOffsetFinder:
         #     "mean_squared_error_similarity_threshold": 0.01,
         # },
         "rthk_beep": {
+            # short pure tone needs quite a bit of workaround
+            # need to downsample and no partition and check cross similarity only
             # won't partition or calculate area ratio if downsample
             "downsample": True,
             "mean_squared_error_similarity_threshold": 0.002, #very sensitive to false positives
@@ -199,19 +201,6 @@ class AudioOffsetFinder:
             #     self.similarity_threshold = 0.02
             # case _:
             #     raise ValueError("unknown similarity method")
-
-    # def debug_clip_area(self, correlation_clip):
-    #     control_len = len(correlation_clip)
-    #     x = np.arange(control_len)
-    #
-    #     total_area_control = control_len * max(correlation_clip)
-    #
-    #     clip_area = simpson(correlation_clip, x=x)
-    #
-    #     print("correlation_clip_length", control_len)
-    #     print("correlation_total_area", total_area_control)
-    #     print("correlation_clip_area", clip_area)
-    #     print("correlation_ratio", clip_area / total_area_control)
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -798,7 +787,7 @@ class AudioOffsetFinder:
                     if debug_mode:
                         print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
                 # if similarity is between range, check shape
-                elif similarity > similarity_threshold_check_area and area_overlap_ratio > area_overlap_ratio_threshold:
+                elif area_overlap_ratio and similarity > similarity_threshold_check_area and area_overlap_ratio > area_overlap_ratio_threshold:
                     if debug_mode:
                         print(
                             f"failed verification for {section_ts} due to area_overlap_ratio {area_overlap_ratio} > {area_overlap_ratio_threshold}")
