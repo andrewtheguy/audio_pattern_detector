@@ -170,10 +170,9 @@ class AudioOffsetFinder:
         #     "mean_squared_error_similarity_threshold": 0.01,
         # },
         "rthk_beep": {
-            # won't partition if downsample
+            # won't partition or calculate area ratio if downsample
             "downsample": True,
-            "mean_squared_error_similarity_threshold": 0.002,
-            #"no_partition": True,
+            "mean_squared_error_similarity_threshold": 0.002, #very sensitive to false positives
         },
     }
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
@@ -302,8 +301,6 @@ class AudioOffsetFinder:
                 plt.savefig(
                     f'{graph_dir}/{clip_name}.png')
                 plt.close()
-
-            #do_downsample = self.clip_properties.get(clip_name, {}).get("downsample", False)
 
             downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.target_num_sample_after_resample)
 
@@ -784,22 +781,30 @@ class AudioOffsetFinder:
                                                  "left_right_diff": abs(similarity_left-similarity_right),
                                                  }))
 
-            area_overlap_ratio_threshold = 0.5
-            similarity_threshold_check_area = 0.002
-
-            if area_overlap_ratio and (similarity_threshold <= similarity_threshold_check_area):
-                raise ValueError(f"similarity_threshold {similarity_threshold} needs to be larger than similarity_threshold_check_area {similarity_threshold_check_area}")
-
-            # if similarity is between range, check shape
-            if similarity > similarity_threshold:
-                if debug_mode:
-                    print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
-            elif area_overlap_ratio and similarity > similarity_threshold_check_area and area_overlap_ratio > area_overlap_ratio_threshold:
-                if debug_mode:
-                    print(
-                        f"failed verification for {section_ts} due to area_overlap_ratio {area_overlap_ratio} > {area_overlap_ratio_threshold}")
+            if do_downsample:
+                if similarity > similarity_threshold:
+                    if debug_mode:
+                        print(
+                            f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                else:
+                    peaks_final.append(peak)
             else:
-                peaks_final.append(peak)
+                area_overlap_ratio_threshold = 0.5
+                similarity_threshold_check_area = 0.002
+
+                if similarity_threshold <= similarity_threshold_check_area:
+                    raise ValueError(f"similarity_threshold {similarity_threshold} needs to be larger than similarity_threshold_check_area {similarity_threshold_check_area}")
+
+                # if similarity is between range, check shape
+                if similarity > similarity_threshold:
+                    if debug_mode:
+                        print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                elif similarity > similarity_threshold_check_area and area_overlap_ratio > area_overlap_ratio_threshold:
+                    if debug_mode:
+                        print(
+                            f"failed verification for {section_ts} due to area_overlap_ratio {area_overlap_ratio} > {area_overlap_ratio_threshold}")
+                else:
+                    peaks_final.append(peak)
 
         if debug_mode and len(peaks) > 0:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
