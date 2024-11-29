@@ -173,7 +173,7 @@ class AudioOffsetFinder:
             # short pure tone needs quite a bit of workaround
             # need to downsample and no partition and check cross similarity only
             # won't partition or calculate area ratio if downsample
-            "is_beep": True,
+            "is_pure_tone_pattern": True,
         },
     }
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
@@ -290,9 +290,9 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}.png')
                 plt.close()
 
-            is_beep = self.clip_properties.get(clip_name, {}).get("is_beep", False)
+            is_pure_tone_pattern = self.clip_properties.get(clip_name, {}).get("is_pure_tone_pattern", False)
             downsampled_correlation_clip = None
-            if is_beep:
+            if is_pure_tone_pattern:
                 downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.beep_target_num_sample_after_resample)
 
                 #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
@@ -603,7 +603,7 @@ class AudioOffsetFinder:
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","downsampled_correlation_clip")(clip_data))
 
         clip_properties = self.clip_properties.get(clip_name, {})
-        is_beep = clip_properties.get("is_beep", False)
+        is_pure_tone_pattern = clip_properties.get("is_pure_tone_pattern", False)
 
 
         debug_mode = self.debug_mode
@@ -685,7 +685,7 @@ class AudioOffsetFinder:
             if len(correlation_slice) != len(correlation_clip):
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
-            if is_beep:
+            if is_pure_tone_pattern:
                 self._get_peak_times_beep(downsampled_correlation_clip=downsampled_correlation_clip,
                                                  correlation_slice=correlation_slice,
                                                  seconds=seconds,
