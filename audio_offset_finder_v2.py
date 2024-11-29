@@ -183,9 +183,6 @@ class AudioOffsetFinder:
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = 8000
-        self.similarity_debug=defaultdict(list)
-        #self.max_distance_debug=defaultdict(list)
-        #self.areas_debug=defaultdict(list)
         self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
         #match self.similarity_method:
         #    case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
@@ -238,6 +235,7 @@ class AudioOffsetFinder:
         clip_datas={}
         clip_cache={
             "downsampled_correlation_clips":{},
+            "similarity_debug":defaultdict(list),
         }
 
         for clip_path in clip_paths:
@@ -375,7 +373,7 @@ class AudioOffsetFinder:
                 x_coords = []
                 y_coords = []
 
-                for index,similarity in self.similarity_debug[clip_name]:
+                for index,similarity in clip_cache['similarity_debug'][clip_name]:
                     x_coords.append(index)
                     y_coords.append(similarity)
 
@@ -772,9 +770,10 @@ class AudioOffsetFinder:
                                                                               lower_limit:upper_limit])
 
         if debug_mode:
+            similarity_debug = clip_cache["similarity_debug"]
             print("similarity", similarity)
             seconds.append(peak / sr)
-            self.similarity_debug[clip_name].append((index, similarity,))
+            similarity_debug[clip_name].append((index, similarity,))
 
             correlation_slice_graph = correlation_slice
             correlation_clip_graph = correlation_clip
@@ -855,7 +854,8 @@ class AudioOffsetFinder:
         if debug_mode:
             print("similarity", similarity)
             seconds.append(peak / sr)
-            self.similarity_debug[clip_name].append((index, similarity,))
+            similarity_debug = clip_cache["similarity_debug"]
+            similarity_debug[clip_name].append((index, similarity,))
 
             correlation_slice_graph = correlation_slice
             correlation_clip_graph = correlation_clip
