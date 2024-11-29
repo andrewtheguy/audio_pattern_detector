@@ -696,14 +696,13 @@ class AudioOffsetFinder:
             if len(correlation_slice) != len(correlation_clip):
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
-            downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice,
-                                                                       self.target_num_sample_after_resample)
-
             area_overlap_ratio = None
             area_prop = None
 
-            # downsampled
+            # downsampled and no partition
             if do_downsample:
+                downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice,
+                                                                           self.target_num_sample_after_resample)
                 similarity = mean_squared_error(downsampled_correlation_clip, downsampled_correlation_slice)
                 #similarity_middle = np.mean(similarity_partitions[4:6])
                 similarity_whole = similarity
