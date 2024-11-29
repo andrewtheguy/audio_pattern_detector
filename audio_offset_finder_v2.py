@@ -652,8 +652,11 @@ class AudioOffsetFinder:
         #trim placeholder clip
         #correlation = correlation[:max_sample]
 
-
+        # no repetition within the duration of the clip
         distance = clip_length
+        # minimum height of the peak of the correlation, don't set it too high otherwise will miss some
+        # the selected ones are going to be checked for similarity
+        # before adding to final peaks
         height_min = 0.25
         peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
