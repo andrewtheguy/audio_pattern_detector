@@ -794,15 +794,15 @@ class AudioOffsetFinder:
                 if similarity_threshold <= similarity_threshold_check_area:
                     raise ValueError(f"similarity_threshold {similarity_threshold} needs to be larger than similarity_threshold_check_area {similarity_threshold_check_area}")
 
-                # if similarity is between range, check shape
                 if similarity > similarity_threshold:
                     if debug_mode:
                         print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                # if similarity is between range, check shape
                 elif similarity > similarity_threshold_check_area and area_overlap_ratio > area_overlap_ratio_threshold:
                     if debug_mode:
                         print(
                             f"failed verification for {section_ts} due to area_overlap_ratio {area_overlap_ratio} > {area_overlap_ratio_threshold}")
-                else:
+                else: # if similarity is less than similarity_threshold_check_area, no need to check area ratio
                     peaks_final.append(peak)
 
         if debug_mode and len(peaks) > 0:
