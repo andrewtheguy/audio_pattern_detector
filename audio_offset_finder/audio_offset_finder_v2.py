@@ -1,23 +1,13 @@
-import argparse
-import sys
-from collections import deque, defaultdict
-import copy
-import datetime
+from collections import defaultdict
 import json
 import logging
 import os
-import pdb
-import time
+
 from operator import itemgetter
 from pathlib import Path
-from scipy.integrate import simpson
-#from pure_tone import is_pure_tone
-
-import soundfile as sf
 
 import numpy as np
 
-from numpy._typing import DTypeLike
 from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
@@ -25,137 +15,21 @@ import matplotlib.pyplot as plt
 import ffmpeg
 
 import pyloudnorm as pyln
-#import pyaudio
 
 import warnings
-from scipy.io import wavfile
-from scipy.signal import stft, istft
 from andrew_utils import seconds_to_time
-from scipy.signal import resample
-from scipy.signal import find_peaks
-from sklearn.metrics import mean_squared_error, median_absolute_error, mean_absolute_error
 
-from numpy_encoder import NumpyEncoder
-from peak_methods import get_peak_profile, find_closest_troughs
-from pure_tone import is_news_report_beep, detect_sine_tone, is_pure_tone
-from utils import slicing_with_zero_padding, area_of_overlap_ratio
+from scipy.signal import find_peaks
+from sklearn.metrics import mean_squared_error
+
+from audio_offset_finder.numpy_encoder import NumpyEncoder
+from audio_offset_finder.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, downsample_preserve_maxima
+from audio_offset_finder.detection_utils import area_of_overlap_ratio, is_pure_tone
 
 logger = logging.getLogger(__name__)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
-
-DEFAULT_METHOD="correlation"
-
-def load_audio_file(file_path, sr=None):
-    # Create ffmpeg process
-    process = (
-        ffmpeg
-        .input(file_path)
-        .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=sr, loglevel="error")
-        .run_async(pipe_stdout=True)
-    )
-    data = process.stdout.read()
-    process.wait()
-    return np.frombuffer(data, dtype="int16")
-    #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
-
-# from librosa.util.buf_to_float
-def buf_to_float(
-    x: np.ndarray, *, n_bytes: int = 2, dtype: DTypeLike = np.float32
-) -> np.ndarray:
-    """Convert an integer buffer to floating point values.
-    This is primarily useful when loading integer-valued wav data
-    into numpy arrays.
-
-    Parameters
-    ----------
-    x : np.ndarray [dtype=int]
-        The integer-valued data buffer
-    n_bytes : int [1, 2, 4]
-        The number of bytes per sample in ``x``
-    dtype : numeric type
-        The target output type (default: 32-bit float)
-
-    Returns
-    -------
-    x_float : np.ndarray [dtype=float]
-        The input data buffer cast to floating point
-    """
-    # Invert the scale of the data
-    scale = 1.0 / float(1 << ((8 * n_bytes) - 1))
-
-    # Construct the format string
-    fmt = f"<i{n_bytes:d}"
-
-    # Rescale and format the data buffer
-    return scale * np.frombuffer(x, fmt).astype(dtype)
-
-def convert_audio_arr_to_float(audio):
-    #raise "chafa"
-    return buf_to_float(audio,n_bytes=2, dtype='float32')
-
-
-# def dtw_distance(series1, series2):
-#     distance, path = fastdtw(series1, series2, dist=2)
-#     return distance
-#     #return d
-
-
-# # Normalize the curves to the same scale
-# def normalize_curve(curve):
-#     return (curve - np.min(curve)) / (np.max(curve) - np.min(curve))
-
-# # Apply DTW and warp the target curve
-# def warp_with_dtw(reference, target):
-#     # Compute dynamic time warping path
-#     path = dtaidistance.dtw.warping_path(reference, target)
-#     #print("path",path)
-#
-#     # Create an array to hold the warped target
-#     warped_target = np.zeros_like(reference)
-#     for ref_idx, target_idx in path:
-#         warped_target[ref_idx] = target[target_idx]
-#
-#     return warped_target, path
-
-def downsample_preserve_maxima(curve, num_samples):
-    n_points = len(curve)
-    step_size = n_points / num_samples
-    compressed_curve = []
-
-    for i in range(num_samples):
-        start_index = int(i * step_size)
-        end_index = int((i + 1) * step_size)
-
-        if start_index >= n_points:
-            break
-
-        window = curve[start_index:end_index]
-        if len(window) == 0:
-            continue
-
-        local_max_index = np.argmax(window)
-        compressed_curve.append(window[local_max_index])
-
-        # # Find peaks within this window
-        # peaks, _ = find_peaks(window)
-        # if len(peaks) == 0:
-        #     # If no peaks, simply downsample by taking the first point in the window
-        #     compressed_curve.append(window[0])
-        # else:
-        #     # Select the local maxima point
-        #     local_max_index = peaks[np.argmax(window[peaks])]
-        #     compressed_curve.append(window[local_max_index])
-
-    # Adjust the length if necessary by adding the last element of the original curve
-    if len(compressed_curve) < num_samples and len(curve) > 0:
-        compressed_curve.append(curve[-1])
-
-    if len(compressed_curve) != num_samples:
-        raise ValueError(f"downsampled curve length {len(compressed_curve)} not equal to num_samples {num_samples}")
-
-    return np.array(compressed_curve)
 
 class AudioOffsetFinder:
     SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
@@ -180,9 +54,8 @@ class AudioOffsetFinder:
         #     "is_pure_tone_pattern": True,
         # },
     }
-    def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
+    def __init__(self, clip_paths, debug_mode=False):
         self.clip_paths = clip_paths
-        self.method = method
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
@@ -192,20 +65,6 @@ class AudioOffsetFinder:
         for clip_path in clip_paths:
             if not os.path.exists(clip_path):
                 raise ValueError(f"Clip {clip_path} does not exist")
-
-
-        #match self.similarity_method:
-        #    case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
-        #self.similarity_threshold = 0.01
-            # case self.SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR:
-            #     self.similarity_threshold = 0.02
-            # case self.SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR: #median_absolute_error, a bit better for news report beep
-            #     self.similarity_threshold = 0.02
-            # case self.SIMILARITY_METHOD_TEST:
-            #     #test
-            #     self.similarity_threshold = 0.02
-            # case _:
-            #     raise ValueError("unknown similarity method")
 
     # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, full_audio_path):
@@ -292,7 +151,7 @@ class AudioOffsetFinder:
                 print(f"clip_length {clip_name}", len(clip))
                 print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate)
                 print("correlation_clip_length", len(correlation_clip))
-                graph_dir = f"./tmp/graph/clip_correlation"
+                graph_dir = f"../tmp/graph/clip_correlation"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 plt.figure(figsize=(10, 4))
@@ -377,12 +236,12 @@ class AudioOffsetFinder:
 
         suffix = Path(full_audio_path).stem
 
-        if self.debug_mode and self.method == "correlation":
+        if self.debug_mode:
             for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
 
                 # similarity debug
-                graph_dir = f"./tmp/graph/{self.method}_similarity_{self.similarity_method}/{clip_name}"
+                graph_dir = f"./tmp/graph/mean_squared_error_similarity_{self.similarity_method}/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 x_coords = []
@@ -408,29 +267,6 @@ class AudioOffsetFinder:
                 plt.savefig(
                     f'{graph_dir}/{suffix}.png')
                 plt.close()
-
-                # # distance debug
-                # graph_dir = f"./tmp/graph/{self.method}_distance_{self.similarity_method}/{clip_name}"
-                # os.makedirs(graph_dir, exist_ok=True)
-                #
-                # x_coords = []
-                # y_coords = []
-                #
-                # for index,distance,distance_index in self.max_distance_debug[clip_name]:
-                #     x_coords.append(index)
-                #     y_coords.append(distance)
-                #
-                # plt.figure(figsize=(10, 4))
-                # # Create scatter plot
-                # plt.scatter(x_coords, y_coords)
-                #
-                # # Adding titles and labels
-                # plt.title('Scatter Plot for Distance')
-                # plt.xlabel('Value')
-                # plt.ylabel('Sublist Index')
-                # plt.savefig(
-                #     f'{graph_dir}/{suffix}.png')
-                # plt.close()
 
         process.wait()
 
@@ -519,16 +355,11 @@ class AudioOffsetFinder:
         #         f"./tmp/audio/section_{clip_name}_{index}_{seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)}.wav",
         #         audio_section, sr)
 
-        if self.method == "correlation":
-
-            # samples_skip_end does not skip results from being included yet
-            peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                                  seconds_per_chunk=seconds_per_chunk,
-                                                  clip_cache=clip_cache,
-                                                  )
-
-        else:
-            raise ValueError("unknown method")
+        # samples_skip_end does not skip results from being included yet
+        peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
+                                              seconds_per_chunk=seconds_per_chunk,
+                                              clip_cache=clip_cache,
+                                              )
 
         # subtract sliding window seconds from peak times
         peak_times = [peak_time - subtract_seconds for peak_time in peak_times]
@@ -892,10 +723,10 @@ class AudioOffsetFinder:
         downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
 
         if downsampled_correlation_clip is None:
-            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip,beep_target_num_sample_after_resample)
+            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
             clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
 
-        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice,beep_target_num_sample_after_resample)
+        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
 
         correlation_clip = downsampled_correlation_clip
         correlation_slice = downsampled_correlation_slice
@@ -954,10 +785,10 @@ class AudioOffsetFinder:
         downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
 
         if downsampled_correlation_clip is None:
-            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip,beep_target_num_sample_after_resample)
+            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
             clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
 
-        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice,beep_target_num_sample_after_resample)
+        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
 
         correlation_clip = downsampled_correlation_clip
         correlation_slice = downsampled_correlation_slice

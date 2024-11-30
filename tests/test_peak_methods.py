@@ -1,9 +1,7 @@
 import unittest
 import numpy as np
 
-from peak_methods import find_closest_troughs
-from process_timestamps import pad_from_backup_intro_ts
-from utils import minutes_to_seconds
+from audio_offset_finder.peak_methods import find_closest_troughs
 
 
 class TestPeakMethods(unittest.TestCase):
