@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
 class AudioOffsetFinder:
-    SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
+    # SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
     # SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR = "mean_absolute_error"
     # SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"
     #SIMILARITY_METHOD_TEST = "test"
@@ -59,7 +59,6 @@ class AudioOffsetFinder:
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = 8000
-        self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
 
         for clip_path in clip_paths:
             if not os.path.exists(clip_path):
@@ -233,7 +232,7 @@ class AudioOffsetFinder:
                     clip_name, _ = os.path.splitext(os.path.basename(clip_path))
 
                     # similarity debug
-                    graph_dir = f"./tmp/graph/mean_squared_error_similarity_{self.similarity_method}/{clip_name}"
+                    graph_dir = f"./tmp/graph/mean_squared_error_similarity/{clip_name}"
                     os.makedirs(graph_dir, exist_ok=True)
 
                     x_coords = []
