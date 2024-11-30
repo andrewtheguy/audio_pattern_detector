@@ -616,14 +616,16 @@ class AudioOffsetFinder:
             clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, sr)
 
         is_pure_tone_pattern = clip_cache["is_pure_tone_pattern"][clip_name]
-        # if is_pure_tone_pattern:
-        #     raise ValueError("is_pure_tone_pattern")
 
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
+        clip_length_seconds = clip_length / sr
 
-        #very_short_clip = len(clip) < 0.75 * sr
+        very_short_clip = clip_length_seconds < 0.5
+
+        if very_short_clip and not is_pure_tone_pattern:
+            raise ValueError(f"very short clip {clip_name} is not supported yet unless it is pure tone pattern, it has {clip_length_seconds} seconds")
 
         # zeroes_second_pad = 1
         # # pad zeros between audio and clip
@@ -847,6 +849,7 @@ class AudioOffsetFinder:
         else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
             peaks_final.append(peak)
 
+    # doesn't work well
     def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
 
         sr = self.target_sample_rate
