@@ -188,6 +188,12 @@ class AudioOffsetFinder:
         self.normalize = True
         self.target_sample_rate = 8000
         self.similarity_method = self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR
+
+        for clip_path in clip_paths:
+            if not os.path.exists(clip_path):
+                raise ValueError(f"Clip {clip_path} does not exist")
+
+
         #match self.similarity_method:
         #    case self.SIMILARITY_METHOD_MEAN_SQUARED_ERROR:
         #self.similarity_threshold = 0.01
@@ -205,9 +211,6 @@ class AudioOffsetFinder:
     def find_clip_in_audio(self, full_audio_path):
         clip_paths = self.clip_paths
         #self.correlation_cache_correlation_method.clear()
-        for clip_path in clip_paths:
-            if not os.path.exists(clip_path):
-                raise ValueError(f"Clip {clip_path} does not exist")
 
         if not os.path.exists(full_audio_path):
             raise ValueError(f"Full audio {full_audio_path} does not exist")
@@ -243,6 +246,8 @@ class AudioOffsetFinder:
             "similarity_debug":defaultdict(list),
         }
 
+        clips_already = set()
+
         for clip_path in clip_paths:
             # Load the audio clip
             clip = load_audio_file(clip_path, sr=self.target_sample_rate)
@@ -250,6 +255,11 @@ class AudioOffsetFinder:
             clip = convert_audio_arr_to_float(clip)
 
             clip_name, _ = os.path.splitext(os.path.basename(clip_path))
+
+            if clip_name in clips_already:
+                raise ValueError(f"clip {clip_name} needs to be unique")
+
+            clips_already.add(clip_name)
 
             clip_seconds = len(clip) / self.target_sample_rate
 
