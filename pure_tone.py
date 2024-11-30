@@ -162,7 +162,7 @@ def detect_sine_tone(audio_signal, sample_rate=8000, tone_frequency=1039, bandwi
     signal2 = signal2 / np.max(signal2)  # Normalize the magnitude
 
 
-    peaks = find_peaks(signal2,threshold=0,width=0,prominence=0.4,rel_height=0.5)
+    peaks = find_peaks(signal2,threshold=0,width=[0,4],height=0.4,rel_height=0.5)
     print("freqs2: ", freqs2)
     print("signal2: ", signal2)
     print("tone_magnitude: ", tone_magnitude)
@@ -170,7 +170,7 @@ def detect_sine_tone(audio_signal, sample_rate=8000, tone_frequency=1039, bandwi
 
     # Visualize the frequency spectrum of the filtered signal
     plt.figure(figsize=(10, 6))
-    plt.plot(freqs2,signal2)
+    plt.plot(signal2)
     plt.title(f'Frequency Spectrum around {tone_frequency} Hz')
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Magnitude')
@@ -178,6 +178,7 @@ def detect_sine_tone(audio_signal, sample_rate=8000, tone_frequency=1039, bandwi
     plt.show()
 
     # should return true only if there is one sharp peak
+    return len(peaks[0]) == 1
 
 def plot_spectrogram(audio_data, sample_rate, title='Spectrogram'):
     """
