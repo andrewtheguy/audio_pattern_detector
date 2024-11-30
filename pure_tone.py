@@ -44,12 +44,12 @@ def is_pure_tone(audio_data, sample_rate):
     peak_freqs = positive_freqs[peaks]
     print(f"peak_freqs: {peak_freqs}")
 
-    if np.any((peak_freqs < 1030) | (peak_freqs > 1040)):
+    if np.any((peak_freqs < 1030) | (peak_freqs > 1042)):
         print("Not a news report clip.")
-        return False
+        return False,peak_freqs
     else:
         print("News report clip detected.")
-        return True
+        return True,peak_freqs
 
 
     # # Check if there's only one significant peak
