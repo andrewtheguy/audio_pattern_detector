@@ -194,6 +194,12 @@ def trapezoidal_area(y1, y2):
     return area
 
 def area_of_overlap_ratio(control, variable):
+
+    if len(control) != len(variable):
+        raise ValueError("Both arrays must have the same length")
+
+    total_rect_control = len(control) * max(control)
+
     y2 = variable
     # Define the x-axis range based on the indices of the input arrays
     x = np.arange(len(control))
@@ -212,20 +218,18 @@ def area_of_overlap_ratio(control, variable):
     overlapping_area = simpson(min_curve, x=x)
     diff_area = area_control+area_y2-2*overlapping_area
 
-    total_area_control = len(control) * max(control)
 
     # Calculate percentage overlap with respect to each curve
     #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
     #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
     #print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
     props = {
-                "total_area_control":total_area_control,
+                "total_rect_control":total_rect_control,
                 "diff_area":diff_area,
                 "overlapping_area":overlapping_area,
                 "area_control":area_control,
                 "area_y2":area_y2,
-                #"diff_area_ratio":diff_area/total_area_control,
-                #"overlapping_area_ratio":overlapping_area/total_area_control,
-                "percent_control_area":area_control/total_area_control,
+                "diff_overlap_ratio":diff_area/overlapping_area,
+                "percent_control_area":area_control/total_rect_control,
             }
-    return diff_area/overlapping_area, props
+    return props
