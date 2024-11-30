@@ -1,4 +1,4 @@
-# Audio Pattern Detection
+# Audio Pattern Detector
 This is a project that detects audio patterns specified by audio clips on a target audio file. It is designed to detect consistent patterns from prerecorded radio shows and podcasts.
 It uses cross-correlation to detect the potential matching pattern, and then uses mean square error and overlapping areas on cross correlation graph to eliminate false positives.
 
