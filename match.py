@@ -2,12 +2,9 @@ import argparse
 import glob
 import json
 import os
-from collections import deque
-import math
-from os.path import basename
 from pathlib import Path
 
-from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
+from audio_offset_finder.audio_offset_finder_v2 import AudioOffsetFinder
 from andrew_utils import seconds_to_time
 
 
@@ -54,9 +51,9 @@ from andrew_utils import seconds_to_time
 
 #     return peak_times_final
 
-def match_pattern(audio_file, pattern_file, method, debug_mode=False):
+def match_pattern(audio_file, pattern_file, debug_mode=False):
     # Find clip occurrences in the full audio
-    peak_times = AudioOffsetFinder(method=method, debug_mode=debug_mode,
+    peak_times = AudioOffsetFinder(debug_mode=debug_mode,
                                    clip_paths=[pattern_file]).find_clip_in_audio(full_audio_path=audio_file)
     return peak_times[pattern_file]
 
@@ -67,7 +64,6 @@ def main():
     parser.add_argument('--pattern-file', metavar='pattern file', required=True, type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, required=False, help='audio file to find pattern')
     parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
-    parser.add_argument('--match-method', metavar='pattern match method', type=str, help='pattern match method, currently only correlation',default=DEFAULT_METHOD)
     #parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
     #                    default=0.4)
     args = parser.parse_args()
@@ -83,7 +79,7 @@ def main():
         #peak_time = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
             print(f"Processing {audio_file}...")
-            peak_times = match_pattern(audio_file, args.pattern_file, args.match_method)
+            peak_times = match_pattern(audio_file, args.pattern_file)
             if len(peak_times) > 0:
                 peak_times_second = [seconds_to_time(seconds=offset) for offset in peak_times]
                 print(f"Clip occurs with the file {audio_file} at the following times (in seconds): {peak_times_second}")
@@ -91,7 +87,7 @@ def main():
                 with open(output_file, 'a') as f:
                     print(json.dumps({'audio_file': audio_file, 'peak_times': peak_times_second},ensure_ascii=False), file=f)
     elif args.audio_file:
-        peak_times=match_pattern(args.audio_file, args.pattern_file, args.match_method, debug_mode=True)
+        peak_times=match_pattern(args.audio_file, args.pattern_file, debug_mode=True)
         print(peak_times)
 
         for offset in peak_times:

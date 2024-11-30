@@ -2,28 +2,25 @@
 import argparse
 import fcntl
 import glob
-from collections import deque, defaultdict
+from collections import defaultdict
 import datetime
 import json
 import logging
 import math
 import os
-import pprint
 import shutil
 import tempfile
 import traceback
 from pathlib import Path
 
 import ffmpeg
-import numpy as np
 import pytz
 
-from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
+from audio_offset_finder.audio_offset_finder_v2 import AudioOffsetFinder
 #from database import save_debug_info_to_db
 from process_timestamps import preprocess_ts, process_timestamps_rthk
 from publish import publish_folder
 from scrape_utils import concatenate_audio, split_audio_by_time_sequences
-from time_sequence_error import TimeSequenceError
 from file_upload.upload_utils2 import upload_file, remote_exists, download_file
 
 logger = logging.getLogger(__name__)
@@ -118,7 +115,7 @@ def get_single_beep(input_file):
 
     clip_paths_news_report=[news_report_clip_path]
 
-    news_report_clip_peak_times = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
+    news_report_clip_peak_times = AudioOffsetFinder(debug_mode=False,
                                    clip_paths=clip_paths_news_report).find_clip_in_audio(full_audio_path=input_file)
     
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
@@ -150,7 +147,6 @@ def get_by_news_report_theme_clip(input_file,news_report_strategy_expected_count
 
     #correlation_threshold_news_report = 0.7
     news_report_clip_peak_times = AudioOffsetFinder(clip_paths=clip_paths_news_report,
-                                                    method=DEFAULT_METHOD,
                                                     ).find_clip_in_audio(full_audio_path=input_file)
 
     news_report_peak_times = news_report_clip_peak_times[news_report_clip_path]
@@ -266,7 +262,6 @@ def scrape(input_file, stream_name, output_dir_trimmed):
         backup_intro_clip_paths=[f'./audio_clips/{clip}' for clip in backup_intro_clips]
 
         intro_clip_peak_times = AudioOffsetFinder(clip_paths=clip_paths_intros+backup_intro_clip_paths,
-                                                        method=DEFAULT_METHOD,
                                                         ).find_clip_in_audio(full_audio_path=input_file)
         
         program_intro_peak_times=[]
