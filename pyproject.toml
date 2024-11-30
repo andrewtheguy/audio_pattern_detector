@@ -11,7 +11,7 @@ numpy = "^1.26.4"
 matplotlib = "^3.9.0"
 ffmpeg-python = "^0.2.0"
 pyloudnorm = "^0.1.1"
-andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", tag = "0.1.1" }
+andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
 setuptools = "^69.5.1"
 scikit-learn = "^1.5.0"
 soundfile = "^0.12.1"
