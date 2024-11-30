@@ -32,30 +32,33 @@ def is_pure_tone(audio_data, sample_rate):
     dominant_freq_idx = np.argmax(positive_magnitude)
     dominant_magnitude = positive_magnitude[dominant_freq_idx]
 
-    #print(f"dominant_freq_idx: {dominant_freq_idx}")
-    #print(f"dominant_magnitude: {dominant_magnitude}")
-    print(f"positive_magnitude: {positive_magnitude}")
-    #print(f"freqs: {positive_freqs[positive_magnitude]}")
+    #print(f"positive_magnitude: {positive_magnitude}")
 
     # Define a threshold for pure tone
-    noise_threshold = 0.05 * dominant_magnitude  # e.g., 5% of the peak
+    noise_threshold = 0.25 * dominant_magnitude  # e.g., 25% of the peak
     peaks = positive_magnitude > noise_threshold
 
-    print(f"dominant_freq: {positive_freqs[dominant_freq_idx]}")
-    print(f"peaks: {positive_magnitude[peaks]}")
-    print(f"freqs2: {positive_freqs[peaks]}")
+    #print(f"dominant_freq: {positive_freqs[dominant_freq_idx]}")
+    print(f"peaks magnitudes: {positive_magnitude[peaks]}")
 
-    #indices = np.where(peaks)
-    #print(f"freq indices peak: {positive_freqs[indices]}")
+    peak_freqs = positive_freqs[peaks]
+    print(f"peak_freqs: {peak_freqs}")
 
-
-    # Check if there's only one significant peak
-    if np.sum(peaks) == 1:
-        print(f"Pure tone detected at frequency: {positive_freqs[dominant_freq_idx]:.2f} Hz")
-        return True
-    else:
-        print("Not a pure tone.")
+    if np.any((peak_freqs < 1030) | (peak_freqs > 1040)):
+        print("Not a news report clip.")
         return False
+    else:
+        print("News report clip detected.")
+        return True
+
+
+    # # Check if there's only one significant peak
+    # if np.sum(peaks) == 1:
+    #     print(f"Pure tone detected at frequency: {positive_freqs[dominant_freq_idx]:.2f} Hz")
+    #     return True
+    # else:
+    #     print("Not a pure tone.")
+    #     return False
 
 
 # # Example usage
