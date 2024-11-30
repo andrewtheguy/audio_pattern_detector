@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "audio-offset-finder"
+name = "audio-offset-finder-v2"
 version = "0.1.0"
 description = ""
 authors = ["Andrew Chen <hello@andrewtheguy.com>"]
@@ -16,7 +16,7 @@ requests = "^2.32.2"
 pytz = "2024.2"
 jinja2 = "^3.1.3"
 python-dotenv = "^1.0.1"
-andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", branch = "main" }
+andrew_utils= { git = "https://github.com/andrewtheguy/andrew_utils.git", tag = "0.1.1" }
 setuptools = "^69.5.1"
 boto3 = "^1.34.103"
 pypinyin = "^0.51.0"
