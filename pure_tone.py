@@ -17,11 +17,11 @@ def is_pure_tone(audio_data, sample_rate):
     fft_result = np.fft.fft(audio_data)
     freqs = np.fft.fftfreq(len(audio_data), d=1 / sample_rate)
 
-    # # Analyze the magnitude spectrum
-    # magnitude = np.abs(fft_result)
-    # positive_freqs = freqs[:len(freqs) // 2]
-    # positive_magnitude = magnitude[:len(freqs) // 2]
-    #
+    # Analyze the magnitude spectrum
+    magnitude = np.abs(fft_result)
+    positive_freqs = freqs[:len(freqs) // 2]
+    positive_magnitude = magnitude[:len(freqs) // 2]
+
     # plt.plot(positive_freqs, positive_magnitude)
     # plt.xlabel('Frequency (Hz)')
     # plt.ylabel('Magnitude')
