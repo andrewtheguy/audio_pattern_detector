@@ -539,61 +539,61 @@ class AudioOffsetFinder:
 
         return peak_times_final
 
-    def _calculate_area_of_overlap_ratio(self, correlation_clip, correlation_slice):
-
-        #
-        # peak_index = np.argmax(downsampled_correlation_clip)
-        # peak_index_slice = np.argmax(downsampled_correlation_slice)
-        # if self.debug_mode:
-        #     print("len", len(downsampled_correlation_clip))
-        #     print("peak_index", peak_index)
-        # #raise "chafa"
-        # if(peak_index != peak_index_slice):
-        #     logger.warning(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
-        # left_trough, right_trough = find_closest_troughs(peak_index, downsampled_correlation_clip)
-        # max_width_half = max(peak_index-left_trough,right_trough-peak_index)
-        #
-        # if max_width_half < 10:
-        #     max_width_half = 10
-        #
-        # new_left = max(0,peak_index-max_width_half)
-        # new_right = min(len(downsampled_correlation_clip),peak_index+max_width_half+1)
-        #
-        # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-        # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-
-        # alternative
-        # peaks, properties = find_peaks(downsampled_correlation_clip, height=0.95,prominence=0.25,distance=21,wlen=21)
-        # if len(peaks) != 1:
-        #     raise ValueError(f"expected 1 peak, found {peaks}")
-        #
-        # new_left = properties["left_bases"][0]
-        # new_right = properties["right_bases"][0]
-        #
-        # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-        # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-
-        # # static
-        # middle = len(downsampled_correlation_clip) // 2
-        #
-        # # mid point of the peak for 1/10th of the downsampled_correlation_clip
-        # new_left = middle - len(downsampled_correlation_clip) // 20
-        # new_right = middle + len(downsampled_correlation_clip) // 20
-        #
-        # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-        # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-
-        area_of_overlap, props = area_of_overlap_ratio(correlation_clip,
-                                                       correlation_slice)
-
-        return area_of_overlap,{
-            #"clip_within_peak":clip_within_peak,
-            #"correlation_slice_within_peak":correlation_slice_within_peak,
-            #"downsampled_correlation_slice":downsampled_correlation_slice,
-            #"new_left":new_left,
-            #"new_right":new_right,
-            "area_props":props,
-        }
+    # def _calculate_area_of_overlap_ratio(self, correlation_clip, correlation_slice):
+    #
+    #     #
+    #     # peak_index = np.argmax(downsampled_correlation_clip)
+    #     # peak_index_slice = np.argmax(downsampled_correlation_slice)
+    #     # if self.debug_mode:
+    #     #     print("len", len(downsampled_correlation_clip))
+    #     #     print("peak_index", peak_index)
+    #     # #raise "chafa"
+    #     # if(peak_index != peak_index_slice):
+    #     #     logger.warning(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
+    #     # left_trough, right_trough = find_closest_troughs(peak_index, downsampled_correlation_clip)
+    #     # max_width_half = max(peak_index-left_trough,right_trough-peak_index)
+    #     #
+    #     # if max_width_half < 10:
+    #     #     max_width_half = 10
+    #     #
+    #     # new_left = max(0,peak_index-max_width_half)
+    #     # new_right = min(len(downsampled_correlation_clip),peak_index+max_width_half+1)
+    #     #
+    #     # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
+    #     # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
+    #
+    #     # alternative
+    #     # peaks, properties = find_peaks(downsampled_correlation_clip, height=0.95,prominence=0.25,distance=21,wlen=21)
+    #     # if len(peaks) != 1:
+    #     #     raise ValueError(f"expected 1 peak, found {peaks}")
+    #     #
+    #     # new_left = properties["left_bases"][0]
+    #     # new_right = properties["right_bases"][0]
+    #     #
+    #     # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
+    #     # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
+    #
+    #     # # static
+    #     # middle = len(downsampled_correlation_clip) // 2
+    #     #
+    #     # # mid point of the peak for 1/10th of the downsampled_correlation_clip
+    #     # new_left = middle - len(downsampled_correlation_clip) // 20
+    #     # new_right = middle + len(downsampled_correlation_clip) // 20
+    #     #
+    #     # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
+    #     # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
+    #
+    #     area_of_overlap, props = area_of_overlap_ratio(correlation_clip,
+    #                                                    correlation_slice)
+    #
+    #     return area_of_overlap,{
+    #         #"clip_within_peak":clip_within_peak,
+    #         #"correlation_slice_within_peak":correlation_slice_within_peak,
+    #         #"downsampled_correlation_slice":downsampled_correlation_slice,
+    #         #"new_left":new_left,
+    #         #"new_right":new_right,
+    #         "area_props":props,
+    #     }
 
     def _get_max_distance(self, downsampled_correlation_clip, downsampled_correlation_slice,):
         distances = np.abs(downsampled_correlation_clip-downsampled_correlation_slice)
@@ -704,7 +704,7 @@ class AudioOffsetFinder:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             if is_pure_tone_pattern:
-                self._get_peak_times_beep(correlation_clip=correlation_clip,
+                self._get_peak_times_beep_v3(correlation_clip=correlation_clip,
                                           correlation_slice=correlation_slice,
                                           seconds=seconds,
                                           peak=peak,
@@ -790,9 +790,11 @@ class AudioOffsetFinder:
 
         lower_limit = round(len(correlation_clip) * left_bound / partition_count)
         upper_limit = round(len(correlation_clip) * right_bound / partition_count)
-        area_overlap_ratio, area_prop = self._calculate_area_of_overlap_ratio(correlation_clip[lower_limit:upper_limit],
+        area_prop = area_of_overlap_ratio(correlation_clip[lower_limit:upper_limit],
                                                                               correlation_slice[
                                                                               lower_limit:upper_limit])
+
+        diff_overlap_ratio = area_prop["diff_overlap_ratio"]
 
         if debug_mode:
             similarity_debug = clip_cache["similarity_debug"]
@@ -819,7 +821,7 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
-            area_props.append([area_overlap_ratio, area_prop])
+            area_props.append([diff_overlap_ratio, area_prop])
 
             similarities.append((similarity, {"whole": similarity_whole,
                                               "left": similarity_left,
@@ -832,7 +834,7 @@ class AudioOffsetFinder:
         similarity_threshold_check_area = 0.002
 
         # reject if similarity is high enough and little area overlap
-        area_overlap_ratio_threshold = 0.5
+        diff_overlap_ratio_threshold = 0.5
 
         if similarity_threshold <= similarity_threshold_check_area:
             raise ValueError(
@@ -842,10 +844,10 @@ class AudioOffsetFinder:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
         # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
-        elif similarity > similarity_threshold_check_area and area_overlap_ratio > area_overlap_ratio_threshold:
+        elif similarity > similarity_threshold_check_area and diff_overlap_ratio > diff_overlap_ratio_threshold:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to area_overlap_ratio {area_overlap_ratio} > {area_overlap_ratio_threshold}")
+                    f"failed verification for {section_ts} due to diff_overlap_ratio {diff_overlap_ratio} > {diff_overlap_ratio_threshold}")
         else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
             peaks_final.append(peak)
 
@@ -892,9 +894,6 @@ class AudioOffsetFinder:
 
         similarity_whole = similarity
 
-        #area_overlap_ratio, area_prop = self._calculate_area_of_overlap_ratio(correlation_clip,
-        #                                                                      correlation_slice)
-
         if debug_mode:
             print("similarity", similarity)
             seconds.append(peak / sr)
@@ -920,8 +919,6 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
-            #area_props.append([area_overlap_ratio, area_prop])
-
             similarities.append((similarity, {"whole": similarity_whole,
                                               "left": 0,
                                               "middle": 0,
@@ -934,4 +931,59 @@ class AudioOffsetFinder:
                     print(
                         f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
             else:
+                peaks_final.append(peak)
+
+    def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
+
+        sr = self.target_sample_rate
+        debug_mode = self.debug_mode
+
+        beep_target_num_sample_after_resample = 101
+
+        downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
+
+        if downsampled_correlation_clip is None:
+            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip,beep_target_num_sample_after_resample)
+            clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
+
+        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice,beep_target_num_sample_after_resample)
+
+        correlation_clip = downsampled_correlation_clip
+        correlation_slice = downsampled_correlation_slice
+
+        area_prop = area_of_overlap_ratio(correlation_clip,correlation_slice)
+
+        overlap_ratio = area_prop["overlapping_area"]/area_prop["area_control"]
+
+        if debug_mode:
+
+            seconds.append(peak / sr)
+
+            graph_max_area = 0.8
+            if overlap_ratio >= graph_max_area:
+                graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                # Optional: plot the correlation graph to visualize
+                plt.figure(figsize=(10, 4))
+                plt.plot(correlation_slice)
+                plt.plot(correlation_clip, alpha=0.7)
+                plt.title('Cross-correlation between the audio clip and full track before slicing')
+                plt.xlabel('Lag')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(
+                    f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
+                plt.close()
+
+            area_props.append([overlap_ratio, area_prop])
+
+            overlap_ratio_threshold = 0.995
+            if overlap_ratio < overlap_ratio_threshold:
+                if debug_mode:
+                    print(
+                        f"failed verification for {section_ts} due to overlap_ratio {overlap_ratio} < {overlap_ratio_threshold}")
+            else:
+                if debug_mode:
+                    print(
+                        f"accepted {section_ts} with overlap_ratio {overlap_ratio} >= {overlap_ratio_threshold}")
                 peaks_final.append(peak)
