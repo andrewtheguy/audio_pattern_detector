@@ -20,17 +20,17 @@ from andrew_utils import seconds_to_time
 from scipy.signal import find_peaks
 from sklearn.metrics import mean_squared_error
 
-from audio_offset_finder_v2.numpy_encoder import NumpyEncoder
-from audio_offset_finder_v2.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, \
+from audio_pattern_detector.numpy_encoder import NumpyEncoder
+from audio_pattern_detector.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, \
     downsample_preserve_maxima, ffmpeg_get_16bit_pcm
-from audio_offset_finder_v2.detection_utils import area_of_overlap_ratio, is_pure_tone
+from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
 
 logger = logging.getLogger(__name__)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-class AudioOffsetFinder:
+class AudioPatternDetector:
     # SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
     # SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR = "mean_absolute_error"
     # SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"

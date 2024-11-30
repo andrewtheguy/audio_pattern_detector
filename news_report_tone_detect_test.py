@@ -6,7 +6,7 @@ import soundfile as sf
 from scipy.signal import find_peaks
 from scipy import signal
 
-from audio_offset_finder_v2.detection_utils import is_pure_tone
+from audio_pattern_detector.detection_utils import is_pure_tone
 
 
 def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
