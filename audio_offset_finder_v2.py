@@ -1009,5 +1009,5 @@ class AudioOffsetFinder:
         else:
             if debug_mode:
                 print(
-                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio} >= {overlap_ratio_threshold}")
+                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio}")
             peaks_final.append(peak)
