@@ -162,23 +162,31 @@ def detect_sine_tone(audio_signal, sample_rate=8000, tone_frequency=1039, bandwi
     signal2 = signal2 / np.max(signal2)  # Normalize the magnitude
 
 
-    peaks = find_peaks(signal2,threshold=0,width=[0,4],height=0.4,rel_height=0.5)
-    print("freqs2: ", freqs2)
-    print("signal2: ", signal2)
-    print("tone_magnitude: ", tone_magnitude)
-    print("peaks: ", peaks)
-
-    # Visualize the frequency spectrum of the filtered signal
+    peaks = find_peaks(signal2,threshold=0,width=[0,4],prominence=0.2,rel_height=0.5)
+    # # print("freqs2: ", freqs2)
+    # # print("signal2: ", signal2)
+    # # print("tone_magnitude: ", tone_magnitude)
+    # print("peaks: ", peaks)
+    # #print("len(peaks[0]): ", len(peaks[0]))
+    #
+    # # Visualize the frequency spectrum of the filtered signal
     plt.figure(figsize=(10, 6))
-    plt.plot(signal2)
+    plt.plot(freqs2,signal2)
     plt.title(f'Frequency Spectrum around {tone_frequency} Hz')
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Magnitude')
     plt.xlim(0, 2000)  # Limiting x-axis for better clarity
     plt.show()
 
+    # needs to be high enough
+    is_news_report_clip = bool(len(peaks[0]) == 1 and peaks[1]["prominences"][0] > 0.9)
+
     # should return true only if there is one sharp peak
-    return len(peaks[0]) == 1
+    return {
+        "is_news_report_clip":is_news_report_clip,
+        "tone_magnitude":tone_magnitude,
+        "peaks":peaks
+    }
 
 def plot_spectrogram(audio_data, sample_rate, title='Spectrogram'):
     """
@@ -250,7 +258,8 @@ if __name__ == '__main__':
     # The audio data is already a float array if `soundfile` loads it directly.
     print("Sample rate:", samplerate)
 
-    detect_sine_tone(data, samplerate)
+    result = detect_sine_tone(data, samplerate)
+    print(result)
 
     #print(detect_sine_tone(data, samplerate))
     plot_spectrogram(data, samplerate)

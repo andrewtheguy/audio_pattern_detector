@@ -37,7 +37,7 @@ from sklearn.metrics import mean_squared_error, median_absolute_error, mean_abso
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile, find_closest_troughs
-from pure_tone import is_news_report_beep
+from pure_tone import is_news_report_beep, detect_sine_tone
 from utils import slicing_with_zero_padding, area_of_overlap_ratio
 
 logger = logging.getLogger(__name__)
@@ -834,7 +834,7 @@ class AudioOffsetFinder:
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
 
-        result = is_news_report_beep(audio, sr, f"{clip_name}_{index}_{section_ts}")
+        result = detect_sine_tone(audio, sr)
         detected = result['is_news_report_clip']
 
         if debug_mode:
