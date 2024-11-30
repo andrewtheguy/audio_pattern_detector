@@ -117,13 +117,16 @@ def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate,ac=None):
         "-i", full_audio_path,
         "-f", "s16le",  # Output format
         "-acodec", "pcm_s16le",  # Audio codec
-        "-ar", str(target_sample_rate),  # Sample rate
-        "-loglevel", "error",  # Suppress extra logs
-        "pipe:"  # Output to stdout
     ]
 
     if ac is not None:
         command.extend(["-ac", str(ac)])
+
+    command.extend([
+                "-ar", str(target_sample_rate),  # Sample rate
+                "-loglevel", "error",  # Suppress extra logs
+                "pipe:"  # Output to stdout
+                ])
 
     process = None
 
