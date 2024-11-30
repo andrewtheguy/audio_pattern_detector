@@ -933,8 +933,10 @@ class AudioOffsetFinder:
             else:
                 peaks_final.append(peak)
 
-    # matching pattern should overlap almost completely with beep pattern
+    # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
     def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
+        # use area to double check, so it can be higher
+        similarity_threshold = 0.01
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -956,19 +958,28 @@ class AudioOffsetFinder:
 
         overlap_ratio = area_prop["overlapping_area"]/area_prop["area_control"]
 
+        similarity = mean_squared_error(correlation_clip, correlation_slice)
+
+        similarity_whole = similarity
+
         if debug_mode:
-
+            print("similarity", similarity)
             seconds.append(peak / sr)
+            similarity_debug = clip_cache["similarity_debug"]
+            similarity_debug[clip_name].append((index, similarity,))
 
-            graph_max_area = 0.8
-            if overlap_ratio >= graph_max_area:
+            correlation_slice_graph = correlation_slice
+            correlation_clip_graph = correlation_clip
+
+            graph_max = 0.1
+            if similarity <= graph_max:
                 graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 # Optional: plot the correlation graph to visualize
                 plt.figure(figsize=(10, 4))
-                plt.plot(correlation_slice)
-                plt.plot(correlation_clip, alpha=0.7)
+                plt.plot(correlation_slice_graph)
+                plt.plot(correlation_clip_graph, alpha=0.7)
                 plt.title('Cross-correlation between the audio clip and full track before slicing')
                 plt.xlabel('Lag')
                 plt.ylabel('Correlation coefficient')
@@ -976,15 +987,26 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
+            similarities.append((similarity, {"whole": similarity_whole,
+                                              "left": 0,
+                                              "middle": 0,
+                                              "right": 0,
+                                              "left_right_diff": 0,
+                                              }))
             area_props.append([overlap_ratio, area_prop])
 
-            overlap_ratio_threshold = 0.99
-            if overlap_ratio < overlap_ratio_threshold:
-                if debug_mode:
-                    print(
-                        f"failed verification for {section_ts} due to overlap_ratio {overlap_ratio} < {overlap_ratio_threshold}")
-            else:
-                if debug_mode:
-                    print(
-                        f"accepted {section_ts} with overlap_ratio {overlap_ratio} >= {overlap_ratio_threshold}")
-                peaks_final.append(peak)
+
+        overlap_ratio_threshold = 0.99
+        if similarity > similarity_threshold:
+            if debug_mode:
+                print(
+                    f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+        elif overlap_ratio < overlap_ratio_threshold:
+            if debug_mode:
+                print(
+                    f"failed verification for {section_ts} due to overlap_ratio {overlap_ratio} < {overlap_ratio_threshold}")
+        else:
+            if debug_mode:
+                print(
+                    f"accepted {section_ts} with overlap_ratio {overlap_ratio} >= {overlap_ratio_threshold}")
+            peaks_final.append(peak)
