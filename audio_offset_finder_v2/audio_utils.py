@@ -1,6 +1,8 @@
 import math
+import subprocess
+from contextlib import contextmanager
+from tabnanny import check
 
-import ffmpeg
 import numpy as np
 from numpy._typing import DTypeLike
 
@@ -26,14 +28,8 @@ def slicing_with_zero_padding(array,width,middle_index):
 
 def load_audio_file(file_path, sr=None):
     # Create ffmpeg process
-    process = (
-        ffmpeg
-        .input(file_path)
-        .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=sr, loglevel="error")
-        .run_async(pipe_stdout=True)
-    )
-    data = process.stdout.read()
-    process.wait()
+    with ffmpeg_get_16bit_pcm(file_path, sr, ac=1) as stdout:
+        data = stdout.read()
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
@@ -112,3 +108,34 @@ def downsample_preserve_maxima(curve, num_samples):
         raise ValueError(f"downsampled curve length {len(compressed_curve)} not equal to num_samples {num_samples}")
 
     return np.array(compressed_curve)
+
+@contextmanager
+def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate,ac=None):
+    # Construct the ffmpeg command
+    command = [
+        "ffmpeg",
+        "-i", full_audio_path,
+        "-f", "s16le",  # Output format
+        "-acodec", "pcm_s16le",  # Audio codec
+        "-ar", str(target_sample_rate),  # Sample rate
+        "-loglevel", "error",  # Suppress extra logs
+        "pipe:"  # Output to stdout
+    ]
+
+    if ac is not None:
+        command.extend(["-ac", str(ac)])
+
+    process = None
+
+    try:
+        # Run the command, capturing only stdout
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE  # Pipe stdout
+        )
+        yield process.stdout
+        if process.wait() != 0:
+            raise ValueError(f"ffmpeg command failed with return code {process.returncode}")
+    finally:
+        if process is not None:
+            process.stdout.close()
