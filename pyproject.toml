@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "audio-offset-finder-v2"
+name = "audio-pattern-detector"
 version = "0.1.0"
 description = ""
 authors = ["Andrew Chen <hello@andrewtheguy.com>"]
