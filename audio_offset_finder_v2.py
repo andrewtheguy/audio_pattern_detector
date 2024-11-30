@@ -870,7 +870,7 @@ class AudioOffsetFinder:
     #     if detected:
     #         peaks_final.append(peak)
 
-    def _get_peak_times_beep(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
+    def _get_peak_times_beep_v1(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
         # short beep is very sensitive, it is better to miss some than to have false positives
         similarity_threshold = 0.002
 
