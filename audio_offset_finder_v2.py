@@ -933,6 +933,7 @@ class AudioOffsetFinder:
             else:
                 peaks_final.append(peak)
 
+    # matching pattern should overlap almost completely with beep pattern
     def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
 
         sr = self.target_sample_rate
@@ -977,7 +978,7 @@ class AudioOffsetFinder:
 
             area_props.append([overlap_ratio, area_prop])
 
-            overlap_ratio_threshold = 0.995
+            overlap_ratio_threshold = 0.99
             if overlap_ratio < overlap_ratio_threshold:
                 if debug_mode:
                     print(
