@@ -2,7 +2,7 @@ import argparse
 import os
 import soundfile as sf
 
-from audio_offset_finder.audio_utils import load_audio_file, convert_audio_arr_to_float
+from audio_offset_finder_v2.audio_utils import load_audio_file, convert_audio_arr_to_float
 
 
 def convert_audio_to_clip_format(audio_path, output_path):

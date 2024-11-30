@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from audio_offset_finder.peak_methods import find_closest_troughs
+from audio_offset_finder_v2.peak_methods import find_closest_troughs
 
 
 class TestPeakMethods(unittest.TestCase):

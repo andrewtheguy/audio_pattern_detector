@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from audio_offset_finder.audio_offset_finder_v2 import AudioOffsetFinder
+from audio_offset_finder_v2.audio_offset_finder_v2 import AudioOffsetFinder
 from andrew_utils import seconds_to_time
 
 
