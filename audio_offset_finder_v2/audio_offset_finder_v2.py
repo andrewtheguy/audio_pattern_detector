@@ -12,8 +12,6 @@ from scipy.signal import correlate
 import math
 import matplotlib.pyplot as plt
 
-import ffmpeg
-
 import pyloudnorm as pyln
 
 import warnings
@@ -23,7 +21,8 @@ from scipy.signal import find_peaks
 from sklearn.metrics import mean_squared_error
 
 from audio_offset_finder_v2.numpy_encoder import NumpyEncoder
-from audio_offset_finder_v2.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, downsample_preserve_maxima
+from audio_offset_finder_v2.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, \
+    downsample_preserve_maxima, ffmpeg_get_16bit_pcm
 from audio_offset_finder_v2.detection_utils import area_of_overlap_ratio, is_pure_tone
 
 logger = logging.getLogger(__name__)
@@ -87,188 +86,180 @@ class AudioOffsetFinder:
         all_peak_times = {clip_path: [] for clip_path in clip_paths}
 
 
-        # Create ffmpeg process
-        process = (
-            ffmpeg
-            .input(full_audio_path)
-            .output('pipe:', format='s16le', acodec='pcm_s16le', ac=1, ar=self.target_sample_rate, loglevel="error")
-            .run_async(pipe_stdout=True)
-        )
-        #audio_size = 0
+        with ffmpeg_get_16bit_pcm(full_audio_path, self.target_sample_rate, ac=1) as stdout:
 
-        i = 0
+            i = 0
 
-        clip_datas={}
-        clip_cache={
-            "downsampled_correlation_clips":{},
-            "is_pure_tone_pattern":{},
-            "similarity_debug":defaultdict(list),
-        }
+            clip_datas={}
+            clip_cache={
+                "downsampled_correlation_clips":{},
+                "is_pure_tone_pattern":{},
+                "similarity_debug":defaultdict(list),
+            }
 
-        clips_already = set()
-
-        for clip_path in clip_paths:
-            # Load the audio clip
-            clip = load_audio_file(clip_path, sr=self.target_sample_rate)
-            # convert to float
-            clip = convert_audio_arr_to_float(clip)
-
-            clip_name, _ = os.path.splitext(os.path.basename(clip_path))
-
-            if clip_name in clips_already:
-                raise ValueError(f"clip {clip_name} needs to be unique")
-
-            clips_already.add(clip_name)
-
-            clip_seconds = len(clip) / self.target_sample_rate
-
-            sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
-
-            if self.normalize:
-                # max_loudness = np.max(np.abs(clip))
-                # clip = clip / max_loudness
-                sr = self.target_sample_rate
-                #clip_second = clip_length / sr
-
-                # normalize loudness
-                if clip_seconds < 0.5:
-                    meter = pyln.Meter(sr, block_size=clip_seconds)
-                else:
-                    meter = pyln.Meter(sr)  # create BS.1770 meter
-                loudness = meter.integrated_loudness(clip)
-
-                # loudness normalize audio to -16 dB LUFS
-                clip = pyln.normalize.loudness(clip, loudness, -16.0)
-
-                # if self.debug_mode:
-                #     audio_test_dir = f"./tmp/clip_audio_normalized"
-                #     os.makedirs(audio_test_dir, exist_ok=True)
-                #     sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
-
-            correlation_clip,absolute_max = self._get_clip_correlation(clip, clip_name)
-
-            if self.debug_mode:
-                print(f"clip_length {clip_name}", len(clip))
-                print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate)
-                print("correlation_clip_length", len(correlation_clip))
-                graph_dir = f"../tmp/graph/clip_correlation"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                plt.figure(figsize=(10, 4))
-
-                plt.plot(correlation_clip)
-                plt.title('Cross-correlation of the audio clip itself')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}.png')
-                plt.close()
-
-            #is_pure_tone_pattern = self.clip_properties.get(clip_name, {}).get("is_pure_tone_pattern", False)
-            #downsampled_correlation_clip = None
-            # if is_pure_tone_pattern:
-            #     downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.beep_target_num_sample_after_resample)
-            #
-            #     #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
-            #     #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
-            #     #exit(1)
-            #
-            #     if self.debug_mode:
-            #
-            #         print("average correlation_clip", np.mean(correlation_clip))
-            #         print("average downsampled_correlation_clip", np.mean(downsampled_correlation_clip))
-            #
-            #         #self.debug_clip_area(correlation_clip)
-            #
-            #         graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-            #         os.makedirs(graph_dir, exist_ok=True)
-            #
-            #         plt.figure(figsize=(10, 4))
-            #
-            #         plt.plot(downsampled_correlation_clip)
-            #         plt.title('Cross-correlation of the audio clip itself')
-            #         plt.xlabel('Lag')
-            #         plt.ylabel('Correlation coefficient')
-            #         plt.savefig(
-            #             f'{graph_dir}/{clip_name}.png')
-            #         plt.close()
-
-            clip_datas[clip_path] = {"clip":clip,
-                                     "clip_name":clip_name,
-                                     "sliding_window":sliding_window,
-                                     "correlation_clip":correlation_clip,
-                                     "correlation_clip_absolute_max":absolute_max,
-                                     #"downsampled_correlation_clip":downsampled_correlation_clip,
-                                     }
-
-        #exit(1)
-
-        # Process audio in chunks
-        while True:
-            in_bytes = process.stdout.read(chunk_size)
-            if not in_bytes:
-                break
-            # Convert bytes to numpy array
-            chunk = np.frombuffer(in_bytes, dtype="int16")
-            # convert to float
-            chunk = convert_audio_arr_to_float(chunk)
-
-            #audio_size += len(chunk)
+            clips_already = set()
 
             for clip_path in clip_paths:
-                clip_data = clip_datas[clip_path]
+                # Load the audio clip
+                clip = load_audio_file(clip_path, sr=self.target_sample_rate)
+                # convert to float
+                clip = convert_audio_arr_to_float(clip)
 
-
-                peak_times = self._process_chunk(chunk=chunk,
-                                                 sr=self.target_sample_rate,
-                                                 previous_chunk=previous_chunk,
-                                                 index=i,
-                                                 clip_data=clip_data,
-                                                 clip_cache=clip_cache,
-                                                 seconds_per_chunk=seconds_per_chunk,
-                                                 )
-
-                all_peak_times[clip_path].extend(peak_times)
-
-            # Update previous_chunk to current chunk
-            previous_chunk = chunk
-            i = i + 1
-
-        suffix = Path(full_audio_path).stem
-
-        if self.debug_mode:
-            for clip_path in clip_paths:
                 clip_name, _ = os.path.splitext(os.path.basename(clip_path))
 
-                # similarity debug
-                graph_dir = f"./tmp/graph/mean_squared_error_similarity_{self.similarity_method}/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
+                if clip_name in clips_already:
+                    raise ValueError(f"clip {clip_name} needs to be unique")
 
-                x_coords = []
-                y_coords = []
+                clips_already.add(clip_name)
 
-                for index,similarity in clip_cache['similarity_debug'][clip_name]:
-                    x_coords.append(index)
-                    y_coords.append(similarity)
+                clip_seconds = len(clip) / self.target_sample_rate
 
-                plt.figure(figsize=(10, 4))
-                # Create scatter plot
-                plt.scatter(x_coords, y_coords)
+                sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
+
+                if self.normalize:
+                    # max_loudness = np.max(np.abs(clip))
+                    # clip = clip / max_loudness
+                    sr = self.target_sample_rate
+                    #clip_second = clip_length / sr
+
+                    # normalize loudness
+                    if clip_seconds < 0.5:
+                        meter = pyln.Meter(sr, block_size=clip_seconds)
+                    else:
+                        meter = pyln.Meter(sr)  # create BS.1770 meter
+                    loudness = meter.integrated_loudness(clip)
+
+                    # loudness normalize audio to -16 dB LUFS
+                    clip = pyln.normalize.loudness(clip, loudness, -16.0)
+
+                    # if self.debug_mode:
+                    #     audio_test_dir = f"./tmp/clip_audio_normalized"
+                    #     os.makedirs(audio_test_dir, exist_ok=True)
+                    #     sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
+
+                correlation_clip,absolute_max = self._get_clip_correlation(clip, clip_name)
+
+                if self.debug_mode:
+                    print(f"clip_length {clip_name}", len(clip))
+                    print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate)
+                    print("correlation_clip_length", len(correlation_clip))
+                    graph_dir = f"../tmp/graph/clip_correlation"
+                    os.makedirs(graph_dir, exist_ok=True)
+
+                    plt.figure(figsize=(10, 4))
+
+                    plt.plot(correlation_clip)
+                    plt.title('Cross-correlation of the audio clip itself')
+                    plt.xlabel('Lag')
+                    plt.ylabel('Correlation coefficient')
+                    plt.savefig(
+                        f'{graph_dir}/{clip_name}.png')
+                    plt.close()
+
+                #is_pure_tone_pattern = self.clip_properties.get(clip_name, {}).get("is_pure_tone_pattern", False)
+                #downsampled_correlation_clip = None
+                # if is_pure_tone_pattern:
+                #     downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.beep_target_num_sample_after_resample)
+                #
+                #     #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
+                #     #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
+                #     #exit(1)
+                #
+                #     if self.debug_mode:
+                #
+                #         print("average correlation_clip", np.mean(correlation_clip))
+                #         print("average downsampled_correlation_clip", np.mean(downsampled_correlation_clip))
+                #
+                #         #self.debug_clip_area(correlation_clip)
+                #
+                #         graph_dir = f"./tmp/graph/clip_correlation_downsampled"
+                #         os.makedirs(graph_dir, exist_ok=True)
+                #
+                #         plt.figure(figsize=(10, 4))
+                #
+                #         plt.plot(downsampled_correlation_clip)
+                #         plt.title('Cross-correlation of the audio clip itself')
+                #         plt.xlabel('Lag')
+                #         plt.ylabel('Correlation coefficient')
+                #         plt.savefig(
+                #             f'{graph_dir}/{clip_name}.png')
+                #         plt.close()
+
+                clip_datas[clip_path] = {"clip":clip,
+                                         "clip_name":clip_name,
+                                         "sliding_window":sliding_window,
+                                         "correlation_clip":correlation_clip,
+                                         "correlation_clip_absolute_max":absolute_max,
+                                         #"downsampled_correlation_clip":downsampled_correlation_clip,
+                                         }
+
+            #exit(1)
+
+            # Process audio in chunks
+            while True:
+                in_bytes = stdout.read(chunk_size)
+                if not in_bytes:
+                    break
+                # Convert bytes to numpy array
+                chunk = np.frombuffer(in_bytes, dtype="int16")
+                # convert to float
+                chunk = convert_audio_arr_to_float(chunk)
+
+                #audio_size += len(chunk)
+
+                for clip_path in clip_paths:
+                    clip_data = clip_datas[clip_path]
 
 
-                ylimit = max(0.01, np.median(y_coords))
-                # Set the y limits
-                plt.ylim(0, ylimit)
+                    peak_times = self._process_chunk(chunk=chunk,
+                                                     sr=self.target_sample_rate,
+                                                     previous_chunk=previous_chunk,
+                                                     index=i,
+                                                     clip_data=clip_data,
+                                                     clip_cache=clip_cache,
+                                                     seconds_per_chunk=seconds_per_chunk,
+                                                     )
 
-                # Adding titles and labels
-                plt.title('Scatter Plot for Similarity')
-                plt.xlabel('Value')
-                plt.ylabel('Sublist Index')
-                plt.savefig(
-                    f'{graph_dir}/{suffix}.png')
-                plt.close()
+                    all_peak_times[clip_path].extend(peak_times)
 
-        process.wait()
+                # Update previous_chunk to current chunk
+                previous_chunk = chunk
+                i = i + 1
+
+            suffix = Path(full_audio_path).stem
+
+            if self.debug_mode:
+                for clip_path in clip_paths:
+                    clip_name, _ = os.path.splitext(os.path.basename(clip_path))
+
+                    # similarity debug
+                    graph_dir = f"./tmp/graph/mean_squared_error_similarity_{self.similarity_method}/{clip_name}"
+                    os.makedirs(graph_dir, exist_ok=True)
+
+                    x_coords = []
+                    y_coords = []
+
+                    for index,similarity in clip_cache['similarity_debug'][clip_name]:
+                        x_coords.append(index)
+                        y_coords.append(similarity)
+
+                    plt.figure(figsize=(10, 4))
+                    # Create scatter plot
+                    plt.scatter(x_coords, y_coords)
+
+
+                    ylimit = max(0.01, np.median(y_coords))
+                    # Set the y limits
+                    plt.ylim(0, ylimit)
+
+                    # Adding titles and labels
+                    plt.title('Scatter Plot for Similarity')
+                    plt.xlabel('Value')
+                    plt.ylabel('Sublist Index')
+                    plt.savefig(
+                        f'{graph_dir}/{suffix}.png')
+                    plt.close()
+
 
         return all_peak_times
 
