@@ -118,7 +118,7 @@ def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
     #     print("News report clip detected.")
     #     result["is_news_report_clip"] = True
 
-    return result
+    #return result
 
     # # Check if there's only one significant peak
     # if np.sum(peaks) == 1:
@@ -258,7 +258,8 @@ if __name__ == '__main__':
     # The audio data is already a float array if `soundfile` loads it directly.
     print("Sample rate:", samplerate)
 
-    result = detect_sine_tone(data, samplerate)
+    #result = detect_sine_tone(data, samplerate)
+    result = is_news_report_beep(data, samplerate)
     print(result)
 
     #print(detect_sine_tone(data, samplerate))
