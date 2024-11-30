@@ -10,21 +10,19 @@ import os
 import traceback
 from collections import defaultdict
 from pathlib import Path
-import shutil
 import tempfile
 from venv import logger
 
 import ffmpeg
 import pytz
 
-from audio_offset_finder_v2 import DEFAULT_METHOD, AudioOffsetFinder
+from audio_offset_finder.audio_offset_finder_v2 import AudioOffsetFinder
 
 from andrew_utils import seconds_to_time, time_to_seconds
 from file_upload.upload_utils2 import upload_file, remote_exists, download_file
 from process_timestamps import process_timestamps_simple
 from publish import publish_folder
 from scrape_utils import concatenate_audio, split_audio_by_time_sequences
-from utils import get_ffprobe_info
 
 # clips should be non-repeating
 
@@ -160,7 +158,7 @@ def scrape_single_intro(input_file,stream_name,recorded):
 
         program_intro_peak_times=[]
 
-        peaks_all = AudioOffsetFinder(method=DEFAULT_METHOD, debug_mode=False,
+        peaks_all = AudioOffsetFinder(debug_mode=False,
                                        clip_paths=clip_paths).find_clip_in_audio(
             full_audio_path=input_file)
 
