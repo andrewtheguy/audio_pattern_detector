@@ -2,7 +2,7 @@ variable "TAG" {
 }
 
 variable "IMAGE_NAME" {
-    default="ghcr.io/andrewtheguy/audio_offset_finder"
+    default="ghcr.io/andrewtheguy/audio_pattern_detector"
 }
 
 
