@@ -851,24 +851,24 @@ class AudioOffsetFinder:
         else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
             peaks_final.append(peak)
 
-    # doesn't work well
-    def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
-
-        sr = self.target_sample_rate
-        debug_mode = self.debug_mode
-
-        result = is_news_report_beep(audio, sr,f"{clip_name}_{index}_{section_ts}_{peak}")
-        detected = result['is_news_report_clip']
-
-        if debug_mode:
-            print("detected", detected)
-            area_props.append({"detect_sine_tone_result": result})
-            audio_test_dir = f"./tmp/clip_audio_news_beep"
-            os.makedirs(audio_test_dir, exist_ok=True)
-            sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio, self.target_sample_rate)
-
-        if detected:
-            peaks_final.append(peak)
+    # # doesn't work well
+    # def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
+    #
+    #     sr = self.target_sample_rate
+    #     debug_mode = self.debug_mode
+    #
+    #     result = is_news_report_beep(audio, sr,f"{clip_name}_{index}_{section_ts}_{peak}")
+    #     detected = result['is_news_report_clip']
+    #
+    #     if debug_mode:
+    #         print("detected", detected)
+    #         area_props.append({"detect_sine_tone_result": result})
+    #         audio_test_dir = f"./tmp/clip_audio_news_beep"
+    #         os.makedirs(audio_test_dir, exist_ok=True)
+    #         sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio, self.target_sample_rate)
+    #
+    #     if detected:
+    #         peaks_final.append(peak)
 
     def _get_peak_times_beep(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
         # short beep is very sensitive, it is better to miss some than to have false positives
@@ -935,8 +935,6 @@ class AudioOffsetFinder:
 
     # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
     def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
-        # use area to double check, so it can be higher
-        similarity_threshold = 0.01
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -996,17 +994,20 @@ class AudioOffsetFinder:
             area_props.append([overlap_ratio, area_prop])
 
 
+        similarity_threshold = 0.01
+        similarity_threshold_check_area = 0.002
         overlap_ratio_threshold = 0.99
+
         if similarity > similarity_threshold:
             if debug_mode:
-                print(
-                    f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
-        elif overlap_ratio < overlap_ratio_threshold:
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+        # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
+        elif similarity > similarity_threshold_check_area and overlap_ratio < overlap_ratio_threshold:
             if debug_mode:
                 print(
                     f"failed verification for {section_ts} due to overlap_ratio {overlap_ratio} < {overlap_ratio_threshold}")
         else:
             if debug_mode:
                 print(
-                    f"accepted {section_ts} with overlap_ratio {overlap_ratio} >= {overlap_ratio_threshold}")
+                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio} >= {overlap_ratio_threshold}")
             peaks_final.append(peak)
