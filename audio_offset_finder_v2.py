@@ -834,7 +834,7 @@ class AudioOffsetFinder:
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
 
-        result = detect_sine_tone(audio, sr)
+        result = is_news_report_beep(audio, sr,f"{clip_name}_{index}_{section_ts}_{peak}")
         detected = result['is_news_report_clip']
 
         if debug_mode:
