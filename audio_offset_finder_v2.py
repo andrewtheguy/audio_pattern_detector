@@ -37,7 +37,7 @@ from sklearn.metrics import mean_squared_error, median_absolute_error, mean_abso
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile, find_closest_troughs
-from pure_tone import is_news_report_beep, detect_sine_tone
+from pure_tone import is_news_report_beep, detect_sine_tone, is_pure_tone
 from utils import slicing_with_zero_padding, area_of_overlap_ratio
 
 logger = logging.getLogger(__name__)
@@ -173,12 +173,12 @@ class AudioOffsetFinder:
         #     # triangular shape at the bottom occupying large area
         #     "mean_squared_error_similarity_threshold": 0.01,
         # },
-        "rthk_beep": {
-            # short pure tone needs quite a bit of workaround
-            # need to downsample and no partition and check cross similarity only
-            # won't partition or calculate area ratio if downsample
-            "is_pure_tone_pattern": True,
-        },
+        # "rthk_beep": {
+        #     # short pure tone needs quite a bit of workaround
+        #     # need to downsample and no partition and check cross similarity only
+        #     # won't partition or calculate area ratio if downsample
+        #     "is_pure_tone_pattern": True,
+        # },
     }
     def __init__(self, clip_paths, method=DEFAULT_METHOD,debug_mode=False):
         self.clip_paths = clip_paths
@@ -239,6 +239,7 @@ class AudioOffsetFinder:
         clip_datas={}
         clip_cache={
             "downsampled_correlation_clips":{},
+            "is_pure_tone_pattern":{},
             "similarity_debug":defaultdict(list),
         }
 
@@ -608,9 +609,15 @@ class AudioOffsetFinder:
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
-        clip_properties = self.clip_properties.get(clip_name, {})
-        is_pure_tone_pattern = clip_properties.get("is_pure_tone_pattern", False)
+        #clip_properties = self.clip_properties.get(clip_name, {})
+        #is_pure_tone_pattern = clip_properties.get("is_pure_tone_pattern", False)
 
+        if clip_cache["is_pure_tone_pattern"].get(clip_name) is None:
+            clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, sr)
+
+        is_pure_tone_pattern = clip_cache["is_pure_tone_pattern"][clip_name]
+        # if is_pure_tone_pattern:
+        #     raise ValueError("is_pure_tone_pattern")
 
         debug_mode = self.debug_mode
 
@@ -695,15 +702,26 @@ class AudioOffsetFinder:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             if is_pure_tone_pattern:
-                self._get_peak_times_beep_v2(
-                                                 audio=audio[peak - len(clip):peak + len(clip)],
-                                                 peak=peak,
-                                                 peaks_final=peaks_final,
-                                                 clip_cache=clip_cache,
-                                                 area_props=area_props,
-                                                 clip_name=clip_name,
-                                                 index=index,
-                                                 section_ts=section_ts,)
+                self._get_peak_times_beep(correlation_clip=correlation_clip,
+                                          correlation_slice=correlation_slice,
+                                          seconds=seconds,
+                                          peak=peak,
+                                          clip_name=clip_name,
+                                          index=index,
+                                          section_ts=section_ts,
+                                          similarities=similarities,
+                                          peaks_final=peaks_final,
+                                          clip_cache=clip_cache,
+                                          area_props=area_props)
+                # self._get_peak_times_beep_v2(
+                #                                  audio=audio[peak - len(clip):peak + len(clip)],
+                #                                  peak=peak,
+                #                                  peaks_final=peaks_final,
+                #                                  clip_cache=clip_cache,
+                #                                  area_props=area_props,
+                #                                  clip_name=clip_name,
+                #                                  index=index,
+                #                                  section_ts=section_ts,)
             else:
                 self._get_peak_times_normal(correlation_clip=correlation_clip,
                                                 correlation_slice=correlation_slice,
