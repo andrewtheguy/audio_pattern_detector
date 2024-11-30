@@ -24,7 +24,7 @@ def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
         bool: True if the audio is a pure tone, False otherwise.
     """
 
-    audio_data = audio_data[0:3662]
+    #audio_data = audio_data[0:3662]
 
     # Perform FFT
     fft_result = np.fft.fft(audio_data)
@@ -129,6 +129,56 @@ def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
     #     return False
 
 
+import numpy as np
+import scipy.signal as signal
+import matplotlib.pyplot as plt
+
+
+
+def detect_sine_tone(audio_signal, sample_rate=8000, tone_frequency=1039, bandwidth=20):
+    # Design a bandpass filter centered at tone_frequency with a specified bandwidth
+    nyquist_rate = sample_rate / 2.0
+    low_cutoff = (tone_frequency - bandwidth) / nyquist_rate
+    high_cutoff = (tone_frequency + bandwidth) / nyquist_rate
+
+    # Create a bandpass filter
+    b, a = signal.butter(4, [low_cutoff, high_cutoff], btype='band')
+
+    # Apply the filter to the audio signal
+    filtered_signal = signal.filtfilt(b, a, audio_signal)
+
+    # Perform FFT to analyze frequency content
+    fft_signal = np.fft.fft(filtered_signal)
+    freqs = np.fft.fftfreq(len(fft_signal), 1 / sample_rate)
+
+    # Find the index corresponding to the target frequency (1039 Hz)
+    target_index = np.argmin(np.abs(freqs - tone_frequency))
+
+    # Find the magnitude of the tone at the target frequency
+    tone_magnitude = np.abs(fft_signal[target_index])
+
+    freqs2 = freqs[:len(freqs) // 2]
+    signal2 = np.abs(fft_signal)[:len(freqs) // 2]
+    signal2 = signal2 / np.max(signal2)  # Normalize the magnitude
+
+
+    peaks = find_peaks(signal2,threshold=0,width=0,prominence=0.4,rel_height=0.5)
+    print("freqs2: ", freqs2)
+    print("signal2: ", signal2)
+    print("tone_magnitude: ", tone_magnitude)
+    print("peaks: ", peaks)
+
+    # Visualize the frequency spectrum of the filtered signal
+    plt.figure(figsize=(10, 6))
+    plt.plot(freqs2,signal2)
+    plt.title(f'Frequency Spectrum around {tone_frequency} Hz')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Magnitude')
+    plt.xlim(0, 2000)  # Limiting x-axis for better clarity
+    plt.show()
+
+    # should return true only if there is one sharp peak
+
 def plot_spectrogram(audio_data, sample_rate, title='Spectrogram'):
     """
     Generate and plot a spectrogram of the audio data
@@ -199,7 +249,7 @@ if __name__ == '__main__':
     # The audio data is already a float array if `soundfile` loads it directly.
     print("Sample rate:", samplerate)
 
-    print(is_news_report_beep(data, samplerate, Path(filename).stem))
+    detect_sine_tone(data, samplerate)
 
     #print(detect_sine_tone(data, samplerate))
     plot_spectrogram(data, samplerate)
