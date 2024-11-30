@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 from pathlib import Path
@@ -11,6 +12,65 @@ from apscheduler.util import normalize
 from scipy.signal import butter, filtfilt, find_peaks
 from scipy.fftpack import fft
 from scipy import signal
+
+
+def is_pure_tone(audio_data, sample_rate, graph_file_name="test"):
+    """
+    Determine if the given audio data represents a pure tone.
+
+    Parameters:
+        audio_data (numpy array): The audio data as a floating-point array.
+        sample_rate (int): The sample rate of the audio data in Hz.
+
+    Returns:
+        bool: True if the audio is a pure tone, False otherwise.
+    """
+
+    #audio_data = audio_data[0:3662]
+
+    # Perform FFT
+    fft_result = np.fft.fft(audio_data)
+    freqs = np.fft.fftfreq(len(audio_data), d=1 / sample_rate)
+
+    # Analyze the magnitude spectrum
+    magnitude = np.abs(fft_result)
+    positive_freqs = freqs[:len(freqs) // 2]
+    positive_magnitude = magnitude[:len(freqs) // 2]
+
+
+    # Find the dominant frequency
+    dominant_freq_idx = np.argmax(positive_magnitude)
+    dominant_magnitude = positive_magnitude[dominant_freq_idx]
+
+    #print(f"positive_magnitude: {positive_magnitude}")
+
+    positive_magnitude_normalized = positive_magnitude / dominant_magnitude
+
+    #
+    # graph_dir = f"./tmp/graph/pure_tone"
+    # os.makedirs(graph_dir, exist_ok=True)
+    #
+    # plt.plot(positive_freqs, positive_magnitude_normalized)
+    # plt.xlabel('Frequency (Hz)')
+    # plt.ylabel('Magnitude')
+    # plt.title('Frequency Spectrum')
+    # #plt.show()
+    # plt.savefig(
+    #     f'{graph_dir}/{graph_file_name}.png')
+    # plt.close()
+
+    # Define a threshold for pure tone
+    #noise_threshold = 0.1
+    peaks,peak_props = find_peaks(positive_magnitude_normalized, prominence=0.05)  # Adjust prominence
+
+    peak_freqs = positive_freqs[peaks]
+    peak_magnitudes = positive_magnitude_normalized[peaks]
+    dominant_freq = positive_freqs[dominant_freq_idx]
+    # print(f"peak_freqs: {peak_freqs}")
+    # print(f"peak_props: {peak_props}")
+    # print(f"peak_magnitudes: {peak_magnitudes}")
+    # print(f"dominant_freq: {dominant_freq}")
+    return len(peaks) == 1 and math.isclose(peak_freqs[0],dominant_freq,rel_tol=0.01)
 
 def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
     """
@@ -258,9 +318,11 @@ if __name__ == '__main__':
     # The audio data is already a float array if `soundfile` loads it directly.
     print("Sample rate:", samplerate)
 
-    #result = detect_sine_tone(data, samplerate)
-    result = is_news_report_beep(data, samplerate)
-    print(result)
+
+    is_pure_tone(data, samplerate)
+
+    #result = is_news_report_beep(data, samplerate)
+    #print(result)
 
     #print(detect_sine_tone(data, samplerate))
     plot_spectrogram(data, samplerate)
