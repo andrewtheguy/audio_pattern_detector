@@ -1,6 +1,6 @@
 import numpy as np
 
-from audio_offset_finder.audio_utils import slicing_with_zero_padding
+from audio_offset_finder_v2.audio_utils import slicing_with_zero_padding
 
 
 def test_slice_odd():
