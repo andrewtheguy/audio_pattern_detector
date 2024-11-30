@@ -11,7 +11,7 @@ import time
 from operator import itemgetter
 from pathlib import Path
 from scipy.integrate import simpson
-from pure_tone import is_pure_tone
+#from pure_tone import is_pure_tone
 
 import soundfile as sf
 
@@ -37,6 +37,7 @@ from sklearn.metrics import mean_squared_error, median_absolute_error, mean_abso
 
 from numpy_encoder import NumpyEncoder
 from peak_methods import get_peak_profile, find_closest_troughs
+from pure_tone import is_news_report_beep
 from utils import slicing_with_zero_padding, area_of_overlap_ratio
 
 logger = logging.getLogger(__name__)
@@ -694,18 +695,15 @@ class AudioOffsetFinder:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             if is_pure_tone_pattern:
-                self._get_peak_times_beep(correlation_clip=correlation_clip,
-                                                 correlation_slice=correlation_slice,
-                                          audio=audio[peak - len(clip):peak + len(clip)],
-                                                 seconds=seconds,
+                self._get_peak_times_beep_v2(
+                                                 audio=audio[peak - len(clip):peak + len(clip)],
                                                  peak=peak,
-                                                 clip_name=clip_name,
-                                                 index=index,
-                                                 section_ts=section_ts,
-                                                 similarities=similarities,
                                                  peaks_final=peaks_final,
                                                  clip_cache=clip_cache,
-                                                 area_props=area_props)
+                                                 area_props=area_props,
+                                                 clip_name=clip_name,
+                                                 index=index,
+                                                 section_ts=section_ts,)
             else:
                 self._get_peak_times_normal(correlation_clip=correlation_clip,
                                                 correlation_slice=correlation_slice,
@@ -831,7 +829,25 @@ class AudioOffsetFinder:
         else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
             peaks_final.append(peak)
 
-    def _get_peak_times_beep(self,correlation_clip,audio,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
+    def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
+
+        sr = self.target_sample_rate
+        debug_mode = self.debug_mode
+
+        result = is_news_report_beep(audio, sr, f"{clip_name}_{index}_{section_ts}")
+        detected = result['is_news_report_clip']
+
+        if debug_mode:
+            print("detected", detected)
+            area_props.append({"detect_sine_tone_result": result})
+            audio_test_dir = f"./tmp/clip_audio_news_beep"
+            os.makedirs(audio_test_dir, exist_ok=True)
+            sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio, self.target_sample_rate)
+
+        if detected:
+            peaks_final.append(peak)
+
+    def _get_peak_times_beep(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
         # short beep is very sensitive, it is better to miss some than to have false positives
         similarity_threshold = 0.002
 
@@ -860,8 +876,6 @@ class AudioOffsetFinder:
 
         if debug_mode:
             print("similarity", similarity)
-            is_news_beep=is_pure_tone(audio, sr)
-            print("is news clip beep", is_news_beep)
             seconds.append(peak / sr)
             similarity_debug = clip_cache["similarity_debug"]
             similarity_debug[clip_name].append((index, similarity,))
@@ -885,12 +899,7 @@ class AudioOffsetFinder:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
-                print("peak", peak)
-                audio_test_dir = f"./tmp/clip_audio_news_beep"
-                os.makedirs(audio_test_dir, exist_ok=True)
-                sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio, self.target_sample_rate)
-
-            area_props.append({"is_news_beep": is_news_beep})
+            #area_props.append([area_overlap_ratio, area_prop])
 
             similarities.append((similarity, {"whole": similarity_whole,
                                               "left": 0,
