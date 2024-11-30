@@ -1,17 +1,14 @@
 import json
 import logging
-import math
 import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections import deque
 
 import ffmpeg
 import numpy as np
 import requests
-from scipy.integrate import simpson
 
 logger = logging.getLogger(__name__)
 
@@ -68,75 +65,11 @@ def find_nearest_distance_forward(array, value):
     return arr2.min()
 
 
-def get_diff_ratio(control, value):
-    diff = np.abs(control - value)
-    # max_value = max(input1,input2)
-    ratio = diff / control
-    return ratio
-
-
-def slicing_with_zero_padding(array,width,middle_index):
-    padding = width/2
-
-    beg = int(middle_index-math.floor(padding))
-    end = int(middle_index+math.ceil(padding))
-
-    if beg < 0:
-        end = end - beg
-        #middle_index = middle_index - beg
-        array = np.pad(array, (-beg, 0), 'constant')
-        beg = beg - beg
-
-
-    if end > len(array):
-        array = np.pad(array, (0, end - len(array)), 'constant')
-    # slice
-    return np.array(array[beg:end])
-
 def list_get(my_list, index, default):
     try:
         return my_list[index]
     except IndexError:
         return default
-
-
-def downsample(values,factor):
-    buffer_ = deque([], maxlen=factor)
-    downsampled_values = []
-    for i, value in enumerate(values):
-        buffer_.appendleft(value)
-        if (i - 1) % factor == 0:
-            # Take max value out of buffer
-            # or you can take higher value if their difference is too big, otherwise just average
-            max_value = max(buffer_)
-            #if max_value > 0.2:
-            downsampled_values.append(max_value)
-            #else:
-            #downsampled_values.append(np.mean(buffer_))
-    return np.array(downsampled_values)
-
-def max_distance(sorted_data):
-    max_dist = 0
-    for i in range(1, len(sorted_data)):
-        dist = sorted_data[i] - sorted_data[i - 1]
-        max_dist = max(max_dist, dist)
-    return max_dist
-
-
-def calculate_similarity(arr1, arr2):
-  """Calculates the similarity between two normalized arrays
-     using mean squared error.
-
-  Args:
-    arr1: The first normalized array.
-    arr2: The second normalized array.
-
-  Returns:
-    A similarity score (lower is more similar) based on
-    mean squared error.
-  """
-  return np.mean((arr1 - arr2)**2)
-
 
 def url_ok(url):
 
@@ -171,65 +104,3 @@ def download(url,target_file):
         shutil.move(tmp_file,target_file)
     print(f'downloaded to {target_file}')
 
-def trapezoidal_area(y1, y2):
-    """
-    Compute the area between two curves using the trapezoidal rule.
-
-    Args:
-    y1 (array): y-coordinates for the first line
-    y2 (array): y-coordinates for the second line
-
-    Returns:
-    float: The area between the two curves.
-    """
-    n = len(y1)
-    area = 0.0
-    for i in range(n - 1):
-        # Calculate the width of each section, which is always 1
-        h = 1
-        # Calculate the average height of the trapezoid
-        avg_height = (y1[i] + y1[i + 1] + y2[i] + y2[i + 1]) / 2
-        # Calculate the area of the trapezoid
-        area += h * avg_height
-    return area
-
-def area_of_overlap_ratio(control, variable):
-
-    if len(control) != len(variable):
-        raise ValueError("Both arrays must have the same length")
-
-    total_rect_control = len(control) * max(control)
-
-    y2 = variable
-    # Define the x-axis range based on the indices of the input arrays
-    x = np.arange(len(control))
-
-    dx=1
-
-    #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
-    #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
-
-    area_control = simpson(control, x=x)
-    area_y2 = simpson(y2, x=x)
-
-    # To find the overlapping area, take the minimum at each point
-    min_curve = np.minimum(control, y2)
-    #overlapping_area = np.trapz(min_curve, dx=dx)
-    overlapping_area = simpson(min_curve, x=x)
-    diff_area = area_control+area_y2-2*overlapping_area
-
-
-    # Calculate percentage overlap with respect to each curve
-    #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
-    #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
-    #print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
-    props = {
-                "total_rect_control":total_rect_control,
-                "diff_area":diff_area,
-                "overlapping_area":overlapping_area,
-                "area_control":area_control,
-                "area_y2":area_y2,
-                "diff_overlap_ratio":diff_area/overlapping_area,
-                "percent_control_area":area_control/total_rect_control,
-            }
-    return props
