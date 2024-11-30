@@ -48,7 +48,7 @@ class AudioOffsetFinder:
         # },
         # "rthk_beep": {
         #     # short pure tone needs quite a bit of workaround
-        #     # need to downsample and no partition and check cross similarity only
+        #     # need to downsample and use special treatment
         #     # won't partition or calculate area ratio if downsample
         #     "is_pure_tone_pattern": True,
         # },
