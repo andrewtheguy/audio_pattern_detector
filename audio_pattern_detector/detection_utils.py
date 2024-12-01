@@ -28,6 +28,8 @@ def area_of_overlap_ratio(control, variable):
     min_curve = np.minimum(control, y2)
     #overlapping_area = np.trapz(min_curve, dx=dx)
     overlapping_area = simpson(min_curve, x=x)
+
+    # Calculate the sum of area of both curves where the two curves don't overlap
     diff_area = area_control+area_y2-2*overlapping_area
 
 
