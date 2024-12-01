@@ -12,7 +12,7 @@ develop = false
 [package.source]
 type = "git"
 url = "https://github.com/andrewtheguy/andrew_utils.git"
-reference = "0.1.1"
+reference = "80a32ac11fdd0bc8d31b590963e4df0891a5863e"
 resolved_reference = "80a32ac11fdd0bc8d31b590963e4df0891a5863e"
 
 [[package]]
