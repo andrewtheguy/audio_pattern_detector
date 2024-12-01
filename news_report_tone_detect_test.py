@@ -9,6 +9,13 @@ from scipy import signal
 from audio_pattern_detector.detection_utils import is_pure_tone
 
 
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+
+
+# not working well
 def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
     """
     Determine if the given audio data represents a pure tone.
@@ -126,12 +133,7 @@ def is_news_report_beep(audio_data, sample_rate, graph_file_name="test"):
     #     return False
 
 
-import numpy as np
-import scipy.signal as signal
-import matplotlib.pyplot as plt
-
-
-
+# not working well
 def detect_sine_tone(audio_signal, sample_rate=8000, tone_frequency=1039, bandwidth=20):
     # Design a bandpass filter centered at tone_frequency with a specified bandwidth
     nyquist_rate = sample_rate / 2.0

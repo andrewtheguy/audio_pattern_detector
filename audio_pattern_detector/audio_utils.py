@@ -109,6 +109,7 @@ def downsample_preserve_maxima(curve, num_samples):
 
     return np.array(compressed_curve)
 
+# convert audio to 16 bit pcm with streaming output
 @contextmanager
 def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate,ac=None):
     # Construct the ffmpeg command

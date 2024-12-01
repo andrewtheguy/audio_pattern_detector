@@ -31,28 +31,7 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
 class AudioPatternDetector:
-    # SIMILARITY_METHOD_MEAN_SQUARED_ERROR = "mean_squared_error"
-    # SIMILARITY_METHOD_MEAN_ABSOLUTE_ERROR = "mean_absolute_error"
-    # SIMILARITY_METHOD_MEDIAN_ABSOLUTE_ERROR = "median_absolute_error"
-    #SIMILARITY_METHOD_TEST = "test"
 
-    # won't work well for short clips because false positives get low similarity
-    clip_properties = {
-        # "受之有道outro": {
-        #     # triangular shape at the bottom occupying large area
-        #     "mean_squared_error_similarity_threshold": 0.005,
-        # },
-        # "temple_bell": {
-        #     # triangular shape at the bottom occupying large area
-        #     "mean_squared_error_similarity_threshold": 0.01,
-        # },
-        # "rthk_beep": {
-        #     # short pure tone needs quite a bit of workaround
-        #     # need to downsample and use special treatment
-        #     # won't partition or calculate area ratio if downsample
-        #     "is_pure_tone_pattern": True,
-        # },
-    }
     def __init__(self, clip_paths, debug_mode=False):
         self.clip_paths = clip_paths
         self.debug_mode = debug_mode
@@ -131,12 +110,7 @@ class AudioPatternDetector:
                     # loudness normalize audio to -16 dB LUFS
                     clip = pyln.normalize.loudness(clip, loudness, -16.0)
 
-                    # if self.debug_mode:
-                    #     audio_test_dir = f"./tmp/clip_audio_normalized"
-                    #     os.makedirs(audio_test_dir, exist_ok=True)
-                    #     sf.write(f"{audio_test_dir}/{clip_name}.wav", clip, self.target_sample_rate)
-
-                correlation_clip,absolute_max = self._get_clip_correlation(clip, clip_name)
+                correlation_clip,absolute_max = self._get_clip_correlation(clip)
 
                 if self.debug_mode:
                     print(f"clip_length {clip_name}", len(clip))
@@ -155,35 +129,6 @@ class AudioPatternDetector:
                         f'{graph_dir}/{clip_name}.png')
                     plt.close()
 
-                #is_pure_tone_pattern = self.clip_properties.get(clip_name, {}).get("is_pure_tone_pattern", False)
-                #downsampled_correlation_clip = None
-                # if is_pure_tone_pattern:
-                #     downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, self.beep_target_num_sample_after_resample)
-                #
-                #     #downsampled_correlation_clip = downsample(correlation_clip, len(correlation_clip)//500)
-                #     #print(f"downsampled_correlation_clip {clip_name} length", len(downsampled_correlation_clip))
-                #     #exit(1)
-                #
-                #     if self.debug_mode:
-                #
-                #         print("average correlation_clip", np.mean(correlation_clip))
-                #         print("average downsampled_correlation_clip", np.mean(downsampled_correlation_clip))
-                #
-                #         #self.debug_clip_area(correlation_clip)
-                #
-                #         graph_dir = f"./tmp/graph/clip_correlation_downsampled"
-                #         os.makedirs(graph_dir, exist_ok=True)
-                #
-                #         plt.figure(figsize=(10, 4))
-                #
-                #         plt.plot(downsampled_correlation_clip)
-                #         plt.title('Cross-correlation of the audio clip itself')
-                #         plt.xlabel('Lag')
-                #         plt.ylabel('Correlation coefficient')
-                #         plt.savefig(
-                #             f'{graph_dir}/{clip_name}.png')
-                #         plt.close()
-
                 clip_datas[clip_path] = {"clip":clip,
                                          "clip_name":clip_name,
                                          "sliding_window":sliding_window,
@@ -191,8 +136,6 @@ class AudioPatternDetector:
                                          "correlation_clip_absolute_max":absolute_max,
                                          #"downsampled_correlation_clip":downsampled_correlation_clip,
                                          }
-
-            #exit(1)
 
             # Process audio in chunks
             while True:
@@ -203,8 +146,6 @@ class AudioPatternDetector:
                 chunk = np.frombuffer(in_bytes, dtype="int16")
                 # convert to float
                 chunk = convert_audio_arr_to_float(chunk)
-
-                #audio_size += len(chunk)
 
                 for clip_path in clip_paths:
                     clip_data = clip_datas[clip_path]
@@ -225,9 +166,10 @@ class AudioPatternDetector:
                 previous_chunk = chunk
                 i = i + 1
 
-            suffix = Path(full_audio_path).stem
-
             if self.debug_mode:
+
+                suffix = Path(full_audio_path).stem
+
                 for clip_path in clip_paths:
                     clip_name, _ = os.path.splitext(os.path.basename(clip_path))
 
@@ -281,7 +223,7 @@ class AudioPatternDetector:
 
         return sliding_window
 
-    def _get_clip_correlation(self, clip, clip_name):
+    def _get_clip_correlation(self, clip):
         # Cross-correlate and normalize correlation
         correlation_clip = correlate(clip, clip, mode='full', method='fft')
 
@@ -297,9 +239,7 @@ class AudioPatternDetector:
     # index: for debugging by saving a file for audio_section
     # seconds_per_chunk: default seconds_per_chunk
     def _process_chunk(self, chunk, clip_data, clip_cache, sr, previous_chunk, index, seconds_per_chunk):
-        debug_mode = self.debug_mode
         clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
-        clip_length = len(clip)
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
         # Concatenate previous chunk for continuity in processing
@@ -332,13 +272,15 @@ class AudioPatternDetector:
 
             # loudness normalize audio to -16 dB LUFS
             audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+
+            # keep for debugging
             # if self.debug_mode:
             #     section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
             #     audio_test_dir = f"./tmp/audio_section_normalized"
             #     os.makedirs(audio_test_dir, exist_ok=True)
             #     sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}.wav", audio_section, self.target_sample_rate)
 
-
+        # keep for debugging
         # if debug_mode:
         #     os.makedirs("./tmp/audio", exist_ok=True)
         #     sf.write(
@@ -370,68 +312,12 @@ class AudioPatternDetector:
 
         return peak_times_final
 
-    # def _calculate_area_of_overlap_ratio(self, correlation_clip, correlation_slice):
+    # def _get_max_distance(self, downsampled_correlation_clip, downsampled_correlation_slice,):
+    #     distances = np.abs(downsampled_correlation_clip-downsampled_correlation_slice)
+    #     max_distance_index = np.argmax(distances)
+    #     max_distance = distances[max_distance_index]
     #
-    #     #
-    #     # peak_index = np.argmax(downsampled_correlation_clip)
-    #     # peak_index_slice = np.argmax(downsampled_correlation_slice)
-    #     # if self.debug_mode:
-    #     #     print("len", len(downsampled_correlation_clip))
-    #     #     print("peak_index", peak_index)
-    #     # #raise "chafa"
-    #     # if(peak_index != peak_index_slice):
-    #     #     logger.warning(f"peak {peak_index_slice} not aligned with the original clip {peak_index}, potential bug in the middle of the chain")
-    #     # left_trough, right_trough = find_closest_troughs(peak_index, downsampled_correlation_clip)
-    #     # max_width_half = max(peak_index-left_trough,right_trough-peak_index)
-    #     #
-    #     # if max_width_half < 10:
-    #     #     max_width_half = 10
-    #     #
-    #     # new_left = max(0,peak_index-max_width_half)
-    #     # new_right = min(len(downsampled_correlation_clip),peak_index+max_width_half+1)
-    #     #
-    #     # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-    #     # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-    #
-    #     # alternative
-    #     # peaks, properties = find_peaks(downsampled_correlation_clip, height=0.95,prominence=0.25,distance=21,wlen=21)
-    #     # if len(peaks) != 1:
-    #     #     raise ValueError(f"expected 1 peak, found {peaks}")
-    #     #
-    #     # new_left = properties["left_bases"][0]
-    #     # new_right = properties["right_bases"][0]
-    #     #
-    #     # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-    #     # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-    #
-    #     # # static
-    #     # middle = len(downsampled_correlation_clip) // 2
-    #     #
-    #     # # mid point of the peak for 1/10th of the downsampled_correlation_clip
-    #     # new_left = middle - len(downsampled_correlation_clip) // 20
-    #     # new_right = middle + len(downsampled_correlation_clip) // 20
-    #     #
-    #     # clip_within_peak = downsampled_correlation_clip[new_left:new_right]
-    #     # correlation_slice_within_peak = downsampled_correlation_slice[new_left:new_right]
-    #
-    #     area_of_overlap, props = area_of_overlap_ratio(correlation_clip,
-    #                                                    correlation_slice)
-    #
-    #     return area_of_overlap,{
-    #         #"clip_within_peak":clip_within_peak,
-    #         #"correlation_slice_within_peak":correlation_slice_within_peak,
-    #         #"downsampled_correlation_slice":downsampled_correlation_slice,
-    #         #"new_left":new_left,
-    #         #"new_right":new_right,
-    #         "area_props":props,
-    #     }
-
-    def _get_max_distance(self, downsampled_correlation_clip, downsampled_correlation_slice,):
-        distances = np.abs(downsampled_correlation_clip-downsampled_correlation_slice)
-        max_distance_index = np.argmax(distances)
-        max_distance = distances[max_distance_index]
-
-        return max_distance,max_distance_index
+    #     return max_distance,max_distance_index
 
 
     # won't work well for very short clips like single beep
@@ -439,9 +325,6 @@ class AudioPatternDetector:
     def _correlation_method(self, clip_data, clip_cache, audio_section, sr, index, seconds_per_chunk):
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
-
-        #clip_properties = self.clip_properties.get(clip_name, {})
-        #is_pure_tone_pattern = clip_properties.get("is_pure_tone_pattern", False)
 
         if clip_cache["is_pure_tone_pattern"].get(clip_name) is None:
             clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, sr)
@@ -492,10 +375,6 @@ class AudioPatternDetector:
                 f'{graph_dir}/{clip_name}_{index}_{section_ts}.png')
             plt.close()
 
-        #max_sample = len(audio) - samples_skip_end
-        #trim placeholder clip
-        #correlation = correlation[:max_sample]
-
         # no repetition within the duration of the clip
         distance = clip_length
         # minimum height of the peak of the correlation, don't set it too high otherwise will miss some
@@ -513,6 +392,8 @@ class AudioPatternDetector:
         #distances = []
 
         for peak in peaks:
+
+            # make sure it is not out of bounds at the beginning and end after slicing
             after = peak + len(correlation_clip)//2
             before = peak - len(correlation_clip)//2
             # max_height_index = np.argmax(correlation)
@@ -527,7 +408,7 @@ class AudioPatternDetector:
                 logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping")
                 continue
 
-            # slice
+            # slice with the center on the peak
             correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
             correlation_slice = correlation_slice/np.max(correlation_slice)
 
@@ -581,7 +462,8 @@ class AudioPatternDetector:
 
             print(f"---")
 
-        peak_times = np.array(peaks_final) / sr
+        # convert peaks to seconds
+        peak_times = [peak / sr for peak in peaks_final]
 
         return peak_times
 
@@ -591,6 +473,9 @@ class AudioPatternDetector:
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
 
+        # make 10 partitions and check the middle 2
+        # real distortions happen in the middle most of the time except for news report beep
+        # since we use this method for news report beep, we only need to check the middle
         partition_count = 10
         left_bound = 4
         right_bound = 6
@@ -603,8 +488,6 @@ class AudioPatternDetector:
                 mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
                                    correlation_slice[i * partition_size:(i + 1) * partition_size]))
 
-        # real distortions happen in the middle most of the time except for news report beep
-        # since we don't partition for news report beep, we only need to check the middle
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
         # similarity_whole = np.mean(similarity_partitions)
         similarity_whole = 0
@@ -625,6 +508,8 @@ class AudioPatternDetector:
                                                                               correlation_slice[
                                                                               lower_limit:upper_limit])
 
+        # ratio of difference between overlapping area and non-overlapping area
+        # needed to check when mean_squared_error is high enough
         diff_overlap_ratio = area_prop["diff_overlap_ratio"]
 
         if debug_mode:
@@ -701,6 +586,7 @@ class AudioPatternDetector:
     #     if detected:
     #         peaks_final.append(peak)
 
+    # no longer in use, it sometimes misses those in between beeps
     def _get_peak_times_beep_v1(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
         # short beep is very sensitive, it is better to miss some than to have false positives
         similarity_threshold = 0.002
