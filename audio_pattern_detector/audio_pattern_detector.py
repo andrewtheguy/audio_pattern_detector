@@ -473,9 +473,8 @@ class AudioPatternDetector:
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
 
-        # make 10 partitions and check the middle 2
-        # real distortions happen in the middle most of the time except for news report beep
-        # since we use this method for news report beep, we only need to check the middle
+        # make 10 partitions and check the middle 2 and the whole and get minimum
+        # real distortions happen in the middle most of the time
         partition_count = 10
         left_bound = 4
         right_bound = 6
@@ -489,15 +488,15 @@ class AudioPatternDetector:
                                    correlation_slice[i * partition_size:(i + 1) * partition_size]))
 
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
-        # similarity_whole = np.mean(similarity_partitions)
-        similarity_whole = 0
+        similarity_whole = np.mean(similarity_partitions)
+        #similarity_whole = 0
         similarity_left = 0
         similarity_right = 0
         # similarity_left = np.mean(similarity_partitions[0:5])
         # similarity_right = np.mean(similarity_partitions[5:10])
 
-        similarity = similarity_middle
-        # similarity = min(similarity_whole,similarity_middle)
+        #similarity = similarity_middle
+        similarity = min(similarity_whole,similarity_middle)
 
         # similarity = min(similarity_left,similarity_middle,similarity_right)
         # similarity = similarity_whole = (similarity_left + similarity_right)/2
