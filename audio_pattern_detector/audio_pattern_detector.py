@@ -473,9 +473,8 @@ class AudioPatternDetector:
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
 
-        # make 10 partitions and check the middle 2
-        # real distortions happen in the middle most of the time except for news report beep
-        # since we use this method for news report beep, we only need to check the middle
+        # make 10 partitions and check the middle 2 and the whole and get minimum
+        # real distortions happen in the middle most of the time
         partition_count = 10
         left_bound = 4
         right_bound = 6
@@ -489,15 +488,15 @@ class AudioPatternDetector:
                                    correlation_slice[i * partition_size:(i + 1) * partition_size]))
 
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
-        # similarity_whole = np.mean(similarity_partitions)
-        similarity_whole = 0
+        similarity_whole = np.mean(similarity_partitions)
+        #similarity_whole = 0
         similarity_left = 0
         similarity_right = 0
         # similarity_left = np.mean(similarity_partitions[0:5])
         # similarity_right = np.mean(similarity_partitions[5:10])
 
-        similarity = similarity_middle
-        # similarity = min(similarity_whole,similarity_middle)
+        #similarity = similarity_middle
+        similarity = min(similarity_whole,similarity_middle)
 
         # similarity = min(similarity_left,similarity_middle,similarity_right)
         # similarity = similarity_whole = (similarity_left + similarity_right)/2
@@ -586,69 +585,69 @@ class AudioPatternDetector:
     #     if detected:
     #         peaks_final.append(peak)
 
-    # no longer in use, it sometimes misses those in between beeps
-    def _get_peak_times_beep_v1(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
-        # short beep is very sensitive, it is better to miss some than to have false positives
-        similarity_threshold = 0.002
-
-        sr = self.target_sample_rate
-        debug_mode = self.debug_mode
-
-        beep_target_num_sample_after_resample = 101
-
-        downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
-
-        if downsampled_correlation_clip is None:
-            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
-            clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
-
-        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
-
-        correlation_clip = downsampled_correlation_clip
-        correlation_slice = downsampled_correlation_slice
-
-        similarity = mean_squared_error(correlation_clip, correlation_slice)
-
-        similarity_whole = similarity
-
-        if debug_mode:
-            print("similarity", similarity)
-            seconds.append(peak / sr)
-            similarity_debug = clip_cache["similarity_debug"]
-            similarity_debug[clip_name].append((index, similarity,))
-
-            correlation_slice_graph = correlation_slice
-            correlation_clip_graph = correlation_clip
-
-            graph_max = 0.1
-            if similarity <= graph_max:
-                graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                # Optional: plot the correlation graph to visualize
-                plt.figure(figsize=(10, 4))
-                plt.plot(correlation_slice_graph)
-                plt.plot(correlation_clip_graph, alpha=0.7)
-                plt.title('Cross-correlation between the audio clip and full track before slicing')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-                plt.close()
-
-            similarities.append((similarity, {"whole": similarity_whole,
-                                              "left": 0,
-                                              "middle": 0,
-                                              "right": 0,
-                                              "left_right_diff": 0,
-                                              }))
-
-            if similarity > similarity_threshold:
-                if debug_mode:
-                    print(
-                        f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
-            else:
-                peaks_final.append(peak)
+    # # no longer in use, it sometimes misses those in between beeps
+    # def _get_peak_times_beep_v1(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
+    #     # short beep is very sensitive, it is better to miss some than to have false positives
+    #     similarity_threshold = 0.002
+    #
+    #     sr = self.target_sample_rate
+    #     debug_mode = self.debug_mode
+    #
+    #     beep_target_num_sample_after_resample = 101
+    #
+    #     downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
+    #
+    #     if downsampled_correlation_clip is None:
+    #         downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
+    #         clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
+    #
+    #     downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
+    #
+    #     correlation_clip = downsampled_correlation_clip
+    #     correlation_slice = downsampled_correlation_slice
+    #
+    #     similarity = mean_squared_error(correlation_clip, correlation_slice)
+    #
+    #     similarity_whole = similarity
+    #
+    #     if debug_mode:
+    #         print("similarity", similarity)
+    #         seconds.append(peak / sr)
+    #         similarity_debug = clip_cache["similarity_debug"]
+    #         similarity_debug[clip_name].append((index, similarity,))
+    #
+    #         correlation_slice_graph = correlation_slice
+    #         correlation_clip_graph = correlation_clip
+    #
+    #         graph_max = 0.1
+    #         if similarity <= graph_max:
+    #             graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
+    #             os.makedirs(graph_dir, exist_ok=True)
+    #
+    #             # Optional: plot the correlation graph to visualize
+    #             plt.figure(figsize=(10, 4))
+    #             plt.plot(correlation_slice_graph)
+    #             plt.plot(correlation_clip_graph, alpha=0.7)
+    #             plt.title('Cross-correlation between the audio clip and full track before slicing')
+    #             plt.xlabel('Lag')
+    #             plt.ylabel('Correlation coefficient')
+    #             plt.savefig(
+    #                 f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
+    #             plt.close()
+    #
+    #         similarities.append((similarity, {"whole": similarity_whole,
+    #                                           "left": 0,
+    #                                           "middle": 0,
+    #                                           "right": 0,
+    #                                           "left_right_diff": 0,
+    #                                           }))
+    #
+    #         if similarity > similarity_threshold:
+    #             if debug_mode:
+    #                 print(
+    #                     f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+    #         else:
+    #             peaks_final.append(peak)
 
     # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
     def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
@@ -712,17 +711,24 @@ class AudioPatternDetector:
 
 
         similarity_threshold = 0.01
+
+        similarity_threshold_check_area_upper = 0.003
+
         similarity_threshold_check_area = 0.002
-        overlap_ratio_threshold = 0.99
 
         if similarity > similarity_threshold:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
         # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
-        elif similarity > similarity_threshold_check_area and overlap_ratio < overlap_ratio_threshold:
+        elif similarity > similarity_threshold_check_area_upper and overlap_ratio < 0.99:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to overlap_ratio {overlap_ratio} < {overlap_ratio_threshold}")
+                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.99")
+        # similar enough, lower area ratio threshold
+        elif similarity > similarity_threshold_check_area and overlap_ratio < 0.98:
+            if debug_mode:
+                print(
+                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.98")
         else:
             if debug_mode:
                 print(
