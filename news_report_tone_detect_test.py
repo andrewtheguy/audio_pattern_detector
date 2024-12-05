@@ -258,10 +258,10 @@ if __name__ == '__main__':
     print("Sample rate:", samplerate)
 
 
-    is_pure_tone(data, samplerate)
+    #is_pure_tone(data, samplerate)
 
-    #result = is_news_report_beep(data, samplerate)
-    #print(result)
+    result = is_news_report_beep(data, samplerate)
+    print(result)
 
     #print(detect_sine_tone(data, samplerate))
     plot_spectrogram(data, samplerate)

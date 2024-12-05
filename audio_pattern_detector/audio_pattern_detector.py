@@ -20,6 +20,8 @@ from andrew_utils import seconds_to_time
 from scipy.signal import find_peaks
 from sklearn.metrics import mean_squared_error
 
+import soundfile as sf
+
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 from audio_pattern_detector.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, \
     downsample_preserve_maxima, ffmpeg_get_16bit_pcm
@@ -347,10 +349,8 @@ class AudioPatternDetector:
         #audio = np.concatenate((audio_section, zeroes))
         # samples_skip_end = zeroes_second_pad * sr + clip_length
 
-        audio=audio_section
-
         # Cross-correlate and normalize correlation
-        correlation = correlate(audio, clip, mode='full', method='fft')
+        correlation = correlate(audio_section, clip, mode='full', method='fft')
         # abs
         correlation = np.abs(correlation)
         absolute_max = np.max(correlation)
@@ -449,6 +449,11 @@ class AudioPatternDetector:
                                                 area_props=area_props,
                                                 clip_cache=clip_cache)
 
+            if debug_mode:
+                audio_test_dir = f"./tmp/audio_section/{clip_name}"
+                os.makedirs(audio_test_dir, exist_ok=True)
+                sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio_section[peak - len(clip):peak + len(clip)],
+                         self.target_sample_rate)
 
         if debug_mode and len(peaks) > 0:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
