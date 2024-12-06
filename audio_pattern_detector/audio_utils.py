@@ -26,13 +26,33 @@ def slicing_with_zero_padding(array,width,middle_index):
     return np.array(array[beg:end])
 
 
-def load_audio_file(file_path, sr=None):
+def convert_audio_file(file_path, sr=None):
     # Create ffmpeg process
     with ffmpeg_get_16bit_pcm(file_path, target_sample_rate=sr, ac=1) as stdout:
         data = stdout.read()
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
+
+def load_wave_file(file_path,sr):
+    import soundfile as sf
+    # Read the file info without loading the full audio
+    info = sf.info(file_path)
+
+    # Check if it meets the conditions
+    if info.channels != 1:
+        raise ValueError(f"The file is not mono. Channels: {info.channels}")
+    if info.samplerate != sr:
+        raise ValueError(f"The sample rate is not {sr} Hz. Sample rate: {info.samplerate}")
+    if info.subtype != "PCM_16":
+        raise ValueError(f"The file is not 16-bit. Subtype: {info.subtype}")
+
+    # Load the audio if it meets the conditions
+    data, samplerate = sf.read(file_path,dtype='float32')
+    #print(data)
+    #exit(1)
+    #print("Audio file loaded successfully.")
+    return data
 
 # from librosa.util.buf_to_float
 def buf_to_float(

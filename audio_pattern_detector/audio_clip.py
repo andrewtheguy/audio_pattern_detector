@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from audio_pattern_detector.audio_utils import load_audio_file, convert_audio_arr_to_float, TARGET_SAMPLE_RATE
+from audio_pattern_detector.audio_utils import load_wave_file, convert_audio_arr_to_float, TARGET_SAMPLE_RATE
 
 
 @dataclass(frozen=True)
@@ -18,9 +18,9 @@ class AudioClip:
     @staticmethod
     def from_audio_file(clip_path):
         # Load the audio clip
-        clip = load_audio_file(clip_path, sr=TARGET_SAMPLE_RATE)
+        clip = load_wave_file(clip_path, sr=TARGET_SAMPLE_RATE)
         # convert to float
-        clip = convert_audio_arr_to_float(clip)
+        #clip = convert_audio_arr_to_float(clip)
         clip_name = Path(clip_path).stem
         return AudioClip(name=clip_name, audio=clip, sample_rate=TARGET_SAMPLE_RATE)
 
