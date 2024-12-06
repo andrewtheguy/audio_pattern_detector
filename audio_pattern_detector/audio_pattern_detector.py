@@ -34,6 +34,18 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 
 class AudioPatternDetector:
 
+    # won't work well for short clips because false positives get low similarity
+    clip_properties = {
+        "受之有道outro": {
+            # triangular shape at the bottom occupying large area
+            "mean_squared_error_similarity_threshold": 0.005,
+        },
+        "temple_bell": {
+            # triangular shape at the bottom occupying large area
+            "mean_squared_error_similarity_threshold": 0.01,
+        },
+    }
+
     def __init__(self, clip_paths, debug_mode=False):
         self.clip_paths = clip_paths
         self.debug_mode = debug_mode
@@ -416,7 +428,7 @@ class AudioPatternDetector:
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
             if is_pure_tone_pattern:
-                self._get_peak_times_beep_v3(correlation_clip=correlation_clip,
+                self._get_peak_times_normal(correlation_clip=correlation_clip,
                                           correlation_slice=correlation_slice,
                                           seconds=seconds,
                                           peak=peak,
@@ -506,17 +518,19 @@ class AudioPatternDetector:
         # similarity = min(similarity_left,similarity_middle,similarity_right)
         # similarity = similarity_whole = (similarity_left + similarity_right)/2
 
-        lower_limit = round(len(correlation_clip) * left_bound / partition_count)
-        upper_limit = round(len(correlation_clip) * right_bound / partition_count)
-        area_prop = area_of_overlap_ratio(correlation_clip[lower_limit:upper_limit],
-                                                                              correlation_slice[
-                                                                              lower_limit:upper_limit])
-
-        # ratio of difference between overlapping area and non-overlapping area
-        # needed to check when mean_squared_error is high enough
-        diff_overlap_ratio = area_prop["diff_overlap_ratio"]
-
         if debug_mode:
+
+            lower_limit = round(len(correlation_clip) * left_bound / partition_count)
+            upper_limit = round(len(correlation_clip) * right_bound / partition_count)
+
+            area_prop = area_of_overlap_ratio(correlation_clip[lower_limit:upper_limit],
+                                              correlation_slice[
+                                              lower_limit:upper_limit])
+
+            # ratio of difference between overlapping area and non-overlapping area
+            # needed to check when mean_squared_error is high enough
+            diff_overlap_ratio = area_prop["diff_overlap_ratio"]
+
             similarity_debug = clip_cache["similarity_debug"]
             print("similarity", similarity)
             seconds.append(peak / sr)
@@ -550,24 +564,16 @@ class AudioPatternDetector:
                                               "left_right_diff": abs(similarity_left - similarity_right),
                                               }))
 
-        similarity_threshold = 0.01
-        similarity_threshold_check_area = 0.002
 
-        # reject if similarity is high enough and little area overlap
-        diff_overlap_ratio_threshold = 0.5
+        similarity_threshold = self.clip_properties.get(clip_name, {}).get("mean_squared_error_similarity_threshold", 0.002)
 
-        if similarity_threshold <= similarity_threshold_check_area:
-            raise ValueError(
-                f"similarity_threshold {similarity_threshold} needs to be larger than similarity_threshold_check_area {similarity_threshold_check_area}")
+        # area check related reject if similarity is high enough and little area overlap
+        # diff_overlap_ratio_threshold = 0.5
 
         if similarity > similarity_threshold:
             if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
-        # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
-        elif similarity > similarity_threshold_check_area and diff_overlap_ratio > diff_overlap_ratio_threshold:
-            if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to diff_overlap_ratio {diff_overlap_ratio} > {diff_overlap_ratio_threshold}")
+                    f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
         else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
             peaks_final.append(peak)
 
