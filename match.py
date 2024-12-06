@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 
+from audio_pattern_detector.audio_clip import AudioClip
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from andrew_utils import seconds_to_time
 
@@ -52,6 +53,9 @@ from andrew_utils import seconds_to_time
 #     return peak_times_final
 
 def match_pattern(audio_file, pattern_file, debug_mode=False):
+    clip_name = Path(pattern_file).stem
+    full_audio_name = Path(audio_file).stem
+    audio_clip = AudioClip
     # Find clip occurrences in the full audio
     peak_times = AudioPatternDetector(debug_mode=debug_mode,
                                    clip_paths=[pattern_file]).find_clip_in_audio(full_audio_path=audio_file)
