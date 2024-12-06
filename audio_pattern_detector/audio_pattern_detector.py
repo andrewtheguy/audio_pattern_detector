@@ -35,7 +35,7 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: [AudioClip], debug_mode=False):
+    def __init__(self, audio_clips: [AudioClip], debug_mode=False, seconds_per_chunk=60):
         self.audio_clips = audio_clips
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
@@ -43,13 +43,27 @@ class AudioPatternDetector:
         self.target_sample_rate = TARGET_SAMPLE_RATE
 
         clips_already = set()
+        max_clip_length = 0
         for audio_clip in self.audio_clips:
             if audio_clip.name in clips_already:
                 raise ValueError(f"clip {audio_clip.name} needs to be unique")
             if audio_clip.sample_rate != self.target_sample_rate:
                 raise ValueError(f"clip {audio_clip.name} needs to be {self.target_sample_rate} sample rate")
             clips_already.add(audio_clip.name)
+            clip_length = len(audio_clip.audio)
+            if clip_length > max_clip_length:
+                max_clip_length = clip_length
 
+        if seconds_per_chunk is None or seconds_per_chunk < 1:
+            # 2 seconds padding
+            seconds_per_chunk = math.ceil(max_clip_length / self.target_sample_rate) * 2
+            logger.warning(f"seconds_per_chunk is not set or less than 1, setting it to longest clip * 2 seconds, which is {seconds_per_chunk} seconds")
+
+        self.seconds_per_chunk = seconds_per_chunk
+
+        if seconds_per_chunk != 60:
+            logger.warning(f"seconds_per_chunk {seconds_per_chunk} is not 60 seconds, turning off debug mode because it was made for 60 seconds only")
+            self.debug_mode = False
 
         # for clip_path in clip_paths:
         #     if not os.path.exists(clip_path):
@@ -65,7 +79,7 @@ class AudioPatternDetector:
         if full_streaming_audio.sample_rate != self.target_sample_rate:
             raise ValueError(f"full_streaming_audio_clip {full_streaming_audio.name} needs to be {self.target_sample_rate} sample rate")
 
-        seconds_per_chunk = 60
+        seconds_per_chunk = self.seconds_per_chunk
 
         # 2 bytes per channel on every sample for 16 bits (int16)
         # times two because it is (int16, mono)
@@ -114,7 +128,7 @@ class AudioPatternDetector:
 
             clip_seconds = len(clip) / self.target_sample_rate
 
-            sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds,seconds_per_chunk)
+            sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds)
 
             if self.normalize:
                 # max_loudness = np.max(np.abs(clip))
@@ -179,7 +193,6 @@ class AudioPatternDetector:
                                                  index=i,
                                                  clip_data=clip_data,
                                                  clip_cache=clip_cache,
-                                                 seconds_per_chunk=seconds_per_chunk,
                                                  )
 
                 all_peak_times[audio_clip.name].extend(peak_times)
@@ -227,7 +240,9 @@ class AudioPatternDetector:
 
         return all_peak_times
 
-    def _get_chunking_timing_info(self, clip_name, clip_seconds, seconds_per_chunk):
+    def _get_chunking_timing_info(self, clip_name, clip_seconds):
+        seconds_per_chunk = self.seconds_per_chunk
+
         sliding_window = math.ceil(clip_seconds)
 
         if (sliding_window != clip_seconds):
@@ -241,7 +256,7 @@ class AudioPatternDetector:
 
         # this should not happen anyways because the seconds per chunk is too small
         if (seconds_per_chunk < sliding_window * 2):
-            seconds_per_chunk = sliding_window * 10
+            #seconds_per_chunk = sliding_window * 10
             raise ValueError(f"seconds_per_chunk {seconds_per_chunk} is too small")
 
         return sliding_window
@@ -261,8 +276,9 @@ class AudioPatternDetector:
     # sliding_window: for previous_chunk in seconds from end
     # index: for debugging by saving a file for audio_section
     # seconds_per_chunk: default seconds_per_chunk
-    def _process_chunk(self, chunk, clip_data, clip_cache, sr, previous_chunk, index, seconds_per_chunk):
+    def _process_chunk(self, chunk, clip_data, clip_cache, sr, previous_chunk, index):
         clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
+        seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
         # Concatenate previous chunk for continuity in processing
@@ -312,7 +328,6 @@ class AudioPatternDetector:
 
         # samples_skip_end does not skip results from being included yet
         peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                              seconds_per_chunk=seconds_per_chunk,
                                               clip_cache=clip_cache,
                                               )
 
@@ -345,12 +360,14 @@ class AudioPatternDetector:
 
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
-    def _correlation_method(self, clip_data, clip_cache, audio_section, sr, index, seconds_per_chunk):
+    def _correlation_method(self, clip_data, clip_cache, audio_section, sr, index):
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
         if clip_cache["is_pure_tone_pattern"].get(clip_name) is None:
             clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, sr)
+
+        seconds_per_chunk = self.seconds_per_chunk
 
         is_pure_tone_pattern = clip_cache["is_pure_tone_pattern"][clip_name]
 
