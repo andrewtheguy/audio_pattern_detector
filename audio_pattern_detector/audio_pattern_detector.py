@@ -4,7 +4,6 @@ import logging
 import os
 
 from operator import itemgetter
-from pathlib import Path
 
 import numpy as np
 
@@ -24,14 +23,15 @@ import soundfile as sf
 
 from audio_pattern_detector.audio_clip import AudioClip, StreamingAudioClip
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
-from audio_pattern_detector.audio_utils import slicing_with_zero_padding, load_audio_file, convert_audio_arr_to_float, \
-    downsample_preserve_maxima, ffmpeg_get_16bit_pcm
+from audio_pattern_detector.audio_utils import slicing_with_zero_padding, convert_audio_arr_to_float, \
+    downsample_preserve_maxima, TARGET_SAMPLE_RATE
 from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
 
 logger = logging.getLogger(__name__)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
+
 
 class AudioPatternDetector:
 
@@ -40,12 +40,14 @@ class AudioPatternDetector:
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
-        self.target_sample_rate = 8000
+        self.target_sample_rate = TARGET_SAMPLE_RATE
 
         clips_already = set()
         for audio_clip in self.audio_clips:
             if audio_clip.name in clips_already:
                 raise ValueError(f"clip {audio_clip.name} needs to be unique")
+            if audio_clip.sample_rate != self.target_sample_rate:
+                raise ValueError(f"clip {audio_clip.name} needs to be {self.target_sample_rate} sample rate")
             clips_already.add(audio_clip.name)
 
 
@@ -54,11 +56,14 @@ class AudioPatternDetector:
         #         raise ValueError(f"Clip {clip_path} does not exist")
 
     # could cause issues with small overlap when intro is followed right by news report
-    def find_clip_in_audio(self, full_audio_clip: StreamingAudioClip):
+    def find_clip_in_audio(self, full_streaming_audio_clip: StreamingAudioClip):
         # clip_paths = self.clip_paths
         #
         # if not os.path.exists(full_audio_path):
         #     raise ValueError(f"Full audio {full_audio_path} does not exist")
+
+        if full_streaming_audio_clip.sample_rate != self.target_sample_rate:
+            raise ValueError(f"full_streaming_audio_clip {full_streaming_audio_clip.name} needs to be {self.target_sample_rate} sample rate")
 
         seconds_per_chunk = 60
 
@@ -76,8 +81,8 @@ class AudioPatternDetector:
         #exit(1)
 
 
-        full_audio_name = full_audio_clip.name
-        stdout = full_audio_clip.audio_stream
+        full_audio_name = full_streaming_audio_clip.name
+        stdout = full_streaming_audio_clip.audio_stream
 
         i = 0
 

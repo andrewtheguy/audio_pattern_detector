@@ -4,9 +4,11 @@ import json
 import os
 from pathlib import Path
 
-from audio_pattern_detector.audio_clip import AudioClip
+from audio_pattern_detector.audio_clip import AudioClip, StreamingAudioClip
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from andrew_utils import seconds_to_time
+
+from audio_pattern_detector.audio_utils import ffmpeg_get_16bit_pcm, TARGET_SAMPLE_RATE
 
 
 # # only for testing
@@ -53,13 +55,22 @@ from andrew_utils import seconds_to_time
 #     return peak_times_final
 
 def match_pattern(audio_file, pattern_file, debug_mode=False):
-    clip_name = Path(pattern_file).stem
-    full_audio_name = Path(audio_file).stem
-    audio_clip = AudioClip
-    # Find clip occurrences in the full audio
-    peak_times = AudioPatternDetector(debug_mode=debug_mode,
-                                   clip_paths=[pattern_file]).find_clip_in_audio(full_audio_path=audio_file)
-    return peak_times[pattern_file]
+    if not os.path.exists(audio_file):
+        raise ValueError(f"Audio {audio_file} does not exist")
+    if not os.path.exists(pattern_file):
+        raise ValueError(f"Pattern {pattern_file} does not exist")
+
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    sr = TARGET_SAMPLE_RATE
+    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(audio_file).stem
+        print(f"Finding pattern in audio file {audio_name}...")
+        #exit(1)
+        full_streaming_audio_clip = StreamingAudioClip(name=audio_name, audio_stream=stdout, sample_rate=sr)
+        # Find clip occurrences in the full audio
+        peak_times = (AudioPatternDetector(debug_mode=debug_mode,audio_clips=[pattern_clip])
+                      .find_clip_in_audio(full_streaming_audio_clip))
+    return peak_times[pattern_clip.name]
 
 
 def main():

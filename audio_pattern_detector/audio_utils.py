@@ -28,7 +28,7 @@ def slicing_with_zero_padding(array,width,middle_index):
 
 def load_audio_file(file_path, sr=None):
     # Create ffmpeg process
-    with ffmpeg_get_16bit_pcm(file_path, sr, ac=1) as stdout:
+    with ffmpeg_get_16bit_pcm(file_path, target_sample_rate=sr, ac=1) as stdout:
         data = stdout.read()
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
@@ -111,7 +111,7 @@ def downsample_preserve_maxima(curve, num_samples):
 
 # convert audio to 16 bit pcm with streaming output
 @contextmanager
-def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate,ac=None):
+def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate=None,ac=None):
     # Construct the ffmpeg command
     command = [
         "ffmpeg",
@@ -123,8 +123,10 @@ def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate,ac=None):
     if ac is not None:
         command.extend(["-ac", str(ac)])
 
+    if target_sample_rate is not None:
+        command.extend(["-ar", str(target_sample_rate)])
+
     command.extend([
-                "-ar", str(target_sample_rate),  # Sample rate
                 "-loglevel", "error",  # Suppress extra logs
                 "pipe:"  # Output to stdout
                 ])
@@ -143,3 +145,6 @@ def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate,ac=None):
     finally:
         if process is not None:
             process.stdout.close()
+
+
+TARGET_SAMPLE_RATE = 8000

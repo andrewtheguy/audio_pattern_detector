@@ -5,6 +5,7 @@ import soundfile as sf
 from audio_pattern_detector.audio_utils import load_audio_file, convert_audio_arr_to_float
 
 
+# will be mono
 def convert_audio_to_clip_format(audio_path, output_path):
     target_sample_rate = 8000
 
