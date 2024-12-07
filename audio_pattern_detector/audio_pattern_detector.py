@@ -1,3 +1,4 @@
+import sys
 from collections import defaultdict
 import json
 import logging
@@ -91,7 +92,7 @@ class AudioPatternDetector:
 
         all_peak_times = {audio_clip.name: [] for audio_clip in self.audio_clips}
 
-        print("all_peak_times",all_peak_times)
+        print("all_peak_times",all_peak_times,file=sys.stderr)
         #exit(1)
 
 
@@ -149,9 +150,9 @@ class AudioPatternDetector:
             correlation_clip,absolute_max = self._get_clip_correlation(clip)
 
             if self.debug_mode:
-                print(f"clip_length {clip_name}", len(clip))
-                print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate)
-                print("correlation_clip_length", len(correlation_clip))
+                print(f"clip_length {clip_name}", len(clip),file=sys.stderr)
+                print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate,file=sys.stderr)
+                print("correlation_clip_length", len(correlation_clip),file=sys.stderr)
                 graph_dir = f"../tmp/graph/clip_correlation"
                 os.makedirs(graph_dir, exist_ok=True)
 
@@ -173,6 +174,8 @@ class AudioPatternDetector:
                                      #"downsampled_correlation_clip":downsampled_correlation_clip,
                                      }
 
+        total_time = 0.0
+
         # Process audio in chunks
         while True:
             in_bytes = stdout.read(chunk_size)
@@ -180,8 +183,10 @@ class AudioPatternDetector:
                 break
             # Convert bytes to numpy array
             chunk = np.frombuffer(in_bytes, dtype="int16")
-            # convert to float
+            # convert to float, don't output float from the previous step otherwise will be very loud
             chunk = convert_audio_arr_to_float(chunk)
+
+            total_time += len(chunk) / self.target_sample_rate
 
             for audio_clip in self.audio_clips:
                 clip_data = clip_datas[audio_clip.name]
@@ -238,7 +243,7 @@ class AudioPatternDetector:
                 plt.close()
 
 
-        return all_peak_times
+        return all_peak_times, total_time
 
     def _get_chunking_timing_info(self, clip_name, clip_seconds):
         seconds_per_chunk = self.seconds_per_chunk
@@ -246,7 +251,7 @@ class AudioPatternDetector:
         sliding_window = math.ceil(clip_seconds)
 
         if (sliding_window != clip_seconds):
-            print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}")
+            print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}",file=sys.stderr)
         # sliding_window = 5
         #
         # if (sliding_window < clip_seconds + 5):
@@ -398,8 +403,8 @@ class AudioPatternDetector:
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
-            print(f"---")
-            print(f"section_ts: {section_ts}, index {index}")
+            print(f"---",file=sys.stderr)
+            print(f"section_ts: {section_ts}, index {index}",file=sys.stderr)
             graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
 
@@ -503,7 +508,7 @@ class AudioPatternDetector:
                               "similarities": similarities}, indent=2, cls=NumpyEncoder),
                   file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
-            print(f"---")
+            print(f"---",file=sys.stderr)
 
         # convert peaks to seconds
         peak_times = [peak / sr for peak in peaks_final]
@@ -556,7 +561,7 @@ class AudioPatternDetector:
 
         if debug_mode:
             similarity_debug = clip_cache["similarity_debug"]
-            print("similarity", similarity)
+            print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug[clip_name].append((index, similarity,))
 
@@ -600,12 +605,12 @@ class AudioPatternDetector:
 
         if similarity > similarity_threshold:
             if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}",file=sys.stderr)
         # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
         elif similarity > similarity_threshold_check_area and diff_overlap_ratio > diff_overlap_ratio_threshold:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to diff_overlap_ratio {diff_overlap_ratio} > {diff_overlap_ratio_threshold}")
+                    f"failed verification for {section_ts} due to diff_overlap_ratio {diff_overlap_ratio} > {diff_overlap_ratio_threshold}",file=sys.stderr)
         else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
             peaks_final.append(peak)
 
@@ -720,7 +725,7 @@ class AudioPatternDetector:
         similarity_whole = similarity
 
         if debug_mode:
-            print("similarity", similarity)
+            print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug = clip_cache["similarity_debug"]
             similarity_debug[clip_name].append((index, similarity,))
@@ -761,19 +766,19 @@ class AudioPatternDetector:
 
         if similarity > similarity_threshold:
             if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}",file=sys.stderr)
         # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
         elif similarity > similarity_threshold_check_area_upper and overlap_ratio < 0.99:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.99")
+                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.99",file=sys.stderr)
         # similar enough, lower area ratio threshold
         elif similarity > similarity_threshold_check_area and overlap_ratio < 0.98:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.98")
+                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.98",file=sys.stderr)
         else:
             if debug_mode:
                 print(
-                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio}")
+                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio}",file=sys.stderr)
             peaks_final.append(peak)
