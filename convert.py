@@ -2,9 +2,10 @@ import argparse
 import os
 import soundfile as sf
 
-from audio_pattern_detector.audio_utils import load_audio_file, convert_audio_arr_to_float
+from audio_pattern_detector.audio_utils import convert_audio_file, convert_audio_arr_to_float
 
 
+# will be mono
 def convert_audio_to_clip_format(audio_path, output_path):
     target_sample_rate = 8000
 
@@ -12,7 +13,7 @@ def convert_audio_to_clip_format(audio_path, output_path):
         raise ValueError(f"Audio {audio_path} does not exist")
 
     # Load the audio clip
-    clip = load_audio_file(audio_path, sr=target_sample_rate)
+    clip = convert_audio_file(audio_path, sr=target_sample_rate)
 
     # convert to float
     clip = convert_audio_arr_to_float(clip)

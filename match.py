@@ -2,10 +2,14 @@ import argparse
 import glob
 import json
 import os
+import sys
 from pathlib import Path
 
+from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from andrew_utils import seconds_to_time
+
+from audio_pattern_detector.audio_utils import ffmpeg_get_16bit_pcm, TARGET_SAMPLE_RATE
 
 
 # # only for testing
@@ -52,10 +56,22 @@ from andrew_utils import seconds_to_time
 #     return peak_times_final
 
 def match_pattern(audio_file, pattern_file, debug_mode=False):
-    # Find clip occurrences in the full audio
-    peak_times = AudioPatternDetector(debug_mode=debug_mode,
-                                   clip_paths=[pattern_file]).find_clip_in_audio(full_audio_path=audio_file)
-    return peak_times[pattern_file]
+    if not os.path.exists(audio_file):
+        raise ValueError(f"Audio {audio_file} does not exist")
+    if not os.path.exists(pattern_file):
+        raise ValueError(f"Pattern {pattern_file} does not exist")
+
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    sr = TARGET_SAMPLE_RATE
+    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(audio_file).stem
+        print(f"Finding pattern in audio file {audio_name}...",file=sys.stderr)
+        #exit(1)
+        full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+        # Find clip occurrences in the full audio
+        peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode,audio_clips=[pattern_clip])
+                      .find_clip_in_audio(full_streaming_audio))
+    return peak_times[pattern_clip.name], total_time
 
 
 def main():
@@ -64,6 +80,7 @@ def main():
     parser.add_argument('--pattern-file', metavar='pattern file', required=True, type=str, help='pattern file')
     parser.add_argument('--audio-file', metavar='audio file', type=str, required=False, help='audio file to find pattern')
     parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
+    parser.add_argument('--debug', metavar='debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=True)
     #parser.add_argument('--threshold', metavar='pattern match method', type=float, help='pattern match method',
     #                    default=0.4)
     args = parser.parse_args()
@@ -75,25 +92,28 @@ def main():
         output_file=f'./tmp/{output_file_prefix}.jsonl'
         with open(output_file, 'w') as f:
             f.truncate(0)
-        print(f"Finding pattern in audio files in folder {args.audio_folder}...")
+        print(f"Finding pattern in audio files in folder {args.audio_folder}...",file=sys.stderr)
         #peak_time = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
-            print(f"Processing {audio_file}...")
-            peak_times = match_pattern(audio_file, args.pattern_file)
+            print(f"Processing {audio_file}...",file=sys.stderr)
+            peak_times, total_time = match_pattern(audio_file, args.pattern_file, debug_mode=False)
+            print(peak_times,file=sys.stderr)
+            print(f"Total time processed: {seconds_to_time(seconds=total_time)}",file=sys.stderr)
             if len(peak_times) > 0:
                 peak_times_second = [seconds_to_time(seconds=offset) for offset in peak_times]
-                print(f"Clip occurs with the file {audio_file} at the following times (in seconds): {peak_times_second}")
+                print(f"Clip occurs with the file {audio_file} at the following times (in seconds): {peak_times_second}",file=sys.stderr)
                 #all_files[audio_file] = peak_times_second
                 with open(output_file, 'a') as f:
                     print(json.dumps({'audio_file': audio_file, 'peak_times': peak_times_second},ensure_ascii=False), file=f)
     elif args.audio_file:
-        peak_times=match_pattern(args.audio_file, args.pattern_file, debug_mode=True)
-        print(peak_times)
+        peak_times,total_time=match_pattern(args.audio_file, args.pattern_file, debug_mode=args.debug)
+        print(peak_times,file=sys.stderr)
+        print(f"Total time processed: {seconds_to_time(seconds=total_time)}",file=sys.stderr)
 
         for offset in peak_times:
-            print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}")
+            print(f"Clip occurs at the following times (in seconds): {seconds_to_time(seconds=offset)}",file=sys.stderr)
     else:
-        print("Please provide either --audio-file or --audio-folder")
+        print("Please provide either --audio-file or --audio-folder",file=sys.stderr)
         exit(1)
 
 
