@@ -92,7 +92,7 @@ class AudioPatternDetector:
 
         all_peak_times = {audio_clip.name: [] for audio_clip in self.audio_clips}
 
-        print("all_peak_times",all_peak_times,file=sys.stderr)
+        #print("all_peak_times",all_peak_times,file=sys.stderr)
         #exit(1)
 
 
