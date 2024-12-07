@@ -24,6 +24,9 @@ class AudioClip:
         clip_name = Path(clip_path).stem
         return AudioClip(name=clip_name, audio=clip, sample_rate=TARGET_SAMPLE_RATE)
 
+    def clip_length_seconds(self):
+        return len(self.audio) / self.sample_rate
+
 
 @dataclass(frozen=True)
 class AudioStream:
