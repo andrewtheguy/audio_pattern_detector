@@ -26,7 +26,7 @@ class AudioClip:
 
 
 @dataclass(frozen=True)
-class StreamingAudio:
+class AudioStream:
     name: str
     audio_stream: io.BufferedReader # this should be raw byte stream of 16 bit mono 8000HZ PCM audio
     sample_rate: int

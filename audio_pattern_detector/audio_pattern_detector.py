@@ -22,7 +22,7 @@ from sklearn.metrics import mean_squared_error
 
 import soundfile as sf
 
-from audio_pattern_detector.audio_clip import AudioClip, StreamingAudio
+from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 from audio_pattern_detector.audio_utils import slicing_with_zero_padding, convert_audio_arr_to_float, \
     downsample_preserve_maxima, TARGET_SAMPLE_RATE
@@ -71,14 +71,14 @@ class AudioPatternDetector:
         #         raise ValueError(f"Clip {clip_path} does not exist")
 
     # could cause issues with small overlap when intro is followed right by news report
-    def find_clip_in_audio(self, full_streaming_audio: StreamingAudio):
+    def find_clip_in_audio(self, audio_stream: AudioStream):
         # clip_paths = self.clip_paths
         #
         # if not os.path.exists(full_audio_path):
         #     raise ValueError(f"Full audio {full_audio_path} does not exist")
 
-        if full_streaming_audio.sample_rate != self.target_sample_rate:
-            raise ValueError(f"full_streaming_audio_clip {full_streaming_audio.name} needs to be {self.target_sample_rate} sample rate")
+        if audio_stream.sample_rate != self.target_sample_rate:
+            raise ValueError(f"full_streaming_audio_clip {audio_stream.name} needs to be {self.target_sample_rate} sample rate")
 
         seconds_per_chunk = self.seconds_per_chunk
 
@@ -96,8 +96,8 @@ class AudioPatternDetector:
         #exit(1)
 
 
-        full_audio_name = full_streaming_audio.name
-        stdout = full_streaming_audio.audio_stream
+        full_audio_name = audio_stream.name
+        stdout = audio_stream.audio_stream
 
         i = 0
 

@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-from audio_pattern_detector.audio_clip import AudioClip, StreamingAudio
+from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from andrew_utils import seconds_to_time
 
@@ -67,7 +67,7 @@ def match_pattern(audio_file, pattern_file, debug_mode=False):
         audio_name = Path(audio_file).stem
         print(f"Finding pattern in audio file {audio_name}...",file=sys.stderr)
         #exit(1)
-        full_streaming_audio = StreamingAudio(name=audio_name, audio_stream=stdout, sample_rate=sr)
+        full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
         peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode,audio_clips=[pattern_clip])
                       .find_clip_in_audio(full_streaming_audio))
