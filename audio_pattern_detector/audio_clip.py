@@ -18,7 +18,7 @@ class AudioClip:
     @staticmethod
     def from_audio_file(clip_path):
         # Load the audio clip
-        clip = load_wave_file(clip_path, sr=TARGET_SAMPLE_RATE)
+        clip = load_wave_file(clip_path, expected_sample_rate=TARGET_SAMPLE_RATE)
         # convert to float
         #clip = convert_audio_arr_to_float(clip)
         clip_name = Path(clip_path).stem

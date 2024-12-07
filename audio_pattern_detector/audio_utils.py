@@ -33,8 +33,8 @@ def convert_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
-
-def load_wave_file(file_path,sr):
+# load wave file with soundfile into float32
+def load_wave_file(file_path, expected_sample_rate):
     import soundfile as sf
     # Read the file info without loading the full audio
     info = sf.info(file_path)
@@ -42,8 +42,8 @@ def load_wave_file(file_path,sr):
     # Check if it meets the conditions
     if info.channels != 1:
         raise ValueError(f"The file is not mono. Channels: {info.channels}")
-    if info.samplerate != sr:
-        raise ValueError(f"The sample rate is not {sr} Hz. Sample rate: {info.samplerate}")
+    if info.samplerate != expected_sample_rate:
+        raise ValueError(f"The sample rate is not {expected_sample_rate} Hz. Sample rate: {info.samplerate}")
     if info.subtype != "PCM_16":
         raise ValueError(f"The file is not 16-bit. Subtype: {info.subtype}")
 
