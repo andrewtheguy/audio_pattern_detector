@@ -24,11 +24,11 @@ def convert_audio_to_clip_format(audio_path, output_path):
 if __name__ == '__main__':
     #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pattern-file', metavar='audio file', type=str, help='audio file to convert')
+    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to convert')
     parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
     #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
     args = parser.parse_args()
 
-    # python convert.py --pattern-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
-    input_file = args.pattern_file
+    # python convert.py --audio-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
+    input_file = args.audio_file
     convert_audio_to_clip_format(input_file,args.dest_file)

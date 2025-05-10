@@ -10,7 +10,6 @@ import numpy as np
 
 from scipy.signal import correlate
 import math
-import matplotlib.pyplot as plt
 
 import pyloudnorm as pyln
 
@@ -36,7 +35,7 @@ warnings.filterwarnings('ignore', module='pyloudnorm')
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: [AudioClip], debug_mode=False, seconds_per_chunk=60):
+    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk=60):
         self.audio_clips = audio_clips
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
@@ -150,6 +149,7 @@ class AudioPatternDetector:
             correlation_clip,absolute_max = self._get_clip_correlation(clip)
 
             if self.debug_mode:
+                import matplotlib.pyplot as plt
                 print(f"clip_length {clip_name}", len(clip),file=sys.stderr)
                 print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate,file=sys.stderr)
                 print("correlation_clip_length", len(correlation_clip),file=sys.stderr)
@@ -403,6 +403,7 @@ class AudioPatternDetector:
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
+            import matplotlib.pyplot as plt
             print(f"---",file=sys.stderr)
             print(f"section_ts: {section_ts}, index {index}",file=sys.stderr)
             graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
@@ -560,6 +561,7 @@ class AudioPatternDetector:
         diff_overlap_ratio = area_prop["diff_overlap_ratio"]
 
         if debug_mode:
+            import matplotlib.pyplot as plt
             similarity_debug = clip_cache["similarity_debug"]
             print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)

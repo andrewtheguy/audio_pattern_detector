@@ -8,11 +8,11 @@ It uses cross-correlation to detect the potential matching pattern, and then use
 
 ## usage
 ```shell
-# detect pattern from audio file with debug
-python match.py --audio-file /Volumes/andrewdata/ftp/grabradiostreamed/am1430/multiple/日落大道/日落大道20240523_1600_s_1.m4a --pattern-file ./audio_clips/am1430/日落大道interlude.wav
+# detect pattern from audio file, add --no-debug for disable debugging
+python match.py --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
 
 # convert audio file to target sample rate
-python convert.py --pattern-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
+python convert.py --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
 
 ```
 
@@ -23,7 +23,7 @@ currently only supports cross-correlation
 Picks all peaks that are above a certain threshold, and then eliminate false positives with cross similarity and mean square error.
 Works well with repeating or non-repeating patterns that are loud enough within the audio section because it adds the normalized clip
 at the end of the audio section, which helps to eliminate false positives that are much softer or non-related to the clip.
-won't work well for patterns that are too short or not loud enough within the audio section. 
+won't work well for patterns that are too short, currently it disallow short clips unless it is pure tone pattern, if it is short and pure tone pattern, then a special correlation logic is used to match. 
 
 It will miss distorted patterns like this because error score is too high and area overlap ratio is too low:
 ![rthk_beep_39_00:39:00_478782](https://github.com/user-attachments/assets/80669708-b8f9-461c-ae6c-2edddb161904)
