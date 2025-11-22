@@ -1,7 +1,5 @@
 FROM python:3.12-slim-bookworm
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 RUN     apt-get -yqq update && \
         apt-get install -yq --no-install-recommends ca-certificates expat libgomp1 tini git && \
         apt-get autoremove -y && \
@@ -19,7 +17,8 @@ WORKDIR $app
 COPY . /usr/src/app
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
-RUN uv sync --locked --no-dev
+RUN --mount=from=ghcr.io/astral-sh/uv:0.9.11,source=/uv,target=/bin/uv \
+    uv sync --locked --no-dev
 
 # numba patch
 ENV NUMBA_CACHE_DIR=/tmp/numba_cache_dir
