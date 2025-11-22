@@ -18,7 +18,7 @@ target "worker" {
 
 target "worker_multi" {
     inherits = ["worker"]
-    platforms = ["linux/amd64", "linux/arm64"]
+    platforms = ["linux/arm64"]
 }
 
 target "worker_amd64_only" {
