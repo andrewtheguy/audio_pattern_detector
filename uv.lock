@@ -9,7 +9,7 @@ source = { git = "https://github.com/andrewtheguy/andrew_utils.git?rev=80a32ac11
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "andrew-utils" },
