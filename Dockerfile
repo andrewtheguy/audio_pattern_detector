@@ -1,11 +1,17 @@
-FROM python:3.12-slim-bookworm as builder
+FROM python:3.12-slim-bookworm AS builder
 
-# Copy the necessary files for Poetry to the generate the requirements file from
-COPY ../pyproject.toml ../poetry.lock /tmp/
+# Install git for resolving git dependencies
+RUN apt-get -yqq update && \
+    apt-get install -yq --no-install-recommends git && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install poetry==1.8.* poetry-plugin-export
+# Copy the necessary files for uv to generate the requirements file from
+COPY pyproject.toml uv.lock /tmp/
 
-RUN cd /tmp && poetry export --without test --without-hashes -f requirements.txt -o requirements.txt
+RUN pip3 install uv
+
+WORKDIR /tmp
+RUN uv pip compile pyproject.toml -o requirements.txt
 
 
 FROM python:3.12-slim-bookworm
@@ -25,7 +31,7 @@ COPY --from=mwader/static-ffmpeg:7.0-1 /ffprobe /usr/local/bin/
 
 #VOLUME '/usr/src/app'
 
-ENV app /usr/src/app
+ENV app=/usr/src/app
 WORKDIR $app
 
 COPY . /usr/src/app

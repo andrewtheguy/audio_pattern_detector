@@ -19,23 +19,21 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install poetry
-      run: pipx install poetry==1.8.2
-              #&& poetry config virtualenvs.create false
+    - name: Install uv
+      run: pipx install uv
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-        cache: 'poetry' # caching poetry dependencies
     - name: Install dependencies
       run: |
-        poetry install
+        uv sync
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        poetry run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        uv run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        poetry run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        uv run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        poetry run pytest
+        uv run pytest
