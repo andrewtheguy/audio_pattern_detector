@@ -207,6 +207,7 @@ class AudioPatternDetector:
             i = i + 1
 
         if self.debug_mode:
+            import matplotlib.pyplot as plt
 
             suffix = full_audio_name
 
@@ -727,6 +728,7 @@ class AudioPatternDetector:
         similarity_whole = similarity
 
         if debug_mode:
+            import matplotlib.pyplot as plt
             print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug = clip_cache["similarity_debug"]
