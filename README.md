@@ -9,10 +9,10 @@ It uses cross-correlation to detect the potential matching pattern, and then use
 ## usage
 ```shell
 # detect pattern from audio file, add --no-debug for disable debugging
-python match.py --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+uv run python match.py --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
 
 # convert audio file to target sample rate
-python convert.py --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+uv run python convert.py --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
 
 ```
 
