@@ -19,7 +19,7 @@ from andrew_utils import seconds_to_time
 from scipy.signal import find_peaks
 from sklearn.metrics import mean_squared_error
 
-import soundfile as sf
+from pydub import AudioSegment
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
@@ -31,6 +31,23 @@ logger = logging.getLogger(__name__)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
+
+
+def _write_audio_file(filepath, audio_data, sample_rate):
+    """Helper function to write audio using pydub"""
+    # Convert float32 [-1, 1] to int16 for pydub
+    audio_int16 = (audio_data * (2**15)).astype(np.int16)
+
+    # Create AudioSegment from numpy array
+    audio = AudioSegment(
+        audio_int16.tobytes(),
+        frame_rate=sample_rate,
+        sample_width=2,  # 16-bit = 2 bytes
+        channels=1
+    )
+
+    # Export to wav file
+    audio.export(filepath, format="wav")
 
 
 class AudioPatternDetector:
@@ -497,8 +514,11 @@ class AudioPatternDetector:
             if debug_mode:
                 audio_test_dir = f"./tmp/audio_section/{clip_name}"
                 os.makedirs(audio_test_dir, exist_ok=True)
-                sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio_section[peak - len(clip):peak + len(clip)],
-                         self.target_sample_rate)
+                _write_audio_file(
+                    f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav",
+                    audio_section[peak - len(clip):peak + len(clip)],
+                    self.target_sample_rate
+                )
 
         if debug_mode and len(peaks) > 0:
             peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"

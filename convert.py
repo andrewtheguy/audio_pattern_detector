@@ -1,6 +1,7 @@
 import argparse
 import os
-import soundfile as sf
+import numpy as np
+from pydub import AudioSegment
 
 from audio_pattern_detector.audio_utils import convert_audio_file, convert_audio_arr_to_float
 
@@ -18,7 +19,19 @@ def convert_audio_to_clip_format(audio_path, output_path):
     # convert to float
     clip = convert_audio_arr_to_float(clip)
 
-    sf.write(output_path, clip, target_sample_rate)
+    # Convert float32 [-1, 1] back to int16 for pydub
+    clip_int16 = (clip * (2**15)).astype(np.int16)
+
+    # Create AudioSegment from numpy array
+    audio = AudioSegment(
+        clip_int16.tobytes(),
+        frame_rate=target_sample_rate,
+        sample_width=2,  # 16-bit = 2 bytes
+        channels=1
+    )
+
+    # Export to wav file
+    audio.export(output_path, format="wav")
 
 
 if __name__ == '__main__':

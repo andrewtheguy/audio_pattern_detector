@@ -33,26 +33,26 @@ def convert_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
-# load wave file with soundfile into float32
+# load wave file with pydub into float32
 def load_wave_file(file_path, expected_sample_rate):
-    import soundfile as sf
-    # Read the file info without loading the full audio
-    info = sf.info(file_path)
+    from pydub import AudioSegment
+
+    # Load the audio file
+    audio = AudioSegment.from_file(file_path)
 
     # Check if it meets the conditions
-    if info.channels != 1:
-        raise ValueError(f"The file is not mono. Channels: {info.channels}")
-    if info.samplerate != expected_sample_rate:
-        raise ValueError(f"The sample rate is not {expected_sample_rate} Hz. Sample rate: {info.samplerate}")
-    if info.subtype != "PCM_16":
-        raise ValueError(f"The file is not 16-bit. Subtype: {info.subtype}")
+    if audio.channels != 1:
+        raise ValueError(f"The file is not mono. Channels: {audio.channels}")
+    if audio.frame_rate != expected_sample_rate:
+        raise ValueError(f"The sample rate is not {expected_sample_rate} Hz. Sample rate: {audio.frame_rate}")
+    if audio.sample_width != 2:  # 2 bytes = 16-bit
+        raise ValueError(f"The file is not 16-bit. Sample width: {audio.sample_width} bytes")
 
-    # Load the audio if it meets the conditions
-    data, samplerate = sf.read(file_path,dtype='float32')
-    #print(data)
-    #exit(1)
-    #print("Audio file loaded successfully.")
-    return data
+    # Convert to numpy array and normalize to float32 [-1, 1]
+    samples = np.array(audio.get_array_of_samples(), dtype='float32')
+    samples = samples / (2**15)  # Normalize 16-bit to [-1, 1]
+
+    return samples
 
 # from librosa.util.buf_to_float
 def buf_to_float(
