@@ -16,7 +16,7 @@ WORKDIR $app
 
 COPY . /usr/src/app
 
-ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+ENV UV_SYSTEM_PYTHON=1
 RUN --mount=from=ghcr.io/astral-sh/uv:0.9.11,source=/uv,target=/bin/uv \
     uv sync --locked --no-dev
 
