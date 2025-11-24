@@ -7,7 +7,18 @@
       "Bash(audio-pattern-detector:*)",
       "Bash(.venv/bin/audio-pattern-detector:*)",
       "Bash(pipx run:*)",
-      "Bash(uv run pytest:*)"
+      "Bash(uv run pytest:*)",
+      "Bash(for file in sample_audios/clips/*.wav sample_audios/*.wav)",
+      "Bash(do)",
+      "Bash(if [ -f \"$file\" ])",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(ffprobe:*)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(mkdir:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(for file in sample_audios/test_16khz/clips/*.wav sample_audios/test_16khz/*.wav)"
     ],
     "deny": [],
     "ask": []

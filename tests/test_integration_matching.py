@@ -1,8 +1,10 @@
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
 
+from audio_pattern_detector.convert import convert_audio_to_clip_format
 from audio_pattern_detector.match import match_pattern
 
 
@@ -527,3 +529,265 @@ class TestNoMatchingPatterns:
         # Verification stage should reject any potential matches
         assert len(peak_times['rthk_beep']) == 0, \
             "Verification stage should filter out false positives"
+
+
+class Test16kHzAudioHandling:
+    """Tests for handling 16kHz audio files and sample rate conversion"""
+
+    def test_convert_16khz_pattern_to_8khz(self):
+        """Test converting 16kHz pattern file to 8kHz format
+
+        The convert function should properly downsample 16kHz audio to 8kHz
+        for use as pattern files.
+        """
+        input_file = "sample_audios/test_16khz/clips/rthk_beep_16k.wav"
+
+        assert Path(input_file).exists(), f"16kHz input file {input_file} not found"
+
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            output_file = tmp.name
+
+        try:
+            # Convert 16kHz to 8kHz
+            convert_audio_to_clip_format(input_file, output_file)
+
+            # Verify output file was created
+            assert Path(output_file).exists(), "Converted file was not created"
+
+            # Verify output is 8kHz using ffprobe
+            import subprocess
+            result = subprocess.run(
+                ['ffprobe', '-v', 'error', '-show_entries',
+                 'stream=sample_rate', '-of', 'default=noprint_wrappers=1:nokey=1',
+                 output_file],
+                capture_output=True,
+                text=True
+            )
+
+            sample_rate = int(result.stdout.strip())
+            assert sample_rate == 8000, f"Expected 8kHz output, got {sample_rate}Hz"
+
+        finally:
+            # Clean up
+            if Path(output_file).exists():
+                os.unlink(output_file)
+
+    def test_match_16khz_audio_with_8khz_pattern(self):
+        """Test matching 16kHz audio file against 8kHz pattern
+
+        The match_pattern function should automatically convert 16kHz audio
+        to 8kHz during processing and correctly identify patterns.
+        """
+        # Use 8kHz pattern (pre-converted)
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        # Use 16kHz audio file
+        audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+
+        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+        assert Path(audio_file).exists(), f"16kHz audio file {audio_file} not found"
+
+        # Run pattern matching - should handle conversion automatically
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Should find the same matches as with 8kHz audio
+        assert 'rthk_beep' in peak_times
+        assert len(peak_times['rthk_beep']) == 2, \
+            f"Expected 2 matches in 16kHz audio, found {len(peak_times['rthk_beep'])}"
+
+        # Verify timestamps are similar (allowing small variation due to resampling)
+        expected_times = [1.4165, 2.419125]
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+            assert abs(actual - expected) < 0.05, \
+                f"Match {i}: Expected ~{expected}s, got {actual}s (tolerance increased for resampling)"
+
+    def test_match_16khz_cbs_news(self):
+        """Test matching 16kHz CBS news audio against 8kHz pattern
+
+        Tests normal pattern detection with 16kHz audio.
+        """
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
+
+        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+        assert Path(audio_file).exists(), f"16kHz audio file {audio_file} not found"
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 1, \
+            f"Expected 1 match in 16kHz audio, found {len(peak_times['cbs_news'])}"
+
+        # Verify timestamp (with increased tolerance for resampling)
+        expected_time = 25.89875
+        actual_time = peak_times['cbs_news'][0]
+        assert abs(actual_time - expected_time) < 0.05, \
+            f"Expected ~{expected_time}s, got {actual_time}s"
+
+    def test_match_16khz_with_converted_16khz_pattern(self):
+        """Test matching 16kHz audio with pattern converted from 16kHz
+
+        This tests the full workflow:
+        1. Convert 16kHz pattern to 8kHz
+        2. Match 16kHz audio against converted pattern
+        3. Verify accuracy is maintained
+        """
+        # Convert 16kHz pattern to 8kHz
+        input_pattern = "sample_audios/test_16khz/clips/rthk_beep_16k.wav"
+
+        assert Path(input_pattern).exists(), f"16kHz pattern {input_pattern} not found"
+
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            converted_pattern = tmp.name
+
+        try:
+            # Step 1: Convert pattern from 16kHz to 8kHz
+            convert_audio_to_clip_format(input_pattern, converted_pattern)
+
+            # Step 2: Match 16kHz audio against converted pattern
+            audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+            assert Path(audio_file).exists()
+
+            peak_times, _ = match_pattern(audio_file, [converted_pattern], debug_mode=False)
+
+            # Step 3: Verify results
+            # Pattern name will be the temp file stem
+            pattern_name = Path(converted_pattern).stem
+            assert pattern_name in peak_times
+
+            assert len(peak_times[pattern_name]) == 2, \
+                f"Expected 2 matches, found {len(peak_times[pattern_name])}"
+
+        finally:
+            if Path(converted_pattern).exists():
+                os.unlink(converted_pattern)
+
+    def test_multiple_16khz_patterns(self):
+        """Test matching with multiple 16kHz-sourced patterns
+
+        Tests that multiple patterns can be used simultaneously
+        even when source files were originally 16kHz.
+        """
+        # Convert multiple 16kHz patterns to 8kHz
+        input_patterns = [
+            "sample_audios/test_16khz/clips/cbs_news_16k.wav",
+            "sample_audios/test_16khz/clips/cbs_news_dada_16k.wav"
+        ]
+
+        converted_patterns = []
+        temp_files = []
+
+        try:
+            # Convert all patterns
+            for input_file in input_patterns:
+                assert Path(input_file).exists(), f"Input pattern {input_file} not found"
+
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+                    output_file = tmp.name
+                    temp_files.append(output_file)
+
+                convert_audio_to_clip_format(input_file, output_file)
+                converted_patterns.append(output_file)
+
+            # Match against 16kHz audio
+            audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
+            assert Path(audio_file).exists()
+
+            peak_times, _ = match_pattern(audio_file, converted_patterns, debug_mode=False)
+
+            # Verify both patterns found their matches
+            assert len(peak_times) == 2, "Expected 2 pattern results"
+
+            # Each pattern should have found 1 match
+            for pattern_name, matches in peak_times.items():
+                assert len(matches) == 1, \
+                    f"Pattern {pattern_name} should have 1 match, found {len(matches)}"
+
+        finally:
+            # Clean up all temp files
+            for temp_file in temp_files:
+                if Path(temp_file).exists():
+                    os.unlink(temp_file)
+
+    def test_16khz_no_false_positives(self):
+        """Test that 16kHz audio doesn't produce false positives
+
+        Verifies that sample rate conversion doesn't introduce
+        false positive matches.
+        """
+        # Use CBS pattern with RTHK audio (should not match)
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 0, \
+            f"16kHz conversion should not introduce false positives, found {len(peak_times['cbs_news'])} matches"
+
+    def test_16khz_beep_pattern_rejection(self):
+        """Test that beep patterns correctly reject mismatches in 16kHz audio
+
+        Verifies beep detection algorithm works correctly after
+        sample rate conversion.
+        """
+        # Use RTHK beep with CBS audio (should not match)
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'rthk_beep' in peak_times
+        assert len(peak_times['rthk_beep']) == 0, \
+            "Beep algorithm should reject mismatches in 16kHz audio"
+
+    def test_sample_rate_preservation_in_results(self):
+        """Test that timestamps are correctly adjusted for sample rate conversion
+
+        When 16kHz audio is converted to 8kHz, timestamps should still
+        reflect the original audio timeline, not the converted timeline.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+
+        # Test with both 8kHz and 16kHz versions of the same audio
+        audio_8k = "sample_audios/rthk_section_with_beep.wav"
+        audio_16k = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_8k).exists()
+        assert Path(audio_16k).exists()
+
+        # Match against 8kHz audio
+        results_8k, _ = match_pattern(audio_8k, [pattern_file], debug_mode=False)
+
+        # Match against 16kHz audio
+        results_16k, _ = match_pattern(audio_16k, [pattern_file], debug_mode=False)
+
+        # Both should find the same number of matches
+        assert len(results_8k['rthk_beep']) == len(results_16k['rthk_beep']), \
+            "Different sample rates should find same number of matches"
+
+        # Timestamps should be similar (within tolerance for resampling)
+        for i, (time_8k, time_16k) in enumerate(zip(
+            sorted(results_8k['rthk_beep']),
+            sorted(results_16k['rthk_beep'])
+        )):
+            assert abs(time_8k - time_16k) < 0.1, \
+                f"Match {i}: Timestamps differ too much: 8kHz={time_8k}s, 16kHz={time_16k}s"
+
+    def test_convert_nonexistent_file(self):
+        """Test error handling when converting nonexistent file"""
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            output_file = tmp.name
+
+        try:
+            with pytest.raises(ValueError, match="does not exist"):
+                convert_audio_to_clip_format("nonexistent_16k.wav", output_file)
+        finally:
+            if Path(output_file).exists():
+                os.unlink(output_file)
