@@ -5,7 +5,7 @@ which can be helpful to get the sections of the particular radio show or podcast
 
 This library is particularly useful for AI workflows to efficiently segment audio files before processing. For example, it helps with OpenAI Whisper transcription preprocessing by trimming audio to the relevant sections, reducing processing time and costs.
 
-The default sample rate of 8kHz was chosen for faster runtime and lower memory usage, since precise timestamps are not required for segmentation tasks. For AI workflows that require 16kHz audio (common for speech recognition models), the library can work with 16kHz as well.
+The default sample rate of 8kHz was chosen for faster runtime and lower memory usage while not having any noticeable effects on matching results compared to the tests I have done with higher sample rates, since precise timestamps are not required for segmentation tasks. For AI workflows that require 16kHz audio (common for speech recognition models), the library can work with 16kHz as well.
 
 It uses cross-correlation to detect the potential matching pattern, and then uses mean square error and overlapping areas on cross correlation graph to eliminate false positives.
 
