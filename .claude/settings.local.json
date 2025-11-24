@@ -6,7 +6,8 @@
       "Bash(uv pip install:*)",
       "Bash(audio-pattern-detector:*)",
       "Bash(.venv/bin/audio-pattern-detector:*)",
-      "Bash(pipx run:*)"
+      "Bash(pipx run:*)",
+      "Bash(uv run pytest:*)"
     ],
     "deny": [],
     "ask": []
