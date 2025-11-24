@@ -84,10 +84,5 @@ won't work well for patterns that are too short, currently it disallow short cli
 It will miss distorted patterns like this because error score is too high and area overlap ratio is too low:
 ![rthk_beep_39_00:39:00_478782](https://github.com/user-attachments/assets/80669708-b8f9-461c-ae6c-2edddb161904)
 
-
-
 ## testing
 use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.
-
-## podcast publishing
-it publishes the media to free ipfs hosting, then it uploads the xml feed to a free cloudflare worker through an external custom endpoint https://github.com/andrewtheguy/podcast_hosting that serves the feed with ipfs urls.
