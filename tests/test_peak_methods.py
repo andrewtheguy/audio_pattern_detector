@@ -6,14 +6,17 @@ from audio_pattern_detector.peak_methods import find_closest_troughs
 
 class TestPeakMethods(unittest.TestCase):
 
-    @unittest.skip(
-        reason="This test is not implemented")
-    def test_zero_everything(self):
-        result = self.do_test(intros=[],
-                              backup_intro_ts=[],
-                              news_reports=[])
-        np.testing.assert_array_equal(result,
-                                      [])
+    def test_find_closest_troughs_empty_data(self):
+        """Test find_closest_troughs with empty data."""
+        data = []
+        result = find_closest_troughs(peak_index=0, data=data)
+        np.testing.assert_array_equal(result, [0, 0])
+
+    def test_find_closest_troughs_single_element(self):
+        """Test find_closest_troughs with single element data."""
+        data = [10]
+        result = find_closest_troughs(peak_index=0, data=data)
+        np.testing.assert_array_equal(result, [0, 0])
 
     def test_find_closest_troughs_no_peak(self):
         data = [10,20,30,40,50]
