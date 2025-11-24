@@ -30,6 +30,13 @@ python -m audio_pattern_detector.cli [command] [options]
 pipx run --spec . audio-pattern-detector [command] [options]
 ```
 
+## Audio Requirements
+
+- **Mono Only**: Only mono (single channel) audio is supported. Stereo or multi-channel audio must be converted to mono first.
+- **Sample Rate**: All audio clips (patterns) and audio streams must use the same sample rate for matching to work. The default is 8kHz.
+- **Format**: Audio files should be mono, 16-bit WAV format.
+- **Converting**: Use the `convert` command to convert audio files to the required format (8kHz, mono, 16-bit WAV).
+
 ## Usage
 
 The package provides a single CLI command `audio-pattern-detector` with two subcommands:
