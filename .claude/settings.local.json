@@ -18,7 +18,8 @@
       "Bash(done)",
       "Bash(mkdir:*)",
       "Bash(ffmpeg:*)",
-      "Bash(for file in sample_audios/test_16khz/clips/*.wav sample_audios/test_16khz/*.wav)"
+      "Bash(for file in sample_audios/test_16khz/clips/*.wav sample_audios/test_16khz/*.wav)",
+      "Bash(uv run ruff:*)"
     ],
     "deny": [],
     "ask": []

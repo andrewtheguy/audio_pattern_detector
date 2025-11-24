@@ -1039,7 +1039,6 @@ class TestStreamingAudioProcessing:
         Patterns must match TARGET_SAMPLE_RATE (8000 Hz).
         """
         pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
 
         # Create clip with correct sample rate
         pattern_clip = AudioClip.from_audio_file(pattern_file)
