@@ -18,12 +18,10 @@ import warnings
 from scipy.signal import find_peaks
 from sklearn.metrics import mean_squared_error
 
-from pydub import AudioSegment
-
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 from audio_pattern_detector.audio_utils import slicing_with_zero_padding, convert_audio_arr_to_float, \
-    downsample_preserve_maxima, TARGET_SAMPLE_RATE, seconds_to_time
+    downsample_preserve_maxima, TARGET_SAMPLE_RATE, seconds_to_time, write_wav_file
 from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
 
 logger = logging.getLogger(__name__)
@@ -32,20 +30,8 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
 def _write_audio_file(filepath, audio_data, sample_rate):
-    """Helper function to write audio using pydub"""
-    # Convert float32 [-1, 1] to int16 for pydub
-    audio_int16 = (audio_data * (2**15)).astype(np.int16)
-
-    # Create AudioSegment from numpy array
-    audio = AudioSegment(
-        audio_int16.tobytes(),
-        frame_rate=sample_rate,
-        sample_width=2,  # 16-bit = 2 bytes
-        channels=1
-    )
-
-    # Export to wav file
-    audio.export(filepath, format="wav")
+    """Helper function to write audio using ffmpeg"""
+    write_wav_file(filepath, audio_data, sample_rate)
 
 
 class AudioPatternDetector:

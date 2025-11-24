@@ -32,23 +32,46 @@ def convert_audio_file(file_path, sr=None):
     return np.frombuffer(data, dtype="int16")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
-# load wave file with pydub into float32
+# load wave file into float32
 def load_wave_file(file_path, expected_sample_rate):
-    from pydub import AudioSegment
+    import json
 
-    # Load the audio file
-    audio = AudioSegment.from_file(file_path)
+    # Use ffprobe to get audio metadata
+    probe_cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=channels,sample_rate,bits_per_sample,codec_name",
+        "-of", "json",
+        file_path
+    ]
+    result = subprocess.run(probe_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ValueError(f"ffprobe failed: {result.stderr}")
+
+    probe_data = json.loads(result.stdout)
+    if not probe_data.get("streams"):
+        raise ValueError(f"No audio streams found in {file_path}")
+
+    stream = probe_data["streams"][0]
+    channels = stream.get("channels", 0)
+    sample_rate = int(stream.get("sample_rate", 0))
+    bits_per_sample = stream.get("bits_per_sample", 0)
 
     # Check if it meets the conditions
-    if audio.channels != 1:
-        raise ValueError(f"The file is not mono. Channels: {audio.channels}")
-    if audio.frame_rate != expected_sample_rate:
-        raise ValueError(f"The sample rate is not {expected_sample_rate} Hz. Sample rate: {audio.frame_rate}")
-    if audio.sample_width != 2:  # 2 bytes = 16-bit
-        raise ValueError(f"The file is not 16-bit. Sample width: {audio.sample_width} bytes")
+    if channels != 1:
+        raise ValueError(f"The file is not mono. Channels: {channels}")
+    if sample_rate != expected_sample_rate:
+        raise ValueError(f"The sample rate is not {expected_sample_rate} Hz. Sample rate: {sample_rate}")
+    if bits_per_sample != 16:
+        raise ValueError(f"The file is not 16-bit. Bits per sample: {bits_per_sample}")
+
+    # Use ffmpeg to read audio data as raw PCM
+    with ffmpeg_get_16bit_pcm(file_path, target_sample_rate=expected_sample_rate, ac=1) as stdout:
+        data = stdout.read()
 
     # Convert to numpy array and normalize to float32 [-1, 1]
-    samples = np.array(audio.get_array_of_samples(), dtype='float32')
+    samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
     samples = samples / (2**15)  # Normalize 16-bit to [-1, 1]
 
     return samples
@@ -167,6 +190,41 @@ def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate=None,ac=None):
 
 
 TARGET_SAMPLE_RATE = 8000
+
+
+def write_wav_file(filepath, audio_data, sample_rate):
+    """Write audio data to a wav file using ffmpeg.
+
+    Args:
+        filepath: Output file path
+        audio_data: numpy array of float32 audio data in range [-1, 1]
+        sample_rate: Sample rate in Hz
+    """
+    # Convert float32 [-1, 1] to int16
+    audio_int16 = (audio_data * (2**15)).astype(np.int16)
+
+    # Use ffmpeg to write wav file
+    command = [
+        "ffmpeg",
+        "-y",  # Overwrite output file
+        "-f", "s16le",  # Input format: signed 16-bit little-endian
+        "-ar", str(sample_rate),  # Sample rate
+        "-ac", "1",  # Mono
+        "-i", "pipe:",  # Read from stdin
+        "-loglevel", "error",
+        filepath
+    ]
+
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    _, stderr = process.communicate(input=audio_int16.tobytes())
+
+    if process.returncode != 0:
+        raise ValueError(f"ffmpeg write failed: {stderr.decode()}")
 
 def seconds_to_time(seconds, include_decimals=True):
     if include_decimals:
