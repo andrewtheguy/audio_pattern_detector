@@ -10,8 +10,7 @@ from audio_pattern_detector.audio_utils import (
     ffmpeg_get_16bit_pcm,
     TARGET_SAMPLE_RATE
 )
-from andrew_utils import seconds_to_time
-
+from audio_pattern_detector.audio_utils import seconds_to_time
 
 def match_pattern(audio_file, pattern_files: list[str], debug_mode=False):
     """Find pattern matches in audio file"""

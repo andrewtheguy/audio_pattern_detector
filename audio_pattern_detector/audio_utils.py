@@ -167,3 +167,17 @@ def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate=None,ac=None):
 
 
 TARGET_SAMPLE_RATE = 8000
+
+def seconds_to_time(seconds, include_decimals=True):
+    if include_decimals:
+        milliseconds = round(seconds * 1000)
+        minutes_remaining, remaining_milliseconds = divmod(milliseconds, 60000)
+        hours, minutes = divmod(minutes_remaining, 60)
+        remaining_seconds = f"{remaining_milliseconds:05d}"
+        remaining_seconds = remaining_seconds[:-3] + '.' + remaining_seconds[-3:]
+        return f"{hours:02d}:{minutes:02d}:{remaining_seconds}"
+    else:
+        seconds = round(seconds)
+        minutes_remaining, remaining_seconds = divmod(seconds, 60)
+        hours, minutes = divmod(minutes_remaining, 60)
+        return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}"

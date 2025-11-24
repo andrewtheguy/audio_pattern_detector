@@ -8,7 +8,6 @@ readme = "README.md"
 dependencies = [
     "numpy>=1.26.4,<2",
     "pyloudnorm>=0.1.1,<0.2",
-    "andrew_utils",
     "setuptools>=69.5.1,<70",
     "scikit-learn>=1.5.0,<2",
     "pydub>=0.25.1,<0.26",
@@ -22,9 +21,6 @@ dev = [
     "basedpyright>=1.34.0",
     "matplotlib>=3.9.0,<4",
 ]
-
-[tool.uv.sources]
-andrew_utils = { git = "https://github.com/andrewtheguy/andrew_utils.git", rev = "80a32ac11fdd0bc8d31b590963e4df0891a5863e" }
 
 [project.scripts]
 audio-pattern-detector = "audio_pattern_detector.cli:main"

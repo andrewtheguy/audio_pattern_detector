@@ -14,7 +14,6 @@ import math
 import pyloudnorm as pyln
 
 import warnings
-from andrew_utils import seconds_to_time
 
 from scipy.signal import find_peaks
 from sklearn.metrics import mean_squared_error
@@ -24,14 +23,13 @@ from pydub import AudioSegment
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 from audio_pattern_detector.audio_utils import slicing_with_zero_padding, convert_audio_arr_to_float, \
-    downsample_preserve_maxima, TARGET_SAMPLE_RATE
+    downsample_preserve_maxima, TARGET_SAMPLE_RATE, seconds_to_time
 from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
 
 logger = logging.getLogger(__name__)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
-
 
 def _write_audio_file(filepath, audio_data, sample_rate):
     """Helper function to write audio using pydub"""
