@@ -1,13 +1,16 @@
-import argparse
 import os
+
 import numpy as np
 from pydub import AudioSegment
 
-from audio_pattern_detector.audio_utils import convert_audio_file, convert_audio_arr_to_float
+from audio_pattern_detector.audio_utils import (
+    convert_audio_file,
+    convert_audio_arr_to_float,
+)
 
 
-# will be mono
 def convert_audio_to_clip_format(audio_path, output_path):
+    """Convert audio file to clip format (8kHz, mono)"""
     target_sample_rate = 8000
 
     if not os.path.exists(audio_path):
@@ -34,14 +37,7 @@ def convert_audio_to_clip_format(audio_path, output_path):
     audio.export(output_path, format="wav")
 
 
-if __name__ == '__main__':
-    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to convert')
-    parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
-    #parser.add_argument('--window', metavar='seconds', type=int, default=10, help='Only use first n seconds of the audio file')
-    args = parser.parse_args()
-
-    # python convert.py --audio-file  /Volumes/andrewdata/audio_test/knowledge_co_e_word_intro.wav --dest-file audio_clips/knowledge_co_e_word_intro.wav
+def cmd_convert(args):
+    """Handler for convert subcommand"""
     input_file = args.audio_file
-    convert_audio_to_clip_format(input_file,args.dest_file)
+    convert_audio_to_clip_format(input_file, args.dest_file)

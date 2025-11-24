@@ -6,14 +6,41 @@ It also helps for openai whisper transcription preprocessing by trimming the aud
 It uses cross-correlation to detect the potential matching pattern, and then uses mean square error and overlapping areas on cross correlation graph to eliminate false positives.
 
 
-## usage
+## Installation
+
+### Install locally with uv
 ```shell
-# detect pattern from audio file, add --no-debug for disable debugging
-uv run python match.py --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+uv pip install -e .
+```
 
-# convert audio file to target sample rate
-uv run python convert.py --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+### Or use with pipx (run without installing)
+```shell
+pipx run --spec . audio-pattern-detector
+```
 
+## Usage
+
+The package provides a single CLI command `audio-pattern-detector` with two subcommands:
+
+### Match - Detect patterns in audio files
+```shell
+# detect pattern from audio file, add --no-debug to disable debugging
+audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+
+# detect pattern using a folder of pattern clips
+audio-pattern-detector match --audio-folder ./audio_files --pattern-folder ./sample_audios/clips
+
+# with pipx
+pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+```
+
+### Convert - Convert audio files to clip format
+```shell
+# convert audio file to target sample rate (8kHz, mono)
+audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+
+# with pipx
+pipx run --spec . audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
 ```
 
 ## audio pattern detection methods

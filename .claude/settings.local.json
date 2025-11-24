@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:docs.astral.sh)"
+      "WebFetch(domain:docs.astral.sh)",
+      "Bash(mv:*)",
+      "Bash(uv pip install:*)",
+      "Bash(audio-pattern-detector:*)",
+      "Bash(.venv/bin/audio-pattern-detector:*)",
+      "Bash(pipx run:*)"
     ],
     "deny": [],
     "ask": []
