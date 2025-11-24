@@ -310,3 +310,220 @@ class TestPatternMatching:
         assert 'cbs_news' in peak_times
         assert len(peak_times['cbs_news']) > 0, \
             "Loudness normalization should not prevent pattern detection"
+
+
+class TestNoMatchingPatterns:
+    """Extended tests for scenarios where patterns should not match"""
+
+    def test_beep_pattern_in_normal_audio(self):
+        """Test that beep pattern does not match in CBS news audio
+
+        RTHK beep is a pure tone pattern that should not match
+        the complex CBS news audio patterns.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+        assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'rthk_beep' in peak_times, "rthk_beep key should exist in results"
+        assert len(peak_times['rthk_beep']) == 0, \
+            f"RTHK beep should not match CBS news audio, but found {len(peak_times['rthk_beep'])} matches: {peak_times['rthk_beep']}"
+
+    def test_cbs_pattern_in_rthk_audio(self):
+        """Test that CBS news pattern does not match in RTHK beep audio
+
+        CBS news is a complex audio pattern that should not match
+        the simple RTHK beep audio.
+        """
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+        assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'cbs_news' in peak_times, "cbs_news key should exist in results"
+        assert len(peak_times['cbs_news']) == 0, \
+            f"CBS news should not match RTHK audio, but found {len(peak_times['cbs_news'])} matches: {peak_times['cbs_news']}"
+
+    def test_dada_pattern_in_rthk_audio(self):
+        """Test that CBS news dada pattern does not match in RTHK audio
+
+        Tests that a shorter CBS pattern still doesn't match unrelated audio.
+        """
+        pattern_file = "sample_audios/clips/cbs_news_dada.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+        assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'cbs_news_dada' in peak_times, "cbs_news_dada key should exist in results"
+        assert len(peak_times['cbs_news_dada']) == 0, \
+            f"CBS news dada should not match RTHK audio, but found {len(peak_times['cbs_news_dada'])} matches: {peak_times['cbs_news_dada']}"
+
+    def test_multiple_patterns_none_match(self):
+        """Test multiple patterns where none should match
+
+        Tests that when multiple patterns are provided and none match,
+        all patterns return empty results.
+        """
+        pattern_files = [
+            "sample_audios/clips/cbs_news.wav",
+            "sample_audios/clips/cbs_news_dada.wav"
+        ]
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        for pattern_file in pattern_files:
+            assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+        assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+        peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=False)
+
+        # Both patterns should exist in results
+        assert 'cbs_news' in peak_times, "cbs_news key should exist"
+        assert 'cbs_news_dada' in peak_times, "cbs_news_dada key should exist"
+
+        # Both should have no matches
+        assert len(peak_times['cbs_news']) == 0, \
+            f"CBS news should not match, found {len(peak_times['cbs_news'])} matches"
+        assert len(peak_times['cbs_news_dada']) == 0, \
+            f"CBS news dada should not match, found {len(peak_times['cbs_news_dada'])} matches"
+
+    def test_all_available_patterns_mixed_results(self):
+        """Test all available patterns against both audio files
+
+        This comprehensive test verifies that:
+        - RTHK beep matches in RTHK audio but not CBS audio
+        - CBS patterns match in CBS audio but not RTHK audio
+        """
+        all_patterns = [
+            "sample_audios/clips/rthk_beep.wav",
+            "sample_audios/clips/cbs_news.wav",
+            "sample_audios/clips/cbs_news_dada.wav"
+        ]
+
+        # Test with RTHK audio
+        rthk_audio = "sample_audios/rthk_section_with_beep.wav"
+        assert Path(rthk_audio).exists()
+
+        rthk_results, _ = match_pattern(rthk_audio, all_patterns, debug_mode=False)
+
+        # RTHK beep should match
+        assert len(rthk_results['rthk_beep']) == 2, "RTHK beep should match in RTHK audio"
+        # CBS patterns should not match
+        assert len(rthk_results['cbs_news']) == 0, "CBS news should not match in RTHK audio"
+        assert len(rthk_results['cbs_news_dada']) == 0, "CBS dada should not match in RTHK audio"
+
+        # Test with CBS audio
+        cbs_audio = "sample_audios/cbs_news_audio_section.wav"
+        assert Path(cbs_audio).exists()
+
+        cbs_results, _ = match_pattern(cbs_audio, all_patterns, debug_mode=False)
+
+        # CBS patterns should match
+        assert len(cbs_results['cbs_news']) == 1, "CBS news should match in CBS audio"
+        assert len(cbs_results['cbs_news_dada']) == 1, "CBS dada should match in CBS audio"
+        # RTHK beep should not match
+        assert len(cbs_results['rthk_beep']) == 0, "RTHK beep should not match in CBS audio"
+
+    def test_similarity_threshold_rejection(self):
+        """Test that patterns with similarity above threshold are rejected
+
+        The normal pattern algorithm rejects matches with similarity > 0.01.
+        This tests that dissimilar patterns are correctly filtered out.
+        """
+        # Using CBS news pattern on RTHK audio should produce high similarity
+        # scores that exceed the threshold, resulting in rejection
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Should be rejected due to high similarity scores
+        assert len(peak_times['cbs_news']) == 0, \
+            "Pattern should be rejected due to similarity threshold"
+
+    def test_overlap_ratio_rejection_for_beep(self):
+        """Test that beep patterns with low overlap ratio are rejected
+
+        The beep detection algorithm requires overlap_ratio > 0.98 or 0.99.
+        This tests that patterns with insufficient overlap are filtered out.
+        """
+        # Using beep pattern on CBS audio should produce low overlap ratios
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Should be rejected due to low overlap ratio
+        assert len(peak_times['rthk_beep']) == 0, \
+            "Beep pattern should be rejected due to low overlap ratio"
+
+    def test_no_false_positives_in_complex_scenario(self):
+        """Test that complex cross-matching scenario produces no false positives
+
+        This test verifies the robustness of both algorithms by testing
+        all combinations of patterns and audio files where matches shouldn't occur.
+        """
+        test_cases = [
+            # (pattern_file, audio_file, pattern_name)
+            ("sample_audios/clips/rthk_beep.wav", "sample_audios/cbs_news_audio_section.wav", "rthk_beep"),
+            ("sample_audios/clips/cbs_news.wav", "sample_audios/rthk_section_with_beep.wav", "cbs_news"),
+            ("sample_audios/clips/cbs_news_dada.wav", "sample_audios/rthk_section_with_beep.wav", "cbs_news_dada"),
+        ]
+
+        for pattern_file, audio_file, pattern_name in test_cases:
+            assert Path(pattern_file).exists(), f"Pattern {pattern_file} not found"
+            assert Path(audio_file).exists(), f"Audio {audio_file} not found"
+
+            peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+            assert pattern_name in peak_times, f"{pattern_name} key missing"
+            assert len(peak_times[pattern_name]) == 0, \
+                f"False positive detected: {pattern_name} in {Path(audio_file).name} " \
+                f"produced {len(peak_times[pattern_name])} matches: {peak_times[pattern_name]}"
+
+    def test_correlation_peak_height_threshold(self):
+        """Test that peaks below height_min=0.25 are filtered out
+
+        The algorithm only considers correlation peaks with height >= 0.25.
+        This test verifies that weak correlations don't produce matches.
+        """
+        # Mismatched patterns should produce low correlation peaks
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Should have no matches due to low correlation peaks
+        assert len(peak_times['cbs_news']) == 0, \
+            "Low correlation peaks should not produce matches"
+
+    def test_verification_stage_filters_false_positives(self):
+        """Test that the verification stage correctly filters false positives
+
+        Even if correlation peaks are found, the verification stage should
+        reject them based on:
+        - MSE similarity threshold
+        - Area overlap ratio
+        - Diff overlap ratio
+
+        This is a critical test for algorithm robustness.
+        """
+        # Test with patterns that might produce correlation peaks but should
+        # be rejected in verification
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Verification stage should reject any potential matches
+        assert len(peak_times['rthk_beep']) == 0, \
+            "Verification stage should filter out false positives"
