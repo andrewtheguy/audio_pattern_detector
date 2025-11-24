@@ -4,6 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from audio_pattern_detector.audio_clip import AudioClip, AudioStream
+from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
+from audio_pattern_detector.audio_utils import ffmpeg_get_16bit_pcm, TARGET_SAMPLE_RATE
 from audio_pattern_detector.convert import convert_audio_to_clip_format
 from audio_pattern_detector.match import match_pattern
 
@@ -791,3 +794,405 @@ class Test16kHzAudioHandling:
         finally:
             if Path(output_file).exists():
                 os.unlink(output_file)
+
+
+class TestStreamingAudioProcessing:
+    """Tests for streaming audio processing using AudioStream and AudioPatternDetector"""
+
+    def test_streaming_rthk_beep_detection(self):
+        """Test streaming detection of RTHK beep pattern
+
+        Uses AudioStream and AudioPatternDetector directly to test
+        the streaming chunk-based processing.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        # Load pattern clip
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        # Process audio using streaming
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            # Run detection
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        # Verify results
+        assert 'rthk_beep' in peak_times
+        assert len(peak_times['rthk_beep']) == 2, \
+            f"Expected 2 matches, found {len(peak_times['rthk_beep'])}"
+
+        expected_times = [1.4165, 2.419125]
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+            assert abs(actual - expected) < 0.01, \
+                f"Match {i}: Expected ~{expected}s, got {actual}s"
+
+    def test_streaming_cbs_news_detection(self):
+        """Test streaming detection of CBS news pattern
+
+        Tests normal pattern detection through the streaming interface.
+        """
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 1
+
+        expected_time = 25.89875
+        assert abs(peak_times['cbs_news'][0] - expected_time) < 0.01
+
+    def test_streaming_multiple_patterns(self):
+        """Test streaming detection with multiple patterns simultaneously
+
+        Verifies that multiple AudioClips can be processed in a single stream.
+        """
+        pattern_files = [
+            "sample_audios/clips/cbs_news.wav",
+            "sample_audios/clips/cbs_news_dada.wav"
+        ]
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        assert Path(audio_file).exists()
+
+        # Load multiple pattern clips
+        pattern_clips = []
+        for pf in pattern_files:
+            assert Path(pf).exists()
+            pattern_clips.append(AudioClip.from_audio_file(pf))
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=pattern_clips)
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        # Both patterns should be found
+        assert 'cbs_news' in peak_times
+        assert 'cbs_news_dada' in peak_times
+        assert len(peak_times['cbs_news']) == 1
+        assert len(peak_times['cbs_news_dada']) == 1
+
+    def test_streaming_16khz_audio_conversion(self):
+        """Test streaming with 16kHz audio auto-conversion
+
+        Verifies that ffmpeg_get_16bit_pcm correctly converts 16kHz to 8kHz
+        during streaming and pattern detection works correctly.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        # Stream 16kHz audio with conversion to 8kHz
+        sr = TARGET_SAMPLE_RATE  # 8000 Hz
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        # Should find same matches as with native 8kHz audio
+        assert 'rthk_beep' in peak_times
+        assert len(peak_times['rthk_beep']) == 2
+
+        expected_times = [1.4165, 2.419125]
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+            assert abs(actual - expected) < 0.05, \
+                f"Match {i}: Expected ~{expected}s, got {actual}s"
+
+    def test_streaming_chunk_processing(self):
+        """Test that streaming processes audio in chunks correctly
+
+        Verifies the chunked processing maintains accuracy when
+        pattern spans chunk boundaries.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            # Use default seconds_per_chunk (60 seconds)
+            detector = AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[pattern_clip],
+                seconds_per_chunk=60
+            )
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        # Should still find all matches regardless of chunking
+        assert len(peak_times['rthk_beep']) == 2
+
+    def test_streaming_small_chunk_size(self):
+        """Test streaming with smaller chunk size
+
+        Tests that the detector handles smaller chunks correctly.
+        Note: With small chunk sizes and sliding window overlap,
+        the same pattern may be detected in multiple chunks,
+        resulting in duplicate timestamps. This tests that the
+        correct timestamps ARE found (duplicates may exist).
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            # Use smaller chunk size (must be at least 2x sliding_window)
+            # rthk_beep is ~0.23s, so sliding_window rounds to 1s
+            # Minimum chunk size is 2s
+            detector = AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[pattern_clip],
+                seconds_per_chunk=3
+            )
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        assert 'rthk_beep' in peak_times
+
+        # With small chunks and sliding window overlap, duplicates may occur
+        # Verify at least 2 matches found
+        assert len(peak_times['rthk_beep']) >= 2
+
+        # Verify expected timestamps are present (use set to handle duplicates)
+        expected_times = [1.4165, 2.419125]
+        found_times = set()
+        for actual in peak_times['rthk_beep']:
+            for expected in expected_times:
+                if abs(actual - expected) < 0.01:
+                    found_times.add(expected)
+                    break
+
+        assert len(found_times) == len(expected_times), \
+            f"Expected to find timestamps near {expected_times}, found {peak_times['rthk_beep']}"
+
+    def test_streaming_no_match_scenario(self):
+        """Test streaming when pattern is not present in audio
+
+        Verifies that streaming processing correctly returns empty results.
+        """
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 0
+
+    def test_streaming_total_time_accuracy(self):
+        """Test that total_time accurately reflects processed audio duration
+
+        Verifies the streaming processor correctly tracks total audio processed.
+        """
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        # rthk_section_with_beep.wav is ~4.08 seconds
+        assert 4.0 < total_time < 4.2, f"Expected ~4.08s, got {total_time}s"
+
+    def test_streaming_with_debug_mode(self):
+        """Test streaming with debug mode enabled
+
+        Verifies debug mode doesn't break streaming processing.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=True, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        assert len(peak_times['rthk_beep']) == 2
+
+    def test_audio_clip_from_file(self):
+        """Test AudioClip.from_audio_file correctly loads pattern files
+
+        Verifies AudioClip dataclass is properly initialized.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+
+        clip = AudioClip.from_audio_file(pattern_file)
+
+        assert clip.name == "rthk_beep"
+        assert clip.sample_rate == TARGET_SAMPLE_RATE
+        assert len(clip.audio) > 0
+        assert clip.clip_length_seconds() > 0
+
+    def test_audio_clip_sample_rate_validation(self):
+        """Test that AudioPatternDetector validates pattern sample rates
+
+        Patterns must match TARGET_SAMPLE_RATE (8000 Hz).
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        # Create clip with correct sample rate
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        # Verify clip has correct sample rate
+        assert pattern_clip.sample_rate == TARGET_SAMPLE_RATE
+
+        # Detector should accept valid clips
+        detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+        assert len(detector.audio_clips) == 1
+
+    def test_streaming_maintains_pattern_order(self):
+        """Test that multiple patterns maintain their result order
+
+        Verifies each pattern's results are stored under the correct key.
+        """
+        pattern_files = [
+            "sample_audios/clips/rthk_beep.wav",
+            "sample_audios/clips/cbs_news.wav",
+            "sample_audios/clips/cbs_news_dada.wav"
+        ]
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=pattern_clips)
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        # All patterns should have result entries
+        assert 'rthk_beep' in peak_times
+        assert 'cbs_news' in peak_times
+        assert 'cbs_news_dada' in peak_times
+
+        # RTHK beep shouldn't match CBS audio
+        assert len(peak_times['rthk_beep']) == 0
+        # CBS patterns should match
+        assert len(peak_times['cbs_news']) == 1
+        assert len(peak_times['cbs_news_dada']) == 1
+
+    def test_streaming_duplicate_pattern_names_rejected(self):
+        """Test that duplicate pattern names are rejected
+
+        AudioPatternDetector should raise ValueError for duplicate clip names.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+
+        clip1 = AudioClip.from_audio_file(pattern_file)
+        clip2 = AudioClip.from_audio_file(pattern_file)  # Same name
+
+        with pytest.raises(ValueError, match="needs to be unique"):
+            AudioPatternDetector(debug_mode=False, audio_clips=[clip1, clip2])
+
+    def test_streaming_16khz_cbs_news(self):
+        """Test streaming 16kHz CBS news audio with conversion
+
+        Tests normal pattern detection through streaming with sample rate conversion.
+        """
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 1
+
+        expected_time = 25.89875
+        assert abs(peak_times['cbs_news'][0] - expected_time) < 0.05
+
+    def test_streaming_results_match_high_level_api(self):
+        """Test that streaming results match the high-level match_pattern API
+
+        Ensures consistency between low-level streaming and high-level APIs.
+        """
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        # High-level API result
+        high_level_results, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Low-level streaming result
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+        sr = TARGET_SAMPLE_RATE
+        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+            audio_name = Path(audio_file).stem
+            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            streaming_results, _ = detector.find_clip_in_audio(audio_stream)
+
+        # Results should be identical
+        assert len(high_level_results['rthk_beep']) == len(streaming_results['rthk_beep'])
+
+        for hl, st in zip(
+            sorted(high_level_results['rthk_beep']),
+            sorted(streaming_results['rthk_beep'])
+        ):
+            assert abs(hl - st) < 0.001, f"Results differ: high-level={hl}, streaming={st}"
