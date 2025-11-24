@@ -9,11 +9,10 @@ source = { git = "https://github.com/andrewtheguy/andrew_utils.git?rev=80a32ac11
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.2.5"
+version = "0.2.6"
 source = { editable = "." }
 dependencies = [
     { name = "andrew-utils" },
-    { name = "matplotlib" },
     { name = "numpy" },
     { name = "pydub" },
     { name = "pyloudnorm" },
@@ -25,6 +24,7 @@ dependencies = [
 dev = [
     { name = "basedpyright" },
     { name = "flake8" },
+    { name = "matplotlib" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -32,7 +32,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "andrew-utils", git = "https://github.com/andrewtheguy/andrew_utils.git?rev=80a32ac11fdd0bc8d31b590963e4df0891a5863e" },
-    { name = "matplotlib", specifier = ">=3.9.0,<4" },
     { name = "numpy", specifier = ">=1.26.4,<2" },
     { name = "pydub", specifier = ">=0.25.1,<0.26" },
     { name = "pyloudnorm", specifier = ">=0.1.1,<0.2" },
@@ -44,6 +43,7 @@ requires-dist = [
 dev = [
     { name = "basedpyright", specifier = ">=1.34.0" },
     { name = "flake8", specifier = ">=7.0.0,<8" },
+    { name = "matplotlib", specifier = ">=3.9.0,<4" },
     { name = "pytest", specifier = ">=8.2.1,<9" },
     { name = "ruff", specifier = ">=0.14.6" },
 ]

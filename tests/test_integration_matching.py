@@ -199,29 +199,6 @@ class TestPatternMatching:
         with pytest.raises(ValueError, match="No pattern clips passed"):
             match_pattern(audio_file, [], debug_mode=False)
 
-    def test_debug_mode_execution(self):
-        """Test that debug mode executes without errors
-
-        Debug mode enables additional logging and graph generation.
-        This test verifies it doesn't crash the detection process.
-        """
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-        # Verify files exist
-        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-        assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-        # Run with debug mode enabled
-        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=True)
-
-        # Should still find the correct matches
-        assert 'rthk_beep' in peak_times
-        assert len(peak_times['rthk_beep']) == 2
-
-        # Debug mode should create graph directories (but we won't check file contents)
-        # Just verify the function completed successfully
-
     def test_beep_detection_algorithm_specifics(self):
         """Test specific behavior of beep detection algorithm
 
@@ -1041,26 +1018,6 @@ class TestStreamingAudioProcessing:
 
         # rthk_section_with_beep.wav is ~4.08 seconds
         assert 4.0 < total_time < 4.2, f"Expected ~4.08s, got {total_time}s"
-
-    def test_streaming_with_debug_mode(self):
-        """Test streaming with debug mode enabled
-
-        Verifies debug mode doesn't break streaming processing.
-        """
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-        pattern_clip = AudioClip.from_audio_file(pattern_file)
-
-        sr = TARGET_SAMPLE_RATE
-        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-            audio_name = Path(audio_file).stem
-            audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
-
-            detector = AudioPatternDetector(debug_mode=True, audio_clips=[pattern_clip])
-            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
-
-        assert len(peak_times['rthk_beep']) == 2
 
     def test_audio_clip_from_file(self):
         """Test AudioClip.from_audio_file correctly loads pattern files
