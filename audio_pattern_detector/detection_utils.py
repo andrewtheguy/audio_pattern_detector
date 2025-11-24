@@ -16,7 +16,7 @@ def area_of_overlap_ratio(control, variable):
     # Define the x-axis range based on the indices of the input arrays
     x = np.arange(len(control))
 
-    dx=1
+    #dx=1
 
     #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
     #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
@@ -99,7 +99,7 @@ def is_pure_tone(audio_data, sample_rate):
     peaks,peak_props = find_peaks(positive_magnitude_normalized, prominence=0.05)  # Adjust prominence
 
     peak_freqs = positive_freqs[peaks]
-    peak_magnitudes = positive_magnitude_normalized[peaks]
+    #peak_magnitudes = positive_magnitude_normalized[peaks]
     dominant_freq = positive_freqs[dominant_freq_idx]
     # print(f"peak_freqs: {peak_freqs}")
     # print(f"peak_props: {peak_props}")

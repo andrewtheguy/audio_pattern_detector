@@ -67,7 +67,7 @@ def match_pattern(audio_file, pattern_files: list[str], debug_mode=False):
         pattern_clips.append(pattern_clip)
 
     if len(pattern_clips)  == 0:
-        raise ValueError(f"No pattern clips passed")
+        raise ValueError("No pattern clips passed")
 
     sr = TARGET_SAMPLE_RATE
     with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:

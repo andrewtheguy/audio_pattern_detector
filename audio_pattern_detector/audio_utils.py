@@ -1,7 +1,6 @@
 import math
 import subprocess
 from contextlib import contextmanager
-from tabnanny import check
 
 import numpy as np
 from numpy._typing import DTypeLike

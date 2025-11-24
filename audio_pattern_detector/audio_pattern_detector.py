@@ -170,7 +170,7 @@ class AudioPatternDetector:
                 print(f"clip_length {clip_name}", len(clip),file=sys.stderr)
                 print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate,file=sys.stderr)
                 print("correlation_clip_length", len(correlation_clip),file=sys.stderr)
-                graph_dir = f"../tmp/graph/clip_correlation"
+                graph_dir = "../tmp/graph/clip_correlation"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 plt.figure(figsize=(10, 4))
@@ -422,7 +422,7 @@ class AudioPatternDetector:
 
         if debug_mode:
             import matplotlib.pyplot as plt
-            print(f"---",file=sys.stderr)
+            print("---",file=sys.stderr)
             print(f"section_ts: {section_ts}, index {index}",file=sys.stderr)
             graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
@@ -530,7 +530,7 @@ class AudioPatternDetector:
                               "similarities": similarities}, indent=2, cls=NumpyEncoder),
                   file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
-            print(f"---",file=sys.stderr)
+            print("---",file=sys.stderr)
 
         # convert peaks to seconds
         peak_times = [peak / sr for peak in peaks_final]

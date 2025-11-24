@@ -33,12 +33,6 @@ class TestPeakMethods(unittest.TestCase):
         np.testing.assert_array_equal(result,
                                       [2,6])
 
-    def test_find_closest_troughs_at_both_end(self):
-        data = [1,2,3,5,4,3,2]
-        result = find_closest_troughs(peak_index=3,data=data)
-        np.testing.assert_array_equal(result,
-                                      [0,len(data)-1])
-
     def test_find_closest_troughs_at_left_end_and_middle_right(self):
         data = [10,20,25,30,50,40,30,25,28,20]
         result = find_closest_troughs(peak_index=np.argmax(data),data=data)
@@ -56,12 +50,6 @@ class TestPeakMethods(unittest.TestCase):
         result = find_closest_troughs(peak_index=3,data=data)
         np.testing.assert_array_equal(result,
                                       [0,len(data)-1])
-
-    def test_find_closest_troughs_at_left_end_and_middle_right(self):
-        data = [10,20,25,30,50,40,30,25,28,20]
-        result = find_closest_troughs(peak_index=np.argmax(data),data=data)
-        np.testing.assert_array_equal(result,
-                                      [0,7])
 
     def test_find_closest_troughs_at_left_second_and_right_second(self):
         data = [10,5,25,28,30,50,40,30,25,20,4,10]

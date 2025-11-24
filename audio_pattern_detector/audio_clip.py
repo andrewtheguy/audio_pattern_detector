@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from audio_pattern_detector.audio_utils import load_wave_file, convert_audio_arr_to_float, TARGET_SAMPLE_RATE
+from audio_pattern_detector.audio_utils import load_wave_file, TARGET_SAMPLE_RATE
 
 
 @dataclass(frozen=True)
