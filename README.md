@@ -13,9 +13,21 @@ It uses cross-correlation to detect the potential matching pattern, and then use
 uv pip install -e .
 ```
 
-### Or use with pipx (run without installing)
+### Run without installing
+
+**Using uv (recommended):**
 ```shell
-pipx run --spec . audio-pattern-detector
+uv run audio-pattern-detector [command] [options]
+```
+
+**Using Python module execution:**
+```shell
+python -m audio_pattern_detector.cli [command] [options]
+```
+
+**Using pipx:**
+```shell
+pipx run --spec . audio-pattern-detector [command] [options]
 ```
 
 ## Usage
@@ -30,6 +42,9 @@ audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pa
 # detect pattern using a folder of pattern clips
 audio-pattern-detector match --audio-folder ./audio_files --pattern-folder ./sample_audios/clips
 
+# with uv run (no install needed)
+uv run audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+
 # with pipx
 pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
 ```
@@ -38,6 +53,9 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/audi
 ```shell
 # convert audio file to target sample rate (8kHz, mono)
 audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+
+# with uv run (no install needed)
+uv run audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
 
 # with pipx
 pipx run --spec . audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
