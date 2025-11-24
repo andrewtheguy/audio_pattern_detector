@@ -5,6 +5,10 @@ from contextlib import contextmanager
 import numpy as np
 from numpy._typing import DTypeLike
 
+# Default sample rate for audio pattern detection (8kHz).
+# All audio clips and streams must use the same sample rate for matching to work.
+TARGET_SAMPLE_RATE = 8000
+
 
 def slicing_with_zero_padding(array,width,middle_index):
     padding = width/2
@@ -187,9 +191,6 @@ def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate=None,ac=None):
     finally:
         if process is not None:
             process.stdout.close()
-
-
-TARGET_SAMPLE_RATE = 8000
 
 
 def write_wav_file(filepath, audio_data, sample_rate):
