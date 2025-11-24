@@ -37,28 +37,28 @@ The package provides a single CLI command `audio-pattern-detector` with two subc
 ### Match - Detect patterns in audio files
 ```shell
 # detect pattern from audio file, add --no-debug to disable debugging
-audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+audio-pattern-detector match --audio-file ./sample_audios/cbs_news_audio_section.wav --pattern-file ./sample_audios/clips/cbs_news_dada.wav
 
 # detect pattern using a folder of pattern clips
 audio-pattern-detector match --audio-folder ./audio_files --pattern-folder ./sample_audios/clips
 
 # with uv run (no install needed)
-uv run audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+uv run audio-pattern-detector match --audio-file ./sample_audios/cbs_news_audio_section.wav --pattern-file ./sample_audios/clips/cbs_news_dada.wav
 
 # with pipx
-pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/audio_section.wav --pattern-file ./sample_audios/clips/dada.wav
+pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_news_audio_section.wav --pattern-file ./sample_audios/clips/cbs_news_dada.wav
 ```
 
 ### Convert - Convert audio files to clip format
 ```shell
 # convert audio file to target sample rate (8kHz, mono)
-audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+audio-pattern-detector convert --audio-file ./tmp/cbs_news_dada.wav --dest-file ./sample_audios/clips/cbs_news_dada.wav
 
 # with uv run (no install needed)
-uv run audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+uv run audio-pattern-detector convert --audio-file ./tmp/cbs_news_dada.wav --dest-file ./sample_audios/clips/cbs_news_dada.wav
 
 # with pipx
-pipx run --spec . audio-pattern-detector convert --audio-file ./tmp/dada.wav --dest-file ./sample_audios/clips/dada.wav
+pipx run --spec . audio-pattern-detector convert --audio-file ./tmp/cbs_news_dada.wav --dest-file ./sample_audios/clips/cbs_news_dada.wav
 ```
 
 ## audio pattern detection methods
