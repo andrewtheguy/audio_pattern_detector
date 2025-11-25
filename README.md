@@ -46,8 +46,11 @@ pipx run --spec . audio-pattern-detector [command] [options]
 The package provides a single CLI command `audio-pattern-detector` with two subcommands:
 
 ### Match - Detect patterns in audio files
+
+The source audio file is automatically converted to the required format (mono, 16-bit WAV at the target sample rate) using ffmpeg.
+
 ```shell
-# detect pattern from audio file, add --no-debug to disable debugging
+# detect pattern from audio file, add --debug to enable debug mode
 audio-pattern-detector match --audio-file ./sample_audios/cbs_news_audio_section.wav --pattern-file ./sample_audios/clips/cbs_news_dada.wav
 
 # detect pattern using a folder of pattern clips
