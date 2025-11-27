@@ -14,11 +14,15 @@ COPY --from=mwader/static-ffmpeg:7.0-1 /ffprobe /usr/local/bin/
 ENV app=/usr/src/app
 WORKDIR $app
 
-COPY . /usr/src/app
+# Copy only dependency files first for better layer caching
+COPY pyproject.toml uv.lock README.md ./
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 RUN --mount=from=ghcr.io/astral-sh/uv:0.9.11,source=/uv,target=/bin/uv \
-    uv sync --locked --no-dev
+    uv sync --locked --no-dev --no-install-project
+
+# Copy application code after dependencies are installed
+COPY . ./
 
 # numba patch
 ENV NUMBA_CACHE_DIR=/tmp/numba_cache_dir
