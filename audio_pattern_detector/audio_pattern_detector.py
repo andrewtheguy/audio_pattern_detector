@@ -63,16 +63,21 @@ class AudioPatternDetector:
             logger.warning(f"seconds_per_chunk is not set or less than 1, setting it to longest clip * 2 seconds, which is {seconds_per_chunk} seconds")
 
         # Validate seconds_per_chunk against all clips' sliding windows
+        # Track the largest min_chunk_size across all clips
+        max_min_chunk_size = 0
         for audio_clip in self.audio_clips:
             clip_seconds = len(audio_clip.audio) / self.target_sample_rate
             sliding_window = math.ceil(clip_seconds)
             min_chunk_size = sliding_window * 2
+            if min_chunk_size > max_min_chunk_size:
+                max_min_chunk_size = min_chunk_size
             if seconds_per_chunk < min_chunk_size:
                 raise ValueError(
                     f"seconds_per_chunk {seconds_per_chunk} is too small for clip '{audio_clip.name}' "
                     f"(duration: {clip_seconds:.2f}s, sliding_window: {sliding_window}s, "
                     f"minimum chunk size: {min_chunk_size}s)"
                 )
+        self._min_chunk_size = max_min_chunk_size
 
         self.seconds_per_chunk = seconds_per_chunk
 
@@ -140,6 +145,30 @@ class AudioPatternDetector:
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
         self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
+
+    def get_config(self):
+        """Return the computed configuration values from __init__.
+
+        Returns:
+            dict: Configuration including seconds_per_chunk, chunk_size_bytes,
+                  min_chunk_size_seconds, and per-clip data (duration, sliding_window, is_pure_tone).
+        """
+        clips_config = {}
+        for clip_name, clip_data in self._clip_datas.items():
+            clip_duration = len(clip_data["clip"]) / self.target_sample_rate
+            clips_config[clip_name] = {
+                "duration_seconds": round(clip_duration, 6),
+                "sliding_window_seconds": clip_data["sliding_window"],
+                "is_pure_tone": self._clip_cache["is_pure_tone_pattern"][clip_name],
+            }
+
+        return {
+            "seconds_per_chunk": self.seconds_per_chunk,
+            "chunk_size_bytes": self._chunk_size,
+            "sample_rate": self.target_sample_rate,
+            "min_chunk_size_seconds": self._min_chunk_size,
+            "clips": clips_config,
+        }
 
     def find_clip_in_audio(self, audio_stream: AudioStream, on_pattern_detected=None, accumulate_results=True):
         """Find clip occurrences in audio stream.

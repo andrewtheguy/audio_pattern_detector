@@ -41,6 +41,10 @@ def main():
     match_parser.add_argument('--stdin', action='store_true', help='read audio from stdin (pipe)')
     match_parser.add_argument('--input-format', metavar='format', type=str, required=False, help='input format for stdin (e.g., mp3, wav, flac)')
     match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
+    match_parser.add_argument('--chunk-seconds', metavar='seconds', type=str, default='60',
+                              help='seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length)')
+    match_parser.add_argument('--show-config', action='store_true',
+                              help='output computed configuration (seconds_per_chunk, sliding windows, etc.) as JSON and exit')
     match_parser.add_argument('--debug', metavar='debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)
     match_parser.set_defaults(func=_lazy_cmd_match)
 

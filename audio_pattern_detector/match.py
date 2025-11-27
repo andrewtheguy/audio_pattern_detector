@@ -28,6 +28,7 @@ def match_pattern(
     input_format=None,
     on_pattern_detected=None,
     accumulate_results=True,
+    seconds_per_chunk=60,
 ):
     """Find pattern matches in audio file, URL, or stdin
 
@@ -41,6 +42,7 @@ def match_pattern(
         on_pattern_detected: Optional callback for streaming output.
                              Signature: on_pattern_detected(clip_name: str, timestamp: float)
         accumulate_results: If False, don't accumulate results (saves memory for streaming)
+        seconds_per_chunk: Seconds per chunk for sliding window (None for auto-compute)
     """
     if not is_url and not from_stdin and not os.path.exists(audio_source):
         raise ValueError(f"Audio {audio_source} does not exist")
@@ -72,7 +74,7 @@ def match_pattern(
         print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
-        peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode, audio_clips=pattern_clips)
+        peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode, audio_clips=pattern_clips, seconds_per_chunk=seconds_per_chunk)
                       .find_clip_in_audio(
                           full_streaming_audio,
                           on_pattern_detected=on_pattern_detected,
@@ -95,7 +97,7 @@ def _make_jsonl_callback():
 
 def _run_match_with_output(
     args, pattern_files, audio_source, debug_output_file,
-    is_url=False, from_stdin=False, input_format=None
+    is_url=False, from_stdin=False, input_format=None, seconds_per_chunk=60
 ):
     """Run match_pattern and handle output (JSON or JSONL)."""
     jsonl_mode = getattr(args, 'jsonl', False)
@@ -117,6 +119,7 @@ def _run_match_with_output(
         input_format=input_format,
         on_pattern_detected=callback,
         accumulate_results=not jsonl_mode,
+        seconds_per_chunk=seconds_per_chunk,
     )
     print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
 
@@ -138,6 +141,17 @@ def _run_match_with_output(
 
 def cmd_match(args):
     """Handler for match subcommand"""
+    # Parse chunk-seconds argument: "auto" -> None, otherwise int
+    chunk_seconds_str = getattr(args, 'chunk_seconds', '60')
+    if chunk_seconds_str.lower() == 'auto':
+        seconds_per_chunk = None
+    else:
+        try:
+            seconds_per_chunk = int(chunk_seconds_str)
+        except ValueError:
+            print(f"Error: --chunk-seconds must be 'auto' or a positive integer, got '{chunk_seconds_str}'", file=sys.stderr)
+            sys.exit(1)
+
     if args.pattern_folder:
         pattern_files = []
         for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
@@ -148,6 +162,24 @@ def cmd_match(args):
     else:
         print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
         sys.exit(1)
+
+    # Handle --show-config: create detector, output config, exit
+    if getattr(args, 'show_config', False):
+        pattern_clips = []
+        for pattern_file in pattern_files:
+            if not os.path.exists(pattern_file):
+                print(f"Error: Pattern {pattern_file} does not exist", file=sys.stderr)
+                sys.exit(1)
+            pattern_clips.append(AudioClip.from_audio_file(pattern_file))
+
+        detector = AudioPatternDetector(
+            audio_clips=pattern_clips,
+            debug_mode=args.debug,
+            seconds_per_chunk=seconds_per_chunk,
+        )
+        config = detector.get_config()
+        print(json.dumps(config, indent=2, ensure_ascii=False))
+        return
 
     jsonl_mode = getattr(args, 'jsonl', False)
 
@@ -160,7 +192,7 @@ def cmd_match(args):
         all_results = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
             print(f"Processing {audio_file}...", file=sys.stderr)
-            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug)
+            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
             all_results[audio_file] = peak_times
 
@@ -178,6 +210,7 @@ def cmd_match(args):
         _run_match_with_output(
             args, pattern_files, args.audio_file,
             debug_output_file=f'./tmp/{Path(args.audio_file).stem}.json',
+            seconds_per_chunk=seconds_per_chunk,
         )
     elif args.audio_url:
         # Validate URL has a duration (not a live stream)
@@ -192,6 +225,7 @@ def cmd_match(args):
             args, pattern_files, args.audio_url,
             debug_output_file='./tmp/url_stream.json',
             is_url=True,
+            seconds_per_chunk=seconds_per_chunk,
         )
     elif args.stdin:
         input_format = getattr(args, 'input_format', None)
@@ -200,6 +234,7 @@ def cmd_match(args):
             debug_output_file='./tmp/stdin_stream.json',
             from_stdin=True,
             input_format=input_format,
+            seconds_per_chunk=seconds_per_chunk,
         )
     else:
         print("Please provide --audio-file, --audio-folder, --audio-url, or --stdin", file=sys.stderr)

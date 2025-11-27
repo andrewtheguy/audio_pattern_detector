@@ -63,6 +63,77 @@ uv run audio-pattern-detector match --audio-file ./sample_audios/cbs_news_audio_
 pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_news_audio_section.wav --pattern-file ./sample_audios/clips/cbs_news_dada.wav
 ```
 
+#### Match CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `--audio-file` | Audio file to search for patterns |
+| `--audio-folder` | Folder of audio files to process |
+| `--audio-url` | URL to audio file (must not be a live stream) |
+| `--stdin` | Read audio from stdin pipe |
+| `--input-format` | Input format hint for stdin (e.g., mp3, wav, flac) |
+| `--pattern-file` | Single pattern file to match |
+| `--pattern-folder` | Folder of pattern clips to match |
+| `--chunk-seconds` | Seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length) |
+| `--show-config` | Output computed configuration as JSON and exit (no audio file required) |
+| `--jsonl` | Output JSONL events as they occur (streaming mode) |
+| `--debug` | Enable debug mode |
+
+#### Sliding Window Configuration
+
+The `--chunk-seconds` option controls the sliding window size for processing audio:
+
+```shell
+# Use default 60-second chunks
+audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav
+
+# Auto-compute chunk size based on pattern length (2x longest pattern)
+audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --chunk-seconds auto
+
+# Use custom 10-second chunks
+audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --chunk-seconds 10
+```
+
+#### Show Configuration
+
+Use `--show-config` to see computed configuration without processing audio:
+
+```shell
+audio-pattern-detector match --pattern-folder ./clips --chunk-seconds auto --show-config
+```
+
+Output:
+```json
+{
+  "seconds_per_chunk": 2,
+  "chunk_size_bytes": 64000,
+  "sample_rate": 8000,
+  "min_chunk_size_seconds": 2,
+  "clips": {
+    "pattern1": {
+      "duration_seconds": 0.5,
+      "sliding_window_seconds": 1,
+      "is_pure_tone": false
+    }
+  }
+}
+```
+
+#### JSONL Streaming Output
+
+Use `--jsonl` for streaming output that emits events as patterns are detected:
+
+```shell
+audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --jsonl
+```
+
+Output format:
+```jsonl
+{"type": "start", "source": "audio.wav"}
+{"type": "pattern_detected", "clip_name": "pattern", "timestamp": 5.5, "timestamp_formatted": "00:00:05.500"}
+{"type": "end", "total_time": 60.0, "total_time_formatted": "00:01:00.000"}
+```
+
 ### Convert - Convert audio files to clip format
 ```shell
 # convert audio file to target sample rate (8kHz, mono)
