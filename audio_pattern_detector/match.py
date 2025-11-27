@@ -98,14 +98,52 @@ class _RawPcmStreamWrapper:
     """Wrapper to make raw PCM stdin work like AudioStream expects.
 
     Reads raw float32 PCM from stdin, optionally resampling to target rate.
+    Includes validation to detect potentially corrupt audio.
     """
 
     def __init__(self, input_sample_rate: int, target_sample_rate: int):
         self.input_sample_rate = input_sample_rate
         self.target_sample_rate = target_sample_rate
         self.needs_resample = input_sample_rate != target_sample_rate
-        # Calculate chunk size for reading (read in chunks that result in target chunk size after resampling)
         self._bytes_per_sample = 4  # float32
+        self._validated = False
+
+    def _validate_first_chunk(self, audio: np.ndarray) -> None:
+        """Check first chunk for signs of corrupt audio and emit warnings."""
+        if self._validated or len(audio) == 0:
+            return
+        self._validated = True
+
+        warnings = []
+
+        # Check for NaN or Inf values (definite corruption)
+        if np.any(np.isnan(audio)):
+            warnings.append("Audio contains NaN values - data may be corrupt")
+        if np.any(np.isinf(audio)):
+            warnings.append("Audio contains Inf values - data may be corrupt")
+
+        # Check value range - float32 PCM should be in [-1, 1]
+        max_abs = np.max(np.abs(audio))
+        if max_abs > 1.5:
+            warnings.append(f"Audio values exceed expected range (max: {max_abs:.2f}) - may be wrong format or corrupt")
+
+        # Check for excessive clipping (>10% of samples at ±1.0)
+        clipped = np.sum(np.abs(audio) >= 0.9999)
+        clip_ratio = clipped / len(audio)
+        if clip_ratio > 0.1:
+            warnings.append(f"Audio appears heavily clipped ({clip_ratio*100:.1f}% of samples)")
+
+        # Check for DC offset (mean should be near 0)
+        mean_val = np.mean(audio)
+        if abs(mean_val) > 0.1:
+            warnings.append(f"Audio has significant DC offset (mean: {mean_val:.3f})")
+
+        # Check if audio is all zeros (silence or no data)
+        if np.all(audio == 0):
+            warnings.append("First chunk is all zeros - verify input is correct")
+
+        for warning in warnings:
+            print(f"Warning: {warning}", file=sys.stderr)
 
     def read(self, size: int) -> bytes:
         """Read and optionally resample audio data.
@@ -117,7 +155,11 @@ class _RawPcmStreamWrapper:
             Raw bytes of float32 PCM at target sample rate
         """
         if not self.needs_resample:
-            return sys.stdin.buffer.read(size)
+            data = sys.stdin.buffer.read(size)
+            if data and not self._validated:
+                audio = np.frombuffer(data, dtype=np.float32)
+                self._validate_first_chunk(audio)
+            return data
 
         # Calculate how many input bytes we need to produce the requested output bytes
         target_samples = size // self._bytes_per_sample
@@ -131,6 +173,8 @@ class _RawPcmStreamWrapper:
 
         # Convert to numpy, resample, and convert back to bytes
         audio = np.frombuffer(data, dtype=np.float32)
+        if not self._validated:
+            self._validate_first_chunk(audio)
         resampled = resample_audio(audio, self.input_sample_rate, self.target_sample_rate)
         return resampled.tobytes()
 
