@@ -10,7 +10,6 @@ dependencies = [
     { name = "numpy" },
     { name = "pyloudnorm" },
     { name = "scipy" },
-    { name = "setuptools" },
 ]
 
 [package.dev-dependencies]
@@ -26,7 +25,6 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26.4,<2" },
     { name = "pyloudnorm", specifier = ">=0.1.1,<0.2" },
     { name = "scipy", specifier = ">=1.16.3,<2" },
-    { name = "setuptools", specifier = ">=69.5.1,<70" },
 ]
 
 [package.metadata.requires-dev]
@@ -349,15 +347,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/82/31/006cbb4b648ba379a95c87262c2855cd0d09453e500937f78b30f02fa1cd/scipy-1.16.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:c5192722cffe15f9329a3948c4b1db789fbb1f05c97899187dcf009b283aea70", size = 38678975, upload-time = "2025-10-28T17:33:15.809Z" },
     { url = "https://files.pythonhosted.org/packages/c2/7f/acbd28c97e990b421af7d6d6cd416358c9c293fc958b8529e0bd5d2a2a19/scipy-1.16.3-cp312-cp312-win_amd64.whl", hash = "sha256:56edc65510d1331dae01ef9b658d428e33ed48b4f77b1d51caf479a0253f96dc", size = 38555926, upload-time = "2025-10-28T17:33:21.388Z" },
     { url = "https://files.pythonhosted.org/packages/ce/69/c5c7807fd007dad4f48e0a5f2153038dc96e8725d3345b9ee31b2b7bed46/scipy-1.16.3-cp312-cp312-win_arm64.whl", hash = "sha256:a8a26c78ef223d3e30920ef759e25625a0ecdd0d60e5a8818b7513c3e5384cf2", size = 25463014, upload-time = "2025-10-28T17:33:25.975Z" },
-]
-
-[[package]]
-name = "setuptools"
-version = "69.5.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d6/4f/b10f707e14ef7de524fe1f8988a294fb262a29c9b5b12275c7e188864aed/setuptools-69.5.1.tar.gz", hash = "sha256:6c1fccdac05a97e598fb0ae3bbed5904ccb317337a51139dcd51453611bbb987", size = 2291314, upload-time = "2024-04-13T21:06:28.589Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/29/13965af254e3373bceae8fb9a0e6ea0d0e571171b80d6646932131d6439b/setuptools-69.5.1-py3-none-any.whl", hash = "sha256:c636ac361bc47580504644275c9ad802c50415c7522212252c033bd15f301f32", size = 894566, upload-time = "2024-04-13T21:06:23.256Z" },
 ]
 
 [[package]]
