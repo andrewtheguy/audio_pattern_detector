@@ -68,24 +68,31 @@ class TestLoadWaveFile:
             # Check normalized range
             assert np.max(np.abs(audio)) <= 1.0
 
-    def test_load_wrong_sample_rate_raises(self):
-        """Test that loading with wrong sample rate raises ValueError."""
+    def test_load_with_different_sample_rate_resamples(self):
+        """Test that loading with different sample rate resamples the audio."""
         sample_file = "sample_audios/clips/rthk_beep.wav"
         if os.path.exists(sample_file):
-            with pytest.raises(ValueError, match="sample rate"):
-                load_wave_file(sample_file, 44100)  # Wrong sample rate
+            # Load at 8kHz (original rate)
+            audio_8k = load_wave_file(sample_file, 8000)
+            # Load at 16kHz (should resample)
+            audio_16k = load_wave_file(sample_file, 16000)
+            # 16kHz version should have approximately twice as many samples
+            assert len(audio_16k) == pytest.approx(len(audio_8k) * 2, rel=0.01)
 
     def test_load_nonexistent_file_raises(self):
         """Test that loading nonexistent file raises an error."""
         with pytest.raises(ValueError):
             load_wave_file("nonexistent_file.wav", 8000)
 
-    def test_load_stereo_file_raises(self):
-        """Test that loading a stereo file raises ValueError."""
+    def test_load_stereo_file_converts_to_mono(self):
+        """Test that loading a stereo file converts it to mono."""
         # Create a temporary stereo file
         sample_rate = 8000
-        audio_left = np.zeros(sample_rate, dtype=np.int16)
-        audio_right = np.zeros(sample_rate, dtype=np.int16)
+        duration_seconds = 1
+        num_samples = sample_rate * duration_seconds
+        # Create different values for left and right channels to verify mixing
+        audio_left = np.full(num_samples, 16384, dtype=np.int16)  # ~0.5
+        audio_right = np.full(num_samples, -16384, dtype=np.int16)  # ~-0.5
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             temp_path = f.name
@@ -109,8 +116,12 @@ class TestLoadWaveFile:
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             proc.communicate(stereo_data.tobytes())
 
-            with pytest.raises(ValueError, match="not mono"):
-                load_wave_file(temp_path, sample_rate)
+            # Should load successfully (stereo converted to mono)
+            audio = load_wave_file(temp_path, sample_rate)
+            assert isinstance(audio, np.ndarray)
+            assert audio.dtype == np.float32
+            # Mono conversion should average left and right channels (0.5 + -0.5) / 2 ≈ 0
+            assert np.max(np.abs(audio)) < 0.1
         finally:
             os.unlink(temp_path)
 

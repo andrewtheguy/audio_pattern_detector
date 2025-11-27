@@ -12,7 +12,7 @@ from audio_pattern_detector.audio_utils import (
     ffmpeg_get_float32_pcm,
     resample_audio,
     seconds_to_time,
-    TARGET_SAMPLE_RATE,
+    DEFAULT_TARGET_SAMPLE_RATE,
 )
 
 def _emit_jsonl(event_type: str, **kwargs):
@@ -30,6 +30,7 @@ def match_pattern(
     seconds_per_chunk=60,
     from_stdin=False,
     sample_rate=None,
+    target_sample_rate=None,
 ):
     """Find pattern matches in audio file or stdin (raw PCM)
 
@@ -42,26 +43,28 @@ def match_pattern(
         accumulate_results: If False, don't accumulate results (saves memory for streaming)
         seconds_per_chunk: Seconds per chunk for sliding window (None for auto-compute)
         from_stdin: Whether to read raw float32 PCM from stdin
-        sample_rate: Sample rate of stdin input (default: TARGET_SAMPLE_RATE)
+        sample_rate: Sample rate of stdin input (default: target_sample_rate)
+        target_sample_rate: Target sample rate for processing (default: DEFAULT_TARGET_SAMPLE_RATE, 8000)
     """
     if not from_stdin and not os.path.exists(audio_source):
         raise ValueError(f"Audio {audio_source} does not exist")
+
+    # Use DEFAULT_TARGET_SAMPLE_RATE as default if not specified
+    sr = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
 
     pattern_clips = []
     for pattern_file in pattern_files:
         if not os.path.exists(pattern_file):
             raise ValueError(f"Pattern {pattern_file} does not exist")
-        pattern_clip = AudioClip.from_audio_file(pattern_file)
+        pattern_clip = AudioClip.from_audio_file(pattern_file, sample_rate=sr)
         pattern_clips.append(pattern_clip)
 
     if len(pattern_clips) == 0:
         raise ValueError("No pattern clips passed")
 
-    sr = TARGET_SAMPLE_RATE
-
     if from_stdin:
         # Stdin mode: read raw float32 little-endian PCM directly
-        input_sr = sample_rate if sample_rate is not None else TARGET_SAMPLE_RATE
+        input_sr = sample_rate if sample_rate is not None else sr
         return _match_pattern_raw_pcm(
             pattern_clips=pattern_clips,
             debug_mode=debug_mode,
@@ -82,7 +85,7 @@ def match_pattern(
         print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
-        peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode, audio_clips=pattern_clips, seconds_per_chunk=seconds_per_chunk)
+        peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode, audio_clips=pattern_clips, seconds_per_chunk=seconds_per_chunk, target_sample_rate=sr)
                       .find_clip_in_audio(
                           full_streaming_audio,
                           on_pattern_detected=on_pattern_detected,
@@ -165,6 +168,7 @@ def _match_pattern_raw_pcm(
             debug_mode=debug_mode,
             audio_clips=pattern_clips,
             seconds_per_chunk=seconds_per_chunk,
+            target_sample_rate=target_sample_rate,
         )
         .find_clip_in_audio(
             full_streaming_audio,
@@ -190,7 +194,7 @@ def _make_jsonl_callback():
 
 def _run_match_with_output(
     args, pattern_files, audio_source, debug_output_file,
-    from_stdin=False, seconds_per_chunk=60, sample_rate=None
+    from_stdin=False, seconds_per_chunk=60, sample_rate=None, target_sample_rate=None
 ):
     """Run match_pattern and handle output (JSON or JSONL).
 
@@ -217,6 +221,7 @@ def _run_match_with_output(
         seconds_per_chunk=seconds_per_chunk,
         from_stdin=from_stdin,
         sample_rate=sample_rate,
+        target_sample_rate=target_sample_rate,
     )
     print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
 
@@ -249,6 +254,9 @@ def cmd_match(args):
             print(f"Error: --chunk-seconds must be 'auto' or a positive integer, got '{chunk_seconds_str}'", file=sys.stderr)
             sys.exit(1)
 
+    # Get target sample rate (None means use default 8000)
+    target_sample_rate = getattr(args, 'target_sample_rate', None)
+
     if args.pattern_folder:
         pattern_files = []
         for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
@@ -271,7 +279,7 @@ def cmd_match(args):
         all_results = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
             print(f"Processing {audio_file}...", file=sys.stderr)
-            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk)
+            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
             all_results[audio_file] = peak_times
 
@@ -290,6 +298,7 @@ def cmd_match(args):
             args, pattern_files, args.audio_file,
             debug_output_file=f'./tmp/{Path(args.audio_file).stem}.json',
             seconds_per_chunk=seconds_per_chunk,
+            target_sample_rate=target_sample_rate,
         )
     elif args.stdin:
         # Stdin mode: raw float32 PCM, always outputs JSONL
@@ -300,6 +309,7 @@ def cmd_match(args):
             from_stdin=True,
             sample_rate=sample_rate,
             seconds_per_chunk=seconds_per_chunk,
+            target_sample_rate=target_sample_rate,
         )
     else:
         print("Please provide --audio-file, --audio-folder, or --stdin", file=sys.stderr)
@@ -308,6 +318,9 @@ def cmd_match(args):
 
 def cmd_show_config(args):
     """Handler for show-config subcommand"""
+    # Get target sample rate (None means use default 8000)
+    target_sample_rate = getattr(args, 'target_sample_rate', None)
+
     if args.pattern_folder:
         pattern_files = []
         for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
@@ -323,13 +336,14 @@ def cmd_show_config(args):
         if not os.path.exists(pattern_file):
             print(f"Error: Pattern {pattern_file} does not exist", file=sys.stderr)
             sys.exit(1)
-        pattern_clips.append(AudioClip.from_audio_file(pattern_file))
+        pattern_clips.append(AudioClip.from_audio_file(pattern_file, sample_rate=target_sample_rate))
 
     # Use auto mode (None) to show minimum computed values
     detector = AudioPatternDetector(
         audio_clips=pattern_clips,
         debug_mode=False,
         seconds_per_chunk=None,
+        target_sample_rate=target_sample_rate,
     )
     config = detector.get_config()
     print(json.dumps(config, indent=2, ensure_ascii=False))

@@ -12,7 +12,7 @@ import pyloudnorm as pyln
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_utils import (
-    TARGET_SAMPLE_RATE,
+    DEFAULT_TARGET_SAMPLE_RATE,
     downsample_preserve_maxima,
     seconds_to_time,
     slicing_with_zero_padding,
@@ -41,12 +41,20 @@ def _write_audio_file(filepath, audio_data, sample_rate):
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk=DEFAULT_SECONDS_PER_CHUNK):
+    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk=DEFAULT_SECONDS_PER_CHUNK, target_sample_rate=None):
+        """Initialize the audio pattern detector.
+
+        Args:
+            audio_clips: List of AudioClip instances to detect.
+            debug_mode: Enable debug mode for additional output.
+            seconds_per_chunk: Seconds per chunk for sliding window processing.
+            target_sample_rate: Target sample rate for all audio. If None, uses DEFAULT_TARGET_SAMPLE_RATE (8000).
+        """
         self.audio_clips = audio_clips
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
-        self.target_sample_rate = TARGET_SAMPLE_RATE
+        self.target_sample_rate = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
 
         clips_already = set()
         max_clip_length = 0

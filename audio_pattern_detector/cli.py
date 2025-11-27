@@ -45,7 +45,8 @@ def main():
     match_parser.add_argument('--audio-file', metavar='audio file', type=str, required=False, help='audio file to find pattern')
     match_parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
     match_parser.add_argument('--stdin', action='store_true', help='read raw float32 little-endian PCM from stdin (always outputs JSONL)')
-    match_parser.add_argument('--sample-rate', metavar='rate', type=int, required=False, help='sample rate for stdin input in Hz (default: 8000)')
+    match_parser.add_argument('--sample-rate', metavar='rate', type=int, required=False, help='sample rate for stdin input in Hz (default: target-sample-rate)')
+    match_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
     match_parser.add_argument('--chunk-seconds', metavar='seconds', type=str, default='60',
                               help='seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length)')
@@ -56,6 +57,7 @@ def main():
     show_config_parser = subparsers.add_parser('show-config', help='Show computed configuration for pattern files')
     show_config_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, help='pattern file')
     show_config_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
+    show_config_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     show_config_parser.set_defaults(func=_lazy_cmd_show_config)
 
     args = parser.parse_args()

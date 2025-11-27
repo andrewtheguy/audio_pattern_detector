@@ -14,7 +14,7 @@ import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
-from audio_pattern_detector.audio_utils import TARGET_SAMPLE_RATE
+from audio_pattern_detector.audio_utils import DEFAULT_TARGET_SAMPLE_RATE
 
 
 def create_sine_tone(frequency: float, duration: float, sample_rate: int) -> np.ndarray:
@@ -38,12 +38,12 @@ def create_audio_stream_from_array(audio: np.ndarray, name: str) -> AudioStream:
     """Create an AudioStream from a numpy array."""
     audio_bytes = float_to_float32_bytes(audio)
     stream = io.BytesIO(audio_bytes)
-    return AudioStream(name=name, audio_stream=stream, sample_rate=TARGET_SAMPLE_RATE)
+    return AudioStream(name=name, audio_stream=stream, sample_rate=DEFAULT_TARGET_SAMPLE_RATE)
 
 
 def create_beep_pattern(duration: float = 0.23, frequency: float = 1000.0) -> AudioClip:
     """Create a synthetic beep pattern for testing."""
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     audio = create_sine_tone(frequency, duration, sr)
     return AudioClip(name="test_beep", audio=audio, sample_rate=sr)
 
@@ -57,7 +57,7 @@ class TestSlidingWindowTimestamps:
         When a pattern is detected in the first chunk (index=0), subtract_seconds=0,
         so the timestamp should be: peak_time - clip_seconds
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23  # seconds
         pattern = create_beep_pattern(duration=pattern_duration)
 
@@ -94,7 +94,7 @@ class TestSlidingWindowTimestamps:
         - The pattern at real position 4.0s should be reported correctly.
         - Formula: (peak_in_section/sr) - subtract_seconds + (index * seconds_per_chunk) - clip_seconds
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -129,7 +129,7 @@ class TestSlidingWindowTimestamps:
 
     def test_detection_in_third_chunk_has_correct_timestamp(self):
         """Test that a detection in the third chunk has the correct timestamp."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -163,7 +163,7 @@ class TestSlidingWindowTimestamps:
 
     def test_multiple_detections_across_chunks_have_correct_timestamps(self):
         """Test multiple patterns across different chunks all have correct timestamps."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -213,7 +213,7 @@ class TestSlidingWindowBoundary:
         The sliding window overlap should allow patterns that span boundaries
         to be detected in the overlapping region.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -253,7 +253,7 @@ class TestSlidingWindowBoundary:
         The pattern starts at the beginning of chunk 2, so it should be
         detected via the sliding window overlap from chunk 1.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -287,7 +287,7 @@ class TestSlidingWindowBoundary:
 
     def test_detection_just_before_boundary_has_correct_timestamp(self):
         """Test detection of pattern ending just before a chunk boundary."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -325,7 +325,7 @@ class TestSlidingWindowBoundary:
         When chunk 2 is processed, it includes sliding_window seconds from
         chunk 1, allowing detection of patterns that span the boundary.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -384,7 +384,7 @@ class TestSlidingWindowWithRealPatterns:
         # Now test with small chunks
         pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
             audio_stream = AudioStream(
                 name=Path(audio_file).stem,
@@ -434,7 +434,7 @@ class TestSlidingWindowWithRealPatterns:
 
         pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
             audio_stream = AudioStream(
                 name=Path(audio_file).stem,
@@ -467,7 +467,7 @@ class TestTimestampCalculationEdgeCases:
 
     def test_pattern_at_very_beginning_of_audio(self):
         """Test detection of pattern at the very start of audio."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         pattern = create_beep_pattern(duration=pattern_duration)
 
@@ -496,7 +496,7 @@ class TestTimestampCalculationEdgeCases:
 
     def test_pattern_near_end_of_last_chunk(self):
         """Test detection of pattern near the end of the last (partial) chunk."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -534,7 +534,7 @@ class TestTimestampCalculationEdgeCases:
         twice, resulting in duplicate timestamps. After deduplication,
         timestamps should be monotonically increasing.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23
         seconds_per_chunk = 3
         pattern = create_beep_pattern(duration=pattern_duration)
@@ -591,7 +591,7 @@ def create_long_beep_pattern(duration: float = 2.5, frequency: float = 1000.0) -
 
     A 2.5 second pattern results in sliding_window = ceil(2.5) = 3 seconds.
     """
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     audio = create_sine_tone(frequency, duration, sr)
     return AudioClip(name="long_beep", audio=audio, sample_rate=sr)
 
@@ -610,7 +610,7 @@ class TestLargeSlidingWindow:
         Pattern duration: 2.5s -> sliding_window: 3s
         seconds_per_chunk: 10s (must be >= 2 * sliding_window = 6s)
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         seconds_per_chunk = 10
         pattern = create_long_beep_pattern(duration=pattern_duration)
@@ -649,7 +649,7 @@ class TestLargeSlidingWindow:
         This tests that timestamps don't accumulate drift over many chunks.
         Pattern at 45.0s with 10s chunks means chunk index=4.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         seconds_per_chunk = 10
         pattern = create_long_beep_pattern(duration=pattern_duration)
@@ -687,7 +687,7 @@ class TestLargeSlidingWindow:
         Places patterns at known positions and verifies each has correct timestamp,
         ensuring no cumulative drift occurs.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         seconds_per_chunk = 10
         pattern = create_long_beep_pattern(duration=pattern_duration)
@@ -737,7 +737,7 @@ class TestLargeSlidingWindow:
         With large sliding window, boundary detection is more complex because
         the overlap region is larger.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         seconds_per_chunk = 10
         pattern = create_long_beep_pattern(duration=pattern_duration)
@@ -776,7 +776,7 @@ class TestLargeSlidingWindow:
         Pattern duration: 4.5s -> sliding_window: 5s
         This stresses the timestamp calculation with large subtract_seconds values.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 4.5
         seconds_per_chunk = 15  # Must be >= 2 * sliding_window = 10s
 
@@ -818,7 +818,7 @@ class TestLargeSlidingWindow:
         This is a stress test to ensure no drift accumulates over many chunks
         with a large sliding window.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         seconds_per_chunk = 10
         pattern = create_long_beep_pattern(duration=pattern_duration)
@@ -857,7 +857,7 @@ class TestLargeSlidingWindow:
         If there's drift, the later chunk should have more error.
         Both should have similar accuracy if there's no drift.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         seconds_per_chunk = 10
         pattern = create_long_beep_pattern(duration=pattern_duration)
@@ -931,7 +931,7 @@ class TestSlidingWindowOverlapDeduplication:
 
         Both should report the same timestamp if detected in both.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 3.5  # sliding_window = ceil(3.5) = 4
         seconds_per_chunk = 10
 
@@ -988,7 +988,7 @@ class TestSlidingWindowOverlapDeduplication:
         - Chunk: 10s
         - Pattern at 8s (near end of first chunk, in overlap region)
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 3.5
         seconds_per_chunk = 10
 
@@ -1038,7 +1038,7 @@ class TestSlidingWindowOverlapDeduplication:
         Pattern at position where it ends at 10s (chunk boundary).
         This is the edge case where detection might happen in both chunks.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 3.5
         seconds_per_chunk = 10
 
@@ -1081,7 +1081,7 @@ class TestSlidingWindowOverlapDeduplication:
 
         Audio: 20s, Chunks: 10s, Pattern at 9s
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 3.5  # ceil(3.5) = 4s sliding window
         seconds_per_chunk = 10
 
@@ -1141,7 +1141,7 @@ class TestSlidingWindowOverlapDeduplication:
           - final_ts = ((P + D - (chunk_size - S))) - S + chunk_size - D
           - = P + D - chunk_size + S - S + chunk_size - D = P ✓
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 3.5  # sliding_window = ceil(3.5) = 4
         seconds_per_chunk = 10
 
@@ -1200,7 +1200,7 @@ class TestSecondsPerChunkValidation:
         So seconds_per_chunk must be >= 6s
         Setting it to 5s should raise ValueError during initialization.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5  # sliding_window = ceil(2.5) = 3s
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
@@ -1219,7 +1219,7 @@ class TestSecondsPerChunkValidation:
         A 2.5s pattern has sliding_window = ceil(2.5) = 3s
         So seconds_per_chunk = 6s should work (exactly 2x).
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5  # sliding_window = 3s
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
@@ -1234,7 +1234,7 @@ class TestSecondsPerChunkValidation:
 
     def test_seconds_per_chunk_above_minimum_works(self):
         """Test that seconds_per_chunk > 2 * sliding_window works."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5  # sliding_window = 3s
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
@@ -1252,7 +1252,7 @@ class TestSecondsPerChunkValidation:
 
         A 2.5s pattern should result in seconds_per_chunk = ceil(2.5) * 2 = 6s
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
@@ -1268,7 +1268,7 @@ class TestSecondsPerChunkValidation:
 
     def test_seconds_per_chunk_zero_auto_computes(self):
         """Test that seconds_per_chunk=0 auto-computes to longest_clip * 2."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
@@ -1283,7 +1283,7 @@ class TestSecondsPerChunkValidation:
 
     def test_seconds_per_chunk_negative_auto_computes(self):
         """Test that seconds_per_chunk < 0 auto-computes to longest_clip * 2."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 2.5
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
@@ -1304,7 +1304,7 @@ class TestSecondsPerChunkValidation:
 
         seconds_per_chunk=4 should fail because 4 < 6 (for longest pattern).
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
 
         # Short pattern
         short_audio = create_sine_tone(1000.0, 0.5, sr)
@@ -1324,7 +1324,7 @@ class TestSecondsPerChunkValidation:
 
     def test_multiple_patterns_valid_chunk_size(self):
         """Test that seconds_per_chunk works when valid for all patterns."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
 
         # Short pattern (sliding_window = 1s)
         short_audio = create_sine_tone(1000.0, 0.5, sr)
@@ -1348,7 +1348,7 @@ class TestSecondsPerChunkValidation:
         A 0.23s pattern has sliding_window = ceil(0.23) = 1s
         So seconds_per_chunk = 2s should work (exactly 2x).
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.23  # sliding_window = 1s
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="beep", audio=audio, sample_rate=sr)
@@ -1367,7 +1367,7 @@ class TestSecondsPerChunkValidation:
         A 0.5s pattern has sliding_window = ceil(0.5) = 1s
         So seconds_per_chunk must be >= 2s. 1s should fail.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
         pattern_duration = 0.5  # sliding_window = 1s
         audio = create_sine_tone(1000.0, pattern_duration, sr)
         pattern = AudioClip(name="short_beep", audio=audio, sample_rate=sr)
@@ -1389,7 +1389,7 @@ class TestSlidingWindowComputation:
 
         This is tested indirectly by checking which chunk sizes work/fail.
         """
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
 
         # Test cases: (pattern_duration, expected_sliding_window)
         test_cases = [
@@ -1429,7 +1429,7 @@ class TestSlidingWindowComputation:
 
     def test_auto_compute_uses_longest_pattern(self):
         """Test that auto-compute considers the longest pattern."""
-        sr = TARGET_SAMPLE_RATE
+        sr = DEFAULT_TARGET_SAMPLE_RATE
 
         # Multiple patterns with different lengths
         patterns = [

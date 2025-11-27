@@ -8,7 +8,7 @@ from numpy._typing import DTypeLike
 
 # Default sample rate for audio pattern detection (8kHz).
 # All audio clips and streams must use the same sample rate for matching to work.
-TARGET_SAMPLE_RATE = 8000
+DEFAULT_TARGET_SAMPLE_RATE = 8000
 
 # Cache for ffmpeg availability check
 _ffmpeg_available = None
@@ -128,8 +128,8 @@ def convert_audio_file(file_path, sr=None):
 def load_wave_file(file_path, expected_sample_rate):
     """Load wave file into float32 array.
 
-    Uses ffmpeg if available, otherwise falls back to scipy for WAV files.
-    When using scipy, resampling is done if sample rate doesn't match.
+    Uses ffmpeg if available for conversion, otherwise falls back to scipy for WAV files.
+    Resampling is done if sample rate doesn't match the expected rate.
 
     Args:
         file_path: Path to audio file.
@@ -138,9 +138,9 @@ def load_wave_file(file_path, expected_sample_rate):
     Returns:
         numpy array of float32 audio samples at expected_sample_rate.
     """
-    # Try ffmpeg first if available
+    # Try ffmpeg first if available - use it for conversion directly
     if is_ffmpeg_available():
-        return _load_wave_file_ffmpeg(file_path, expected_sample_rate)
+        return _load_wave_file_ffmpeg_convert(file_path, expected_sample_rate)
 
     # Fallback to scipy (WAV files only)
     if not file_path.lower().endswith('.wav'):
@@ -156,6 +156,17 @@ def load_wave_file(file_path, expected_sample_rate):
         data = resample_audio(data, sample_rate, expected_sample_rate)
 
     return data
+
+
+def _load_wave_file_ffmpeg_convert(file_path, target_sample_rate):
+    """Load and convert wave file using ffmpeg to target sample rate."""
+    # Use ffmpeg to convert audio data to target sample rate
+    with ffmpeg_get_float32_pcm(file_path, target_sample_rate=target_sample_rate, ac=1) as stdout:
+        data = stdout.read()
+
+    # ffmpeg f32le output is already normalized to [-1, 1]
+    samples = np.frombuffer(data, dtype=np.float32)
+    return samples
 
 
 def _load_wave_file_ffmpeg(file_path, expected_sample_rate):

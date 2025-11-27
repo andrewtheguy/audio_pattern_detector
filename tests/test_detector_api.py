@@ -11,7 +11,7 @@ import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector, DEFAULT_SECONDS_PER_CHUNK
-from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, TARGET_SAMPLE_RATE
+from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, DEFAULT_TARGET_SAMPLE_RATE
 
 
 # --- Helper Functions ---
@@ -25,7 +25,7 @@ def run_detector_with_callback(audio_file, pattern_files, accumulate_results=Tru
     def callback(clip_name, timestamp):
         events.append((clip_name, timestamp))
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -44,7 +44,7 @@ def run_detector_without_callback(audio_file, pattern_files, accumulate_results=
     """Helper to run detector without callback."""
     pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -402,7 +402,7 @@ def test_callback_called_immediately():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -432,7 +432,7 @@ def test_callback_receives_correct_types():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -499,7 +499,7 @@ def test_get_config_sample_rate():
     detector = AudioPatternDetector(audio_clips=[pattern_clip])
 
     config = detector.get_config()
-    assert config["sample_rate"] == TARGET_SAMPLE_RATE
+    assert config["sample_rate"] == DEFAULT_TARGET_SAMPLE_RATE
     assert config["sample_rate"] == 8000
 
 

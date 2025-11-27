@@ -6,7 +6,7 @@ import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
-from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, TARGET_SAMPLE_RATE
+from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, DEFAULT_TARGET_SAMPLE_RATE
 from audio_pattern_detector.convert import convert_audio_to_clip_format
 from audio_pattern_detector.match import match_pattern
 
@@ -820,7 +820,7 @@ def test_streaming_rthk_beep_detection():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     # Process audio using streaming
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -853,7 +853,7 @@ def test_streaming_cbs_news_detection():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -887,7 +887,7 @@ def test_streaming_multiple_patterns():
         assert Path(pf).exists()
         pattern_clips.append(AudioClip.from_audio_file(pf))
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -917,7 +917,7 @@ def test_streaming_16khz_audio_conversion():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     # Stream 16kHz audio with conversion to 8kHz
-    sr = TARGET_SAMPLE_RATE  # 8000 Hz
+    sr = DEFAULT_TARGET_SAMPLE_RATE  # 8000 Hz
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -946,7 +946,7 @@ def test_streaming_chunk_processing():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -977,7 +977,7 @@ def test_streaming_small_chunk_size():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -1021,7 +1021,7 @@ def test_streaming_no_match_scenario():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -1043,7 +1043,7 @@ def test_streaming_total_time_accuracy():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -1065,7 +1065,7 @@ def test_audio_clip_from_file():
     clip = AudioClip.from_audio_file(pattern_file)
 
     assert clip.name == "rthk_beep"
-    assert clip.sample_rate == TARGET_SAMPLE_RATE
+    assert clip.sample_rate == DEFAULT_TARGET_SAMPLE_RATE
     assert len(clip.audio) > 0
     assert clip.clip_length_seconds() > 0
 
@@ -1073,7 +1073,7 @@ def test_audio_clip_from_file():
 def test_audio_clip_sample_rate_validation():
     """Test that AudioPatternDetector validates pattern sample rates
 
-    Patterns must match TARGET_SAMPLE_RATE (8000 Hz).
+    Patterns must match DEFAULT_TARGET_SAMPLE_RATE (8000 Hz).
     """
     pattern_file = "sample_audios/clips/rthk_beep.wav"
 
@@ -1081,7 +1081,7 @@ def test_audio_clip_sample_rate_validation():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     # Verify clip has correct sample rate
-    assert pattern_clip.sample_rate == TARGET_SAMPLE_RATE
+    assert pattern_clip.sample_rate == DEFAULT_TARGET_SAMPLE_RATE
 
     # Detector should accept valid clips
     detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
@@ -1102,7 +1102,7 @@ def test_streaming_maintains_pattern_order():
 
     pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -1149,7 +1149,7 @@ def test_streaming_16khz_cbs_news():
 
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
@@ -1177,7 +1177,7 @@ def test_streaming_results_match_high_level_api():
 
     # Low-level streaming result
     pattern_clip = AudioClip.from_audio_file(pattern_file)
-    sr = TARGET_SAMPLE_RATE
+    sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
