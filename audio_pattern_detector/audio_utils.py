@@ -30,10 +30,10 @@ def slicing_with_zero_padding(array,width,middle_index):
 
 
 def convert_audio_file(file_path, sr=None):
-    # Create ffmpeg process
-    with ffmpeg_get_16bit_pcm(file_path, target_sample_rate=sr, ac=1) as stdout:
+    # Create ffmpeg process - output is float32 directly
+    with ffmpeg_get_float32_pcm(file_path, target_sample_rate=sr, ac=1) as stdout:
         data = stdout.read()
-    return np.frombuffer(data, dtype="int16")
+    return np.frombuffer(data, dtype="float32")
     #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
 
 # load wave file into float32
@@ -70,13 +70,12 @@ def load_wave_file(file_path, expected_sample_rate):
     if bits_per_sample != 16:
         raise ValueError(f"The file is not 16-bit. Bits per sample: {bits_per_sample}")
 
-    # Use ffmpeg to read audio data as raw PCM
-    with ffmpeg_get_16bit_pcm(file_path, target_sample_rate=expected_sample_rate, ac=1) as stdout:
+    # Use ffmpeg to read audio data as float32 PCM directly
+    with ffmpeg_get_float32_pcm(file_path, target_sample_rate=expected_sample_rate, ac=1) as stdout:
         data = stdout.read()
 
-    # Convert to numpy array and normalize to float32 [-1, 1]
-    samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
-    samples = samples / (2**15)  # Normalize 16-bit to [-1, 1]
+    # ffmpeg f32le output is already normalized to [-1, 1]
+    samples = np.frombuffer(data, dtype=np.float32)
 
     return samples
 
@@ -155,15 +154,15 @@ def downsample_preserve_maxima(curve, num_samples):
 
     return np.array(compressed_curve)
 
-# convert audio to 16 bit pcm with streaming output
+# convert audio to float32 pcm with streaming output
 @contextmanager
-def ffmpeg_get_16bit_pcm(full_audio_path,target_sample_rate=None,ac=None):
+def ffmpeg_get_float32_pcm(full_audio_path, target_sample_rate=None, ac=None):
     # Construct the ffmpeg command
     command = [
         "ffmpeg",
         "-i", full_audio_path,
-        "-f", "s16le",  # Output format
-        "-acodec", "pcm_s16le",  # Audio codec
+        "-f", "f32le",  # Output format: 32-bit float little-endian
+        "-acodec", "pcm_f32le",  # Audio codec
     ]
 
     if ac is not None:

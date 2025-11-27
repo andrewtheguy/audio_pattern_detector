@@ -6,7 +6,7 @@ import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
-from audio_pattern_detector.audio_utils import ffmpeg_get_16bit_pcm, TARGET_SAMPLE_RATE
+from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, TARGET_SAMPLE_RATE
 from audio_pattern_detector.convert import convert_audio_to_clip_format
 from audio_pattern_detector.match import match_pattern
 
@@ -821,7 +821,7 @@ def test_streaming_rthk_beep_detection():
 
     # Process audio using streaming
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -854,7 +854,7 @@ def test_streaming_cbs_news_detection():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -888,7 +888,7 @@ def test_streaming_multiple_patterns():
         pattern_clips.append(AudioClip.from_audio_file(pf))
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -905,7 +905,7 @@ def test_streaming_multiple_patterns():
 def test_streaming_16khz_audio_conversion():
     """Test streaming with 16kHz audio auto-conversion
 
-    Verifies that ffmpeg_get_16bit_pcm correctly converts 16kHz to 8kHz
+    Verifies that ffmpeg_get_float32_pcm correctly converts 16kHz to 8kHz
     during streaming and pattern detection works correctly.
     """
     pattern_file = "sample_audios/clips/rthk_beep.wav"
@@ -918,7 +918,7 @@ def test_streaming_16khz_audio_conversion():
 
     # Stream 16kHz audio with conversion to 8kHz
     sr = TARGET_SAMPLE_RATE  # 8000 Hz
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -947,7 +947,7 @@ def test_streaming_chunk_processing():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -978,7 +978,7 @@ def test_streaming_small_chunk_size():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -1022,7 +1022,7 @@ def test_streaming_no_match_scenario():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -1044,7 +1044,7 @@ def test_streaming_total_time_accuracy():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -1103,7 +1103,7 @@ def test_streaming_maintains_pattern_order():
     pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -1150,7 +1150,7 @@ def test_streaming_16khz_cbs_news():
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
@@ -1178,7 +1178,7 @@ def test_streaming_results_match_high_level_api():
     # Low-level streaming result
     pattern_clip = AudioClip.from_audio_file(pattern_file)
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_file).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 

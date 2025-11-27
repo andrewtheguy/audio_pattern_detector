@@ -7,7 +7,7 @@ from pathlib import Path
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from audio_pattern_detector.audio_utils import (
-    ffmpeg_get_16bit_pcm,
+    ffmpeg_get_float32_pcm,
     get_audio_duration,
     seconds_to_time,
     TARGET_SAMPLE_RATE,
@@ -29,7 +29,7 @@ def match_pattern(audio_source, pattern_files: list[str], debug_mode=False, is_u
         raise ValueError("No pattern clips passed")
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_source, target_sample_rate=sr, ac=1) as stdout:
+    with ffmpeg_get_float32_pcm(audio_source, target_sample_rate=sr, ac=1) as stdout:
         audio_name = Path(audio_source).stem if not is_url else "stream"
         print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
