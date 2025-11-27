@@ -65,19 +65,21 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 
 #### Match CLI Options
 
-| Option | Description |
-|--------|-------------|
-| `--audio-file` | Audio file to search for patterns |
-| `--audio-folder` | Folder of audio files to process |
-| `--stdin` | Read WAV format audio from stdin (always outputs JSONL) |
-| `--raw-pcm` | With `--stdin`: read raw float32 little-endian PCM instead of WAV (requires `--source-sample-rate`) |
-| `--source-sample-rate` | Source sample rate for raw PCM stdin in Hz (only used with `--raw-pcm`) |
-| `--target-sample-rate` | Target sample rate for processing in Hz (default: 8000). Use 16000 for AI workflows that require 16kHz audio. |
-| `--pattern-file` | Single pattern file to match |
-| `--pattern-folder` | Folder of pattern clips to match |
-| `--chunk-seconds` | Seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length) |
-| `--jsonl` | Output JSONL events as they occur (streaming mode, for file inputs) |
-| `--debug` | Enable debug mode |
+| Option | Description | Requires ffmpeg |
+|--------|-------------|-----------------|
+| `--audio-file` | Audio file to search for patterns | Yes |
+| `--audio-folder` | Folder of audio files to process | Yes |
+| `--stdin` | Read WAV format audio from stdin (always outputs JSONL) | No |
+| `--raw-pcm` | With `--stdin`: read raw float32 little-endian PCM instead of WAV (requires `--source-sample-rate`) | No |
+| `--source-sample-rate` | Source sample rate for raw PCM stdin in Hz (only used with `--raw-pcm`) | No |
+| `--target-sample-rate` | Target sample rate for processing in Hz (default: 8000). Use 16000 for AI workflows that require 16kHz audio. | - |
+| `--pattern-file` | Single pattern file to match | Yes* |
+| `--pattern-folder` | Folder of pattern clips to match | Yes* |
+| `--chunk-seconds` | Seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length) | - |
+| `--jsonl` | Output JSONL events as they occur (streaming mode, for file inputs) | - |
+| `--debug` | Enable debug mode | - |
+
+*Pattern files require ffmpeg for automatic resampling to the target sample rate. If patterns are already at the target sample rate (default 8kHz), scipy is used as fallback.
 
 #### Target Sample Rate
 
@@ -116,36 +118,44 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 
 Use `--stdin` to read WAV format audio from stdin. This mode always outputs JSONL for real-time streaming detection. The sample rate is automatically read from the WAV header.
 
+**This mode does not require ffmpeg** - audio is read using Python's `wave` module and resampled using scipy.
+
 ```shell
-# WAV stdin (sample rate read from header, resampled to default 8kHz)
+# WAV stdin - sample rate read from header, resampled to 8kHz (default target) if different
 ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
 
-# WAV stdin with custom target sample rate (e.g., 16kHz for AI workflows)
+# WAV stdin - sample rate read from header, resampled to 16kHz target if different
 ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
   audio-pattern-detector match --stdin --target-sample-rate 16000 --pattern-file pattern.wav
+
+# WAV stdin at 8kHz - no resampling needed (source matches default target)
+ffmpeg -i input.mp3 -f wav -ac 1 -ar 8000 pipe: | \
+  audio-pattern-detector match --stdin --pattern-file pattern.wav
 ```
 
 **Note**: When using `--stdin` (WAV mode):
 - Input must be WAV format (sample rate, channels, and bit depth are read from header)
 - Stereo audio is automatically mixed to mono
 - Output is always JSONL format for real-time streaming
-- Audio is automatically resampled to target sample rate if different from source
+- **Resampling**: If the WAV header sample rate differs from `--target-sample-rate` (default: 8000), audio is resampled using scipy
 
 #### Stdin Mode (Raw PCM)
 
 Use `--stdin --raw-pcm` to read raw float32 little-endian PCM data from stdin. This is useful when integrating with pipelines that produce headerless PCM data.
 
+**This mode does not require ffmpeg** - audio is read directly from stdin and resampled using scipy if needed.
+
 ```shell
-# Raw PCM at 8kHz (source matches default target sample rate)
+# Raw PCM at 8kHz - no resampling needed (source matches default target)
 ffmpeg -i input.mp3 -f f32le -ac 1 -ar 8000 pipe: | \
   audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 8000 --pattern-file pattern.wav
 
-# Raw PCM at 16kHz input, processed at 16kHz (no resampling)
+# Raw PCM at 16kHz input, target 16kHz - no resampling needed (source matches target)
 ffmpeg -i input.mp3 -f f32le -ac 1 -ar 16000 pipe: | \
   audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 16000 --target-sample-rate 16000 --pattern-file pattern.wav
 
-# Raw PCM at 16kHz input, resampled to 8kHz for processing
+# Raw PCM at 16kHz input, target 8kHz (default) - resampled from 16kHz to 8kHz
 some-16khz-source | \
   audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 16000 --pattern-file pattern.wav
 ```
@@ -154,8 +164,9 @@ some-16khz-source | \
 - Input must be raw float32 little-endian PCM (f32le)
 - `--source-sample-rate` is required to specify the input sample rate
 - Output is always JSONL format for real-time streaming
-- If `--source-sample-rate` differs from `--target-sample-rate`, audio is automatically resampled using scipy
+- **Resampling**: If `--source-sample-rate` differs from `--target-sample-rate` (default: 8000), audio is resampled using scipy
 - Pattern files are loaded at the target sample rate (default: 8000)
+- WAV header detection: If WAV data is accidentally sent to raw PCM mode, an error is raised with a helpful message
 
 ### Show-config - Show computed configuration for patterns
 
@@ -200,6 +211,9 @@ Output format:
 ```
 
 ### Convert - Convert audio files to clip format
+
+**Requires ffmpeg** to convert audio files.
+
 ```shell
 # convert audio file to target sample rate (8kHz, mono)
 audio-pattern-detector convert --audio-file ./tmp/cbs_news_dada.wav --dest-file ./sample_audios/clips/cbs_news_dada.wav
