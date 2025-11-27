@@ -20,7 +20,7 @@ from sklearn.metrics import mean_squared_error
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
-from audio_pattern_detector.audio_utils import slicing_with_zero_padding, convert_audio_arr_to_float, \
+from audio_pattern_detector.audio_utils import slicing_with_zero_padding, \
     downsample_preserve_maxima, TARGET_SAMPLE_RATE, seconds_to_time, write_wav_file
 from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
 
@@ -82,9 +82,8 @@ class AudioPatternDetector:
 
         seconds_per_chunk = self.seconds_per_chunk
 
-        # 2 bytes per channel on every sample for 16 bits (int16)
-        # times two because it is (int16, mono)
-        chunk_size = (seconds_per_chunk * self.target_sample_rate) * 2
+        # 4 bytes per sample for float32, mono
+        chunk_size = int(seconds_per_chunk * self.target_sample_rate) * 4
 
         # Initialize parameters
 
@@ -182,10 +181,8 @@ class AudioPatternDetector:
             in_bytes = stdout.read(chunk_size)
             if not in_bytes:
                 break
-            # Convert bytes to numpy array
-            chunk = np.frombuffer(in_bytes, dtype="int16")
-            # convert to float, don't output float from the previous step otherwise will be very loud
-            chunk = convert_audio_arr_to_float(chunk)
+            # Convert bytes to numpy array (float32 directly from ffmpeg)
+            chunk = np.frombuffer(in_bytes, dtype="float32")
 
             total_time += len(chunk) / self.target_sample_rate
 

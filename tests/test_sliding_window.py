@@ -26,16 +26,15 @@ def create_silence(duration: float, sample_rate: int) -> np.ndarray:
     return np.zeros(int(sample_rate * duration), dtype=np.float32)
 
 
-def float_to_int16_bytes(audio: np.ndarray) -> bytes:
-    """Convert float audio array to int16 bytes for streaming."""
-    # Normalize to int16 range
-    audio_int16 = (audio * 32767).astype(np.int16)
-    return audio_int16.tobytes()
+def float_to_float32_bytes(audio: np.ndarray) -> bytes:
+    """Convert float audio array to float32 bytes for streaming."""
+    audio_float32 = audio.astype(np.float32)
+    return audio_float32.tobytes()
 
 
 def create_audio_stream_from_array(audio: np.ndarray, name: str) -> AudioStream:
     """Create an AudioStream from a numpy array."""
-    audio_bytes = float_to_int16_bytes(audio)
+    audio_bytes = float_to_float32_bytes(audio)
     stream = io.BytesIO(audio_bytes)
     return AudioStream(name=name, audio_stream=stream, sample_rate=TARGET_SAMPLE_RATE)
 
@@ -374,7 +373,7 @@ class TestSlidingWindowWithRealPatterns:
         if not Path(pattern_file).exists() or not Path(audio_file).exists():
             pytest.skip("Sample audio files not found")
 
-        from audio_pattern_detector.audio_utils import ffmpeg_get_16bit_pcm
+        from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm
         from audio_pattern_detector.match import match_pattern
 
         # First, get reference results with default chunk size
@@ -384,7 +383,7 @@ class TestSlidingWindowWithRealPatterns:
         pattern_clip = AudioClip.from_audio_file(pattern_file)
 
         sr = TARGET_SAMPLE_RATE
-        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+        with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
             audio_stream = AudioStream(
                 name=Path(audio_file).stem,
                 audio_stream=stdout,
@@ -429,12 +428,12 @@ class TestSlidingWindowWithRealPatterns:
         if not Path(pattern_file).exists() or not Path(audio_file).exists():
             pytest.skip("Sample audio files not found")
 
-        from audio_pattern_detector.audio_utils import ffmpeg_get_16bit_pcm
+        from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm
 
         pattern_clip = AudioClip.from_audio_file(pattern_file)
 
         sr = TARGET_SAMPLE_RATE
-        with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
+        with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
             audio_stream = AudioStream(
                 name=Path(audio_file).stem,
                 audio_stream=stdout,

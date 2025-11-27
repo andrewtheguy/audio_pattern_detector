@@ -2,7 +2,6 @@ import os
 
 from audio_pattern_detector.audio_utils import (
     convert_audio_file,
-    convert_audio_arr_to_float,
     write_wav_file,
 )
 
@@ -14,11 +13,8 @@ def convert_audio_to_clip_format(audio_path, output_path):
     if not os.path.exists(audio_path):
         raise ValueError(f"Audio {audio_path} does not exist")
 
-    # Load the audio clip
+    # Load the audio clip (already float32 from ffmpeg)
     clip = convert_audio_file(audio_path, sr=target_sample_rate)
-
-    # convert to float
-    clip = convert_audio_arr_to_float(clip)
 
     # Write to wav file using ffmpeg
     write_wav_file(output_path, clip, target_sample_rate)
