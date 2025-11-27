@@ -21,7 +21,8 @@
       "Bash(for file in sample_audios/test_16khz/clips/*.wav sample_audios/test_16khz/*.wav)",
       "Bash(uv run ruff:*)",
       "Bash(time python:*)",
-      "Bash(time:*)"
+      "Bash(time:*)",
+      "Bash(uv sync:*)"
     ],
     "deny": [],
     "ask": []
