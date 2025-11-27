@@ -1,8 +1,19 @@
 import argparse
 import sys
 
-from audio_pattern_detector.convert import cmd_convert
-from audio_pattern_detector.match import cmd_match
+
+def _lazy_cmd_convert(args):
+    """Import convert command lazily to speed up CLI startup."""
+    from audio_pattern_detector.convert import cmd_convert
+
+    return cmd_convert(args)
+
+
+def _lazy_cmd_match(args):
+    """Import match command lazily to speed up CLI startup."""
+    from audio_pattern_detector.match import cmd_match
+
+    return cmd_match(args)
 
 
 def main():
@@ -18,7 +29,7 @@ def main():
     convert_parser = subparsers.add_parser('convert', help='Convert audio files to clip format')
     convert_parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to convert')
     convert_parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
-    convert_parser.set_defaults(func=cmd_convert)
+    convert_parser.set_defaults(func=_lazy_cmd_convert)
 
     # Add match subcommand
     match_parser = subparsers.add_parser('match', help='Find pattern matches in audio files')
@@ -28,7 +39,7 @@ def main():
     match_parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
     match_parser.add_argument('--audio-url', metavar='audio url', type=str, required=False, help='audio URL to find pattern (must not be a live stream)')
     match_parser.add_argument('--debug', metavar='debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)
-    match_parser.set_defaults(func=cmd_match)
+    match_parser.set_defaults(func=_lazy_cmd_match)
 
     args = parser.parse_args()
 
@@ -42,3 +53,15 @@ def main():
 
 if __name__ == '__main__':
     main()
+def _lazy_cmd_convert(args):
+    """Import convert command lazily to speed up CLI startup."""
+    from audio_pattern_detector.convert import cmd_convert
+
+    return cmd_convert(args)
+
+
+def _lazy_cmd_match(args):
+    """Import match command lazily to speed up CLI startup."""
+    from audio_pattern_detector.match import cmd_match
+
+    return cmd_match(args)
