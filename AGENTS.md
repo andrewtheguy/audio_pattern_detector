@@ -1,1 +1,1 @@
-do `uv run ruff check` after changes to make sure code style is correct.
+do `uv run ruff check` after changes to make sure code style is correct and then `uv run pytest`.
