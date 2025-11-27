@@ -47,6 +47,8 @@ def main():
     match_parser.add_argument('--audio-url', metavar='audio url', type=str, required=False, help='audio URL to find pattern (must not be a live stream)')
     match_parser.add_argument('--stdin', action='store_true', help='read audio from stdin (pipe)')
     match_parser.add_argument('--input-format', metavar='format', type=str, required=False, help='input format for stdin (e.g., mp3, wav, flac)')
+    match_parser.add_argument('--raw-pcm', action='store_true', help='read raw float32 little-endian PCM from stdin (bypasses ffmpeg)')
+    match_parser.add_argument('--sample-rate', metavar='rate', type=int, required=False, help='sample rate for raw PCM input in Hz (default: 8000)')
     match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
     match_parser.add_argument('--chunk-seconds', metavar='seconds', type=str, default='60',
                               help='seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length)')

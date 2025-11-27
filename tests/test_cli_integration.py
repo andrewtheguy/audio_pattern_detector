@@ -503,3 +503,128 @@ def test_match_16khz_audio_auto_converts():
     assert "rthk_beep" in output
     # Should find matches despite sample rate difference
     assert len(output["rthk_beep"]) > 0
+
+
+# --- Raw PCM Input Tests ---
+
+
+def test_cli_match_help_shows_raw_pcm_options():
+    """Test that match --help shows --raw-pcm and --sample-rate options."""
+    result = run_cli("match", "--help")
+    assert result.returncode == 0
+    assert "--raw-pcm" in result.stdout
+    assert "--sample-rate" in result.stdout
+
+
+def test_raw_pcm_reads_audio():
+    """Test --raw-pcm reads raw float32 little-endian PCM correctly."""
+    import numpy as np
+
+    # Read a WAV file and convert to raw float32 PCM at 8kHz using ffmpeg
+    cmd = [
+        "ffmpeg", "-i", "sample_audios/rthk_section_with_beep.wav",
+        "-f", "f32le", "-acodec", "pcm_f32le", "-ac", "1", "-ar", "8000",
+        "-loglevel", "error", "pipe:"
+    ]
+    ffmpeg_result = subprocess.run(cmd, capture_output=True, check=True)
+    raw_pcm_data = ffmpeg_result.stdout
+
+    # Verify we have valid float32 data
+    audio = np.frombuffer(raw_pcm_data, dtype=np.float32)
+    assert len(audio) > 0
+
+    # Now use our CLI with raw PCM
+    result = run_cli_binary(
+        "match",
+        "--raw-pcm",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=raw_pcm_data,
+    )
+    assert result.returncode == 0
+
+    output = json.loads(result.stdout.decode())
+    assert "rthk_beep" in output
+    # Should find matches
+    assert len(output["rthk_beep"]) > 0
+
+
+def test_raw_pcm_with_sample_rate_resamples():
+    """Test --raw-pcm with --sample-rate resamples audio correctly."""
+    import numpy as np
+
+    # Generate raw float32 PCM at 16kHz using ffmpeg
+    cmd = [
+        "ffmpeg", "-i", "sample_audios/rthk_section_with_beep.wav",
+        "-f", "f32le", "-acodec", "pcm_f32le", "-ac", "1", "-ar", "16000",
+        "-loglevel", "error", "pipe:"
+    ]
+    ffmpeg_result = subprocess.run(cmd, capture_output=True, check=True)
+    raw_pcm_data = ffmpeg_result.stdout
+
+    # Verify we have valid float32 data at 16kHz
+    audio = np.frombuffer(raw_pcm_data, dtype=np.float32)
+    assert len(audio) > 0
+
+    # Use our CLI with raw PCM at 16kHz (will be resampled to 8kHz)
+    result = run_cli_binary(
+        "match",
+        "--raw-pcm",
+        "--sample-rate", "16000",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=raw_pcm_data,
+    )
+    assert result.returncode == 0
+
+    output = json.loads(result.stdout.decode())
+    assert "rthk_beep" in output
+    # Should find matches despite sample rate conversion
+    assert len(output["rthk_beep"]) > 0
+
+
+def test_raw_pcm_conflicts_with_input_format():
+    """Test --raw-pcm and --input-format cannot be used together."""
+    result = run_cli(
+        "match",
+        "--raw-pcm",
+        "--input-format", "wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "cannot be used with" in result.stderr.lower() or "input-format" in result.stderr
+
+
+def test_raw_pcm_with_jsonl():
+    """Test --raw-pcm works with --jsonl for streaming output."""
+    # Generate raw float32 PCM at 8kHz
+    cmd = [
+        "ffmpeg", "-i", "sample_audios/rthk_section_with_beep.wav",
+        "-f", "f32le", "-acodec", "pcm_f32le", "-ac", "1", "-ar", "8000",
+        "-loglevel", "error", "pipe:"
+    ]
+    ffmpeg_result = subprocess.run(cmd, capture_output=True, check=True)
+    raw_pcm_data = ffmpeg_result.stdout
+
+    result = run_cli_binary(
+        "match",
+        "--raw-pcm",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--jsonl",
+        stdin_data=raw_pcm_data,
+    )
+    assert result.returncode == 0
+
+    # Verify JSONL output format
+    lines = result.stdout.decode().strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # First event should be "start" with source "stdin"
+    assert events[0]["type"] == "start"
+    assert events[0]["source"] == "stdin"
+
+    # Last event should be "end"
+    assert events[-1]["type"] == "end"
+
+    # Should have pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0

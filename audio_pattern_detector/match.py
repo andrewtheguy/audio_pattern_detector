@@ -4,11 +4,14 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
+
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from audio_pattern_detector.audio_utils import (
     ffmpeg_get_float32_pcm,
     get_audio_duration,
+    resample_audio,
     seconds_to_time,
     TARGET_SAMPLE_RATE,
 )
@@ -29,6 +32,8 @@ def match_pattern(
     on_pattern_detected=None,
     accumulate_results=True,
     seconds_per_chunk=60,
+    raw_pcm=False,
+    sample_rate=None,
 ):
     """Find pattern matches in audio file, URL, or stdin
 
@@ -43,8 +48,10 @@ def match_pattern(
                              Signature: on_pattern_detected(clip_name: str, timestamp: float)
         accumulate_results: If False, don't accumulate results (saves memory for streaming)
         seconds_per_chunk: Seconds per chunk for sliding window (None for auto-compute)
+        raw_pcm: If True, read raw float32 little-endian PCM from stdin (bypasses ffmpeg)
+        sample_rate: Sample rate of raw PCM input (default: TARGET_SAMPLE_RATE)
     """
-    if not is_url and not from_stdin and not os.path.exists(audio_source):
+    if not is_url and not from_stdin and not raw_pcm and not os.path.exists(audio_source):
         raise ValueError(f"Audio {audio_source} does not exist")
 
     pattern_clips = []
@@ -58,6 +65,21 @@ def match_pattern(
         raise ValueError("No pattern clips passed")
 
     sr = TARGET_SAMPLE_RATE
+
+    if raw_pcm:
+        # Raw PCM mode: read float32 little-endian PCM directly from stdin
+        input_sr = sample_rate if sample_rate is not None else TARGET_SAMPLE_RATE
+        return _match_pattern_raw_pcm(
+            pattern_clips=pattern_clips,
+            debug_mode=debug_mode,
+            on_pattern_detected=on_pattern_detected,
+            accumulate_results=accumulate_results,
+            seconds_per_chunk=seconds_per_chunk,
+            input_sample_rate=input_sr,
+            target_sample_rate=sr,
+        )
+
+    # Standard mode: use ffmpeg
     with ffmpeg_get_float32_pcm(
         audio_source,
         target_sample_rate=sr,
@@ -83,6 +105,91 @@ def match_pattern(
     return peak_times, total_time
 
 
+class _RawPcmStreamWrapper:
+    """Wrapper to make raw PCM stdin work like AudioStream expects.
+
+    Reads raw float32 PCM from stdin, optionally resampling to target rate.
+    """
+
+    def __init__(self, input_sample_rate: int, target_sample_rate: int):
+        self.input_sample_rate = input_sample_rate
+        self.target_sample_rate = target_sample_rate
+        self.needs_resample = input_sample_rate != target_sample_rate
+        # Calculate chunk size for reading (read in chunks that result in target chunk size after resampling)
+        self._bytes_per_sample = 4  # float32
+
+    def read(self, size: int) -> bytes:
+        """Read and optionally resample audio data.
+
+        Args:
+            size: Number of bytes to return (at target sample rate)
+
+        Returns:
+            Raw bytes of float32 PCM at target sample rate
+        """
+        if not self.needs_resample:
+            return sys.stdin.buffer.read(size)
+
+        # Calculate how many input bytes we need to produce the requested output bytes
+        target_samples = size // self._bytes_per_sample
+        input_samples = int(target_samples * self.input_sample_rate / self.target_sample_rate)
+        input_bytes = input_samples * self._bytes_per_sample
+
+        # Read input data
+        data = sys.stdin.buffer.read(input_bytes)
+        if not data:
+            return b""
+
+        # Convert to numpy, resample, and convert back to bytes
+        audio = np.frombuffer(data, dtype=np.float32)
+        resampled = resample_audio(audio, self.input_sample_rate, self.target_sample_rate)
+        return resampled.tobytes()
+
+
+def _match_pattern_raw_pcm(
+    pattern_clips,
+    debug_mode,
+    on_pattern_detected,
+    accumulate_results,
+    seconds_per_chunk,
+    input_sample_rate,
+    target_sample_rate,
+):
+    """Internal function to handle raw PCM mode."""
+    print(f"Reading raw PCM from stdin (sample rate: {input_sample_rate}Hz)...", file=sys.stderr)
+
+    if input_sample_rate != target_sample_rate:
+        print(f"Resampling from {input_sample_rate}Hz to {target_sample_rate}Hz...", file=sys.stderr)
+
+    # Create stream wrapper that handles resampling
+    stream_wrapper = _RawPcmStreamWrapper(input_sample_rate, target_sample_rate)
+
+    audio_name = "stdin"
+    print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
+
+    full_streaming_audio = AudioStream(
+        name=audio_name,
+        audio_stream=stream_wrapper,
+        sample_rate=target_sample_rate,
+    )
+
+    # Find clip occurrences in the full audio
+    peak_times, total_time = (
+        AudioPatternDetector(
+            debug_mode=debug_mode,
+            audio_clips=pattern_clips,
+            seconds_per_chunk=seconds_per_chunk,
+        )
+        .find_clip_in_audio(
+            full_streaming_audio,
+            on_pattern_detected=on_pattern_detected,
+            accumulate_results=accumulate_results,
+        )
+    )
+
+    return peak_times, total_time
+
+
 def _make_jsonl_callback():
     """Create a callback that emits pattern_detected JSONL events."""
     def callback(clip_name: str, timestamp: float):
@@ -97,7 +204,8 @@ def _make_jsonl_callback():
 
 def _run_match_with_output(
     args, pattern_files, audio_source, debug_output_file,
-    is_url=False, from_stdin=False, input_format=None, seconds_per_chunk=60
+    is_url=False, from_stdin=False, input_format=None, seconds_per_chunk=60,
+    raw_pcm=False, sample_rate=None
 ):
     """Run match_pattern and handle output (JSON or JSONL)."""
     jsonl_mode = getattr(args, 'jsonl', False)
@@ -107,7 +215,7 @@ def _run_match_with_output(
 
     # Emit start event for JSONL mode
     if jsonl_mode:
-        _emit_jsonl("start", source="stdin" if from_stdin else (audio_source or "unknown"))
+        _emit_jsonl("start", source="stdin" if (from_stdin or raw_pcm) else (audio_source or "unknown"))
 
     # In JSONL mode, don't accumulate results (saves memory)
     peak_times, total_time = match_pattern(
@@ -120,6 +228,8 @@ def _run_match_with_output(
         on_pattern_detected=callback,
         accumulate_results=not jsonl_mode,
         seconds_per_chunk=seconds_per_chunk,
+        raw_pcm=raw_pcm,
+        sample_rate=sample_rate,
     )
     print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
 
@@ -209,6 +319,21 @@ def cmd_match(args):
             is_url=True,
             seconds_per_chunk=seconds_per_chunk,
         )
+    elif getattr(args, 'raw_pcm', False):
+        # Raw PCM mode - validate options
+        input_format = getattr(args, 'input_format', None)
+        if input_format:
+            print("Error: --input-format cannot be used with --raw-pcm", file=sys.stderr)
+            sys.exit(1)
+
+        sample_rate = getattr(args, 'sample_rate', None)
+        _run_match_with_output(
+            args, pattern_files, None,
+            debug_output_file='./tmp/stdin_raw_pcm.json',
+            raw_pcm=True,
+            sample_rate=sample_rate,
+            seconds_per_chunk=seconds_per_chunk,
+        )
     elif args.stdin:
         input_format = getattr(args, 'input_format', None)
         _run_match_with_output(
@@ -219,7 +344,7 @@ def cmd_match(args):
             seconds_per_chunk=seconds_per_chunk,
         )
     else:
-        print("Please provide --audio-file, --audio-folder, --audio-url, or --stdin", file=sys.stderr)
+        print("Please provide --audio-file, --audio-folder, --audio-url, --stdin, or --raw-pcm", file=sys.stderr)
         sys.exit(1)
 
 

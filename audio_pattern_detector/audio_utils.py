@@ -10,6 +10,93 @@ from numpy._typing import DTypeLike
 # All audio clips and streams must use the same sample rate for matching to work.
 TARGET_SAMPLE_RATE = 8000
 
+# Cache for ffmpeg availability check
+_ffmpeg_available = None
+
+
+def is_ffmpeg_available() -> bool:
+    """Check if ffmpeg is available on the system.
+
+    Returns:
+        bool: True if ffmpeg is available, False otherwise.
+    """
+    global _ffmpeg_available
+    if _ffmpeg_available is not None:
+        return _ffmpeg_available
+
+    try:
+        subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            check=True,
+        )
+        _ffmpeg_available = True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        _ffmpeg_available = False
+
+    return _ffmpeg_available
+
+
+def load_wav_file_scipy(file_path: str) -> tuple[np.ndarray, int]:
+    """Load WAV file without ffmpeg using scipy.io.wavfile.
+
+    Args:
+        file_path: Path to WAV file.
+
+    Returns:
+        tuple: (audio_data as float32 normalized to [-1,1], sample_rate)
+
+    Raises:
+        ValueError: If file is not a valid WAV file or has unsupported format.
+    """
+    from scipy.io import wavfile
+
+    try:
+        sample_rate, data = wavfile.read(file_path)
+    except Exception as e:
+        raise ValueError(f"Failed to read WAV file {file_path}: {e}") from e
+
+    # Convert to float32 normalized to [-1, 1]
+    if data.dtype == np.int16:
+        data = data.astype(np.float32) / 32768.0
+    elif data.dtype == np.int32:
+        data = data.astype(np.float32) / 2147483648.0
+    elif data.dtype == np.float32:
+        pass  # Already float32
+    elif data.dtype == np.float64:
+        data = data.astype(np.float32)
+    elif data.dtype == np.uint8:
+        data = (data.astype(np.float32) - 128.0) / 128.0
+    else:
+        raise ValueError(f"Unsupported WAV dtype: {data.dtype}")
+
+    # Handle stereo -> mono if needed
+    if len(data.shape) > 1:
+        data = data.mean(axis=1).astype(np.float32)
+
+    return data, sample_rate
+
+
+def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    """Resample audio using scipy (no ffmpeg needed).
+
+    Args:
+        audio: Audio data as numpy array.
+        orig_sr: Original sample rate.
+        target_sr: Target sample rate.
+
+    Returns:
+        Resampled audio data.
+    """
+    if orig_sr == target_sr:
+        return audio
+
+    from scipy import signal
+
+    num_samples = int(len(audio) * target_sr / orig_sr)
+    resampled = signal.resample(audio, num_samples)
+    return resampled.astype(np.float32)
+
 
 def slicing_with_zero_padding(array,width,middle_index):
     padding = width/2
@@ -39,6 +126,40 @@ def convert_audio_file(file_path, sr=None):
 
 # load wave file into float32
 def load_wave_file(file_path, expected_sample_rate):
+    """Load wave file into float32 array.
+
+    Uses ffmpeg if available, otherwise falls back to scipy for WAV files.
+    When using scipy, resampling is done if sample rate doesn't match.
+
+    Args:
+        file_path: Path to audio file.
+        expected_sample_rate: Expected sample rate of the output.
+
+    Returns:
+        numpy array of float32 audio samples at expected_sample_rate.
+    """
+    # Try ffmpeg first if available
+    if is_ffmpeg_available():
+        return _load_wave_file_ffmpeg(file_path, expected_sample_rate)
+
+    # Fallback to scipy (WAV files only)
+    if not file_path.lower().endswith('.wav'):
+        raise ValueError(
+            f"ffmpeg not available and file {file_path} is not a WAV file. "
+            "Install ffmpeg or use WAV files for patterns."
+        )
+
+    data, sample_rate = load_wav_file_scipy(file_path)
+
+    # Resample if needed
+    if sample_rate != expected_sample_rate:
+        data = resample_audio(data, sample_rate, expected_sample_rate)
+
+    return data
+
+
+def _load_wave_file_ffmpeg(file_path, expected_sample_rate):
+    """Load wave file using ffmpeg (original implementation)."""
     import json
 
     # Use ffprobe to get audio metadata

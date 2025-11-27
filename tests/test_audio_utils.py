@@ -344,3 +344,146 @@ class TestConvertAudioToClipFormat:
             assert np.min(audio) >= -1.0
         finally:
             os.unlink(output_path)
+
+
+class TestFfmpegFreeUtilities:
+    """Tests for ffmpeg-free utilities (scipy-based WAV loading and resampling)."""
+
+    def test_is_ffmpeg_available_returns_bool(self):
+        """Test that is_ffmpeg_available returns a boolean."""
+        from audio_pattern_detector.audio_utils import is_ffmpeg_available
+        result = is_ffmpeg_available()
+        assert isinstance(result, bool)
+
+    def test_is_ffmpeg_available_cached(self):
+        """Test that is_ffmpeg_available result is cached."""
+        from audio_pattern_detector import audio_utils
+        # Reset cache
+        audio_utils._ffmpeg_available = None
+        first_call = audio_utils.is_ffmpeg_available()
+        second_call = audio_utils.is_ffmpeg_available()
+        assert first_call == second_call
+        # Cache should be set
+        assert audio_utils._ffmpeg_available is not None
+
+    def test_load_wav_file_scipy_basic(self):
+        """Test loading WAV file with scipy."""
+        from audio_pattern_detector.audio_utils import load_wav_file_scipy
+        sample_file = "sample_audios/clips/rthk_beep.wav"
+        if not os.path.exists(sample_file):
+            pytest.skip("Sample file not found")
+
+        audio, sample_rate = load_wav_file_scipy(sample_file)
+        assert isinstance(audio, np.ndarray)
+        assert audio.dtype == np.float32
+        assert sample_rate == 8000
+        assert len(audio) > 0
+        # Check normalized range
+        assert np.max(np.abs(audio)) <= 1.0
+
+    def test_load_wav_file_scipy_int16(self):
+        """Test loading 16-bit WAV file with scipy."""
+        from audio_pattern_detector.audio_utils import load_wav_file_scipy
+        # All our sample files are 16-bit
+        sample_file = "sample_audios/clips/cbs_news.wav"
+        if not os.path.exists(sample_file):
+            pytest.skip("Sample file not found")
+
+        audio, sample_rate = load_wav_file_scipy(sample_file)
+        # Should be normalized float32
+        assert audio.dtype == np.float32
+        assert np.max(np.abs(audio)) <= 1.0
+
+    def test_load_wav_file_scipy_nonexistent(self):
+        """Test that loading nonexistent file raises ValueError."""
+        from audio_pattern_detector.audio_utils import load_wav_file_scipy
+        with pytest.raises(ValueError, match="Failed to read"):
+            load_wav_file_scipy("nonexistent_file.wav")
+
+    def test_resample_audio_same_rate(self):
+        """Test resampling when source and target rates are the same."""
+        from audio_pattern_detector.audio_utils import resample_audio
+        audio = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)
+        result = resample_audio(audio, 8000, 8000)
+        np.testing.assert_array_equal(audio, result)
+
+    def test_resample_audio_downsample(self):
+        """Test downsampling from 16kHz to 8kHz."""
+        from audio_pattern_detector.audio_utils import resample_audio
+        # Create 1 second of audio at 16kHz (16000 samples)
+        audio = np.sin(2 * np.pi * 440 * np.arange(16000) / 16000).astype(np.float32)
+        result = resample_audio(audio, 16000, 8000)
+        # Should have 8000 samples (1 second at 8kHz)
+        assert len(result) == 8000
+        assert result.dtype == np.float32
+
+    def test_resample_audio_upsample(self):
+        """Test upsampling from 8kHz to 16kHz."""
+        from audio_pattern_detector.audio_utils import resample_audio
+        # Create 1 second of audio at 8kHz (8000 samples)
+        audio = np.sin(2 * np.pi * 440 * np.arange(8000) / 8000).astype(np.float32)
+        result = resample_audio(audio, 8000, 16000)
+        # Should have 16000 samples (1 second at 16kHz)
+        assert len(result) == 16000
+        assert result.dtype == np.float32
+
+    def test_resample_audio_preserves_frequency(self):
+        """Test that resampling preserves audio frequency content."""
+        from audio_pattern_detector.audio_utils import resample_audio
+        # Create a 440Hz sine wave at 16kHz
+        freq = 440
+        duration = 0.1  # 100ms
+        orig_sr = 16000
+        target_sr = 8000
+        t = np.arange(int(orig_sr * duration)) / orig_sr
+        audio = np.sin(2 * np.pi * freq * t).astype(np.float32)
+
+        # Resample to 8kHz
+        resampled = resample_audio(audio, orig_sr, target_sr)
+
+        # Create reference at target sample rate
+        t_ref = np.arange(int(target_sr * duration)) / target_sr
+        reference = np.sin(2 * np.pi * freq * t_ref).astype(np.float32)
+
+        # Should be similar (allow some tolerance due to resampling artifacts)
+        assert len(resampled) == len(reference)
+        # Cross-correlation should be high
+        correlation = np.corrcoef(resampled, reference)[0, 1]
+        assert correlation > 0.99, f"Correlation too low: {correlation}"
+
+    def test_load_wave_file_fallback_to_scipy(self):
+        """Test that load_wave_file falls back to scipy when ffmpeg unavailable."""
+        from audio_pattern_detector import audio_utils
+
+        # Save original ffmpeg state and set to unavailable
+        original_state = audio_utils._ffmpeg_available
+        audio_utils._ffmpeg_available = False
+
+        try:
+            sample_file = "sample_audios/clips/rthk_beep.wav"
+            if not os.path.exists(sample_file):
+                pytest.skip("Sample file not found")
+
+            # This should use scipy fallback
+            audio = audio_utils.load_wave_file(sample_file, 8000)
+            assert isinstance(audio, np.ndarray)
+            assert audio.dtype == np.float32
+            assert len(audio) > 0
+        finally:
+            # Restore original state
+            audio_utils._ffmpeg_available = original_state
+
+    def test_load_wave_file_non_wav_without_ffmpeg_raises(self):
+        """Test that non-WAV files without ffmpeg raise ValueError."""
+        from audio_pattern_detector import audio_utils
+
+        # Save original ffmpeg state and set to unavailable
+        original_state = audio_utils._ffmpeg_available
+        audio_utils._ffmpeg_available = False
+
+        try:
+            with pytest.raises(ValueError, match="not a WAV file"):
+                audio_utils.load_wave_file("some_file.mp3", 8000)
+        finally:
+            # Restore original state
+            audio_utils._ffmpeg_available = original_state
