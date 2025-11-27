@@ -69,15 +69,12 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 |--------|-------------|
 | `--audio-file` | Audio file to search for patterns |
 | `--audio-folder` | Folder of audio files to process |
-| `--audio-url` | URL to audio file (must not be a live stream) |
-| `--stdin` | Read audio from stdin pipe |
-| `--input-format` | Input format hint for stdin (e.g., mp3, wav, flac) |
-| `--raw-pcm` | Read raw float32 little-endian PCM from stdin (bypasses ffmpeg) |
-| `--sample-rate` | Sample rate for raw PCM input in Hz (default: 8000) |
+| `--stdin` | Read raw float32 little-endian PCM from stdin (always outputs JSONL) |
+| `--sample-rate` | Sample rate for stdin input in Hz (default: 8000) |
 | `--pattern-file` | Single pattern file to match |
 | `--pattern-folder` | Folder of pattern clips to match |
 | `--chunk-seconds` | Seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length) |
-| `--jsonl` | Output JSONL events as they occur (streaming mode) |
+| `--jsonl` | Output JSONL events as they occur (streaming mode, for file inputs) |
 | `--debug` | Enable debug mode |
 
 #### Sliding Window Configuration
@@ -95,28 +92,25 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --chunk-seconds 10
 ```
 
-#### Raw PCM Input Mode
+#### Stdin Mode (Raw PCM)
 
-Use `--raw-pcm` to read raw float32 little-endian PCM data directly from stdin, bypassing ffmpeg for the audio stream. This is useful for integration with pipelines that already produce float32 PCM data.
+Use `--stdin` to read raw float32 little-endian PCM data from stdin. This mode always outputs JSONL for real-time streaming detection. This is useful for integration with pipelines that produce float32 PCM data.
 
 ```shell
 # Raw PCM at 8kHz (no conversion needed)
 ffmpeg -i input.mp3 -f f32le -ac 1 -ar 8000 pipe: | \
-  audio-pattern-detector match --raw-pcm --pattern-file pattern.wav
+  audio-pattern-detector match --stdin --pattern-file pattern.wav
 
 # Raw PCM at 16kHz (will be resampled to 8kHz internally)
 some-16khz-source | \
-  audio-pattern-detector match --raw-pcm --sample-rate 16000 --pattern-file pattern.wav
-
-# Combined with JSONL output for streaming detection
-ffmpeg -i input.mp3 -f f32le -ac 1 -ar 8000 pipe: | \
-  audio-pattern-detector match --raw-pcm --pattern-file pattern.wav --jsonl
+  audio-pattern-detector match --stdin --sample-rate 16000 --pattern-file pattern.wav
 ```
 
-**Note**: When using `--raw-pcm`:
+**Note**: When using `--stdin`:
+- Input must be raw float32 little-endian PCM (f32le)
+- Output is always JSONL format for real-time streaming
 - ffmpeg is not required for reading the audio stream (but pattern WAV files still require scipy)
 - If `--sample-rate` differs from 8000, audio is resampled using scipy
-- `--input-format` cannot be used with `--raw-pcm`
 
 ### Show-config - Show computed configuration for patterns
 
