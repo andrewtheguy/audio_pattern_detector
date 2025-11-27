@@ -40,6 +40,7 @@ def main():
     match_parser.add_argument('--audio-url', metavar='audio url', type=str, required=False, help='audio URL to find pattern (must not be a live stream)')
     match_parser.add_argument('--stdin', action='store_true', help='read audio from stdin (pipe)')
     match_parser.add_argument('--input-format', metavar='format', type=str, required=False, help='input format for stdin (e.g., mp3, wav, flac)')
+    match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
     match_parser.add_argument('--debug', metavar='debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)
     match_parser.set_defaults(func=_lazy_cmd_match)
 

@@ -13,6 +13,12 @@ from audio_pattern_detector.audio_utils import (
     TARGET_SAMPLE_RATE,
 )
 
+def _emit_jsonl(event_type: str, **kwargs):
+    """Emit a JSONL event to stdout and flush immediately."""
+    event = {"type": event_type, **kwargs}
+    print(json.dumps(event, ensure_ascii=False), flush=True)
+
+
 def match_pattern(
     audio_source,
     pattern_files: list[str],
@@ -20,8 +26,22 @@ def match_pattern(
     is_url=False,
     from_stdin=False,
     input_format=None,
+    on_pattern_detected=None,
+    accumulate_results=True,
 ):
-    """Find pattern matches in audio file, URL, or stdin"""
+    """Find pattern matches in audio file, URL, or stdin
+
+    Args:
+        audio_source: Path to audio file, URL, or None if from_stdin=True
+        pattern_files: List of pattern file paths
+        debug_mode: Enable debug mode
+        is_url: Whether audio_source is a URL
+        from_stdin: Whether to read audio from stdin
+        input_format: Input format hint for ffmpeg when reading from stdin
+        on_pattern_detected: Optional callback for streaming output.
+                             Signature: on_pattern_detected(clip_name: str, timestamp: float)
+        accumulate_results: If False, don't accumulate results (saves memory for streaming)
+    """
     if not is_url and not from_stdin and not os.path.exists(audio_source):
         raise ValueError(f"Audio {audio_source} does not exist")
 
@@ -53,7 +73,66 @@ def match_pattern(
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
         peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode, audio_clips=pattern_clips)
-                      .find_clip_in_audio(full_streaming_audio))
+                      .find_clip_in_audio(
+                          full_streaming_audio,
+                          on_pattern_detected=on_pattern_detected,
+                          accumulate_results=accumulate_results,
+                      ))
+    return peak_times, total_time
+
+
+def _make_jsonl_callback():
+    """Create a callback that emits pattern_detected JSONL events."""
+    def callback(clip_name: str, timestamp: float):
+        _emit_jsonl(
+            "pattern_detected",
+            clip_name=clip_name,
+            timestamp=timestamp,
+            timestamp_formatted=seconds_to_time(timestamp),
+        )
+    return callback
+
+
+def _run_match_with_output(
+    args, pattern_files, audio_source, debug_output_file,
+    is_url=False, from_stdin=False, input_format=None
+):
+    """Run match_pattern and handle output (JSON or JSONL)."""
+    jsonl_mode = getattr(args, 'jsonl', False)
+
+    # Create callback for JSONL mode
+    callback = _make_jsonl_callback() if jsonl_mode else None
+
+    # Emit start event for JSONL mode
+    if jsonl_mode:
+        _emit_jsonl("start", source="stdin" if from_stdin else (audio_source or "unknown"))
+
+    # In JSONL mode, don't accumulate results (saves memory)
+    peak_times, total_time = match_pattern(
+        audio_source,
+        pattern_files,
+        debug_mode=args.debug,
+        is_url=is_url,
+        from_stdin=from_stdin,
+        input_format=input_format,
+        on_pattern_detected=callback,
+        accumulate_results=not jsonl_mode,
+    )
+    print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
+
+    # In debug mode, also write to file (only if we accumulated results)
+    if args.debug and peak_times is not None:
+        os.makedirs('./tmp', exist_ok=True)
+        with open(debug_output_file, 'w') as f:
+            print(json.dumps(peak_times, ensure_ascii=False), file=f)
+        print(f"Debug output written to {debug_output_file}", file=sys.stderr)
+
+    # Output
+    if jsonl_mode:
+        _emit_jsonl("end", total_time=total_time, total_time_formatted=seconds_to_time(total_time))
+    else:
+        print(json.dumps(peak_times, ensure_ascii=False))
+
     return peak_times, total_time
 
 
@@ -70,7 +149,13 @@ def cmd_match(args):
         print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
         sys.exit(1)
 
+    jsonl_mode = getattr(args, 'jsonl', False)
+
     if args.audio_folder:
+        if jsonl_mode:
+            print("Error: --jsonl is not supported with --audio-folder", file=sys.stderr)
+            sys.exit(1)
+
         print(f"Finding pattern in audio files in folder {args.audio_folder}...", file=sys.stderr)
         all_results = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
@@ -90,19 +175,10 @@ def cmd_match(args):
         # Output final JSON to stdout for piping
         print(json.dumps(all_results, ensure_ascii=False))
     elif args.audio_file:
-        peak_times, total_time = match_pattern(args.audio_file, pattern_files, debug_mode=args.debug)
-        print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
-
-        # In debug mode, also write to file
-        if args.debug:
-            output_file = f'./tmp/{Path(args.audio_file).stem}.json'
-            os.makedirs('./tmp', exist_ok=True)
-            with open(output_file, 'w') as f:
-                print(json.dumps(peak_times, ensure_ascii=False), file=f)
-            print(f"Debug output written to {output_file}", file=sys.stderr)
-
-        # Output final JSON to stdout for piping
-        print(json.dumps(peak_times, ensure_ascii=False))
+        _run_match_with_output(
+            args, pattern_files, args.audio_file,
+            debug_output_file=f'./tmp/{Path(args.audio_file).stem}.json',
+        )
     elif args.audio_url:
         # Validate URL has a duration (not a live stream)
         print(f"Checking URL duration: {args.audio_url}...", file=sys.stderr)
@@ -112,36 +188,19 @@ def cmd_match(args):
             sys.exit(1)
         print(f"URL duration: {seconds_to_time(seconds=duration)}", file=sys.stderr)
 
-        peak_times, total_time = match_pattern(args.audio_url, pattern_files, debug_mode=args.debug, is_url=True)
-        print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
-
-        # In debug mode, also write to file
-        if args.debug:
-            output_file = './tmp/url_stream.json'
-            os.makedirs('./tmp', exist_ok=True)
-            with open(output_file, 'w') as f:
-                print(json.dumps(peak_times, ensure_ascii=False), file=f)
-            print(f"Debug output written to {output_file}", file=sys.stderr)
-
-        # Output final JSON to stdout for piping
-        print(json.dumps(peak_times, ensure_ascii=False))
+        _run_match_with_output(
+            args, pattern_files, args.audio_url,
+            debug_output_file='./tmp/url_stream.json',
+            is_url=True,
+        )
     elif args.stdin:
         input_format = getattr(args, 'input_format', None)
-        peak_times, total_time = match_pattern(
-            None, pattern_files, debug_mode=args.debug, from_stdin=True, input_format=input_format
+        _run_match_with_output(
+            args, pattern_files, None,
+            debug_output_file='./tmp/stdin_stream.json',
+            from_stdin=True,
+            input_format=input_format,
         )
-        print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
-
-        # In debug mode, also write to file
-        if args.debug:
-            output_file = './tmp/stdin_stream.json'
-            os.makedirs('./tmp', exist_ok=True)
-            with open(output_file, 'w') as f:
-                print(json.dumps(peak_times, ensure_ascii=False), file=f)
-            print(f"Debug output written to {output_file}", file=sys.stderr)
-
-        # Output final JSON to stdout for piping
-        print(json.dumps(peak_times, ensure_ascii=False))
     else:
         print("Please provide --audio-file, --audio-folder, --audio-url, or --stdin", file=sys.stderr)
         sys.exit(1)

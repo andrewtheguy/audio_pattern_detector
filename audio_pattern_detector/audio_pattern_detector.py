@@ -73,7 +73,16 @@ class AudioPatternDetector:
         #         raise ValueError(f"Clip {clip_path} does not exist")
 
     # could cause issues with small overlap when intro is followed right by news report
-    def find_clip_in_audio(self, audio_stream: AudioStream):
+    def find_clip_in_audio(self, audio_stream: AudioStream, on_pattern_detected=None, accumulate_results=True):
+        """Find clip occurrences in audio stream.
+
+        Args:
+            audio_stream: The audio stream to search in
+            on_pattern_detected: Optional callback function called when a pattern is detected.
+                                 Signature: on_pattern_detected(clip_name: str, timestamp: float)
+            accumulate_results: If False, don't accumulate peak_times (saves memory for streaming).
+                               When False, returns empty dict for peak_times.
+        """
         # clip_paths = self.clip_paths
         #
         # if not os.path.exists(full_audio_path):
@@ -91,10 +100,11 @@ class AudioPatternDetector:
 
         previous_chunk = None  # Buffer to maintain continuity between chunks
 
-        all_peak_times = {audio_clip.name: [] for audio_clip in self.audio_clips}
-
-        #print("all_peak_times",all_peak_times,file=sys.stderr)
-        #exit(1)
+        # Only allocate if we need to accumulate results
+        if accumulate_results:
+            all_peak_times = {audio_clip.name: [] for audio_clip in self.audio_clips}
+        else:
+            all_peak_times = None
 
 
         full_audio_name = audio_stream.name
@@ -200,7 +210,13 @@ class AudioPatternDetector:
                                                  clip_cache=clip_cache,
                                                  )
 
-                all_peak_times[audio_clip.name].extend(peak_times)
+                # Call callback for each detected pattern immediately
+                if on_pattern_detected and peak_times:
+                    for timestamp in peak_times:
+                        on_pattern_detected(audio_clip.name, timestamp)
+
+                if all_peak_times is not None:
+                    all_peak_times[audio_clip.name].extend(peak_times)
 
             # Update previous_chunk to current chunk
             previous_chunk = chunk
