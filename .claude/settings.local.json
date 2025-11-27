@@ -22,7 +22,8 @@
       "Bash(uv run ruff:*)",
       "Bash(time python:*)",
       "Bash(time:*)",
-      "Bash(uv sync:*)"
+      "Bash(uv sync:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
