@@ -227,6 +227,37 @@ def write_wav_file(filepath, audio_data, sample_rate):
     if process.returncode != 0:
         raise ValueError(f"ffmpeg write failed: {stderr.decode()}")
 
+def get_audio_duration(audio_path: str) -> float | None:
+    """Get the duration of an audio file/URL using ffprobe.
+
+    Args:
+        audio_path: Path to audio file or URL
+
+    Returns:
+        Duration in seconds, or None if duration cannot be determined (e.g., live stream)
+    """
+    import json
+
+    probe_cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "json",
+        audio_path
+    ]
+    result = subprocess.run(probe_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ValueError(f"ffprobe failed: {result.stderr}")
+
+    probe_data = json.loads(result.stdout)
+    duration_str = probe_data.get("format", {}).get("duration")
+
+    if duration_str is None:
+        return None
+
+    return float(duration_str)
+
+
 def seconds_to_time(seconds, include_decimals=True):
     if include_decimals:
         milliseconds = round(seconds * 1000)

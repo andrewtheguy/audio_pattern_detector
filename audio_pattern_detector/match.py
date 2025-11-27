@@ -8,14 +8,15 @@ from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from audio_pattern_detector.audio_utils import (
     ffmpeg_get_16bit_pcm,
-    TARGET_SAMPLE_RATE
+    get_audio_duration,
+    seconds_to_time,
+    TARGET_SAMPLE_RATE,
 )
-from audio_pattern_detector.audio_utils import seconds_to_time
 
-def match_pattern(audio_file, pattern_files: list[str], debug_mode=False):
-    """Find pattern matches in audio file"""
-    if not os.path.exists(audio_file):
-        raise ValueError(f"Audio {audio_file} does not exist")
+def match_pattern(audio_source, pattern_files: list[str], debug_mode=False, is_url=False):
+    """Find pattern matches in audio file or URL"""
+    if not is_url and not os.path.exists(audio_source):
+        raise ValueError(f"Audio {audio_source} does not exist")
 
     pattern_clips = []
     for pattern_file in pattern_files:
@@ -28,8 +29,8 @@ def match_pattern(audio_file, pattern_files: list[str], debug_mode=False):
         raise ValueError("No pattern clips passed")
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_16bit_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_16bit_pcm(audio_source, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(audio_source).stem if not is_url else "stream"
         print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
@@ -84,6 +85,28 @@ def cmd_match(args):
 
         # Output final JSON to stdout for piping
         print(json.dumps(peak_times, ensure_ascii=False))
+    elif args.audio_url:
+        # Validate URL has a duration (not a live stream)
+        print(f"Checking URL duration: {args.audio_url}...", file=sys.stderr)
+        duration = get_audio_duration(args.audio_url)
+        if duration is None:
+            print("Error: URL appears to be a live stream (no duration). Only non-live audio is supported.", file=sys.stderr)
+            sys.exit(1)
+        print(f"URL duration: {seconds_to_time(seconds=duration)}", file=sys.stderr)
+
+        peak_times, total_time = match_pattern(args.audio_url, pattern_files, debug_mode=args.debug, is_url=True)
+        print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
+
+        # In debug mode, also write to file
+        if args.debug:
+            output_file = './tmp/url_stream.json'
+            os.makedirs('./tmp', exist_ok=True)
+            with open(output_file, 'w') as f:
+                print(json.dumps(peak_times, ensure_ascii=False), file=f)
+            print(f"Debug output written to {output_file}", file=sys.stderr)
+
+        # Output final JSON to stdout for piping
+        print(json.dumps(peak_times, ensure_ascii=False))
     else:
-        print("Please provide either --audio-file or --audio-folder", file=sys.stderr)
+        print("Please provide --audio-file, --audio-folder, or --audio-url", file=sys.stderr)
         sys.exit(1)

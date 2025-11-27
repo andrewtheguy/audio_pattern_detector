@@ -26,6 +26,7 @@ def main():
     match_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
     match_parser.add_argument('--audio-file', metavar='audio file', type=str, required=False, help='audio file to find pattern')
     match_parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
+    match_parser.add_argument('--audio-url', metavar='audio url', type=str, required=False, help='audio URL to find pattern (must not be a live stream)')
     match_parser.add_argument('--debug', metavar='debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)
     match_parser.set_defaults(func=cmd_match)
 
