@@ -89,7 +89,7 @@ The `--target-sample-rate` option allows using a different sample rate for proce
 # Use default 8kHz sample rate (faster, lower memory)
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav
 
-# Use 16kHz for AI workflows (e.g., Whisper preprocessing)
+# Use 16kHz for AI workflows (helpful if pattern.wav is already at 16kHz)
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --target-sample-rate 16000
 ```
 
