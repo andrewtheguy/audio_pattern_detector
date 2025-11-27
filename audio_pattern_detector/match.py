@@ -158,7 +158,13 @@ def cmd_match(args):
 
         print(f"Finding pattern in audio files in folder {args.audio_folder}...", file=sys.stderr)
         all_results = {}
-        for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
+        # Support multiple audio formats
+        audio_files = []
+        for ext in ['*.m4a', '*.wav', '*.mp3', '*.flac', '*.ogg']:
+            audio_files.extend(glob.glob(f'{args.audio_folder}/{ext}'))
+        # Sort for consistent ordering
+        audio_files.sort()
+        for audio_file in audio_files:
             print(f"Processing {audio_file}...", file=sys.stderr)
             peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
