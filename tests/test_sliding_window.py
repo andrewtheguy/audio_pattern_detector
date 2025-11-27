@@ -3,6 +3,8 @@
 These tests verify:
 1. Detections after the first window have correct timestamps
 2. Detections work properly when patterns are at window boundaries
+3. Minimum validation for seconds_per_chunk parameter
+4. Auto-computation of seconds_per_chunk when None or < 1
 """
 import io
 import numpy as np
@@ -1181,3 +1183,269 @@ class TestSlidingWindowOverlapDeduplication:
                         diff = abs(t1 - t2)
                         assert diff < 0.1, \
                             f"Duplicate timestamps differ: {t1}s vs {t2}s (diff={diff:.4f}s)"
+
+
+class TestSecondsPerChunkValidation:
+    """Tests for seconds_per_chunk parameter validation.
+
+    The AudioPatternDetector has the following validation rules:
+    1. seconds_per_chunk must be >= 2 * sliding_window (raises ValueError in __init__)
+    2. If seconds_per_chunk is None or < 1, it's auto-computed as longest_clip * 2
+    """
+
+    def test_seconds_per_chunk_too_small_raises_error(self):
+        """Test that seconds_per_chunk < 2 * sliding_window raises ValueError.
+
+        A 2.5s pattern has sliding_window = ceil(2.5) = 3s
+        So seconds_per_chunk must be >= 6s
+        Setting it to 5s should raise ValueError during initialization.
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 2.5  # sliding_window = ceil(2.5) = 3s
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
+
+        # 5 < 2 * 3 = 6, so this should fail during __init__
+        with pytest.raises(ValueError, match="too small"):
+            AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[pattern],
+                seconds_per_chunk=5
+            )
+
+    def test_seconds_per_chunk_exactly_minimum_works(self):
+        """Test that seconds_per_chunk = 2 * sliding_window works.
+
+        A 2.5s pattern has sliding_window = ceil(2.5) = 3s
+        So seconds_per_chunk = 6s should work (exactly 2x).
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 2.5  # sliding_window = 3s
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
+
+        # 6 = 2 * 3, exactly at minimum - should work
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=6
+        )
+        assert detector.seconds_per_chunk == 6
+
+    def test_seconds_per_chunk_above_minimum_works(self):
+        """Test that seconds_per_chunk > 2 * sliding_window works."""
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 2.5  # sliding_window = 3s
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
+
+        # 10 > 6 (2 * 3), should work fine
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=10
+        )
+        assert detector.seconds_per_chunk == 10
+
+    def test_seconds_per_chunk_none_auto_computes(self):
+        """Test that seconds_per_chunk=None auto-computes to longest_clip * 2.
+
+        A 2.5s pattern should result in seconds_per_chunk = ceil(2.5) * 2 = 6s
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 2.5
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=None
+        )
+        # Auto-computed: ceil(clip_length_samples / sr) * 2 = ceil(2.5) * 2 = 6
+        expected = 6  # ceil(2.5) * 2
+        assert detector.seconds_per_chunk == expected
+
+    def test_seconds_per_chunk_zero_auto_computes(self):
+        """Test that seconds_per_chunk=0 auto-computes to longest_clip * 2."""
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 2.5
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=0
+        )
+        expected = 6  # ceil(2.5) * 2
+        assert detector.seconds_per_chunk == expected
+
+    def test_seconds_per_chunk_negative_auto_computes(self):
+        """Test that seconds_per_chunk < 0 auto-computes to longest_clip * 2."""
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 2.5
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="test_pattern", audio=audio, sample_rate=sr)
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=-5
+        )
+        expected = 6  # ceil(2.5) * 2
+        assert detector.seconds_per_chunk == expected
+
+    def test_multiple_patterns_uses_longest_for_validation(self):
+        """Test that with multiple patterns, the longest is used for validation.
+
+        Pattern 1: 0.5s -> sliding_window = 1s -> min chunk = 2s
+        Pattern 2: 3.0s -> sliding_window = 3s -> min chunk = 6s
+
+        seconds_per_chunk=4 should fail because 4 < 6 (for longest pattern).
+        """
+        sr = TARGET_SAMPLE_RATE
+
+        # Short pattern
+        short_audio = create_sine_tone(1000.0, 0.5, sr)
+        short_pattern = AudioClip(name="short", audio=short_audio, sample_rate=sr)
+
+        # Long pattern
+        long_audio = create_sine_tone(500.0, 3.0, sr)
+        long_pattern = AudioClip(name="long", audio=long_audio, sample_rate=sr)
+
+        # 4 < 2 * 3 = 6, should fail due to long pattern
+        with pytest.raises(ValueError, match="too small"):
+            AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[short_pattern, long_pattern],
+                seconds_per_chunk=4
+            )
+
+    def test_multiple_patterns_valid_chunk_size(self):
+        """Test that seconds_per_chunk works when valid for all patterns."""
+        sr = TARGET_SAMPLE_RATE
+
+        # Short pattern (sliding_window = 1s)
+        short_audio = create_sine_tone(1000.0, 0.5, sr)
+        short_pattern = AudioClip(name="short", audio=short_audio, sample_rate=sr)
+
+        # Long pattern (sliding_window = 3s)
+        long_audio = create_sine_tone(500.0, 3.0, sr)
+        long_pattern = AudioClip(name="long", audio=long_audio, sample_rate=sr)
+
+        # 8 > 6 (2 * 3), should work
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[short_pattern, long_pattern],
+            seconds_per_chunk=8
+        )
+        assert detector.seconds_per_chunk == 8
+
+    def test_short_pattern_small_chunk_works(self):
+        """Test that short patterns allow small chunk sizes.
+
+        A 0.23s pattern has sliding_window = ceil(0.23) = 1s
+        So seconds_per_chunk = 2s should work (exactly 2x).
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 0.23  # sliding_window = 1s
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="beep", audio=audio, sample_rate=sr)
+
+        # 2 = 2 * 1, exactly at minimum
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=2
+        )
+        assert detector.seconds_per_chunk == 2
+
+    def test_short_pattern_chunk_just_below_minimum_fails(self):
+        """Test that even 1 second below minimum fails.
+
+        A 0.5s pattern has sliding_window = ceil(0.5) = 1s
+        So seconds_per_chunk must be >= 2s. 1s should fail.
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 0.5  # sliding_window = 1s
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="short_beep", audio=audio, sample_rate=sr)
+
+        # 1 < 2 * 1 = 2, should fail
+        with pytest.raises(ValueError, match="too small"):
+            AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[pattern],
+                seconds_per_chunk=1
+            )
+
+
+class TestSlidingWindowComputation:
+    """Tests for sliding_window computation from pattern duration."""
+
+    def test_sliding_window_is_ceiling_of_pattern_duration(self):
+        """Verify sliding_window = ceil(pattern_duration).
+
+        This is tested indirectly by checking which chunk sizes work/fail.
+        """
+        sr = TARGET_SAMPLE_RATE
+
+        # Test cases: (pattern_duration, expected_sliding_window)
+        test_cases = [
+            (0.1, 1),   # ceil(0.1) = 1
+            (0.5, 1),   # ceil(0.5) = 1
+            (1.0, 1),   # ceil(1.0) = 1
+            (1.1, 2),   # ceil(1.1) = 2
+            (2.0, 2),   # ceil(2.0) = 2
+            (2.5, 3),   # ceil(2.5) = 3
+            (4.9, 5),   # ceil(4.9) = 5
+        ]
+
+        for pattern_duration, expected_sliding_window in test_cases:
+            audio = create_sine_tone(1000.0, pattern_duration, sr)
+            pattern = AudioClip(name="test", audio=audio, sample_rate=sr)
+
+            # Minimum valid chunk size is 2 * expected_sliding_window
+            min_valid_chunk = 2 * expected_sliding_window
+
+            # Should work with exactly minimum
+            detector = AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[pattern],
+                seconds_per_chunk=min_valid_chunk
+            )
+            assert detector.seconds_per_chunk == min_valid_chunk, \
+                f"Pattern {pattern_duration}s: expected chunk {min_valid_chunk}s to work"
+
+            # Should fail with one less (unless it would be < 1, which auto-computes)
+            if min_valid_chunk > 1:
+                with pytest.raises(ValueError, match="too small"):
+                    AudioPatternDetector(
+                        debug_mode=False,
+                        audio_clips=[pattern],
+                        seconds_per_chunk=min_valid_chunk - 1
+                    )
+
+    def test_auto_compute_uses_longest_pattern(self):
+        """Test that auto-compute considers the longest pattern."""
+        sr = TARGET_SAMPLE_RATE
+
+        # Multiple patterns with different lengths
+        patterns = [
+            AudioClip(name="p1", audio=create_sine_tone(1000.0, 1.0, sr), sample_rate=sr),  # 1s
+            AudioClip(name="p2", audio=create_sine_tone(800.0, 2.5, sr), sample_rate=sr),   # 2.5s
+            AudioClip(name="p3", audio=create_sine_tone(600.0, 0.3, sr), sample_rate=sr),   # 0.3s
+        ]
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=patterns,
+            seconds_per_chunk=None  # Auto-compute
+        )
+
+        # Longest is 2.5s -> ceil(2.5) = 3 -> auto = 3 * 2 = 6
+        # But the code uses: math.ceil(max_clip_length / target_sample_rate) * 2
+        # max_clip_length is in samples: 2.5 * 8000 = 20000 samples
+        # seconds = 20000 / 8000 = 2.5 -> ceil = 3 -> * 2 = 6
+        assert detector.seconds_per_chunk == 6

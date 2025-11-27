@@ -62,15 +62,84 @@ class AudioPatternDetector:
             seconds_per_chunk = math.ceil(max_clip_length / self.target_sample_rate) * 2
             logger.warning(f"seconds_per_chunk is not set or less than 1, setting it to longest clip * 2 seconds, which is {seconds_per_chunk} seconds")
 
+        # Validate seconds_per_chunk against all clips' sliding windows
+        for audio_clip in self.audio_clips:
+            clip_seconds = len(audio_clip.audio) / self.target_sample_rate
+            sliding_window = math.ceil(clip_seconds)
+            min_chunk_size = sliding_window * 2
+            if seconds_per_chunk < min_chunk_size:
+                raise ValueError(
+                    f"seconds_per_chunk {seconds_per_chunk} is too small for clip '{audio_clip.name}' "
+                    f"(duration: {clip_seconds:.2f}s, sliding_window: {sliding_window}s, "
+                    f"minimum chunk size: {min_chunk_size}s)"
+                )
+
         self.seconds_per_chunk = seconds_per_chunk
 
         if seconds_per_chunk != 60:
             logger.warning(f"seconds_per_chunk {seconds_per_chunk} is not 60 seconds, turning off debug mode because it was made for 60 seconds only")
             self.debug_mode = False
 
-        # for clip_path in clip_paths:
-        #     if not os.path.exists(clip_path):
-        #         raise ValueError(f"Clip {clip_path} does not exist")
+        # Pre-compute clip data that doesn't depend on audio_stream
+        self._clip_datas = {}
+        self._clip_cache = {
+            "downsampled_correlation_clips": {},
+            "is_pure_tone_pattern": {},
+        }
+
+        for audio_clip in self.audio_clips:
+            clip = audio_clip.audio
+            clip_name = audio_clip.name
+            clip_seconds = len(clip) / self.target_sample_rate
+
+            # Compute sliding window
+            sliding_window = math.ceil(clip_seconds)
+            if sliding_window != clip_seconds:
+                print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}", file=sys.stderr)
+
+            # Normalize clip if enabled
+            if self.normalize:
+                sr = self.target_sample_rate
+                if clip_seconds < 0.5:
+                    meter = pyln.Meter(sr, block_size=clip_seconds)
+                else:
+                    meter = pyln.Meter(sr)
+                loudness = meter.integrated_loudness(clip)
+                clip = pyln.normalize.loudness(clip, loudness, -16.0)
+
+            # Compute correlation
+            correlation_clip, absolute_max = self._get_clip_correlation(clip)
+
+            # Pre-compute is_pure_tone
+            self._clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, self.target_sample_rate)
+
+            # Debug output for correlation
+            if self.debug_mode:
+                import matplotlib.pyplot as plt
+                print(f"clip_length {clip_name}", len(clip), file=sys.stderr)
+                print(f"clip_length {clip_name} seconds", len(clip) / self.target_sample_rate, file=sys.stderr)
+                print("correlation_clip_length", len(correlation_clip), file=sys.stderr)
+                graph_dir = "../tmp/graph/clip_correlation"
+                os.makedirs(graph_dir, exist_ok=True)
+
+                plt.figure(figsize=(10, 4))
+                plt.plot(correlation_clip)
+                plt.title('Cross-correlation of the audio clip itself')
+                plt.xlabel('Lag')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(f'{graph_dir}/{clip_name}.png')
+                plt.close()
+
+            self._clip_datas[clip_name] = {
+                "clip": clip,
+                "clip_name": clip_name,
+                "sliding_window": sliding_window,
+                "correlation_clip": correlation_clip,
+                "correlation_clip_absolute_max": absolute_max,
+            }
+
+        # Pre-compute chunk_size (4 bytes per sample for float32, mono)
+        self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
 
     def find_clip_in_audio(self, audio_stream: AudioStream, on_pattern_detected=None, accumulate_results=True):
         """Find clip occurrences in audio stream.
@@ -90,13 +159,7 @@ class AudioPatternDetector:
         if audio_stream.sample_rate != self.target_sample_rate:
             raise ValueError(f"full_streaming_audio_clip {audio_stream.name} needs to be {self.target_sample_rate} sample rate")
 
-        seconds_per_chunk = self.seconds_per_chunk
-
-        # 4 bytes per sample for float32, mono
-        chunk_size = int(seconds_per_chunk * self.target_sample_rate) * 4
-
         # Initialize parameters
-
         previous_chunk = None  # Buffer to maintain continuity between chunks
 
         # Only allocate if we need to accumulate results
@@ -111,85 +174,14 @@ class AudioPatternDetector:
 
         i = 0
 
-        clip_datas={}
-        clip_cache={
-            "downsampled_correlation_clips":{},
-            "is_pure_tone_pattern":{},
-            "similarity_debug":defaultdict(list),
-        }
-
-        #clips_already = set()
-
-        for audio_clip in self.audio_clips:
-            # # Load the audio clip
-            # clip = load_audio_file(clip_path, sr=self.target_sample_rate)
-            # # convert to float
-            # clip = convert_audio_arr_to_float(clip)
-
-            clip = audio_clip.audio
-
-            #clip_name, _ = os.path.splitext(os.path.basename(clip_path))
-
-            # if clip_name in clips_already:
-            #     raise ValueError(f"clip {clip_name} needs to be unique")
-            #
-            # clips_already.add(clip_name)
-
-            clip_name = audio_clip.name
-
-            clip_seconds = len(clip) / self.target_sample_rate
-
-            sliding_window = self._get_chunking_timing_info(clip_name,clip_seconds)
-
-            if self.normalize:
-                # max_loudness = np.max(np.abs(clip))
-                # clip = clip / max_loudness
-                sr = self.target_sample_rate
-                #clip_second = clip_length / sr
-
-                # normalize loudness
-                if clip_seconds < 0.5:
-                    meter = pyln.Meter(sr, block_size=clip_seconds)
-                else:
-                    meter = pyln.Meter(sr)  # create BS.1770 meter
-                loudness = meter.integrated_loudness(clip)
-
-                # loudness normalize audio to -16 dB LUFS
-                clip = pyln.normalize.loudness(clip, loudness, -16.0)
-
-            correlation_clip,absolute_max = self._get_clip_correlation(clip)
-
-            if self.debug_mode:
-                import matplotlib.pyplot as plt
-                print(f"clip_length {clip_name}", len(clip),file=sys.stderr)
-                print(f"clip_length {clip_name} seconds", len(clip)/self.target_sample_rate,file=sys.stderr)
-                print("correlation_clip_length", len(correlation_clip),file=sys.stderr)
-                graph_dir = "../tmp/graph/clip_correlation"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                plt.figure(figsize=(10, 4))
-
-                plt.plot(correlation_clip)
-                plt.title('Cross-correlation of the audio clip itself')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}.png')
-                plt.close()
-
-            clip_datas[clip_name] = {"clip":clip,
-                                     "clip_name":clip_name,
-                                     "sliding_window":sliding_window,
-                                     "correlation_clip":correlation_clip,
-                                     "correlation_clip_absolute_max":absolute_max,
-                                     #"downsampled_correlation_clip":downsampled_correlation_clip,
-                                     }
+        # similarity_debug is per-run (for debug output), not pre-computed
+        similarity_debug = defaultdict(list)
 
         total_time = 0.0
 
         # Process audio in chunks
         while True:
-            in_bytes = stdout.read(chunk_size)
+            in_bytes = stdout.read(self._chunk_size)
             if not in_bytes:
                 break
             # Convert bytes to numpy array (float32 directly from ffmpeg)
@@ -201,14 +193,15 @@ class AudioPatternDetector:
             chunk_matches = []  # List of (timestamp, clip_name) tuples
 
             for audio_clip in self.audio_clips:
-                clip_data = clip_datas[audio_clip.name]
+                clip_data = self._clip_datas[audio_clip.name]
 
                 peak_times = self._process_chunk(chunk=chunk,
                                                  sr=self.target_sample_rate,
                                                  previous_chunk=previous_chunk,
                                                  index=i,
                                                  clip_data=clip_data,
-                                                 clip_cache=clip_cache,
+                                                 clip_cache=self._clip_cache,
+                                                 similarity_debug=similarity_debug,
                                                  )
 
                 # Collect matches for sorting
@@ -245,7 +238,7 @@ class AudioPatternDetector:
                 x_coords = []
                 y_coords = []
 
-                for index,similarity in clip_cache['similarity_debug'][clip_name]:
+                for index,similarity in similarity_debug[clip_name]:
                     x_coords.append(index)
                     y_coords.append(similarity)
 
@@ -269,27 +262,6 @@ class AudioPatternDetector:
 
         return all_peak_times, total_time
 
-    def _get_chunking_timing_info(self, clip_name, clip_seconds):
-        seconds_per_chunk = self.seconds_per_chunk
-
-        sliding_window = math.ceil(clip_seconds)
-
-        if (sliding_window != clip_seconds):
-            print(f"adjusted sliding_window from {clip_seconds} to {sliding_window} for {clip_name}",file=sys.stderr)
-        # sliding_window = 5
-        #
-        # if (sliding_window < clip_seconds + 5):
-        #     # need to extend the sliding window to overlap the clip
-        #     sliding_window = clip_seconds + 5
-        #     print(f"adjusted sliding_window to {sliding_window} for {clip_name}")
-
-        # this should not happen anyways because the seconds per chunk is too small
-        if (seconds_per_chunk < sliding_window * 2):
-            #seconds_per_chunk = sliding_window * 10
-            raise ValueError(f"seconds_per_chunk {seconds_per_chunk} is too small")
-
-        return sliding_window
-
     def _get_clip_correlation(self, clip):
         # Cross-correlate and normalize correlation
         from scipy.signal import correlate
@@ -306,7 +278,7 @@ class AudioPatternDetector:
     # sliding_window: for previous_chunk in seconds from end
     # index: for debugging by saving a file for audio_section
     # seconds_per_chunk: default seconds_per_chunk
-    def _process_chunk(self, chunk, clip_data, clip_cache, sr, previous_chunk, index):
+    def _process_chunk(self, chunk, clip_data, clip_cache, sr, previous_chunk, index, similarity_debug):
         clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
@@ -359,6 +331,7 @@ class AudioPatternDetector:
         # samples_skip_end does not skip results from being included yet
         peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
                                               clip_cache=clip_cache,
+                                              similarity_debug=similarity_debug,
                                               )
 
         # subtract sliding window seconds from peak times
@@ -390,7 +363,7 @@ class AudioPatternDetector:
 
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
-    def _correlation_method(self, clip_data, clip_cache, audio_section, sr, index):
+    def _correlation_method(self, clip_data, clip_cache, audio_section, sr, index, similarity_debug):
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
@@ -497,7 +470,8 @@ class AudioPatternDetector:
                                           similarities=similarities,
                                           peaks_final=peaks_final,
                                           clip_cache=clip_cache,
-                                          area_props=area_props)
+                                          area_props=area_props,
+                                          similarity_debug=similarity_debug)
                 # self._get_peak_times_beep_v2(
                 #                                  audio=audio[peak - len(clip):peak + len(clip)],
                 #                                  peak=peak,
@@ -518,7 +492,8 @@ class AudioPatternDetector:
                                                 similarities=similarities,
                                                 peaks_final=peaks_final,
                                                 area_props=area_props,
-                                                clip_cache=clip_cache)
+                                                clip_cache=clip_cache,
+                                                similarity_debug=similarity_debug)
 
             if debug_mode:
                 audio_test_dir = f"./tmp/audio_section/{clip_name}"
@@ -547,7 +522,7 @@ class AudioPatternDetector:
         return peak_times
 
     def _get_peak_times_normal(self, correlation_clip, correlation_slice, seconds, peak, clip_name, index,
-                             section_ts, similarities, peaks_final, clip_cache, area_props):
+                             section_ts, similarities, peaks_final, clip_cache, area_props, similarity_debug):
 
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
@@ -592,7 +567,6 @@ class AudioPatternDetector:
 
         if debug_mode:
             import matplotlib.pyplot as plt
-            similarity_debug = clip_cache["similarity_debug"]
             print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug[clip_name].append((index, similarity,))
@@ -730,7 +704,7 @@ class AudioPatternDetector:
     #             peaks_final.append(peak)
 
     # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
-    def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
+    def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props,similarity_debug):
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -760,7 +734,6 @@ class AudioPatternDetector:
             import matplotlib.pyplot as plt
             print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
-            similarity_debug = clip_cache["similarity_debug"]
             similarity_debug[clip_name].append((index, similarity,))
 
             correlation_slice_graph = correlation_slice
