@@ -1,30 +1,32 @@
-import sys
-from collections import defaultdict
 import json
 import logging
+import math
 import os
-
+import sys
+import warnings
+from collections import defaultdict
 from operator import itemgetter
 
 import numpy as np
-
-from scipy.signal import correlate
-import math
-
 import pyloudnorm as pyln
 
-import warnings
-
-from scipy.signal import find_peaks
-from sklearn.metrics import mean_squared_error
-
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
-from audio_pattern_detector.numpy_encoder import NumpyEncoder
-from audio_pattern_detector.audio_utils import slicing_with_zero_padding, \
-    downsample_preserve_maxima, TARGET_SAMPLE_RATE, seconds_to_time, write_wav_file
+from audio_pattern_detector.audio_utils import (
+    TARGET_SAMPLE_RATE,
+    downsample_preserve_maxima,
+    seconds_to_time,
+    slicing_with_zero_padding,
+    write_wav_file,
+)
 from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
+from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
+
+
+def _mean_squared_error(y_true, y_pred):
+    """Simple MSE implementation to avoid sklearn dependency."""
+    return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
@@ -267,6 +269,7 @@ class AudioPatternDetector:
 
     def _get_clip_correlation(self, clip):
         # Cross-correlate and normalize correlation
+        from scipy.signal import correlate
         correlation_clip = correlate(clip, clip, mode='full', method='fft')
 
         # abs
@@ -392,6 +395,7 @@ class AudioPatternDetector:
         # samples_skip_end = zeroes_second_pad * sr + clip_length
 
         # Cross-correlate and normalize correlation
+        from scipy.signal import correlate
         correlation = correlate(audio_section, clip, mode='full', method='fft')
         # abs
         correlation = np.abs(correlation)
@@ -424,6 +428,7 @@ class AudioPatternDetector:
         # the selected ones are going to be checked for similarity
         # before adding to final peaks
         height_min = 0.25
+        from scipy.signal import find_peaks
         peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
@@ -535,7 +540,7 @@ class AudioPatternDetector:
         similarity_partitions = []
         for i in range(partition_count):
             similarity_partitions.append(
-                mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
+                _mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
                                    correlation_slice[i * partition_size:(i + 1) * partition_size]))
 
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
@@ -724,7 +729,7 @@ class AudioPatternDetector:
 
         overlap_ratio = area_prop["overlapping_area"]/area_prop["area_control"]
 
-        similarity = mean_squared_error(correlation_clip, correlation_slice)
+        similarity = _mean_squared_error(correlation_clip, correlation_slice)
 
         similarity_whole = similarity
 
