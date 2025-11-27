@@ -1,11 +1,10 @@
 import math
 
 import numpy as np
-from scipy.integrate import simpson
-from scipy.signal import find_peaks
 
 
 def area_of_overlap_ratio(control, variable):
+    from scipy.integrate import simpson
 
     if len(control) != len(variable):
         raise ValueError("Both arrays must have the same length")
@@ -13,20 +12,13 @@ def area_of_overlap_ratio(control, variable):
     total_rect_control = len(control) * max(control)
 
     y2 = variable
-    # Define the x-axis range based on the indices of the input arrays
     x = np.arange(len(control))
-
-    #dx=1
-
-    #area_y1 = np.trapz(y1, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
-    #area_y2 = np.trapz(y2, dx=dx)  # dx=1 since the difference between consecutive x-values is 1
 
     area_control = simpson(control, x=x)
     area_y2 = simpson(y2, x=x)
 
     # To find the overlapping area, take the minimum at each point
     min_curve = np.minimum(control, y2)
-    #overlapping_area = np.trapz(min_curve, dx=dx)
     overlapping_area = simpson(min_curve, x=x)
 
     # Calculate the sum of area of both curves where the two curves don't overlap
@@ -96,7 +88,8 @@ def is_pure_tone(audio_data, sample_rate):
 
     # Define a threshold for pure tone
     #noise_threshold = 0.1
-    peaks,peak_props = find_peaks(positive_magnitude_normalized, prominence=0.05)  # Adjust prominence
+    from scipy.signal import find_peaks
+    peaks, peak_props = find_peaks(positive_magnitude_normalized, prominence=0.05)
 
     peak_freqs = positive_freqs[peaks]
     #peak_magnitudes = positive_magnitude_normalized[peaks]
