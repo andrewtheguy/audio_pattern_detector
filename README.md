@@ -89,7 +89,7 @@ The `--target-sample-rate` option allows using a different sample rate for proce
 # Use default 8kHz sample rate (faster, lower memory)
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav
 
-# Use 16kHz for AI workflows (helpful if pattern.wav is already at 16kHz)
+# Use 16kHz for AI workflows (helpful if both source and pattern.wav is already at 16kHz)
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --target-sample-rate 16000
 ```
 
@@ -98,6 +98,8 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 - Audio files are converted to the target rate via ffmpeg
 - For WAV stdin mode, audio is automatically resampled from the WAV header sample rate
 - For raw PCM stdin mode, use `--source-sample-rate` for input rate and `--target-sample-rate` for processing rate
+
+**Automatic resampling**: Sample rate mismatches never cause errors. All audio (source files, stdin streams, and pattern files) is automatically resampled to the target sample rate (default: 8kHz). For example, 16kHz audio will be silently downsampled to 8kHz if `--target-sample-rate` is not specified.
 
 #### Sliding Window Configuration
 
