@@ -23,7 +23,8 @@
       "Bash(time python:*)",
       "Bash(time:*)",
       "Bash(uv sync:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(uv run:*)"
     ],
     "deny": [],
     "ask": []

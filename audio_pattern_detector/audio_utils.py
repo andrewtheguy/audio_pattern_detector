@@ -1,5 +1,6 @@
 import math
 import subprocess
+import sys
 from contextlib import contextmanager
 
 import numpy as np
@@ -156,14 +157,24 @@ def downsample_preserve_maxima(curve, num_samples):
 
 # convert audio to float32 pcm with streaming output
 @contextmanager
-def ffmpeg_get_float32_pcm(full_audio_path, target_sample_rate=None, ac=None):
+def ffmpeg_get_float32_pcm(
+    full_audio_path, target_sample_rate=None, ac=None, from_stdin=False, input_format=None
+):
     # Construct the ffmpeg command
-    command = [
-        "ffmpeg",
-        "-i", full_audio_path,
+    command = ["ffmpeg"]
+
+    # When reading from stdin, we may need to specify input format
+    if from_stdin:
+        if input_format:
+            command.extend(["-f", input_format])
+        command.extend(["-i", "pipe:0"])
+    else:
+        command.extend(["-i", full_audio_path])
+
+    command.extend([
         "-f", "f32le",  # Output format: 32-bit float little-endian
         "-acodec", "pcm_f32le",  # Audio codec
-    ]
+    ])
 
     if ac is not None:
         command.extend(["-ac", str(ac)])
@@ -180,8 +191,10 @@ def ffmpeg_get_float32_pcm(full_audio_path, target_sample_rate=None, ac=None):
 
     try:
         # Run the command, capturing only stdout
+        # When reading from stdin, connect parent's stdin to ffmpeg
         process = subprocess.Popen(
             command,
+            stdin=sys.stdin.buffer if from_stdin else None,
             stdout=subprocess.PIPE  # Pipe stdout
         )
         yield process.stdout

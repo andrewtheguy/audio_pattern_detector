@@ -13,9 +13,16 @@ from audio_pattern_detector.audio_utils import (
     TARGET_SAMPLE_RATE,
 )
 
-def match_pattern(audio_source, pattern_files: list[str], debug_mode=False, is_url=False):
-    """Find pattern matches in audio file or URL"""
-    if not is_url and not os.path.exists(audio_source):
+def match_pattern(
+    audio_source,
+    pattern_files: list[str],
+    debug_mode=False,
+    is_url=False,
+    from_stdin=False,
+    input_format=None,
+):
+    """Find pattern matches in audio file, URL, or stdin"""
+    if not is_url and not from_stdin and not os.path.exists(audio_source):
         raise ValueError(f"Audio {audio_source} does not exist")
 
     pattern_clips = []
@@ -29,8 +36,19 @@ def match_pattern(audio_source, pattern_files: list[str], debug_mode=False, is_u
         raise ValueError("No pattern clips passed")
 
     sr = TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_source, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_source).stem if not is_url else "stream"
+    with ffmpeg_get_float32_pcm(
+        audio_source,
+        target_sample_rate=sr,
+        ac=1,
+        from_stdin=from_stdin,
+        input_format=input_format,
+    ) as stdout:
+        if from_stdin:
+            audio_name = "stdin"
+        elif is_url:
+            audio_name = "stream"
+        else:
+            audio_name = Path(audio_source).stem
         print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
@@ -107,6 +125,23 @@ def cmd_match(args):
 
         # Output final JSON to stdout for piping
         print(json.dumps(peak_times, ensure_ascii=False))
+    elif args.stdin:
+        input_format = getattr(args, 'input_format', None)
+        peak_times, total_time = match_pattern(
+            None, pattern_files, debug_mode=args.debug, from_stdin=True, input_format=input_format
+        )
+        print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
+
+        # In debug mode, also write to file
+        if args.debug:
+            output_file = './tmp/stdin_stream.json'
+            os.makedirs('./tmp', exist_ok=True)
+            with open(output_file, 'w') as f:
+                print(json.dumps(peak_times, ensure_ascii=False), file=f)
+            print(f"Debug output written to {output_file}", file=sys.stderr)
+
+        # Output final JSON to stdout for piping
+        print(json.dumps(peak_times, ensure_ascii=False))
     else:
-        print("Please provide --audio-file, --audio-folder, or --audio-url", file=sys.stderr)
+        print("Please provide --audio-file, --audio-folder, --audio-url, or --stdin", file=sys.stderr)
         sys.exit(1)
