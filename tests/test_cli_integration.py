@@ -441,6 +441,125 @@ def test_match_jsonl_events_are_flushed():
     assert last["type"] == "end"
 
 
+def test_match_jsonl_timestamps_monotonic():
+    """Test that --jsonl pattern_detected events have monotonically increasing timestamps.
+
+    Since events are emitted as patterns are detected during streaming,
+    timestamps should be in chronological order.
+    """
+    result = run_cli(
+        "match",
+        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--jsonl",
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Get all pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) >= 2, "Need at least 2 events to test monotonicity"
+
+    # Verify timestamps are monotonically increasing
+    timestamps = [e["timestamp"] for e in pattern_events]
+    for i in range(1, len(timestamps)):
+        assert timestamps[i] >= timestamps[i - 1], \
+            f"Timestamps not monotonic: {timestamps[i - 1]} -> {timestamps[i]}"
+
+
+def test_match_jsonl_multiple_patterns_timestamps_monotonic():
+    """Test that --jsonl events from multiple patterns are in timestamp order.
+
+    When multiple patterns are detected, all events should still be
+    output in chronological order regardless of which pattern matched.
+    """
+    result = run_cli(
+        "match",
+        "--audio-file", "sample_audios/cbs_news_audio_section.wav",
+        "--pattern-folder", "sample_audios/clips",
+        "--jsonl",
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Get all pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+
+    # Verify timestamps are monotonically increasing across all patterns
+    timestamps = [e["timestamp"] for e in pattern_events]
+    for i in range(1, len(timestamps)):
+        assert timestamps[i] >= timestamps[i - 1], \
+            f"Timestamps not monotonic: {timestamps[i - 1]} -> {timestamps[i]} " \
+            f"(patterns: {pattern_events[i - 1]['clip_name']} -> {pattern_events[i]['clip_name']})"
+
+
+def test_match_jsonl_earlier_pattern_emitted_first():
+    """Test that pattern with earlier timestamp is emitted first in JSONL.
+
+    Uses pre-generated audio file with patterns close together:
+    - silence (1s) + clip2_early (~0.67s) + silence (1s) + aaa_late (~1s) + silence (1s) + clip2 + aaa
+
+    Pattern timeline (~6.3s total):
+    - clip2_early at ~1s
+    - aaa_late at ~2.67s
+    - clip2_early again at ~4.67s
+    - aaa_late again at ~5.34s
+
+    This tests that even when patterns are close together, the one with the
+    earlier timestamp is emitted first, regardless of alphabetical order (aaa < clip2).
+    """
+    result = run_cli(
+        "match",
+        "--audio-file", "sample_audios/test_generated/interleaved_patterns.wav",
+        "--pattern-folder", "sample_audios/test_generated/clips",
+        "--jsonl",
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Get pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+
+    # Should have 4 events: clip2, aaa, clip2, aaa
+    assert len(pattern_events) == 4, \
+        f"Expected 4 events, got {len(pattern_events)}: {pattern_events}"
+
+    # Verify timestamps are monotonically increasing
+    timestamps = [e["timestamp"] for e in pattern_events]
+    for i in range(1, len(timestamps)):
+        assert timestamps[i] >= timestamps[i - 1], \
+            f"Timestamps not monotonic at index {i}: {timestamps}"
+
+    # First event should be clip2_early (at ~1s), not aaa_late
+    # even though "aaa" sorts before "clip2" alphabetically
+    assert pattern_events[0]["clip_name"] == "clip2_early", \
+        f"Expected clip2_early first, got {pattern_events[0]['clip_name']}"
+
+    # Second event should be aaa_late (at ~2.67s)
+    assert pattern_events[1]["clip_name"] == "aaa_late", \
+        f"Expected aaa_late second, got {pattern_events[1]['clip_name']}"
+
+    # Third event should be clip2_early again (at ~4.67s)
+    assert pattern_events[2]["clip_name"] == "clip2_early", \
+        f"Expected clip2_early third, got {pattern_events[2]['clip_name']}"
+
+    # Fourth event should be aaa_late again (at ~5.34s)
+    assert pattern_events[3]["clip_name"] == "aaa_late", \
+        f"Expected aaa_late fourth, got {pattern_events[3]['clip_name']}"
+
+    # Verify the pattern alternates: clip2, aaa, clip2, aaa
+    expected_order = ["clip2_early", "aaa_late", "clip2_early", "aaa_late"]
+    actual_order = [e["clip_name"] for e in pattern_events]
+    assert actual_order == expected_order, \
+        f"Expected order {expected_order}, got {actual_order}"
+
+
 # --- Convert Command Tests ---
 
 

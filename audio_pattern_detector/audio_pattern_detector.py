@@ -72,7 +72,6 @@ class AudioPatternDetector:
         #     if not os.path.exists(clip_path):
         #         raise ValueError(f"Clip {clip_path} does not exist")
 
-    # could cause issues with small overlap when intro is followed right by news report
     def find_clip_in_audio(self, audio_stream: AudioStream, on_pattern_detected=None, accumulate_results=True):
         """Find clip occurrences in audio stream.
 
@@ -198,9 +197,11 @@ class AudioPatternDetector:
 
             total_time += len(chunk) / self.target_sample_rate
 
+            # Collect all matches from all clips for this chunk
+            chunk_matches = []  # List of (timestamp, clip_name) tuples
+
             for audio_clip in self.audio_clips:
                 clip_data = clip_datas[audio_clip.name]
-
 
                 peak_times = self._process_chunk(chunk=chunk,
                                                  sr=self.target_sample_rate,
@@ -210,13 +211,19 @@ class AudioPatternDetector:
                                                  clip_cache=clip_cache,
                                                  )
 
-                # Call callback for each detected pattern immediately
+                # Collect matches for sorting
                 if on_pattern_detected and peak_times:
                     for timestamp in peak_times:
-                        on_pattern_detected(audio_clip.name, timestamp)
+                        chunk_matches.append((timestamp, audio_clip.name))
 
                 if all_peak_times is not None:
                     all_peak_times[audio_clip.name].extend(peak_times)
+
+            # Call callback in timestamp order (monotonic output)
+            if on_pattern_detected and chunk_matches:
+                chunk_matches.sort(key=lambda x: x[0])  # Sort by timestamp
+                for timestamp, clip_name in chunk_matches:
+                    on_pattern_detected(clip_name, timestamp)
 
             # Update previous_chunk to current chunk
             previous_chunk = chunk
