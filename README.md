@@ -104,10 +104,9 @@ audio-pattern-detector show-config --pattern-folder ./clips
 Output:
 ```json
 {
-  "seconds_per_chunk": 2,
-  "chunk_size_bytes": 64000,
-  "sample_rate": 8000,
+  "default_seconds_per_chunk": 60,
   "min_chunk_size_seconds": 2,
+  "sample_rate": 8000,
   "clips": {
     "pattern1": {
       "duration_seconds": 0.5,
@@ -117,6 +116,9 @@ Output:
   }
 }
 ```
+
+- `default_seconds_per_chunk`: The default chunk size (60 seconds)
+- `min_chunk_size_seconds`: Minimum required chunk size for these patterns (use this or higher with `--chunk-seconds`)
 
 #### JSONL Streaming Output (match)
 
