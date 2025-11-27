@@ -97,7 +97,7 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 - Pattern files are automatically resampled to the target rate
 - Audio files are converted to the target rate via ffmpeg
 - For WAV stdin mode, audio is automatically resampled from the WAV header sample rate
-- For raw PCM stdin mode, use `--source-sample-rate` for input rate and `--target-sample-rate` for processing rate
+- For raw PCM stdin mode, `--source-sample-rate` is required (no header), `--target-sample-rate` is optional (defaults to 8kHz)
 
 **Automatic resampling**: Sample rate mismatches never cause errors. All audio (source files, stdin streams, and pattern files) is automatically resampled to the target sample rate (default: 8kHz). For example, 16kHz audio will be silently downsampled to 8kHz if `--target-sample-rate` is not specified.
 
