@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
-from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
+from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector, DEFAULT_SECONDS_PER_CHUNK
 from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, TARGET_SAMPLE_RATE
 
 
@@ -450,3 +450,176 @@ def test_callback_receives_correct_types():
         # Timestamp can be Python float or numpy float64
         assert ts_type in ("float", "float64"), \
             f"timestamp should be float or float64, got {ts_type}"
+
+
+# --- get_config() Tests ---
+
+
+def test_get_config_returns_correct_structure():
+    """Test get_config returns dict with expected keys."""
+    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    detector = AudioPatternDetector(audio_clips=[pattern_clip])
+
+    config = detector.get_config()
+
+    # Verify structure
+    assert isinstance(config, dict)
+    assert "default_seconds_per_chunk" in config
+    assert "min_chunk_size_seconds" in config
+    assert "sample_rate" in config
+    assert "clips" in config
+
+
+def test_get_config_default_seconds_per_chunk():
+    """Test default_seconds_per_chunk always returns the constant value."""
+    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+    # Test with default seconds_per_chunk
+    detector1 = AudioPatternDetector(audio_clips=[pattern_clip])
+    config1 = detector1.get_config()
+    assert config1["default_seconds_per_chunk"] == DEFAULT_SECONDS_PER_CHUNK
+
+    # Test with custom seconds_per_chunk (should still return the constant as default)
+    detector2 = AudioPatternDetector(audio_clips=[pattern_clip], seconds_per_chunk=30)
+    config2 = detector2.get_config()
+    assert config2["default_seconds_per_chunk"] == DEFAULT_SECONDS_PER_CHUNK
+
+    # Test with auto mode (None) (should still return the constant as default)
+    detector3 = AudioPatternDetector(audio_clips=[pattern_clip], seconds_per_chunk=None)
+    config3 = detector3.get_config()
+    assert config3["default_seconds_per_chunk"] == DEFAULT_SECONDS_PER_CHUNK
+
+
+def test_get_config_sample_rate():
+    """Test sample_rate is correct."""
+    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    detector = AudioPatternDetector(audio_clips=[pattern_clip])
+
+    config = detector.get_config()
+    assert config["sample_rate"] == TARGET_SAMPLE_RATE
+    assert config["sample_rate"] == 8000
+
+
+def test_get_config_min_chunk_size_single_pattern():
+    """Test min_chunk_size_seconds for single pattern."""
+    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    detector = AudioPatternDetector(audio_clips=[pattern_clip])
+
+    config = detector.get_config()
+
+    # min_chunk_size should be sliding_window * 2
+    clip_config = config["clips"]["rthk_beep"]
+    expected_min = clip_config["sliding_window_seconds"] * 2
+    assert config["min_chunk_size_seconds"] == expected_min
+
+
+def test_get_config_min_chunk_size_multiple_patterns():
+    """Test min_chunk_size_seconds is max of all patterns' minimums."""
+    pattern_files = [
+        "sample_audios/clips/rthk_beep.wav",      # Short beep
+        "sample_audios/clips/cbs_news.wav",       # Longer pattern
+        "sample_audios/clips/cbs_news_dada.wav",  # Another pattern
+    ]
+    pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
+    detector = AudioPatternDetector(audio_clips=pattern_clips)
+
+    config = detector.get_config()
+
+    # Calculate expected min_chunk_size (max of all sliding_window * 2)
+    expected_min = 0
+    for clip_name, clip_config in config["clips"].items():
+        min_for_clip = clip_config["sliding_window_seconds"] * 2
+        if min_for_clip > expected_min:
+            expected_min = min_for_clip
+
+    assert config["min_chunk_size_seconds"] == expected_min
+    # The larger patterns should determine the min
+    assert config["min_chunk_size_seconds"] >= 2  # At least 2 seconds
+
+
+def test_get_config_clips_info():
+    """Test clips dict contains correct per-clip info."""
+    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    detector = AudioPatternDetector(audio_clips=[pattern_clip])
+
+    config = detector.get_config()
+
+    # Verify clip is in clips dict
+    assert "rthk_beep" in config["clips"]
+    clip_config = config["clips"]["rthk_beep"]
+
+    # Verify required fields
+    assert "duration_seconds" in clip_config
+    assert "sliding_window_seconds" in clip_config
+    assert "is_pure_tone" in clip_config
+
+    # Verify types
+    assert isinstance(clip_config["duration_seconds"], float)
+    assert isinstance(clip_config["sliding_window_seconds"], int)
+    assert isinstance(clip_config["is_pure_tone"], bool)
+
+    # Verify reasonable values
+    assert clip_config["duration_seconds"] > 0
+    assert clip_config["sliding_window_seconds"] >= 1
+
+
+def test_get_config_clips_multiple_patterns():
+    """Test clips dict includes all patterns."""
+    pattern_files = [
+        "sample_audios/clips/rthk_beep.wav",
+        "sample_audios/clips/cbs_news.wav",
+        "sample_audios/clips/cbs_news_dada.wav",
+    ]
+    pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
+    detector = AudioPatternDetector(audio_clips=pattern_clips)
+
+    config = detector.get_config()
+
+    # All patterns should be in clips dict
+    assert "rthk_beep" in config["clips"]
+    assert "cbs_news" in config["clips"]
+    assert "cbs_news_dada" in config["clips"]
+    assert len(config["clips"]) == 3
+
+
+def test_get_config_is_pure_tone():
+    """Test is_pure_tone is correctly computed."""
+    # rthk_beep is a pure tone pattern (beep)
+    beep_clip = AudioClip.from_audio_file("sample_audios/clips/rthk_beep.wav")
+    detector1 = AudioPatternDetector(audio_clips=[beep_clip])
+    config1 = detector1.get_config()
+    assert config1["clips"]["rthk_beep"]["is_pure_tone"] is True
+
+    # cbs_news_dada is NOT a pure tone (complex audio)
+    dada_clip = AudioClip.from_audio_file("sample_audios/clips/cbs_news_dada.wav")
+    detector2 = AudioPatternDetector(audio_clips=[dada_clip])
+    config2 = detector2.get_config()
+    assert config2["clips"]["cbs_news_dada"]["is_pure_tone"] is False
+
+
+def test_get_config_sliding_window_computed_correctly():
+    """Test sliding_window_seconds is ceil of clip duration."""
+    import math
+
+    pattern_files = [
+        "sample_audios/clips/rthk_beep.wav",
+        "sample_audios/clips/cbs_news.wav",
+    ]
+
+    for pattern_file in pattern_files:
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+        detector = AudioPatternDetector(audio_clips=[pattern_clip])
+        config = detector.get_config()
+
+        clip_name = Path(pattern_file).stem
+        clip_config = config["clips"][clip_name]
+
+        # sliding_window should be ceil of duration
+        expected_sliding_window = math.ceil(clip_config["duration_seconds"])
+        assert clip_config["sliding_window_seconds"] == expected_sliding_window, \
+            f"{clip_name}: Expected sliding_window {expected_sliding_window}, got {clip_config['sliding_window_seconds']}"
