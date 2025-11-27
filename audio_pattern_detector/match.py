@@ -52,28 +52,38 @@ def cmd_match(args):
         sys.exit(1)
 
     if args.audio_folder:
-        output_file_prefix = f'{os.path.basename(args.audio_folder)}'
-        output_file = f'./tmp/{output_file_prefix}.jsonl'
-        with open(output_file, 'w') as f:
-            f.truncate(0)
         print(f"Finding pattern in audio files in folder {args.audio_folder}...", file=sys.stderr)
+        all_results = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
             print(f"Processing {audio_file}...", file=sys.stderr)
-            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=False)
-            print(peak_times, file=sys.stderr)
+            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
-            if len(peak_times) > 0:
-                peak_times_second = [seconds_to_time(seconds=offset) for offset in peak_times]
-                print(f"Clip occurs with the file {audio_file} at the following times (in seconds): {peak_times_second}", file=sys.stderr)
-                with open(output_file, 'a') as f:
-                    print(json.dumps({'audio_file': audio_file, 'peak_times': peak_times_second}, ensure_ascii=False), file=f)
+            all_results[audio_file] = peak_times
+
+        # In debug mode, also write to file
+        if args.debug:
+            output_file = f'./tmp/{os.path.basename(args.audio_folder)}.json'
+            os.makedirs('./tmp', exist_ok=True)
+            with open(output_file, 'w') as f:
+                print(json.dumps(all_results, ensure_ascii=False), file=f)
+            print(f"Debug output written to {output_file}", file=sys.stderr)
+
+        # Output final JSON to stdout for piping
+        print(json.dumps(all_results, ensure_ascii=False))
     elif args.audio_file:
         peak_times, total_time = match_pattern(args.audio_file, pattern_files, debug_mode=args.debug)
-        print(peak_times, file=sys.stderr)
         print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
-        output_file = f'./tmp/{Path(args.audio_file).stem}.json'
-        with open(output_file, 'w') as f:
-            print(json.dumps({'audio_file': args.audio_file, 'peak_times': peak_times}, ensure_ascii=False), file=f)
+
+        # In debug mode, also write to file
+        if args.debug:
+            output_file = f'./tmp/{Path(args.audio_file).stem}.json'
+            os.makedirs('./tmp', exist_ok=True)
+            with open(output_file, 'w') as f:
+                print(json.dumps(peak_times, ensure_ascii=False), file=f)
+            print(f"Debug output written to {output_file}", file=sys.stderr)
+
+        # Output final JSON to stdout for piping
+        print(json.dumps(peak_times, ensure_ascii=False))
     else:
         print("Please provide either --audio-file or --audio-folder", file=sys.stderr)
         sys.exit(1)
