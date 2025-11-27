@@ -29,10 +29,11 @@ def match_pattern(
     accumulate_results=True,
     seconds_per_chunk=60,
     from_stdin=False,
+    raw_pcm=False,
     sample_rate=None,
     target_sample_rate=None,
 ):
-    """Find pattern matches in audio file or stdin (raw PCM)
+    """Find pattern matches in audio file or stdin
 
     Args:
         audio_source: Path to audio file, or None if from_stdin=True
@@ -42,8 +43,10 @@ def match_pattern(
                              Signature: on_pattern_detected(clip_name: str, timestamp: float)
         accumulate_results: If False, don't accumulate results (saves memory for streaming)
         seconds_per_chunk: Seconds per chunk for sliding window (None for auto-compute)
-        from_stdin: Whether to read raw float32 PCM from stdin
-        sample_rate: Sample rate of stdin input (default: target_sample_rate)
+        from_stdin: Whether to read from stdin
+        raw_pcm: If True and from_stdin=True, read raw float32 PCM (requires sample_rate).
+                 If False and from_stdin=True, read WAV format from stdin.
+        sample_rate: Sample rate of stdin input (required for raw_pcm mode, ignored for WAV mode)
         target_sample_rate: Target sample rate for processing (default: DEFAULT_TARGET_SAMPLE_RATE, 8000)
     """
     if not from_stdin and not os.path.exists(audio_source):
@@ -63,17 +66,28 @@ def match_pattern(
         raise ValueError("No pattern clips passed")
 
     if from_stdin:
-        # Stdin mode: read raw float32 little-endian PCM directly
-        input_sr = sample_rate if sample_rate is not None else sr
-        return _match_pattern_raw_pcm(
-            pattern_clips=pattern_clips,
-            debug_mode=debug_mode,
-            on_pattern_detected=on_pattern_detected,
-            accumulate_results=accumulate_results,
-            seconds_per_chunk=seconds_per_chunk,
-            input_sample_rate=input_sr,
-            target_sample_rate=sr,
-        )
+        if raw_pcm:
+            # Raw PCM mode: read raw float32 little-endian PCM directly
+            input_sr = sample_rate if sample_rate is not None else sr
+            return _match_pattern_raw_pcm(
+                pattern_clips=pattern_clips,
+                debug_mode=debug_mode,
+                on_pattern_detected=on_pattern_detected,
+                accumulate_results=accumulate_results,
+                seconds_per_chunk=seconds_per_chunk,
+                input_sample_rate=input_sr,
+                target_sample_rate=sr,
+            )
+        else:
+            # WAV mode: read WAV format from stdin
+            return _match_pattern_wav_stdin(
+                pattern_clips=pattern_clips,
+                debug_mode=debug_mode,
+                on_pattern_detected=on_pattern_detected,
+                accumulate_results=accumulate_results,
+                seconds_per_chunk=seconds_per_chunk,
+                target_sample_rate=sr,
+            )
 
     # File mode: use ffmpeg
     with ffmpeg_get_float32_pcm(
@@ -92,6 +106,103 @@ def match_pattern(
                           accumulate_results=accumulate_results,
                       ))
     return peak_times, total_time
+
+
+class _WavStdinStreamWrapper:
+    """Wrapper to read WAV format from stdin.
+
+    Reads WAV header to get sample rate, then streams audio data.
+    Automatically converts to target sample rate if needed.
+    """
+
+    def __init__(self, target_sample_rate: int):
+        import wave
+        self.target_sample_rate = target_sample_rate
+        self._bytes_per_sample = 4  # output is float32
+        self._validated = False
+
+        # Read WAV header from stdin
+        try:
+            self._wav = wave.open(sys.stdin.buffer, 'rb')
+        except wave.Error as e:
+            raise ValueError(f"Failed to read WAV header from stdin: {e}. Use --raw-pcm for headerless PCM data.")
+
+        self.input_sample_rate = self._wav.getframerate()
+        self._channels = self._wav.getnchannels()
+        self._sampwidth = self._wav.getsampwidth()
+        self.needs_resample = self.input_sample_rate != target_sample_rate
+
+        print(f"WAV stdin: {self.input_sample_rate}Hz, {self._channels} channel(s), {self._sampwidth*8}-bit", file=sys.stderr)
+
+        if self._channels != 1:
+            print(f"Warning: WAV has {self._channels} channels, will be mixed to mono", file=sys.stderr)
+
+    def _validate_first_chunk(self, audio: np.ndarray) -> None:
+        """Check first chunk for signs of corrupt audio."""
+        if self._validated or len(audio) == 0:
+            return
+        self._validated = True
+
+        warnings = []
+        if np.any(np.isnan(audio)):
+            warnings.append("Audio contains NaN values - data may be corrupt")
+        if np.any(np.isinf(audio)):
+            warnings.append("Audio contains Inf values - data may be corrupt")
+
+        max_abs = np.max(np.abs(audio))
+        if max_abs > 1.5:
+            warnings.append(f"Audio values exceed expected range (max: {max_abs:.2f})")
+
+        if np.all(audio == 0):
+            warnings.append("First chunk is all zeros - verify input is correct")
+
+        for warning in warnings:
+            print(f"Warning: {warning}", file=sys.stderr)
+
+    def read(self, size: int) -> bytes:
+        """Read and convert audio data from WAV stdin.
+
+        Args:
+            size: Number of bytes to return (at target sample rate, float32)
+
+        Returns:
+            Raw bytes of float32 PCM at target sample rate
+        """
+        # Calculate how many frames to read
+        target_samples = size // self._bytes_per_sample
+        if self.needs_resample:
+            input_samples = int(target_samples * self.input_sample_rate / self.target_sample_rate)
+        else:
+            input_samples = target_samples
+
+        # Read raw frames from WAV
+        raw_data = self._wav.readframes(input_samples)
+        if not raw_data:
+            return b""
+
+        # Convert to float32 based on sample width
+        if self._sampwidth == 2:  # 16-bit
+            audio = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
+        elif self._sampwidth == 4:  # 32-bit
+            audio = np.frombuffer(raw_data, dtype=np.int32).astype(np.float32) / 2147483648.0
+        elif self._sampwidth == 1:  # 8-bit unsigned
+            audio = (np.frombuffer(raw_data, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+        else:
+            raise ValueError(f"Unsupported WAV sample width: {self._sampwidth} bytes")
+
+        # Mix to mono if stereo
+        if self._channels > 1:
+            audio = audio.reshape(-1, self._channels).mean(axis=1).astype(np.float32)
+
+        # Validate first chunk
+        if not self._validated:
+            self._validate_first_chunk(audio)
+
+        # Resample if needed
+        if self.needs_resample:
+            audio = resample_audio(audio, self.input_sample_rate, self.target_sample_rate)
+
+        return audio.tobytes()
 
 
 class _RawPcmStreamWrapper:
@@ -179,6 +290,45 @@ class _RawPcmStreamWrapper:
         return resampled.tobytes()
 
 
+def _match_pattern_wav_stdin(
+    pattern_clips,
+    debug_mode,
+    on_pattern_detected,
+    accumulate_results,
+    seconds_per_chunk,
+    target_sample_rate,
+):
+    """Internal function to handle WAV stdin mode."""
+    # Create stream wrapper that reads WAV header and handles resampling
+    stream_wrapper = _WavStdinStreamWrapper(target_sample_rate)
+
+    audio_name = "stdin"
+    print(f"Finding pattern in audio stream {audio_name}...", file=sys.stderr)
+
+    full_streaming_audio = AudioStream(
+        name=audio_name,
+        audio_stream=stream_wrapper,
+        sample_rate=target_sample_rate,
+    )
+
+    # Find clip occurrences in the full audio
+    peak_times, total_time = (
+        AudioPatternDetector(
+            debug_mode=debug_mode,
+            audio_clips=pattern_clips,
+            seconds_per_chunk=seconds_per_chunk,
+            target_sample_rate=target_sample_rate,
+        )
+        .find_clip_in_audio(
+            full_streaming_audio,
+            on_pattern_detected=on_pattern_detected,
+            accumulate_results=accumulate_results,
+        )
+    )
+
+    return peak_times, total_time
+
+
 def _match_pattern_raw_pcm(
     pattern_clips,
     debug_mode,
@@ -189,7 +339,7 @@ def _match_pattern_raw_pcm(
     target_sample_rate,
 ):
     """Internal function to handle raw PCM mode."""
-    print(f"Reading raw PCM from stdin (sample rate: {input_sample_rate}Hz)...", file=sys.stderr)
+    print(f"Reading raw PCM from stdin (source sample rate: {input_sample_rate}Hz)...", file=sys.stderr)
 
     if input_sample_rate != target_sample_rate:
         print(f"Resampling from {input_sample_rate}Hz to {target_sample_rate}Hz...", file=sys.stderr)
@@ -238,7 +388,7 @@ def _make_jsonl_callback():
 
 def _run_match_with_output(
     args, pattern_files, audio_source, debug_output_file,
-    from_stdin=False, seconds_per_chunk=60, sample_rate=None, target_sample_rate=None
+    from_stdin=False, raw_pcm=False, seconds_per_chunk=60, source_sample_rate=None, target_sample_rate=None
 ):
     """Run match_pattern and handle output (JSON or JSONL).
 
@@ -264,7 +414,8 @@ def _run_match_with_output(
         accumulate_results=not jsonl_mode,
         seconds_per_chunk=seconds_per_chunk,
         from_stdin=from_stdin,
-        sample_rate=sample_rate,
+        raw_pcm=raw_pcm,
+        sample_rate=source_sample_rate,
         target_sample_rate=target_sample_rate,
     )
     print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
@@ -345,13 +496,26 @@ def cmd_match(args):
             target_sample_rate=target_sample_rate,
         )
     elif args.stdin:
-        # Stdin mode: raw float32 PCM, always outputs JSONL
-        sample_rate = getattr(args, 'sample_rate', None)
+        # Stdin mode: always outputs JSONL
+        raw_pcm = getattr(args, 'raw_pcm', False)
+        source_sample_rate = getattr(args, 'source_sample_rate', None)
+
+        # Validate raw_pcm mode requires source_sample_rate
+        if raw_pcm and source_sample_rate is None:
+            print("Error: --source-sample-rate is required when using --raw-pcm", file=sys.stderr)
+            sys.exit(1)
+
+        # source_sample_rate should not be used with WAV mode
+        if not raw_pcm and source_sample_rate is not None:
+            print("Error: --source-sample-rate can only be used with --raw-pcm (WAV mode reads sample rate from header)", file=sys.stderr)
+            sys.exit(1)
+
         _run_match_with_output(
             args, pattern_files, None,
             debug_output_file='./tmp/stdin_stream.json',
             from_stdin=True,
-            sample_rate=sample_rate,
+            raw_pcm=raw_pcm,
+            source_sample_rate=source_sample_rate,
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
         )

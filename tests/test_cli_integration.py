@@ -70,7 +70,9 @@ def test_cli_match_help():
     assert "--audio-file" in result.stdout
     assert "--audio-folder" in result.stdout
     assert "--stdin" in result.stdout
-    assert "--sample-rate" in result.stdout
+    assert "--raw-pcm" in result.stdout
+    assert "--source-sample-rate" in result.stdout
+    assert "--target-sample-rate" in result.stdout
     assert "--jsonl" in result.stdout
     assert "--chunk-seconds" in result.stdout
 
@@ -167,7 +169,7 @@ def test_match_chunk_seconds_invalid_value():
     assert "auto" in result.stderr or "integer" in result.stderr
 
 
-# --- Match Command: --stdin Tests (Raw PCM, Always JSONL) ---
+# --- Match Command: --stdin Tests (WAV and Raw PCM, Always JSONL) ---
 
 
 def _convert_wav_to_raw_pcm(wav_file: str, sample_rate: int = 8000) -> bytes:
@@ -181,13 +183,52 @@ def _convert_wav_to_raw_pcm(wav_file: str, sample_rate: int = 8000) -> bytes:
     return result.stdout
 
 
+def _convert_file_to_wav_stdout(audio_file: str, sample_rate: int = 8000) -> bytes:
+    """Helper to convert audio file to WAV and pipe to stdout."""
+    cmd = [
+        "ffmpeg", "-i", audio_file,
+        "-f", "wav", "-acodec", "pcm_s16le", "-ac", "1", "-ar", str(sample_rate),
+        "-loglevel", "error", "pipe:"
+    ]
+    result = subprocess.run(cmd, capture_output=True, check=True)
+    return result.stdout
+
+
+def test_match_stdin_reads_wav():
+    """Test match reads WAV from stdin and outputs JSONL."""
+    wav_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+
+    result = run_cli_binary(
+        "match",
+        "--stdin",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=wav_data,
+    )
+    assert result.returncode == 0
+
+    # stdin mode always outputs JSONL
+    lines = result.stdout.decode().strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Should have start and end events
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "end"
+
+    # Should have pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0
+    assert pattern_events[0]["clip_name"] == "rthk_beep"
+
+
 def test_match_stdin_reads_raw_pcm():
-    """Test match reads raw PCM from stdin and outputs JSONL."""
+    """Test match --raw-pcm reads raw PCM from stdin and outputs JSONL."""
     raw_pcm_data = _convert_wav_to_raw_pcm("sample_audios/rthk_section_with_beep.wav")
 
     result = run_cli_binary(
         "match",
         "--stdin",
+        "--raw-pcm",
+        "--source-sample-rate", "8000",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
         stdin_data=raw_pcm_data,
     )
@@ -208,14 +249,14 @@ def test_match_stdin_reads_raw_pcm():
 
 
 def test_match_stdin_with_pattern_folder():
-    """Test --stdin works with --pattern-folder."""
-    raw_pcm_data = _convert_wav_to_raw_pcm("sample_audios/cbs_news_audio_section.wav")
+    """Test --stdin with WAV works with --pattern-folder."""
+    wav_data = _convert_file_to_wav_stdout("sample_audios/cbs_news_audio_section.wav")
 
     result = run_cli_binary(
         "match",
         "--stdin",
         "--pattern-folder", "sample_audios/clips",
-        stdin_data=raw_pcm_data,
+        stdin_data=wav_data,
     )
     assert result.returncode == 0
 
@@ -276,14 +317,14 @@ def test_match_jsonl_start_event_source():
     start_event = json.loads(result.stdout.strip().split("\n")[0])
     assert "rthk_section_with_beep.wav" in start_event["source"]
 
-    # Test with stdin (raw PCM, always outputs JSONL)
-    raw_pcm_data = _convert_wav_to_raw_pcm("sample_audios/rthk_section_with_beep.wav")
+    # Test with stdin (WAV mode, always outputs JSONL)
+    wav_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
 
     result = run_cli_binary(
         "match",
         "--stdin",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
-        stdin_data=raw_pcm_data,
+        stdin_data=wav_data,
     )
     start_event = json.loads(result.stdout.decode().strip().split("\n")[0])
     assert start_event["source"] == "stdin"
@@ -523,8 +564,8 @@ def test_match_16khz_audio_auto_converts():
 # --- Stdin with Sample Rate Tests ---
 
 
-def test_stdin_with_sample_rate_resamples():
-    """Test --stdin with --sample-rate resamples audio correctly."""
+def test_stdin_raw_pcm_with_source_sample_rate_resamples():
+    """Test --stdin --raw-pcm with --source-sample-rate resamples audio correctly."""
     import numpy as np
 
     # Generate raw float32 PCM at 16kHz using ffmpeg
@@ -534,11 +575,12 @@ def test_stdin_with_sample_rate_resamples():
     audio = np.frombuffer(raw_pcm_data, dtype=np.float32)
     assert len(audio) > 0
 
-    # Use stdin mode with 16kHz (will be resampled to 8kHz)
+    # Use stdin mode with 16kHz raw PCM (will be resampled to 8kHz)
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--sample-rate", "16000",
+        "--raw-pcm",
+        "--source-sample-rate", "16000",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
         stdin_data=raw_pcm_data,
     )
@@ -551,3 +593,58 @@ def test_stdin_with_sample_rate_resamples():
     # Should have pattern_detected events despite sample rate conversion
     pattern_events = [e for e in events if e["type"] == "pattern_detected"]
     assert len(pattern_events) > 0
+
+
+def test_stdin_wav_with_different_sample_rate_resamples():
+    """Test --stdin WAV mode automatically resamples from header sample rate."""
+    # Generate WAV at 16kHz
+    wav_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav", sample_rate=16000)
+
+    # Use stdin mode with WAV (sample rate read from header, resampled to 8kHz)
+    result = run_cli_binary(
+        "match",
+        "--stdin",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=wav_data,
+    )
+    assert result.returncode == 0
+
+    # stdin mode always outputs JSONL
+    lines = result.stdout.decode().strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Should have pattern_detected events despite sample rate conversion
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0
+
+
+def test_stdin_raw_pcm_requires_source_sample_rate():
+    """Test --stdin --raw-pcm requires --source-sample-rate."""
+    raw_pcm_data = _convert_wav_to_raw_pcm("sample_audios/rthk_section_with_beep.wav")
+
+    result = run_cli_binary(
+        "match",
+        "--stdin",
+        "--raw-pcm",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=raw_pcm_data,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert b"--source-sample-rate is required" in result.stderr
+
+
+def test_stdin_source_sample_rate_only_with_raw_pcm():
+    """Test --source-sample-rate can only be used with --raw-pcm."""
+    wav_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+
+    result = run_cli_binary(
+        "match",
+        "--stdin",
+        "--source-sample-rate", "8000",  # Not allowed without --raw-pcm
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=wav_data,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert b"--source-sample-rate can only be used with --raw-pcm" in result.stderr

@@ -69,8 +69,9 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 |--------|-------------|
 | `--audio-file` | Audio file to search for patterns |
 | `--audio-folder` | Folder of audio files to process |
-| `--stdin` | Read raw float32 little-endian PCM from stdin (always outputs JSONL) |
-| `--sample-rate` | Sample rate for stdin input in Hz (default: target-sample-rate) |
+| `--stdin` | Read WAV format audio from stdin (always outputs JSONL) |
+| `--raw-pcm` | With `--stdin`: read raw float32 little-endian PCM instead of WAV (requires `--source-sample-rate`) |
+| `--source-sample-rate` | Source sample rate for raw PCM stdin in Hz (only used with `--raw-pcm`) |
 | `--target-sample-rate` | Target sample rate for processing in Hz (default: 8000). Use 16000 for AI workflows that require 16kHz audio. |
 | `--pattern-file` | Single pattern file to match |
 | `--pattern-folder` | Folder of pattern clips to match |
@@ -93,8 +94,8 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 **Note**: When using a custom target sample rate:
 - Pattern files are automatically resampled to the target rate
 - Audio files are converted to the target rate via ffmpeg
-- For stdin mode, use `--sample-rate` for input rate and `--target-sample-rate` for processing rate
-- Stdin mode supports both upsampling (e.g., 8kHz → 16kHz) and downsampling (e.g., 16kHz → 8kHz)
+- For WAV stdin mode, audio is automatically resampled from the WAV header sample rate
+- For raw PCM stdin mode, use `--source-sample-rate` for input rate and `--target-sample-rate` for processing rate
 
 #### Sliding Window Configuration
 
@@ -111,29 +112,49 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --chunk-seconds 10
 ```
 
-#### Stdin Mode (Raw PCM)
+#### Stdin Mode (WAV)
 
-Use `--stdin` to read raw float32 little-endian PCM data from stdin. This mode always outputs JSONL for real-time streaming detection. This is useful for integration with pipelines that produce float32 PCM data.
+Use `--stdin` to read WAV format audio from stdin. This mode always outputs JSONL for real-time streaming detection. The sample rate is automatically read from the WAV header.
 
 ```shell
-# Raw PCM at 8kHz (no conversion needed, uses default target sample rate)
-ffmpeg -i input.mp3 -f f32le -ac 1 -ar 8000 pipe: | \
+# WAV stdin (sample rate read from header, resampled to default 8kHz)
+ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
+
+# WAV stdin with custom target sample rate (e.g., 16kHz for AI workflows)
+ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
+  audio-pattern-detector match --stdin --target-sample-rate 16000 --pattern-file pattern.wav
+```
+
+**Note**: When using `--stdin` (WAV mode):
+- Input must be WAV format (sample rate, channels, and bit depth are read from header)
+- Stereo audio is automatically mixed to mono
+- Output is always JSONL format for real-time streaming
+- Audio is automatically resampled to target sample rate if different from source
+
+#### Stdin Mode (Raw PCM)
+
+Use `--stdin --raw-pcm` to read raw float32 little-endian PCM data from stdin. This is useful when integrating with pipelines that produce headerless PCM data.
+
+```shell
+# Raw PCM at 8kHz (source matches default target sample rate)
+ffmpeg -i input.mp3 -f f32le -ac 1 -ar 8000 pipe: | \
+  audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 8000 --pattern-file pattern.wav
 
 # Raw PCM at 16kHz input, processed at 16kHz (no resampling)
 ffmpeg -i input.mp3 -f f32le -ac 1 -ar 16000 pipe: | \
-  audio-pattern-detector match --stdin --sample-rate 16000 --target-sample-rate 16000 --pattern-file pattern.wav
+  audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 16000 --target-sample-rate 16000 --pattern-file pattern.wav
 
 # Raw PCM at 16kHz input, resampled to 8kHz for processing
 some-16khz-source | \
-  audio-pattern-detector match --stdin --sample-rate 16000 --pattern-file pattern.wav
+  audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 16000 --pattern-file pattern.wav
 ```
 
-**Note**: When using `--stdin`:
+**Note**: When using `--stdin --raw-pcm`:
 - Input must be raw float32 little-endian PCM (f32le)
+- `--source-sample-rate` is required to specify the input sample rate
 - Output is always JSONL format for real-time streaming
-- ffmpeg is not required for reading the audio stream (but pattern WAV files still require scipy)
-- If `--sample-rate` differs from `--target-sample-rate`, audio is automatically resampled using scipy (supports both upsampling and downsampling)
+- If `--source-sample-rate` differs from `--target-sample-rate`, audio is automatically resampled using scipy
 - Pattern files are loaded at the target sample rate (default: 8000)
 
 ### Show-config - Show computed configuration for patterns
