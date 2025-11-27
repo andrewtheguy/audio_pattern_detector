@@ -94,6 +94,7 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 - Pattern files are automatically resampled to the target rate
 - Audio files are converted to the target rate via ffmpeg
 - For stdin mode, use `--sample-rate` for input rate and `--target-sample-rate` for processing rate
+- Stdin mode supports both upsampling (e.g., 8kHz → 16kHz) and downsampling (e.g., 16kHz → 8kHz)
 
 #### Sliding Window Configuration
 
@@ -132,7 +133,7 @@ some-16khz-source | \
 - Input must be raw float32 little-endian PCM (f32le)
 - Output is always JSONL format for real-time streaming
 - ffmpeg is not required for reading the audio stream (but pattern WAV files still require scipy)
-- If `--sample-rate` differs from `--target-sample-rate`, audio is resampled using scipy
+- If `--sample-rate` differs from `--target-sample-rate`, audio is automatically resampled using scipy (supports both upsampling and downsampling)
 - Pattern files are loaded at the target sample rate (default: 8000)
 
 ### Show-config - Show computed configuration for patterns
