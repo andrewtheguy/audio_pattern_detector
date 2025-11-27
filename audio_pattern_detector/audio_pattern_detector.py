@@ -23,6 +23,9 @@ from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
 
+# Default seconds per chunk for sliding window processing
+DEFAULT_SECONDS_PER_CHUNK = 60
+
 
 def _mean_squared_error(y_true, y_pred):
     """Simple MSE implementation to avoid sklearn dependency."""
@@ -38,7 +41,7 @@ def _write_audio_file(filepath, audio_data, sample_rate):
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk=60):
+    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk=DEFAULT_SECONDS_PER_CHUNK):
         self.audio_clips = audio_clips
         self.debug_mode = debug_mode
         #self.correlation_cache_correlation_method = {}
@@ -163,10 +166,9 @@ class AudioPatternDetector:
             }
 
         return {
-            "seconds_per_chunk": self.seconds_per_chunk,
-            "chunk_size_bytes": self._chunk_size,
-            "sample_rate": self.target_sample_rate,
+            "default_seconds_per_chunk": DEFAULT_SECONDS_PER_CHUNK,
             "min_chunk_size_seconds": self._min_chunk_size,
+            "sample_rate": self.target_sample_rate,
             "clips": clips_config,
         }
 

@@ -16,6 +16,13 @@ def _lazy_cmd_match(args):
     return cmd_match(args)
 
 
+def _lazy_cmd_show_config(args):
+    """Import show_config command lazily to speed up CLI startup."""
+    from audio_pattern_detector.match import cmd_show_config
+
+    return cmd_show_config(args)
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -43,10 +50,14 @@ def main():
     match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
     match_parser.add_argument('--chunk-seconds', metavar='seconds', type=str, default='60',
                               help='seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length)')
-    match_parser.add_argument('--show-config', action='store_true',
-                              help='output computed configuration (seconds_per_chunk, sliding windows, etc.) as JSON and exit')
     match_parser.add_argument('--debug', metavar='debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)
     match_parser.set_defaults(func=_lazy_cmd_match)
+
+    # Add show-config subcommand
+    show_config_parser = subparsers.add_parser('show-config', help='Show computed configuration for pattern files')
+    show_config_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, help='pattern file')
+    show_config_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
+    show_config_parser.set_defaults(func=_lazy_cmd_show_config)
 
     args = parser.parse_args()
 

@@ -163,24 +163,6 @@ def cmd_match(args):
         print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
         sys.exit(1)
 
-    # Handle --show-config: create detector, output config, exit
-    if getattr(args, 'show_config', False):
-        pattern_clips = []
-        for pattern_file in pattern_files:
-            if not os.path.exists(pattern_file):
-                print(f"Error: Pattern {pattern_file} does not exist", file=sys.stderr)
-                sys.exit(1)
-            pattern_clips.append(AudioClip.from_audio_file(pattern_file))
-
-        detector = AudioPatternDetector(
-            audio_clips=pattern_clips,
-            debug_mode=args.debug,
-            seconds_per_chunk=seconds_per_chunk,
-        )
-        config = detector.get_config()
-        print(json.dumps(config, indent=2, ensure_ascii=False))
-        return
-
     jsonl_mode = getattr(args, 'jsonl', False)
 
     if args.audio_folder:
@@ -239,3 +221,32 @@ def cmd_match(args):
     else:
         print("Please provide --audio-file, --audio-folder, --audio-url, or --stdin", file=sys.stderr)
         sys.exit(1)
+
+
+def cmd_show_config(args):
+    """Handler for show-config subcommand"""
+    if args.pattern_folder:
+        pattern_files = []
+        for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
+            pattern_files.append(pattern_file)
+    elif args.pattern_file:
+        pattern_files = [args.pattern_file]
+    else:
+        print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
+        sys.exit(1)
+
+    pattern_clips = []
+    for pattern_file in pattern_files:
+        if not os.path.exists(pattern_file):
+            print(f"Error: Pattern {pattern_file} does not exist", file=sys.stderr)
+            sys.exit(1)
+        pattern_clips.append(AudioClip.from_audio_file(pattern_file))
+
+    # Use auto mode (None) to show minimum computed values
+    detector = AudioPatternDetector(
+        audio_clips=pattern_clips,
+        debug_mode=False,
+        seconds_per_chunk=None,
+    )
+    config = detector.get_config()
+    print(json.dumps(config, indent=2, ensure_ascii=False))

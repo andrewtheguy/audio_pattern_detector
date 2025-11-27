@@ -75,7 +75,6 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 | `--pattern-file` | Single pattern file to match |
 | `--pattern-folder` | Folder of pattern clips to match |
 | `--chunk-seconds` | Seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length) |
-| `--show-config` | Output computed configuration as JSON and exit (no audio file required) |
 | `--jsonl` | Output JSONL events as they occur (streaming mode) |
 | `--debug` | Enable debug mode |
 
@@ -94,12 +93,12 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav -
 audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav --chunk-seconds 10
 ```
 
-#### Show Configuration
+### Show-config - Show computed configuration for patterns
 
-Use `--show-config` to see computed configuration without processing audio:
+Use `show-config` to see computed configuration for pattern files without processing audio:
 
 ```shell
-audio-pattern-detector match --pattern-folder ./clips --chunk-seconds auto --show-config
+audio-pattern-detector show-config --pattern-folder ./clips
 ```
 
 Output:
@@ -119,7 +118,7 @@ Output:
 }
 ```
 
-#### JSONL Streaming Output
+#### JSONL Streaming Output (match)
 
 Use `--jsonl` for streaming output that emits events as patterns are detected:
 
