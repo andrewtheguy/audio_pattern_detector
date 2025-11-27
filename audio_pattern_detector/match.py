@@ -219,6 +219,31 @@ class _RawPcmStreamWrapper:
         self._bytes_per_sample = 4  # float32
         self._validated = False
 
+    def _check_for_wav_header(self, data: bytes) -> None:
+        """Check if data starts with WAV header and raise error if so.
+
+        WAV file structure:
+        - Bytes 0-3:   "RIFF" (0x52, 0x49, 0x46, 0x46)
+        - Bytes 4-7:   File size minus 8
+        - Bytes 8-11:  "WAVE" (0x57, 0x41, 0x56, 0x45)
+        - Bytes 12-15: "fmt " (0x66, 0x6D, 0x74, 0x20) - format chunk ID
+
+        If raw PCM mode receives WAV data, abort early with a helpful error message.
+        """
+        if len(data) < 16:
+            return
+
+        # Check for WAV header: RIFF....WAVEfmt
+        is_riff = data[0:4] == b'RIFF'
+        is_wave = data[8:12] == b'WAVE'
+        is_fmt = data[12:16] == b'fmt '
+
+        if is_riff and is_wave and is_fmt:
+            raise ValueError(
+                "Input appears to be WAV format (detected RIFF/WAVE/fmt header). "
+                "Use --stdin without --raw-pcm for WAV input, or ensure input is raw float32 PCM."
+            )
+
     def _validate_first_chunk(self, audio: np.ndarray) -> None:
         """Check first chunk for signs of corrupt audio and emit warnings."""
         if self._validated or len(audio) == 0:
@@ -268,6 +293,8 @@ class _RawPcmStreamWrapper:
         if not self.needs_resample:
             data = sys.stdin.buffer.read(size)
             if data and not self._validated:
+                # Check for WAV header before processing as raw PCM
+                self._check_for_wav_header(data)
                 audio = np.frombuffer(data, dtype=np.float32)
                 self._validate_first_chunk(audio)
             return data
@@ -281,6 +308,10 @@ class _RawPcmStreamWrapper:
         data = sys.stdin.buffer.read(input_bytes)
         if not data:
             return b""
+
+        # Check for WAV header before processing as raw PCM
+        if not self._validated:
+            self._check_for_wav_header(data)
 
         # Convert to numpy, resample, and convert back to bytes
         audio = np.frombuffer(data, dtype=np.float32)

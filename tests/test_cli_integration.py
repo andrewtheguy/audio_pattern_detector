@@ -648,3 +648,21 @@ def test_stdin_source_sample_rate_only_with_raw_pcm():
     )
     assert result.returncode != 0
     assert b"--source-sample-rate can only be used with --raw-pcm" in result.stderr
+
+
+def test_stdin_raw_pcm_rejects_wav_input():
+    """Test --raw-pcm mode detects and rejects WAV input with helpful error."""
+    # Send WAV data to raw PCM mode - should be rejected
+    wav_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+
+    result = run_cli_binary(
+        "match",
+        "--stdin",
+        "--raw-pcm",
+        "--source-sample-rate", "8000",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        stdin_data=wav_data,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert b"WAV format" in result.stderr or b"RIFF/WAVE" in result.stderr
