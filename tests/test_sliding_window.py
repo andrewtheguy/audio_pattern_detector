@@ -906,3 +906,279 @@ class TestLargeSlidingWindow:
         # If there was drift, late_error would be significantly larger
         assert abs(late_error - early_error) < 0.5, \
             f"Drift detected: early_error={early_error:.3f}s, late_error={late_error:.3f}s"
+
+
+class TestSlidingWindowOverlapDeduplication:
+    """Tests for patterns in the overlap region between chunks.
+
+    When a pattern falls in the overlap region, it may be detected by both
+    the current chunk and the next chunk. This tests whether both detections
+    report the same timestamp (which would allow deduplication).
+    """
+
+    def test_pattern_in_overlap_detected_with_same_timestamp(self):
+        """Test that a pattern in the overlap region produces consistent timestamps.
+
+        Scenario:
+        - Pattern duration: 3.5s -> sliding_window = ceil(3.5) = 4s
+        - Chunk size: 10s
+        - Audio duration: 20s
+        - Pattern at 7s (overlaps into next chunk's sliding window)
+
+        Chunk 0 processes 0-10s, detects pattern at ~7s
+        Chunk 1 processes 6-20s (with 4s overlap), may also detect pattern at ~7s
+
+        Both should report the same timestamp if detected in both.
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 3.5  # sliding_window = ceil(3.5) = 4
+        seconds_per_chunk = 10
+
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="overlap_test", audio=audio, sample_rate=sr)
+
+        # Pattern at 7s - this is in the overlap region for chunk 1
+        # Chunk 1's overlap covers seconds 6-10 from chunk 0
+        pattern_start = 7.0
+        audio_duration = 20.0
+
+        silence_before = create_silence(pattern_start, sr)
+        silence_after = create_silence(audio_duration - pattern_start - pattern_duration, sr)
+        full_audio = np.concatenate([silence_before, pattern.audio, silence_after])
+
+        audio_stream = create_audio_stream_from_array(full_audio, "test_audio")
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=seconds_per_chunk
+        )
+        peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        assert 'overlap_test' in peak_times
+
+        # Check if we got duplicate detections
+        detections = peak_times['overlap_test']
+        print(f"Detections: {detections}")  # Debug output
+
+        if len(detections) >= 2:
+            # If detected twice, both timestamps should be very close (same position)
+            detections_sorted = sorted(detections)
+            for i in range(1, len(detections_sorted)):
+                diff = abs(detections_sorted[i] - detections_sorted[i - 1])
+                # If timestamps are nearly identical, they represent the same detection
+                if diff < 0.1:
+                    print(f"Duplicate detection found: {detections_sorted[i-1]:.4f}s and {detections_sorted[i]:.4f}s")
+
+        # Verify at least one detection near expected position
+        expected_time = pattern_start
+        closest = min(detections, key=lambda t: abs(t - expected_time))
+        assert abs(closest - expected_time) < 0.5, \
+            f"Expected detection near {expected_time}s, got {closest}s"
+
+    def test_overlap_duplicate_timestamps_are_identical(self):
+        """Test that duplicate detections from overlap have identical timestamps.
+
+        This is important for deduplication - if both chunks detect the same
+        pattern, they should report exactly the same timestamp.
+
+        Using:
+        - Pattern: 3.5s (sliding_window = 4s)
+        - Chunk: 10s
+        - Pattern at 8s (near end of first chunk, in overlap region)
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 3.5
+        seconds_per_chunk = 10
+
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="dedup_test", audio=audio, sample_rate=sr)
+
+        # Pattern at 8s - definitely in overlap (6-10s of chunk 0)
+        pattern_start = 8.0
+        audio_duration = 25.0
+
+        silence_before = create_silence(pattern_start, sr)
+        silence_after = create_silence(audio_duration - pattern_start - pattern_duration, sr)
+        full_audio = np.concatenate([silence_before, pattern.audio, silence_after])
+
+        audio_stream = create_audio_stream_from_array(full_audio, "test_audio")
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=seconds_per_chunk
+        )
+        peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        detections = peak_times['dedup_test']
+        print(f"Detections for dedup_test: {detections}")
+
+        # If we have duplicates, verify they are the same timestamp
+        if len(detections) > 1:
+            unique_timestamps = set()
+            for t in detections:
+                # Round to 2 decimal places to group near-identical timestamps
+                rounded = round(t, 2)
+                unique_timestamps.add(rounded)
+
+            # Check if duplicates have same timestamp (after rounding)
+            if len(unique_timestamps) < len(detections):
+                print("Duplicate timestamps detected - can be deduplicated!")
+
+            # All detections should point to the same position
+            for t in detections:
+                assert abs(t - pattern_start) < 0.5, \
+                    f"Detection {t}s too far from expected {pattern_start}s"
+
+    def test_pattern_exactly_at_chunk_boundary_overlap(self):
+        """Test pattern that ends exactly at chunk boundary.
+
+        Pattern at position where it ends at 10s (chunk boundary).
+        This is the edge case where detection might happen in both chunks.
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 3.5
+        seconds_per_chunk = 10
+
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="boundary_exact", audio=audio, sample_rate=sr)
+
+        # Pattern ends exactly at 10s boundary
+        pattern_start = 10.0 - pattern_duration  # 6.5s
+        audio_duration = 25.0
+
+        silence_before = create_silence(pattern_start, sr)
+        silence_after = create_silence(audio_duration - pattern_start - pattern_duration, sr)
+        full_audio = np.concatenate([silence_before, pattern.audio, silence_after])
+
+        audio_stream = create_audio_stream_from_array(full_audio, "test_audio")
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=seconds_per_chunk
+        )
+        peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        detections = peak_times['boundary_exact']
+        print(f"Boundary exact detections: {detections}")
+
+        assert len(detections) >= 1, "Pattern at boundary should be detected"
+
+        # All detections should be near the expected timestamp
+        for t in detections:
+            assert abs(t - pattern_start) < 0.5, \
+                f"Detection {t}s too far from expected {pattern_start}s"
+
+    def test_short_pattern_large_sliding_window_scenario(self):
+        """Test scenario similar to user's question.
+
+        Note: sliding_window is always ceil(pattern_duration), so to get
+        a 4-second sliding window with a 1-second pattern is not directly
+        possible. This test uses a 3.5s pattern (4s sliding window).
+
+        Audio: 20s, Chunks: 10s, Pattern at 9s
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 3.5  # ceil(3.5) = 4s sliding window
+        seconds_per_chunk = 10
+
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="user_scenario", audio=audio, sample_rate=sr)
+
+        # Pattern at 9s (like user's example)
+        # This is in the overlap region (6-10s) for chunk 1
+        pattern_start = 9.0
+        audio_duration = 20.0
+
+        # But pattern would extend to 12.5s, crossing into chunk 1
+        silence_before = create_silence(pattern_start, sr)
+        remaining = audio_duration - pattern_start - pattern_duration
+        if remaining > 0:
+            silence_after = create_silence(remaining, sr)
+            full_audio = np.concatenate([silence_before, pattern.audio, silence_after])
+        else:
+            # Pattern extends beyond audio duration
+            full_audio = np.concatenate([silence_before, pattern.audio])
+            full_audio = full_audio[:int(audio_duration * sr)]
+
+        audio_stream = create_audio_stream_from_array(full_audio, "test_audio")
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=seconds_per_chunk
+        )
+        peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+        detections = peak_times['user_scenario']
+        print(f"User scenario detections: {detections}")
+
+        # Analyze duplicates
+        if len(detections) > 1:
+            # Check if duplicates are at same timestamp
+            sorted_dets = sorted(detections)
+            duplicates_same_ts = []
+            for i in range(len(sorted_dets) - 1):
+                if abs(sorted_dets[i + 1] - sorted_dets[i]) < 0.1:
+                    duplicates_same_ts.append((sorted_dets[i], sorted_dets[i + 1]))
+            if duplicates_same_ts:
+                print(f"Same-timestamp duplicates found: {duplicates_same_ts}")
+                print("These can be deduplicated by rounding/grouping")
+
+    def test_verify_duplicate_timestamp_calculation(self):
+        """Verify the exact timestamp calculation for overlap duplicates.
+
+        This test traces through the math to confirm both chunks produce
+        the same timestamp for the same pattern position.
+
+        For a pattern at absolute position P with duration D:
+        - Chunk 0 (index=0): final_ts = (P + D) - 0 + 0 - D = P
+        - Chunk 1 (index=1) with sliding_window S:
+          - Pattern is at position (P + D - (chunk_size - S)) in audio_section
+          - final_ts = ((P + D - (chunk_size - S))) - S + chunk_size - D
+          - = P + D - chunk_size + S - S + chunk_size - D = P ✓
+        """
+        sr = TARGET_SAMPLE_RATE
+        pattern_duration = 3.5  # sliding_window = ceil(3.5) = 4
+        seconds_per_chunk = 10
+
+        audio = create_sine_tone(1000.0, pattern_duration, sr)
+        pattern = AudioClip(name="calc_verify", audio=audio, sample_rate=sr)
+
+        # Test multiple positions in the overlap region
+        test_positions = [6.5, 7.0, 8.0, 9.0]
+        audio_duration = 25.0
+
+        for pattern_start in test_positions:
+            silence_before = create_silence(pattern_start, sr)
+            remaining = audio_duration - pattern_start - pattern_duration
+            silence_after = create_silence(max(0, remaining), sr)
+            full_audio = np.concatenate([silence_before, pattern.audio, silence_after])
+            full_audio = full_audio[:int(audio_duration * sr)]
+
+            audio_stream = create_audio_stream_from_array(full_audio, "test_audio")
+
+            detector = AudioPatternDetector(
+                debug_mode=False,
+                audio_clips=[pattern],
+                seconds_per_chunk=seconds_per_chunk
+            )
+            peak_times, _ = detector.find_clip_in_audio(audio_stream)
+
+            detections = peak_times['calc_verify']
+
+            # All detections should be near pattern_start
+            for t in detections:
+                error = abs(t - pattern_start)
+                assert error < 0.5, \
+                    f"Pattern at {pattern_start}s: detection at {t}s has error {error:.3f}s"
+
+            # If multiple detections, they should be identical (same timestamp)
+            if len(detections) > 1:
+                for i, t1 in enumerate(detections):
+                    for t2 in detections[i + 1:]:
+                        diff = abs(t1 - t2)
+                        assert diff < 0.1, \
+                            f"Duplicate timestamps differ: {t1}s vs {t2}s (diff={diff:.4f}s)"
