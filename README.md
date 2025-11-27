@@ -12,26 +12,26 @@ It uses cross-correlation to detect the potential matching pattern, and then use
 
 ## Installation
 
-### Install locally with uv
+### Install from GitHub (recommended)
+```shell
+uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git
+```
+
+### Install locally for development
 ```shell
 uv pip install -e .
 ```
 
 ### Run without installing
 
-**Using uv (recommended):**
+**Using uv (from local directory):**
 ```shell
 uv run audio-pattern-detector [command] [options]
 ```
 
-**Using Python module execution:**
+**Using pipx (from GitHub):**
 ```shell
-python -m audio_pattern_detector.cli [command] [options]
-```
-
-**Using pipx:**
-```shell
-pipx run --spec . audio-pattern-detector [command] [options]
+pipx run --spec git+https://github.com/andrewtheguy/audio_pattern_detector.git audio-pattern-detector [command] [options]
 ```
 
 ## Audio Requirements
