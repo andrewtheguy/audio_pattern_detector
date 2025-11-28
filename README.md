@@ -239,5 +239,32 @@ won't work well for patterns that are too short, currently it disallow short cli
 It will miss distorted patterns like this because error score is too high and area overlap ratio is too low:
 ![rthk_beep_39_00:39:00_478782](https://github.com/user-attachments/assets/80669708-b8f9-461c-ae6c-2edddb161904)
 
-## testing
-use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.
+## Testing
+
+Use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.
+
+```shell
+uv run pytest
+```
+
+### Testing with Docker
+
+Build with dev dependencies and run tests with mounted tests directory:
+
+```shell
+# Build with dev dependencies
+docker build --build-arg INCLUDE_DEV=true -t audio-pattern-detector-test .
+
+# Run tests (mount tests directory since it's excluded from image)
+docker run --rm \
+  -v $(pwd)/tests:/usr/src/app/tests:ro \
+  audio-pattern-detector-test \
+  uv run pytest -v
+```
+
+### Production Docker build
+
+```shell
+# Default build (no dev dependencies)
+docker build -t audio-pattern-detector .
+```
