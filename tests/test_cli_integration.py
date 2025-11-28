@@ -16,11 +16,16 @@ from pathlib import Path
 
 import pytest
 
-# Skip stdin tests on GitHub Actions due to pipe handling differences
+# Skip stdin tests on GitHub Actions due to FIFO stdin issue
+# GitHub Actions Ubuntu runners have an ever-present FIFO on stdin that interferes
+# with subprocess stdin piping. This is a known issue:
+# https://github.com/actions/runner-images/issues/10959
+# NOTE: Running tests inside Docker should avoid this issue.
 IS_GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS") == "true"
+# Temporarily disabled to test Docker workaround
 skip_on_github_actions = pytest.mark.skipif(
-    IS_GITHUB_ACTIONS,
-    reason="Stdin pipe handling differs on GitHub Actions runners"
+    False,  # Was: IS_GITHUB_ACTIONS
+    reason="GitHub Actions FIFO stdin issue: https://github.com/actions/runner-images/issues/10959"
 )
 
 

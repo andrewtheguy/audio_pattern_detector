@@ -34,6 +34,13 @@ jobs:
       run: |
         # stop the build if there are Python syntax errors or undefined names
         uv run ruff check
-    - name: Test with pytest
+    # Run tests inside Docker to avoid GitHub Actions FIFO stdin issue
+    # https://github.com/actions/runner-images/issues/10959
+    - name: Build Docker image with dev dependencies
+      run: docker build --build-arg INCLUDE_DEV=true -t audio-pattern-detector-test .
+    - name: Test with pytest in Docker
       run: |
-        uv run pytest
+        docker run --rm \
+          -v ${{ github.workspace }}/tests:/usr/src/app/tests:ro \
+          audio-pattern-detector-test \
+          uv run pytest -v
