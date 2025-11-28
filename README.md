@@ -249,15 +249,16 @@ uv run pytest
 
 ### Testing with Docker
 
-Build with dev dependencies and run tests with mounted tests directory:
+Build with dev dependencies and run tests with mounted directories:
 
 ```shell
 # Build with dev dependencies
 docker build --build-arg INCLUDE_DEV=true -t audio-pattern-detector-test .
 
-# Run tests (mount tests directory since it's excluded from image)
+# Run tests (mount tests and sample_audios since they're excluded from image)
 docker run --rm \
   -v $(pwd)/tests:/usr/src/app/tests:ro \
+  -v $(pwd)/sample_audios:/usr/src/app/sample_audios:ro \
   audio-pattern-detector-test \
   uv run pytest -v
 ```
