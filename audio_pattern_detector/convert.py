@@ -1,3 +1,4 @@
+import argparse
 import os
 
 from audio_pattern_detector.audio_utils import (
@@ -6,7 +7,7 @@ from audio_pattern_detector.audio_utils import (
 )
 
 
-def convert_audio_to_clip_format(audio_path, output_path):
+def convert_audio_to_clip_format(audio_path: str, output_path: str) -> None:
     """Convert audio file to clip format (8kHz, mono)"""
     target_sample_rate = 8000
 
@@ -20,7 +21,7 @@ def convert_audio_to_clip_format(audio_path, output_path):
     write_wav_file(output_path, clip, target_sample_rate)
 
 
-def cmd_convert(args):
+def cmd_convert(args: argparse.Namespace) -> None:
     """Handler for convert subcommand"""
     input_file = args.audio_file
     convert_audio_to_clip_format(input_file, args.dest_file)

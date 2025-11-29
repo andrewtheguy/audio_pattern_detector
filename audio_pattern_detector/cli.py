@@ -2,21 +2,21 @@ import argparse
 import sys
 
 
-def _lazy_cmd_convert(args):
+def _lazy_cmd_convert(args: argparse.Namespace) -> None:
     """Import convert command lazily to speed up CLI startup."""
     from audio_pattern_detector.convert import cmd_convert
 
     return cmd_convert(args)
 
 
-def _lazy_cmd_match(args):
+def _lazy_cmd_match(args: argparse.Namespace) -> None:
     """Import match command lazily to speed up CLI startup."""
     from audio_pattern_detector.match import cmd_match
 
     return cmd_match(args)
 
 
-def _lazy_cmd_show_config(args):
+def _lazy_cmd_show_config(args: argparse.Namespace) -> None:
     """Import show_config command lazily to speed up CLI startup."""
     from audio_pattern_detector.match import cmd_show_config
 

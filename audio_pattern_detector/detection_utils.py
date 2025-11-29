@@ -1,5 +1,5 @@
 import math
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,7 +16,7 @@ class OverlapResult(TypedDict):
     percent_control_area: float
 
 
-def area_of_overlap_ratio(control: NDArray[np.floating], variable: NDArray[np.floating]) -> OverlapResult:
+def area_of_overlap_ratio(control: NDArray[np.floating[Any]], variable: NDArray[np.floating[Any]]) -> OverlapResult:
     from scipy.integrate import simpson
 
     if len(control) != len(variable):

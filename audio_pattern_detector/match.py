@@ -1,9 +1,11 @@
+import argparse
 import glob
 import json
 import os
 import sys
 import wave
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -18,7 +20,7 @@ from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
 )
 
-def _emit_jsonl(event_type: str, **kwargs):
+def _emit_jsonl(event_type: str, **kwargs: Any) -> None:
     """Emit a JSONL event to stdout and flush immediately."""
     event = {"type": event_type, **kwargs}
     print(json.dumps(event, ensure_ascii=False), flush=True)
@@ -557,9 +559,16 @@ def _make_jsonl_callback() -> PatternDetectedCallback:
 
 
 def _run_match_with_output(
-    args, pattern_files, audio_source, debug_output_file,
-    from_stdin=False, raw_pcm=False, seconds_per_chunk: int | None = 60, source_sample_rate=None, target_sample_rate=None
-):
+    args: argparse.Namespace,
+    pattern_files: list[str],
+    audio_source: str | None,
+    debug_output_file: str,
+    from_stdin: bool = False,
+    raw_pcm: bool = False,
+    seconds_per_chunk: int | None = 60,
+    source_sample_rate: int | None = None,
+    target_sample_rate: int | None = None,
+) -> tuple[dict[str, list[float]] | None, float]:
     """Run match_pattern and handle output (JSON or JSONL).
 
     For stdin mode, always uses JSONL output.
@@ -606,7 +615,7 @@ def _run_match_with_output(
     return peak_times, total_time
 
 
-def cmd_match(args):
+def cmd_match(args: argparse.Namespace) -> None:
     """Handler for match subcommand"""
     # Parse chunk-seconds argument: "auto" -> None, otherwise int
     chunk_seconds_str = getattr(args, 'chunk_seconds', '60')
@@ -694,7 +703,7 @@ def cmd_match(args):
         sys.exit(1)
 
 
-def cmd_show_config(args):
+def cmd_show_config(args: argparse.Namespace) -> None:
     """Handler for show-config subcommand"""
     # Get target sample rate (None means use default 8000)
     target_sample_rate = getattr(args, 'target_sample_rate', None)

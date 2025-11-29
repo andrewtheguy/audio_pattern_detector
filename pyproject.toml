@@ -32,6 +32,7 @@ filterwarnings = [
 
 [tool.pyright]
 exclude = [".venv", "build", "dist", ".git", "tests"]
+reportUnknownParameterType = true
 
 [build-system]
 requires = ["hatchling"]

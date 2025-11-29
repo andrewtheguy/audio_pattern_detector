@@ -7,7 +7,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from operator import itemgetter
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import numpy as np
 import pyloudnorm as pyln
@@ -37,7 +37,7 @@ class ClipData(TypedDict):
     clip_name: str
     sliding_window: int
     correlation_clip: NDArray[np.float64]
-    correlation_clip_absolute_max: np.floating
+    correlation_clip_absolute_max: np.floating[Any]
 
 
 class ClipCache(TypedDict):
@@ -65,7 +65,7 @@ class DetectorConfig(TypedDict):
 PatternDetectedCallback = Callable[[str, float], None]
 
 
-def _mean_squared_error(y_true: NDArray[np.floating], y_pred: NDArray[np.floating]) -> np.floating:
+def _mean_squared_error(y_true: NDArray[np.floating[Any]], y_pred: NDArray[np.floating[Any]]) -> np.floating[Any]:
     """Simple MSE implementation to avoid sklearn dependency."""
     return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
 
@@ -347,14 +347,14 @@ class AudioPatternDetector:
 
         return all_peak_times, total_time
 
-    def _get_clip_correlation(self, clip: NDArray[np.float32]) -> tuple[NDArray[np.float64], np.floating]:
+    def _get_clip_correlation(self, clip: NDArray[np.float32]) -> tuple[NDArray[np.float64], np.floating[Any]]:
         # Cross-correlate and normalize correlation
         from scipy.signal import correlate
         correlation_clip: NDArray[np.float64] = correlate(clip, clip, mode='full', method='fft')
 
         # abs
         correlation_clip = np.abs(correlation_clip)
-        absolute_max: np.floating = np.max(correlation_clip)
+        absolute_max: np.floating[Any] = np.max(correlation_clip)
         correlation_clip /= absolute_max
 
         return correlation_clip, absolute_max
@@ -371,7 +371,7 @@ class AudioPatternDetector:
         sr: int,
         previous_chunk: NDArray[np.float32] | None,
         index: int,
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
         clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
         seconds_per_chunk = self.seconds_per_chunk
@@ -464,7 +464,7 @@ class AudioPatternDetector:
         audio_section: NDArray[np.float32],
         sr: int,
         index: int,
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
@@ -632,11 +632,11 @@ class AudioPatternDetector:
         clip_name: str,
         index: int,
         section_ts: str,
-        similarities: list[tuple[np.floating, dict[str, float | np.floating]]],
+        similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
         peaks_final: list[int],
         clip_cache: ClipCache,
-        area_props: list[list],
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+        area_props: list[list[Any]],
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> None:
 
         debug_mode = self.debug_mode
@@ -828,11 +828,11 @@ class AudioPatternDetector:
         clip_name: str,
         index: int,
         section_ts: str,
-        similarities: list[tuple[np.floating, dict[str, float | np.floating]]],
+        similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
         peaks_final: list[int],
         clip_cache: ClipCache,
-        area_props: list[list],
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+        area_props: list[list[Any]],
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> None:
 
         sr = self.target_sample_rate

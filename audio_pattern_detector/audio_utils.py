@@ -3,7 +3,7 @@ import subprocess
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import IO
+from typing import IO, Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -39,7 +39,7 @@ def is_ffmpeg_available() -> bool:
     return _ffmpeg_available
 
 
-def load_wav_file_scipy(file_path: str) -> tuple[np.ndarray, int]:
+def load_wav_file_scipy(file_path: str) -> tuple[NDArray[np.float32], int]:
     """Load WAV file without ffmpeg using scipy.io.wavfile.
 
     Args:
@@ -79,7 +79,7 @@ def load_wav_file_scipy(file_path: str) -> tuple[np.ndarray, int]:
     return data, sample_rate
 
 
-def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> NDArray[np.float32]:
     """Resample audio using scipy (no ffmpeg needed).
 
     Args:
@@ -167,11 +167,11 @@ def _load_wave_file_ffmpeg_convert(file_path: str, target_sample_rate: int) -> N
     return samples
 
 
-def downsample_preserve_maxima(curve: NDArray[np.floating], num_samples: int) -> NDArray[np.float32]:
+def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
     """Downsample a curve while preserving local maxima."""
     n_points = len(curve)
     step_size = n_points / num_samples
-    compressed_curve: list[np.floating] = []
+    compressed_curve: list[np.floating[Any]] = []
 
     for i in range(num_samples):
         start_index = int(i * step_size)
