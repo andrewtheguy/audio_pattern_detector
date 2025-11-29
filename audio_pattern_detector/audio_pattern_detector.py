@@ -41,7 +41,7 @@ def _write_audio_file(filepath, audio_data, sample_rate):
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk=DEFAULT_SECONDS_PER_CHUNK, target_sample_rate=None):
+    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate=None):
         """Initialize the audio pattern detector.
 
         Args:

@@ -27,7 +27,7 @@ def match_pattern(
     debug_mode=False,
     on_pattern_detected=None,
     accumulate_results=True,
-    seconds_per_chunk=60,
+    seconds_per_chunk: int | None = 60,
     from_stdin=False,
     raw_pcm=False,
     sample_rate=None,
@@ -555,7 +555,7 @@ def _make_jsonl_callback():
 
 def _run_match_with_output(
     args, pattern_files, audio_source, debug_output_file,
-    from_stdin=False, raw_pcm=False, seconds_per_chunk=60, source_sample_rate=None, target_sample_rate=None
+    from_stdin=False, raw_pcm=False, seconds_per_chunk: int | None = 60, source_sample_rate=None, target_sample_rate=None
 ):
     """Run match_pattern and handle output (JSON or JSONL).
 

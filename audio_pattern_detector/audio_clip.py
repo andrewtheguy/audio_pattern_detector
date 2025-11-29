@@ -1,11 +1,16 @@
-import io
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_utils import load_wave_file, DEFAULT_TARGET_SAMPLE_RATE
+
+
+class ReadableStream(Protocol):
+    """Protocol for objects that can read bytes."""
+    def read(self, size: int, /) -> bytes: ...
 
 
 @dataclass(frozen=True)
@@ -42,5 +47,5 @@ class AudioClip:
 @dataclass(frozen=True)
 class AudioStream:
     name: str
-    audio_stream: io.BufferedReader # this should be raw byte stream of 16 bit mono 8000HZ PCM audio
+    audio_stream: ReadableStream  # raw byte stream of float32 mono PCM audio at sample_rate
     sample_rate: int

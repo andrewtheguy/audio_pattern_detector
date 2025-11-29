@@ -94,7 +94,7 @@ def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarra
 
     num_samples = int(len(audio) * target_sr / orig_sr)
     resampled = signal.resample(audio, num_samples)
-    return resampled.astype(np.float32)
+    return np.asarray(resampled, dtype=np.float32)
 
 
 def slicing_with_zero_padding(array,width,middle_index):
@@ -249,11 +249,12 @@ def ffmpeg_get_float32_pcm(
             stdin=sys.stdin.buffer if from_stdin else None,
             stdout=subprocess.PIPE  # Pipe stdout
         )
+        assert process.stdout is not None  # guaranteed by stdout=subprocess.PIPE
         yield process.stdout
         if process.wait() != 0:
             raise ValueError(f"ffmpeg command failed with return code {process.returncode}")
     finally:
-        if process is not None:
+        if process is not None and process.stdout is not None:
             process.stdout.close()
 
 
