@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Build Docker image with dev dependencies
-      run: docker build --build-arg INCLUDE_DEV=true -t audio-pattern-detector-test .
+    - name: Build test Docker image
+      run: docker build -f Dockerfile.test -t audio-pattern-detector-test .
     - name: Lint with ruff
       run: docker run --rm audio-pattern-detector-test uv run ruff check
     - name: Type check with basedpyright
@@ -29,5 +29,4 @@ jobs:
         docker run --rm \
           -v ${{ github.workspace }}/tests:/usr/src/app/tests:ro \
           -v ${{ github.workspace }}/sample_audios:/usr/src/app/sample_audios:ro \
-          audio-pattern-detector-test \
-          uv run pytest -v
+          audio-pattern-detector-test

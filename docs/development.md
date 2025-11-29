@@ -22,27 +22,41 @@ Use pytest to test because not all of them are written using default python unit
 uv run pytest
 ```
 
-## Testing with Docker
+## Docker
 
-Build with dev dependencies and run tests with mounted directories:
+### Testing with Docker
+
+Use `Dockerfile.test` which includes ffmpeg and dev dependencies:
 
 ```shell
-# Build with dev dependencies
-docker build --build-arg INCLUDE_DEV=true -t audio-pattern-detector-test .
+# Build test image
+docker build -f Dockerfile.test -t audio-pattern-detector-test .
 
 # Run tests (mount tests and sample_audios since they're excluded from image)
 docker run --rm \
   -v $(pwd)/tests:/usr/src/app/tests:ro \
   -v $(pwd)/sample_audios:/usr/src/app/sample_audios:ro \
-  audio-pattern-detector-test \
-  uv run pytest -v
+  audio-pattern-detector-test
 ```
 
-## Production Docker build
+### Production Docker build
+
+Use the default `Dockerfile` which is minimal and does not include ffmpeg:
 
 ```shell
-# Default build (no dev dependencies)
 docker build -t audio-pattern-detector .
+```
+
+**Note**: The production image does not include ffmpeg. It supports:
+- WAV files (processed with scipy, no ffmpeg needed)
+- Stdin modes (WAV, raw PCM, multiplexed)
+
+For non-WAV file support (mp3, flac, etc.), pipe through ffmpeg on the host:
+
+```shell
+ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
+  docker run --rm -i -v $(pwd)/pattern.wav:/pattern.wav:ro audio-pattern-detector \
+  audio-pattern-detector match --stdin --pattern-file /pattern.wav
 ```
 
 ## Detection Algorithm

@@ -1,0 +1,34 @@
+# Test Dockerfile - includes ffmpeg and dev dependencies
+FROM python:3.12-slim-bookworm
+
+RUN apt-get -yqq update && \
+    apt-get install -yq --no-install-recommends ca-certificates expat libgomp1 tini git && \
+    apt-get autoremove -y && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# Include ffmpeg for testing non-WAV file support
+COPY --from=mwader/static-ffmpeg:7.0-1 /ffmpeg /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:7.0-1 /ffprobe /usr/local/bin/
+
+COPY --from=ghcr.io/astral-sh/uv:0.9.11 /uv /usr/local/bin/uv
+
+ENV app=/usr/src/app
+WORKDIR $app
+
+# Copy only dependency files first for better layer caching
+COPY pyproject.toml uv.lock README.md ./
+
+ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+RUN uv sync --locked --no-install-project
+
+# Copy application code (tests and sample_audios should be mounted)
+COPY audio_pattern_detector ./audio_pattern_detector
+
+# Install the project with dev dependencies
+RUN uv sync --locked
+
+# numba cache
+ENV NUMBA_CACHE_DIR=/tmp/numba_cache_dir
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["uv", "run", "pytest", "-v"]
