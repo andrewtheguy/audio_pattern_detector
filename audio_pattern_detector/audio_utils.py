@@ -364,13 +364,12 @@ def write_wav_file(filepath, audio_data, sample_rate):
     process = subprocess.Popen(
         command,
         stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stdout=subprocess.DEVNULL,  # ffmpeg writes to file, not stdout
     )
-    _, stderr = process.communicate(input=audio_int16.tobytes())
+    process.communicate(input=audio_int16.tobytes())
 
     if process.returncode != 0:
-        raise ValueError(f"ffmpeg write failed: {stderr.decode()}")
+        raise ValueError(f"ffmpeg write failed with return code {process.returncode}")
 
 def get_audio_duration(audio_path: str) -> float | None:
     """Get the duration of an audio file/URL using ffprobe.
