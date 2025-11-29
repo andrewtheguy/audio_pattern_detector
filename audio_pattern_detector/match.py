@@ -130,10 +130,20 @@ def match_pattern(
     sr = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
 
     pattern_clips = []
+    clip_names_seen: dict[str, str] = {}  # name -> file path for error messages
     for pattern_file in pattern_files:
         if not os.path.exists(pattern_file):
             raise ValueError(f"Pattern {pattern_file} does not exist")
         pattern_clip = AudioClip.from_audio_file(pattern_file, sample_rate=sr)
+        # Check for duplicate clip names
+        if pattern_clip.name in clip_names_seen:
+            raise ValueError(
+                f"Duplicate clip name '{pattern_clip.name}' from files:\n"
+                f"  - {clip_names_seen[pattern_clip.name]}\n"
+                f"  - {pattern_file}\n"
+                f"Use --pattern-file with name=path syntax to specify unique names."
+            )
+        clip_names_seen[pattern_clip.name] = pattern_file
         pattern_clips.append(pattern_clip)
 
     if len(pattern_clips) == 0:
@@ -789,13 +799,17 @@ def cmd_match(args: argparse.Namespace) -> None:
         return
 
     # Non-multiplexed modes: require pattern file(s)
+    if args.pattern_folder and args.pattern_file:
+        print("Error: --pattern-file and --pattern-folder are mutually exclusive", file=sys.stderr)
+        sys.exit(1)
+
     if args.pattern_folder:
         pattern_files = []
         for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
             print(f"adding pattern file {pattern_file}...", file=sys.stderr)
             pattern_files.append(pattern_file)
     elif args.pattern_file:
-        pattern_files = [args.pattern_file]
+        pattern_files = args.pattern_file  # already a list from action='append'
     else:
         print("Please provide either --pattern-file, --pattern-folder, or --multiplexed-stdin", file=sys.stderr)
         sys.exit(1)
@@ -866,12 +880,16 @@ def cmd_show_config(args: argparse.Namespace) -> None:
     # Get target sample rate (None means use default 8000)
     target_sample_rate = getattr(args, 'target_sample_rate', None)
 
+    if args.pattern_folder and args.pattern_file:
+        print("Error: --pattern-file and --pattern-folder are mutually exclusive", file=sys.stderr)
+        sys.exit(1)
+
     if args.pattern_folder:
         pattern_files = []
         for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
             pattern_files.append(pattern_file)
     elif args.pattern_file:
-        pattern_files = [args.pattern_file]
+        pattern_files = args.pattern_file  # already a list from action='append'
     else:
         print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
         sys.exit(1)

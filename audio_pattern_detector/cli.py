@@ -40,7 +40,8 @@ def main():
 
     # Add match subcommand
     match_parser = subparsers.add_parser('match', help='Find pattern matches in audio files')
-    match_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, help='pattern file')
+    match_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, action='append',
+                              help='pattern file (can be specified multiple times)')
     match_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
     match_parser.add_argument('--audio-file', metavar='audio file', type=str, required=False, help='audio file to find pattern')
     match_parser.add_argument('--audio-folder', metavar='audio folder', type=str, required=False, help='audio folder to find pattern in files')
@@ -60,7 +61,8 @@ def main():
 
     # Add show-config subcommand
     show_config_parser = subparsers.add_parser('show-config', help='Show computed configuration for pattern files')
-    show_config_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, help='pattern file')
+    show_config_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, action='append',
+                                    help='pattern file (can be specified multiple times)')
     show_config_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
     show_config_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     show_config_parser.set_defaults(func=_lazy_cmd_show_config)
