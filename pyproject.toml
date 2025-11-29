@@ -30,6 +30,9 @@ filterwarnings = [
     "ignore::RuntimeWarning:pyloudnorm.*",
 ]
 
+[tool.pyright]
+exclude = [".venv", "build", "dist", ".git"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
