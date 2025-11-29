@@ -4,7 +4,6 @@ import sys
 from contextlib import contextmanager
 
 import numpy as np
-from numpy._typing import DTypeLike
 
 # Default sample rate for audio pattern detection (8kHz).
 # All audio clips and streams must use the same sample rate for matching to work.
@@ -168,86 +167,6 @@ def _load_wave_file_ffmpeg_convert(file_path, target_sample_rate):
     # ffmpeg f32le output is already normalized to [-1, 1]
     samples = np.frombuffer(data, dtype=np.float32)
     return samples
-
-
-def _load_wave_file_ffmpeg(file_path, expected_sample_rate):
-    """Load wave file using ffmpeg (original implementation)."""
-    import json
-
-    # Use ffprobe to get audio metadata
-    probe_cmd = [
-        "ffprobe",
-        "-v", "error",
-        "-select_streams", "a:0",
-        "-show_entries", "stream=channels,sample_rate,bits_per_sample,codec_name",
-        "-of", "json",
-        file_path
-    ]
-    result = subprocess.run(probe_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise ValueError(f"ffprobe failed: {result.stderr}")
-
-    probe_data = json.loads(result.stdout)
-    if not probe_data.get("streams"):
-        raise ValueError(f"No audio streams found in {file_path}")
-
-    stream = probe_data["streams"][0]
-    channels = stream.get("channels", 0)
-    sample_rate = int(stream.get("sample_rate", 0))
-    bits_per_sample = stream.get("bits_per_sample", 0)
-
-    # Check if it meets the conditions
-    if channels != 1:
-        raise ValueError(f"The file is not mono. Channels: {channels}")
-    if sample_rate != expected_sample_rate:
-        raise ValueError(f"The sample rate is not {expected_sample_rate} Hz. Sample rate: {sample_rate}")
-    if bits_per_sample != 16:
-        raise ValueError(f"The file is not 16-bit. Bits per sample: {bits_per_sample}")
-
-    # Use ffmpeg to read audio data as float32 PCM directly
-    with ffmpeg_get_float32_pcm(file_path, target_sample_rate=expected_sample_rate, ac=1) as stdout:
-        data = stdout.read()
-
-    # ffmpeg f32le output is already normalized to [-1, 1]
-    samples = np.frombuffer(data, dtype=np.float32)
-
-    return samples
-
-# from librosa.util.buf_to_float
-def buf_to_float(
-    x: np.ndarray, *, n_bytes: int = 2, dtype: DTypeLike = np.float32
-) -> np.ndarray:
-    """Convert an integer buffer to floating point values.
-    This is primarily useful when loading integer-valued wav data
-    into numpy arrays.
-
-    Parameters
-    ----------
-    x : np.ndarray [dtype=int]
-        The integer-valued data buffer
-    n_bytes : int [1, 2, 4]
-        The number of bytes per sample in ``x``
-    dtype : numeric type
-        The target output type (default: 32-bit float)
-
-    Returns
-    -------
-    x_float : np.ndarray [dtype=float]
-        The input data buffer cast to floating point
-    """
-    # Invert the scale of the data
-    scale = 1.0 / float(1 << ((8 * n_bytes) - 1))
-
-    # Construct the format string
-    fmt = f"<i{n_bytes:d}"
-
-    # Rescale and format the data buffer
-    return scale * np.frombuffer(x, fmt).astype(dtype)
-
-
-def convert_audio_arr_to_float(audio):
-    #raise "chafa"
-    return buf_to_float(audio, n_bytes=2, dtype='float32')
 
 
 def downsample_preserve_maxima(curve, num_samples):
