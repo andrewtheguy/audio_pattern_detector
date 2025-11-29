@@ -14,7 +14,7 @@ It uses cross-correlation to detect the potential matching pattern, and then use
 
 ### Install from GitHub (recommended)
 ```shell
-uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git
+uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@ref(tag or branch)
 ```
 
 ### Install locally for development
