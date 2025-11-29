@@ -34,6 +34,19 @@ filterwarnings = [
 exclude = [".venv", "build", "dist", ".git", "tests"]
 reportUnknownParameterType = true
 reportUninitializedInstanceVariable = true
+# Disable basedpyright-specific strict rules
+reportMissingTypeStubs = false
+reportExplicitAny = false
+reportAny = false
+reportUnannotatedClassAttribute = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportImplicitStringConcatenation = false
+reportMissingImports = true
+reportUnusedCallResult = false
+reportImplicitOverride = false
 
 [build-system]
 requires = ["hatchling"]

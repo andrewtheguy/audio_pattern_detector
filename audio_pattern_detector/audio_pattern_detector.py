@@ -169,7 +169,7 @@ class AudioPatternDetector:
 
             # Debug output for correlation
             if self.debug_mode:
-                import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+                import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
                 print(f"clip_length {clip_name}", len(clip), file=sys.stderr)
                 print(f"clip_length {clip_name} seconds", len(clip) / self.target_sample_rate, file=sys.stderr)
                 print("correlation_clip_length", len(correlation_clip), file=sys.stderr)
@@ -308,7 +308,7 @@ class AudioPatternDetector:
             i = i + 1
 
         if self.debug_mode:
-            import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+            import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
 
             suffix = full_audio_name
 
@@ -504,7 +504,7 @@ class AudioPatternDetector:
         section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
-            import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+            import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
             print("---",file=sys.stderr)
             print(f"section_ts: {section_ts}, index {index}",file=sys.stderr)
             graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
@@ -681,7 +681,7 @@ class AudioPatternDetector:
         diff_overlap_ratio = area_prop["diff_overlap_ratio"]
 
         if debug_mode:
-            import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+            import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
             print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug[clip_name].append((index, similarity,))
@@ -860,7 +860,7 @@ class AudioPatternDetector:
         similarity_whole = similarity
 
         if debug_mode:
-            import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+            import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]
             print("similarity", similarity,file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug[clip_name].append((index, similarity,))
