@@ -31,7 +31,7 @@ filterwarnings = [
 ]
 
 [tool.pyright]
-exclude = [".venv", "build", "dist", ".git"]
+exclude = [".venv", "build", "dist", ".git", "tests"]
 
 [build-system]
 requires = ["hatchling"]
