@@ -1,9 +1,22 @@
 import math
+from typing import TypedDict
 
 import numpy as np
+from numpy.typing import NDArray
 
 
-def area_of_overlap_ratio(control, variable):
+class OverlapResult(TypedDict):
+    """Result of area_of_overlap_ratio calculation."""
+    total_rect_control: float
+    diff_area: float
+    overlapping_area: float
+    area_control: float
+    area_y2: float
+    diff_overlap_ratio: float
+    percent_control_area: float
+
+
+def area_of_overlap_ratio(control: NDArray[np.floating], variable: NDArray[np.floating]) -> OverlapResult:
     from scipy.integrate import simpson
 
     if len(control) != len(variable):
@@ -29,28 +42,28 @@ def area_of_overlap_ratio(control, variable):
     #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
     #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
     #print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
-    props = {
-                "total_rect_control":total_rect_control,
-                "diff_area":diff_area,
-                "overlapping_area":overlapping_area,
-                "area_control":area_control,
-                "area_y2":area_y2,
-                "diff_overlap_ratio":diff_area/overlapping_area,
-                "percent_control_area":area_control/total_rect_control,
-            }
-    return props
+    result: OverlapResult = {
+        "total_rect_control": float(total_rect_control),
+        "diff_area": float(diff_area),
+        "overlapping_area": float(overlapping_area),
+        "area_control": float(area_control),
+        "area_y2": float(area_y2),
+        "diff_overlap_ratio": float(diff_area / overlapping_area),
+        "percent_control_area": float(area_control / total_rect_control),
+    }
+    return result
 
 
-def is_pure_tone(audio_data, sample_rate):
+def is_pure_tone(audio_data: NDArray[np.float32], sample_rate: int) -> bool:
     """
     Determine if the given audio data represents a pure tone.
 
     Parameters:
-        audio_data (numpy array): The audio data as a floating-point array.
-        sample_rate (int): The sample rate of the audio data in Hz.
+        audio_data: The audio data as a floating-point array.
+        sample_rate: The sample rate of the audio data in Hz.
 
     Returns:
-        bool: True if the audio is a pure tone, False otherwise.
+        True if the audio is a pure tone, False otherwise.
     """
 
     #audio_data = audio_data[0:3662]
@@ -101,8 +114,9 @@ def is_pure_tone(audio_data, sample_rate):
     return len(peaks) == 1 and math.isclose(peak_freqs[0],dominant_freq,rel_tol=0.01)
 
 
-def max_distance(sorted_data):
-    max_dist = 0
+def max_distance(sorted_data: list[float]) -> float:
+    """Find the maximum distance between consecutive elements in sorted data."""
+    max_dist: float = 0
     for i in range(1, len(sorted_data)):
         dist = sorted_data[i] - sorted_data[i - 1]
         max_dist = max(max_dist, dist)

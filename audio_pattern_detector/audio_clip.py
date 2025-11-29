@@ -19,9 +19,8 @@ class AudioClip:
     audio: NDArray[np.float32]
     sample_rate: int
 
-    # only takes filename
     @staticmethod
-    def from_audio_file(clip_path, sample_rate=None):
+    def from_audio_file(clip_path: str | Path, sample_rate: int | None = None) -> "AudioClip":
         """Load an audio clip from a file.
 
         Args:
@@ -34,13 +33,11 @@ class AudioClip:
         if sample_rate is None:
             sample_rate = DEFAULT_TARGET_SAMPLE_RATE
         # Load the audio clip
-        clip = load_wave_file(clip_path, expected_sample_rate=sample_rate)
-        # convert to float
-        #clip = convert_audio_arr_to_float(clip)
+        clip = load_wave_file(str(clip_path), expected_sample_rate=sample_rate)
         clip_name = Path(clip_path).stem
         return AudioClip(name=clip_name, audio=clip, sample_rate=sample_rate)
 
-    def clip_length_seconds(self):
+    def clip_length_seconds(self) -> float:
         return len(self.audio) / self.sample_rate
 
 

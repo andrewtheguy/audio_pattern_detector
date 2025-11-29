@@ -5,10 +5,13 @@ import os
 import sys
 import warnings
 from collections import defaultdict
+from collections.abc import Callable
 from operator import itemgetter
+from typing import TypedDict
 
 import numpy as np
 import pyloudnorm as pyln
+from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_utils import (
@@ -27,21 +30,56 @@ logger = logging.getLogger(__name__)
 DEFAULT_SECONDS_PER_CHUNK = 60
 
 
-def _mean_squared_error(y_true, y_pred):
+# Type definitions
+class ClipData(TypedDict):
+    """Internal clip data structure."""
+    clip: NDArray[np.float32]
+    clip_name: str
+    sliding_window: int
+    correlation_clip: NDArray[np.float64]
+    correlation_clip_absolute_max: np.floating
+
+
+class ClipCache(TypedDict):
+    """Cache for clip-related computed data."""
+    downsampled_correlation_clips: dict[str, NDArray[np.float32]]
+    is_pure_tone_pattern: dict[str, bool]
+
+
+class ClipConfig(TypedDict):
+    """Configuration for a single clip in get_config output."""
+    duration_seconds: float
+    sliding_window_seconds: int
+    is_pure_tone: bool
+
+
+class DetectorConfig(TypedDict):
+    """Return type for get_config method."""
+    default_seconds_per_chunk: int
+    min_chunk_size_seconds: int
+    sample_rate: int
+    clips: dict[str, ClipConfig]
+
+
+# Type alias for pattern detection callback
+PatternDetectedCallback = Callable[[str, float], None]
+
+
+def _mean_squared_error(y_true: NDArray[np.floating], y_pred: NDArray[np.floating]) -> np.floating:
     """Simple MSE implementation to avoid sklearn dependency."""
     return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
 
 #ignore possible clipping
 warnings.filterwarnings('ignore', module='pyloudnorm')
 
-def _write_audio_file(filepath, audio_data, sample_rate):
+def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rate: int) -> None:
     """Helper function to write audio using ffmpeg"""
     write_wav_file(filepath, audio_data, sample_rate)
 
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: list[AudioClip], debug_mode=False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate=None):
+    def __init__(self, audio_clips: list[AudioClip], debug_mode: bool = False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate: int | None = None) -> None:
         """Initialize the audio pattern detector.
 
         Args:
@@ -97,8 +135,8 @@ class AudioPatternDetector:
             self.debug_mode = False
 
         # Pre-compute clip data that doesn't depend on audio_stream
-        self._clip_datas = {}
-        self._clip_cache = {
+        self._clip_datas: dict[str, ClipData] = {}
+        self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
             "is_pure_tone_pattern": {},
         }
@@ -157,14 +195,14 @@ class AudioPatternDetector:
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
         self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
 
-    def get_config(self):
+    def get_config(self) -> DetectorConfig:
         """Return the computed configuration values from __init__.
 
         Returns:
-            dict: Configuration including seconds_per_chunk, chunk_size_bytes,
+            DetectorConfig: Configuration including seconds_per_chunk, chunk_size_bytes,
                   min_chunk_size_seconds, and per-clip data (duration, sliding_window, is_pure_tone).
         """
-        clips_config = {}
+        clips_config: dict[str, ClipConfig] = {}
         for clip_name, clip_data in self._clip_datas.items():
             clip_duration = len(clip_data["clip"]) / self.target_sample_rate
             clips_config[clip_name] = {
@@ -180,7 +218,12 @@ class AudioPatternDetector:
             "clips": clips_config,
         }
 
-    def find_clip_in_audio(self, audio_stream: AudioStream, on_pattern_detected=None, accumulate_results=True):
+    def find_clip_in_audio(
+        self,
+        audio_stream: AudioStream,
+        on_pattern_detected: PatternDetectedCallback | None = None,
+        accumulate_results: bool = True,
+    ) -> tuple[dict[str, list[float]] | None, float]:
         """Find clip occurrences in audio stream.
 
         Args:
@@ -188,7 +231,10 @@ class AudioPatternDetector:
             on_pattern_detected: Optional callback function called when a pattern is detected.
                                  Signature: on_pattern_detected(clip_name: str, timestamp: float)
             accumulate_results: If False, don't accumulate peak_times (saves memory for streaming).
-                               When False, returns empty dict for peak_times.
+                               When False, returns None for peak_times.
+
+        Returns:
+            Tuple of (peak_times dict or None if accumulate_results=False, total_time in seconds)
         """
         # clip_paths = self.clip_paths
         #
@@ -301,23 +347,32 @@ class AudioPatternDetector:
 
         return all_peak_times, total_time
 
-    def _get_clip_correlation(self, clip):
+    def _get_clip_correlation(self, clip: NDArray[np.float32]) -> tuple[NDArray[np.float64], np.floating]:
         # Cross-correlate and normalize correlation
         from scipy.signal import correlate
-        correlation_clip = correlate(clip, clip, mode='full', method='fft')
+        correlation_clip: NDArray[np.float64] = correlate(clip, clip, mode='full', method='fft')
 
         # abs
         correlation_clip = np.abs(correlation_clip)
-        absolute_max = np.max(correlation_clip)
+        absolute_max: np.floating = np.max(correlation_clip)
         correlation_clip /= absolute_max
 
-        return correlation_clip,absolute_max
+        return correlation_clip, absolute_max
 
 
     # sliding_window: for previous_chunk in seconds from end
     # index: for debugging by saving a file for audio_section
     # seconds_per_chunk: default seconds_per_chunk
-    def _process_chunk(self, chunk, clip_data, clip_cache, sr, previous_chunk, index, similarity_debug):
+    def _process_chunk(
+        self,
+        chunk: NDArray[np.float32],
+        clip_data: ClipData,
+        clip_cache: ClipCache,
+        sr: int,
+        previous_chunk: NDArray[np.float32] | None,
+        index: int,
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+    ) -> list[float]:
         clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
@@ -402,7 +457,15 @@ class AudioPatternDetector:
 
     # won't work well for very short clips like single beep
     # because it is more likely to have false positives or miss good ones
-    def _correlation_method(self, clip_data, clip_cache, audio_section, sr, index, similarity_debug):
+    def _correlation_method(
+        self,
+        clip_data: ClipData,
+        clip_cache: ClipCache,
+        audio_section: NDArray[np.float32],
+        sr: int,
+        index: int,
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+    ) -> list[float]:
         clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
@@ -560,8 +623,21 @@ class AudioPatternDetector:
 
         return peak_times
 
-    def _get_peak_times_normal(self, correlation_clip, correlation_slice, seconds, peak, clip_name, index,
-                             section_ts, similarities, peaks_final, clip_cache, area_props, similarity_debug):
+    def _get_peak_times_normal(
+        self,
+        correlation_clip: NDArray[np.float64],
+        correlation_slice: NDArray[np.float32],
+        seconds: list[float],
+        peak: int,
+        clip_name: str,
+        index: int,
+        section_ts: str,
+        similarities: list[tuple[np.floating, dict[str, float | np.floating]]],
+        peaks_final: list[int],
+        clip_cache: ClipCache,
+        area_props: list[list],
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+    ) -> None:
 
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
@@ -743,7 +819,21 @@ class AudioPatternDetector:
     #             peaks_final.append(peak)
 
     # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
-    def _get_peak_times_beep_v3(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props,similarity_debug):
+    def _get_peak_times_beep_v3(
+        self,
+        correlation_clip: NDArray[np.float64],
+        correlation_slice: NDArray[np.float32],
+        seconds: list[float],
+        peak: int,
+        clip_name: str,
+        index: int,
+        section_ts: str,
+        similarities: list[tuple[np.floating, dict[str, float | np.floating]]],
+        peaks_final: list[int],
+        clip_cache: ClipCache,
+        area_props: list[list],
+        similarity_debug: defaultdict[str, list[tuple[int, np.floating]]],
+    ) -> None:
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -758,14 +848,14 @@ class AudioPatternDetector:
 
         downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
 
-        correlation_clip = downsampled_correlation_clip
-        correlation_slice = downsampled_correlation_slice
+        ds_corr_clip = downsampled_correlation_clip
+        ds_corr_slice = downsampled_correlation_slice
 
-        area_prop = area_of_overlap_ratio(correlation_clip,correlation_slice)
+        area_prop = area_of_overlap_ratio(ds_corr_clip, ds_corr_slice)
 
         overlap_ratio = area_prop["overlapping_area"]/area_prop["area_control"]
 
-        similarity = _mean_squared_error(correlation_clip, correlation_slice)
+        similarity = _mean_squared_error(ds_corr_clip, ds_corr_slice)
 
         similarity_whole = similarity
 

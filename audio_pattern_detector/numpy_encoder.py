@@ -1,10 +1,13 @@
 import json
+from typing import Any
 
 import numpy as np
 
 
 class NumpyEncoder(json.JSONEncoder):
-    def default(self, o):
+    """JSON encoder that handles numpy types."""
+
+    def default(self, o: Any) -> Any:
         if isinstance(o, np.integer):
             return int(o)
         if isinstance(o, np.floating):

@@ -2,11 +2,14 @@ import glob
 import json
 import os
 import sys
+import wave
 from pathlib import Path
 
 import numpy as np
+from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
+from audio_pattern_detector.audio_pattern_detector import PatternDetectedCallback
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from audio_pattern_detector.audio_utils import (
     ffmpeg_get_float32_pcm,
@@ -22,17 +25,17 @@ def _emit_jsonl(event_type: str, **kwargs):
 
 
 def match_pattern(
-    audio_source,
+    audio_source: str | None,
     pattern_files: list[str],
-    debug_mode=False,
-    on_pattern_detected=None,
-    accumulate_results=True,
+    debug_mode: bool = False,
+    on_pattern_detected: PatternDetectedCallback | None = None,
+    accumulate_results: bool = True,
     seconds_per_chunk: int | None = 60,
-    from_stdin=False,
-    raw_pcm=False,
-    sample_rate=None,
-    target_sample_rate=None,
-):
+    from_stdin: bool = False,
+    raw_pcm: bool = False,
+    sample_rate: int | None = None,
+    target_sample_rate: int | None = None,
+) -> tuple[dict[str, list[float]] | None, float]:
     """Find pattern matches in audio file or stdin
 
     Args:
@@ -49,8 +52,9 @@ def match_pattern(
         sample_rate: Sample rate of stdin input (required for raw_pcm mode, ignored for WAV mode)
         target_sample_rate: Target sample rate for processing (default: DEFAULT_TARGET_SAMPLE_RATE, 8000)
     """
-    if not from_stdin and not os.path.exists(audio_source):
-        raise ValueError(f"Audio {audio_source} does not exist")
+    if not from_stdin:
+        if audio_source is None or not os.path.exists(audio_source):
+            raise ValueError(f"Audio {audio_source} does not exist")
 
     # Use DEFAULT_TARGET_SAMPLE_RATE as default if not specified
     sr = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
@@ -89,7 +93,8 @@ def match_pattern(
                 target_sample_rate=sr,
             )
 
-    # File mode
+    # File mode - audio_source is guaranteed to be str here since from_stdin=False
+    assert audio_source is not None
     audio_name = Path(audio_source).stem
     print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
 
@@ -146,15 +151,14 @@ class _WavStdinStreamWrapper:
     Automatically converts to target sample rate if needed.
     """
 
-    def __init__(self, target_sample_rate: int):
-        import wave
+    def __init__(self, target_sample_rate: int) -> None:
         self.target_sample_rate = target_sample_rate
         self._bytes_per_sample = 4  # output is float32
         self._validated = False
 
         # Read WAV header from stdin
         try:
-            self._wav = wave.open(sys.stdin.buffer, 'rb')
+            self._wav: wave.Wave_read = wave.open(sys.stdin.buffer, 'rb')
         except wave.Error as e:
             raise ValueError(f"Failed to read WAV header from stdin: {e}. Use --raw-pcm for headerless PCM data.")
 
@@ -168,13 +172,13 @@ class _WavStdinStreamWrapper:
         if self._channels != 1:
             print(f"Warning: WAV has {self._channels} channels, will be mixed to mono", file=sys.stderr)
 
-    def _validate_first_chunk(self, audio: np.ndarray) -> None:
+    def _validate_first_chunk(self, audio: NDArray[np.float32]) -> None:
         """Check first chunk for signs of corrupt audio."""
         if self._validated or len(audio) == 0:
             return
         self._validated = True
 
-        warnings = []
+        warnings: list[str] = []
         if np.any(np.isnan(audio)):
             warnings.append("Audio contains NaN values - data may be corrupt")
         if np.any(np.isinf(audio)):
@@ -190,7 +194,7 @@ class _WavStdinStreamWrapper:
         for warning in warnings:
             print(f"Warning: {warning}", file=sys.stderr)
 
-    def read(self, size: int) -> bytes:
+    def read(self, size: int, /) -> bytes:
         """Read and convert audio data from WAV stdin.
 
         Args:
@@ -235,7 +239,7 @@ class _WavStdinStreamWrapper:
 
         return audio.tobytes()
 
-    def close(self):
+    def close(self) -> None:
         """Close the WAV file."""
         self._wav.close()
 
@@ -248,8 +252,7 @@ class _WavFileStreamWrapper:
     No ffmpeg required - uses Python's wave module and scipy for resampling.
     """
 
-    def __init__(self, file_path: str, target_sample_rate: int):
-        import wave
+    def __init__(self, file_path: str, target_sample_rate: int) -> None:
         self.target_sample_rate = target_sample_rate
         self._bytes_per_sample = 4  # output is float32
         self._validated = False
@@ -257,7 +260,7 @@ class _WavFileStreamWrapper:
 
         # Read WAV header from file
         try:
-            self._wav = wave.open(file_path, 'rb')
+            self._wav: wave.Wave_read = wave.open(file_path, 'rb')
         except (wave.Error, FileNotFoundError, OSError) as e:
             raise ValueError(f"Failed to read WAV file {file_path}: {e}")
 
@@ -269,13 +272,13 @@ class _WavFileStreamWrapper:
         if self._channels != 1:
             print(f"Warning: WAV has {self._channels} channels, will be mixed to mono", file=sys.stderr)
 
-    def _validate_first_chunk(self, audio: np.ndarray) -> None:
+    def _validate_first_chunk(self, audio: NDArray[np.float32]) -> None:
         """Check first chunk for signs of corrupt audio."""
         if self._validated or len(audio) == 0:
             return
         self._validated = True
 
-        warnings = []
+        warnings: list[str] = []
         if np.any(np.isnan(audio)):
             warnings.append("Audio contains NaN values - data may be corrupt")
         if np.any(np.isinf(audio)):
@@ -291,7 +294,7 @@ class _WavFileStreamWrapper:
         for warning in warnings:
             print(f"Warning: {warning}", file=sys.stderr)
 
-    def read(self, size: int) -> bytes:
+    def read(self, size: int, /) -> bytes:
         """Read and convert audio data from WAV file.
 
         Args:
@@ -336,7 +339,7 @@ class _WavFileStreamWrapper:
 
         return audio.tobytes()
 
-    def close(self):
+    def close(self) -> None:
         """Close the WAV file."""
         self._wav.close()
 
@@ -348,7 +351,7 @@ class _RawPcmStreamWrapper:
     Includes validation to detect potentially corrupt audio.
     """
 
-    def __init__(self, input_sample_rate: int, target_sample_rate: int):
+    def __init__(self, input_sample_rate: int, target_sample_rate: int) -> None:
         self.input_sample_rate = input_sample_rate
         self.target_sample_rate = target_sample_rate
         self.needs_resample = input_sample_rate != target_sample_rate
@@ -380,13 +383,13 @@ class _RawPcmStreamWrapper:
                 "Use --stdin without --raw-pcm for WAV input, or ensure input is raw float32 PCM."
             )
 
-    def _validate_first_chunk(self, audio: np.ndarray) -> None:
+    def _validate_first_chunk(self, audio: NDArray[np.float32]) -> None:
         """Check first chunk for signs of corrupt audio and emit warnings."""
         if self._validated or len(audio) == 0:
             return
         self._validated = True
 
-        warnings = []
+        warnings: list[str] = []
 
         # Check for NaN or Inf values (definite corruption)
         if np.any(np.isnan(audio)):
@@ -417,7 +420,7 @@ class _RawPcmStreamWrapper:
         for warning in warnings:
             print(f"Warning: {warning}", file=sys.stderr)
 
-    def read(self, size: int) -> bytes:
+    def read(self, size: int, /) -> bytes:
         """Read and optionally resample audio data.
 
         Args:
@@ -458,13 +461,13 @@ class _RawPcmStreamWrapper:
 
 
 def _match_pattern_wav_stdin(
-    pattern_clips,
-    debug_mode,
-    on_pattern_detected,
-    accumulate_results,
-    seconds_per_chunk,
-    target_sample_rate,
-):
+    pattern_clips: list[AudioClip],
+    debug_mode: bool,
+    on_pattern_detected: PatternDetectedCallback | None,
+    accumulate_results: bool,
+    seconds_per_chunk: int | None,
+    target_sample_rate: int,
+) -> tuple[dict[str, list[float]] | None, float]:
     """Internal function to handle WAV stdin mode."""
     # Create stream wrapper that reads WAV header and handles resampling
     stream_wrapper = _WavStdinStreamWrapper(target_sample_rate)
@@ -497,14 +500,14 @@ def _match_pattern_wav_stdin(
 
 
 def _match_pattern_raw_pcm(
-    pattern_clips,
-    debug_mode,
-    on_pattern_detected,
-    accumulate_results,
-    seconds_per_chunk,
-    input_sample_rate,
-    target_sample_rate,
-):
+    pattern_clips: list[AudioClip],
+    debug_mode: bool,
+    on_pattern_detected: PatternDetectedCallback | None,
+    accumulate_results: bool,
+    seconds_per_chunk: int | None,
+    input_sample_rate: int,
+    target_sample_rate: int,
+) -> tuple[dict[str, list[float]] | None, float]:
     """Internal function to handle raw PCM mode."""
     print(f"Reading raw PCM from stdin (source sample rate: {input_sample_rate}Hz)...", file=sys.stderr)
 
@@ -541,9 +544,9 @@ def _match_pattern_raw_pcm(
     return peak_times, total_time
 
 
-def _make_jsonl_callback():
+def _make_jsonl_callback() -> PatternDetectedCallback:
     """Create a callback that emits pattern_detected JSONL events."""
-    def callback(clip_name: str, timestamp: float):
+    def callback(clip_name: str, timestamp: float) -> None:
         _emit_jsonl(
             "pattern_detected",
             clip_name=clip_name,

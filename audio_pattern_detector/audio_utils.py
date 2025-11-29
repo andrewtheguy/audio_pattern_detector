@@ -1,9 +1,12 @@
 import math
 import subprocess
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
+from typing import IO
 
 import numpy as np
+from numpy.typing import NDArray
 
 # Default sample rate for audio pattern detection (8kHz).
 # All audio clips and streams must use the same sample rate for matching to work.
@@ -97,18 +100,16 @@ def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarra
     return np.asarray(resampled, dtype=np.float32)
 
 
-def slicing_with_zero_padding(array,width,middle_index):
-    padding = width/2
+def slicing_with_zero_padding(array: NDArray[np.float32], width: int, middle_index: int) -> NDArray[np.float32]:
+    padding = width / 2
 
-    beg = int(middle_index-math.floor(padding))
-    end = int(middle_index+math.ceil(padding))
+    beg = int(middle_index - math.floor(padding))
+    end = int(middle_index + math.ceil(padding))
 
     if beg < 0:
         end = end - beg
-        #middle_index = middle_index - beg
         array = np.pad(array, (-beg, 0), 'constant')
         beg = beg - beg
-
 
     if end > len(array):
         array = np.pad(array, (0, end - len(array)), 'constant')
@@ -116,15 +117,13 @@ def slicing_with_zero_padding(array,width,middle_index):
     return np.array(array[beg:end])
 
 
-def convert_audio_file(file_path, sr=None):
-    # Create ffmpeg process - output is float32 directly
+def convert_audio_file(file_path: str, sr: int | None = None) -> NDArray[np.float32]:
+    """Convert audio file to float32 PCM using ffmpeg."""
     with ffmpeg_get_float32_pcm(file_path, target_sample_rate=sr, ac=1) as stdout:
         data = stdout.read()
-    return np.frombuffer(data, dtype="float32")
-    #return librosa.load(file_path, sr=sr, mono=True)  # mono=True ensures a single channel audio
+    return np.frombuffer(data, dtype=np.float32)
 
-# load wave file into float32
-def load_wave_file(file_path, expected_sample_rate):
+def load_wave_file(file_path: str, expected_sample_rate: int) -> NDArray[np.float32]:
     """Load wave file into float32 array.
 
     For WAV files, uses scipy directly (no ffmpeg needed).
@@ -158,21 +157,21 @@ def load_wave_file(file_path, expected_sample_rate):
     return _load_wave_file_ffmpeg_convert(file_path, expected_sample_rate)
 
 
-def _load_wave_file_ffmpeg_convert(file_path, target_sample_rate):
+def _load_wave_file_ffmpeg_convert(file_path: str, target_sample_rate: int) -> NDArray[np.float32]:
     """Load and convert wave file using ffmpeg to target sample rate."""
-    # Use ffmpeg to convert audio data to target sample rate
     with ffmpeg_get_float32_pcm(file_path, target_sample_rate=target_sample_rate, ac=1) as stdout:
         data = stdout.read()
 
     # ffmpeg f32le output is already normalized to [-1, 1]
-    samples = np.frombuffer(data, dtype=np.float32)
+    samples: NDArray[np.float32] = np.frombuffer(data, dtype=np.float32)
     return samples
 
 
-def downsample_preserve_maxima(curve, num_samples):
+def downsample_preserve_maxima(curve: NDArray[np.floating], num_samples: int) -> NDArray[np.float32]:
+    """Downsample a curve while preserving local maxima."""
     n_points = len(curve)
     step_size = n_points / num_samples
-    compressed_curve = []
+    compressed_curve: list[np.floating] = []
 
     for i in range(num_samples):
         start_index = int(i * step_size)
@@ -188,16 +187,6 @@ def downsample_preserve_maxima(curve, num_samples):
         local_max_index = np.argmax(window)
         compressed_curve.append(window[local_max_index])
 
-        # # Find peaks within this window
-        # peaks, _ = find_peaks(window)
-        # if len(peaks) == 0:
-        #     # If no peaks, simply downsample by taking the first point in the window
-        #     compressed_curve.append(window[0])
-        # else:
-        #     # Select the local maxima point
-        #     local_max_index = peaks[np.argmax(window[peaks])]
-        #     compressed_curve.append(window[local_max_index])
-
     # Adjust the length if necessary by adding the last element of the original curve
     if len(compressed_curve) < num_samples and len(curve) > 0:
         compressed_curve.append(curve[-1])
@@ -205,13 +194,17 @@ def downsample_preserve_maxima(curve, num_samples):
     if len(compressed_curve) != num_samples:
         raise ValueError(f"downsampled curve length {len(compressed_curve)} not equal to num_samples {num_samples}")
 
-    return np.array(compressed_curve)
+    return np.array(compressed_curve, dtype=np.float32)
 
-# convert audio to float32 pcm with streaming output
 @contextmanager
 def ffmpeg_get_float32_pcm(
-    full_audio_path, target_sample_rate=None, ac=None, from_stdin=False, input_format=None
-):
+    full_audio_path: str,
+    target_sample_rate: int | None = None,
+    ac: int | None = None,
+    from_stdin: bool = False,
+    input_format: str | None = None,
+) -> Generator[IO[bytes], None, None]:
+    """Convert audio to float32 PCM with streaming output."""
     # Construct the ffmpeg command
     command = ["ffmpeg"]
 
@@ -258,7 +251,7 @@ def ffmpeg_get_float32_pcm(
             process.stdout.close()
 
 
-def write_wav_file(filepath, audio_data, sample_rate):
+def write_wav_file(filepath: str, audio_data: NDArray[np.float32], sample_rate: int) -> None:
     """Write audio data to a wav file using ffmpeg.
 
     Args:
@@ -319,7 +312,8 @@ def get_audio_duration(audio_path: str) -> float | None:
     return float(duration_str)
 
 
-def seconds_to_time(seconds, include_decimals=True):
+def seconds_to_time(seconds: float, include_decimals: bool = True) -> str:
+    """Convert seconds to time string format HH:MM:SS.mmm or HH:MM:SS."""
     if include_decimals:
         milliseconds = round(seconds * 1000)
         minutes_remaining, remaining_milliseconds = divmod(milliseconds, 60000)
