@@ -47,7 +47,7 @@ The package provides a single CLI command `audio-pattern-detector` with two subc
 
 ### Match - Detect patterns in audio files
 
-The source audio file is automatically converted to the required format (mono, 16-bit WAV at the target sample rate) using ffmpeg.
+WAV files are processed directly using scipy (no ffmpeg required). Non-WAV files are automatically converted using ffmpeg.
 
 ```shell
 # detect pattern from audio file, add --debug to enable debug mode
@@ -67,8 +67,8 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 
 | Option                 | Description                                                              | Requires ffmpeg |
 |------------------------|--------------------------------------------------------------------------|-----------------|
-| `--audio-file`         | Audio file to search for patterns                                        | Yes             |
-| `--audio-folder`       | Folder of audio files to process                                         | Yes             |
+| `--audio-file`         | Audio file to search for patterns                                        | WAV: No, other: Yes |
+| `--audio-folder`       | Folder of audio files to process                                         | WAV: No, other: Yes |
 | `--stdin`              | Read WAV format audio from stdin (always outputs JSONL)                  | No              |
 | `--raw-pcm`            | With `--stdin`: read raw float32 PCM instead of WAV                      | No              |
 | `--source-sample-rate` | Source sample rate for raw PCM stdin in Hz (only with `--raw-pcm`)       | No              |
@@ -79,7 +79,8 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 | `--jsonl`              | Output JSONL events as they occur (streaming mode, for file inputs)      | -               |
 | `--debug`              | Enable debug mode                                                        | -               |
 
-Pattern files (WAV) are loaded and resampled using scipy - no ffmpeg required.
+WAV files (audio and patterns) are loaded and resampled using scipy - no ffmpeg required.
+For non-WAV audio files (mp3, flac, etc.), ffmpeg is required for conversion.
 
 #### Target Sample Rate
 

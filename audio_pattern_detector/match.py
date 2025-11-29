@@ -89,22 +89,53 @@ def match_pattern(
                 target_sample_rate=sr,
             )
 
-    # File mode: use ffmpeg
+    # File mode
+    audio_name = Path(audio_source).stem
+    print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
+
+    # For WAV files, use scipy (no ffmpeg needed)
+    if audio_source.lower().endswith('.wav'):
+        stream_wrapper = _WavFileStreamWrapper(audio_source, sr)
+        try:
+            full_streaming_audio = AudioStream(name=audio_name, audio_stream=stream_wrapper, sample_rate=sr)
+            peak_times, total_time = (
+                AudioPatternDetector(
+                    debug_mode=debug_mode,
+                    audio_clips=pattern_clips,
+                    seconds_per_chunk=seconds_per_chunk,
+                    target_sample_rate=sr,
+                )
+                .find_clip_in_audio(
+                    full_streaming_audio,
+                    on_pattern_detected=on_pattern_detected,
+                    accumulate_results=accumulate_results,
+                )
+            )
+        finally:
+            stream_wrapper.close()
+        return peak_times, total_time
+
+    # For non-WAV files, use ffmpeg
     with ffmpeg_get_float32_pcm(
         audio_source,
         target_sample_rate=sr,
         ac=1,
     ) as stdout:
-        audio_name = Path(audio_source).stem
-        print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
         full_streaming_audio = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
         # Find clip occurrences in the full audio
-        peak_times, total_time = (AudioPatternDetector(debug_mode=debug_mode, audio_clips=pattern_clips, seconds_per_chunk=seconds_per_chunk, target_sample_rate=sr)
-                      .find_clip_in_audio(
-                          full_streaming_audio,
-                          on_pattern_detected=on_pattern_detected,
-                          accumulate_results=accumulate_results,
-                      ))
+        peak_times, total_time = (
+            AudioPatternDetector(
+                debug_mode=debug_mode,
+                audio_clips=pattern_clips,
+                seconds_per_chunk=seconds_per_chunk,
+                target_sample_rate=sr,
+            )
+            .find_clip_in_audio(
+                full_streaming_audio,
+                on_pattern_detected=on_pattern_detected,
+                accumulate_results=accumulate_results,
+            )
+        )
     return peak_times, total_time
 
 
@@ -203,6 +234,111 @@ class _WavStdinStreamWrapper:
             audio = resample_audio(audio, self.input_sample_rate, self.target_sample_rate)
 
         return audio.tobytes()
+
+    def close(self):
+        """Close the WAV file."""
+        self._wav.close()
+
+
+class _WavFileStreamWrapper:
+    """Wrapper to read WAV format from a file.
+
+    Reads WAV header to get sample rate, then streams audio data.
+    Automatically converts to target sample rate if needed.
+    No ffmpeg required - uses Python's wave module and scipy for resampling.
+    """
+
+    def __init__(self, file_path: str, target_sample_rate: int):
+        import wave
+        self.target_sample_rate = target_sample_rate
+        self._bytes_per_sample = 4  # output is float32
+        self._validated = False
+        self._file_path = file_path
+
+        # Read WAV header from file
+        try:
+            self._wav = wave.open(file_path, 'rb')
+        except (wave.Error, FileNotFoundError, OSError) as e:
+            raise ValueError(f"Failed to read WAV file {file_path}: {e}")
+
+        self.input_sample_rate = self._wav.getframerate()
+        self._channels = self._wav.getnchannels()
+        self._sampwidth = self._wav.getsampwidth()
+        self.needs_resample = self.input_sample_rate != target_sample_rate
+
+        if self._channels != 1:
+            print(f"Warning: WAV has {self._channels} channels, will be mixed to mono", file=sys.stderr)
+
+    def _validate_first_chunk(self, audio: np.ndarray) -> None:
+        """Check first chunk for signs of corrupt audio."""
+        if self._validated or len(audio) == 0:
+            return
+        self._validated = True
+
+        warnings = []
+        if np.any(np.isnan(audio)):
+            warnings.append("Audio contains NaN values - data may be corrupt")
+        if np.any(np.isinf(audio)):
+            warnings.append("Audio contains Inf values - data may be corrupt")
+
+        max_abs = np.max(np.abs(audio))
+        if max_abs > 1.5:
+            warnings.append(f"Audio values exceed expected range (max: {max_abs:.2f})")
+
+        if np.all(audio == 0):
+            warnings.append("First chunk is all zeros - verify input is correct")
+
+        for warning in warnings:
+            print(f"Warning: {warning}", file=sys.stderr)
+
+    def read(self, size: int) -> bytes:
+        """Read and convert audio data from WAV file.
+
+        Args:
+            size: Number of bytes to return (at target sample rate, float32)
+
+        Returns:
+            Raw bytes of float32 PCM at target sample rate
+        """
+        # Calculate how many frames to read
+        target_samples = size // self._bytes_per_sample
+        if self.needs_resample:
+            input_samples = int(target_samples * self.input_sample_rate / self.target_sample_rate)
+        else:
+            input_samples = target_samples
+
+        # Read raw frames from WAV
+        raw_data = self._wav.readframes(input_samples)
+        if not raw_data:
+            return b""
+
+        # Convert to float32 based on sample width
+        if self._sampwidth == 2:  # 16-bit
+            audio = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
+        elif self._sampwidth == 4:  # 32-bit
+            audio = np.frombuffer(raw_data, dtype=np.int32).astype(np.float32) / 2147483648.0
+        elif self._sampwidth == 1:  # 8-bit unsigned
+            audio = (np.frombuffer(raw_data, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+        else:
+            raise ValueError(f"Unsupported WAV sample width: {self._sampwidth} bytes")
+
+        # Mix to mono if stereo
+        if self._channels > 1:
+            audio = audio.reshape(-1, self._channels).mean(axis=1).astype(np.float32)
+
+        # Validate first chunk
+        if not self._validated:
+            self._validate_first_chunk(audio)
+
+        # Resample if needed
+        if self.needs_resample:
+            audio = resample_audio(audio, self.input_sample_rate, self.target_sample_rate)
+
+        return audio.tobytes()
+
+    def close(self):
+        """Close the WAV file."""
+        self._wav.close()
 
 
 class _RawPcmStreamWrapper:

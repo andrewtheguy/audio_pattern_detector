@@ -8,7 +8,7 @@ from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, DEFAULT_TARGET_SAMPLE_RATE
 from audio_pattern_detector.convert import convert_audio_to_clip_format
-from audio_pattern_detector.match import match_pattern
+from audio_pattern_detector.match import match_pattern, _WavFileStreamWrapper
 
 
 # --- Pattern Matching Tests ---
@@ -1193,3 +1193,339 @@ def test_streaming_results_match_high_level_api():
         sorted(streaming_results['rthk_beep'])
     ):
         assert abs(hl - st) < 0.001, f"Results differ: high-level={hl}, streaming={st}"
+
+
+# --- WAV File Processing Without FFmpeg Tests ---
+
+
+class TestWavFileStreamWrapper:
+    """Tests for _WavFileStreamWrapper class (ffmpeg-free WAV file streaming)."""
+
+    def test_wav_file_stream_wrapper_basic(self):
+        """Test basic functionality of _WavFileStreamWrapper."""
+        wav_file = "sample_audios/clips/rthk_beep.wav"
+        assert Path(wav_file).exists()
+
+        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        try:
+            assert wrapper.target_sample_rate == DEFAULT_TARGET_SAMPLE_RATE
+            assert wrapper.input_sample_rate > 0
+            assert wrapper._channels >= 1
+            assert wrapper._sampwidth > 0
+        finally:
+            wrapper.close()
+
+    def test_wav_file_stream_wrapper_read(self):
+        """Test reading data from _WavFileStreamWrapper."""
+        import numpy as np
+
+        wav_file = "sample_audios/clips/rthk_beep.wav"
+        assert Path(wav_file).exists()
+
+        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        try:
+            # Read some data (4 bytes per float32 sample)
+            data = wrapper.read(4000)  # 1000 samples
+            assert len(data) > 0
+
+            # Convert to numpy and verify
+            audio = np.frombuffer(data, dtype=np.float32)
+            assert len(audio) > 0
+            assert audio.dtype == np.float32
+            # Audio should be normalized
+            assert np.max(np.abs(audio)) <= 1.5
+        finally:
+            wrapper.close()
+
+    def test_wav_file_stream_wrapper_full_read(self):
+        """Test reading entire WAV file via _WavFileStreamWrapper."""
+        import numpy as np
+
+        wav_file = "sample_audios/clips/rthk_beep.wav"
+        assert Path(wav_file).exists()
+
+        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        try:
+            # Read entire file in chunks
+            all_data = b""
+            while True:
+                chunk = wrapper.read(32000)  # 8000 samples per read
+                if not chunk:
+                    break
+                all_data += chunk
+
+            audio = np.frombuffer(all_data, dtype=np.float32)
+            assert len(audio) > 0
+            # rthk_beep is ~0.23 seconds at 8kHz = ~1840 samples
+            assert 1500 < len(audio) < 2500
+        finally:
+            wrapper.close()
+
+    def test_wav_file_stream_wrapper_resampling(self):
+        """Test that _WavFileStreamWrapper correctly resamples audio."""
+        import numpy as np
+
+        # Use 16kHz file to test resampling to 8kHz
+        wav_file = "sample_audios/test_16khz/clips/rthk_beep_16k.wav"
+        if not Path(wav_file).exists():
+            pytest.skip("16kHz test file not found")
+
+        wrapper = _WavFileStreamWrapper(wav_file, 8000)
+        try:
+            assert wrapper.input_sample_rate == 16000
+            assert wrapper.target_sample_rate == 8000
+            assert wrapper.needs_resample is True
+
+            # Read entire file
+            all_data = b""
+            while True:
+                chunk = wrapper.read(32000)
+                if not chunk:
+                    break
+                all_data += chunk
+
+            audio = np.frombuffer(all_data, dtype=np.float32)
+            # Should be at 8kHz, not 16kHz
+            # Duration should be preserved (~0.23s = ~1840 samples at 8kHz)
+            assert 1500 < len(audio) < 2500
+        finally:
+            wrapper.close()
+
+    def test_wav_file_stream_wrapper_no_resampling(self):
+        """Test _WavFileStreamWrapper when no resampling is needed."""
+        wav_file = "sample_audios/clips/rthk_beep.wav"  # Already 8kHz
+        assert Path(wav_file).exists()
+
+        wrapper = _WavFileStreamWrapper(wav_file, 8000)
+        try:
+            assert wrapper.input_sample_rate == 8000
+            assert wrapper.target_sample_rate == 8000
+            assert wrapper.needs_resample is False
+        finally:
+            wrapper.close()
+
+    def test_wav_file_stream_wrapper_nonexistent_file(self):
+        """Test that _WavFileStreamWrapper raises error for nonexistent file."""
+        with pytest.raises(ValueError, match="Failed to read WAV file"):
+            _WavFileStreamWrapper("nonexistent.wav", 8000)
+
+    def test_wav_file_stream_wrapper_with_audio_stream(self):
+        """Test using _WavFileStreamWrapper with AudioStream class."""
+        wav_file = "sample_audios/clips/rthk_beep.wav"
+        assert Path(wav_file).exists()
+
+        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        try:
+            audio_stream = AudioStream(
+                name="test_stream",
+                audio_stream=wrapper,
+                sample_rate=DEFAULT_TARGET_SAMPLE_RATE
+            )
+            assert audio_stream.name == "test_stream"
+            assert audio_stream.sample_rate == DEFAULT_TARGET_SAMPLE_RATE
+        finally:
+            wrapper.close()
+
+
+class TestWavFileMatchingWithoutFfmpeg:
+    """Tests for WAV file pattern matching without ffmpeg."""
+
+    def test_wav_match_uses_scipy_directly(self):
+        """Test that WAV file matching uses scipy, not ffmpeg."""
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        # This should use _WavFileStreamWrapper internally
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # Should find the expected matches
+        assert 'rthk_beep' in peak_times
+        assert len(peak_times['rthk_beep']) == 2
+
+        expected_times = [1.4165, 2.419125]
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+            assert abs(actual - expected) < 0.01
+
+    def test_wav_match_results_consistent(self):
+        """Test that WAV matching produces consistent results with streaming API."""
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        # Run match_pattern (uses scipy for WAV)
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 1
+
+        expected_time = 25.89875
+        assert abs(peak_times['cbs_news'][0] - expected_time) < 0.01
+
+    def test_wav_match_16khz_resampling(self):
+        """Test WAV matching with 16kHz file (resampled to 8kHz)."""
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+
+        assert Path(pattern_file).exists()
+        if not Path(audio_file).exists():
+            pytest.skip("16kHz test file not found")
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'rthk_beep' in peak_times
+        assert len(peak_times['rthk_beep']) == 2
+
+        expected_times = [1.4165, 2.419125]
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+            assert abs(actual - expected) < 0.05
+
+    def test_wav_match_no_false_positives(self):
+        """Test that WAV matching doesn't produce false positives."""
+        pattern_file = "sample_audios/clips/cbs_news.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert 'cbs_news' in peak_times
+        assert len(peak_times['cbs_news']) == 0
+
+    def test_wav_match_multiple_patterns(self):
+        """Test WAV matching with multiple patterns."""
+        pattern_files = [
+            "sample_audios/clips/cbs_news.wav",
+            "sample_audios/clips/cbs_news_dada.wav"
+        ]
+        audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+        for pf in pattern_files:
+            assert Path(pf).exists()
+        assert Path(audio_file).exists()
+
+        peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=False)
+
+        assert 'cbs_news' in peak_times
+        assert 'cbs_news_dada' in peak_times
+        assert len(peak_times['cbs_news']) == 1
+        assert len(peak_times['cbs_news_dada']) == 1
+
+    def test_wav_match_without_ffmpeg_available(self):
+        """Test WAV file matching works when ffmpeg is not available."""
+        from audio_pattern_detector import audio_utils
+
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        # Mock ffmpeg as unavailable
+        original_state = audio_utils._ffmpeg_available
+        audio_utils._ffmpeg_available = False
+
+        try:
+            # Should still work for WAV files
+            peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+            assert 'rthk_beep' in peak_times
+            assert len(peak_times['rthk_beep']) == 2
+
+            expected_times = [1.4165, 2.419125]
+            for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+                assert abs(actual - expected) < 0.01
+        finally:
+            audio_utils._ffmpeg_available = original_state
+
+    def test_wav_match_streaming_with_wrapper(self):
+        """Test streaming pattern matching using _WavFileStreamWrapper directly."""
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        # Load pattern
+        pattern_clip = AudioClip.from_audio_file(pattern_file)
+
+        # Use _WavFileStreamWrapper directly
+        wrapper = _WavFileStreamWrapper(audio_file, DEFAULT_TARGET_SAMPLE_RATE)
+        try:
+            audio_stream = AudioStream(
+                name=Path(audio_file).stem,
+                audio_stream=wrapper,
+                sample_rate=DEFAULT_TARGET_SAMPLE_RATE
+            )
+
+            detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
+            peak_times, total_time = detector.find_clip_in_audio(audio_stream)
+
+            assert 'rthk_beep' in peak_times
+            assert len(peak_times['rthk_beep']) == 2
+        finally:
+            wrapper.close()
+
+    def test_wav_match_total_time_accuracy(self):
+        """Test that total_time is accurate for WAV file matching."""
+        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        audio_file = "sample_audios/rthk_section_with_beep.wav"
+
+        assert Path(pattern_file).exists()
+        assert Path(audio_file).exists()
+
+        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        # rthk_section_with_beep.wav is ~4.08 seconds
+        assert 4.0 < total_time < 4.2, f"Expected ~4.08s, got {total_time}s"
+
+    def test_wav_match_stereo_file(self):
+        """Test WAV matching with stereo file (converted to mono)."""
+        # Create a temporary stereo WAV file for testing
+        import subprocess
+        import numpy as np
+
+        sample_rate = 8000
+        duration_seconds = 1
+        num_samples = sample_rate * duration_seconds
+
+        # Create stereo data
+        audio_left = np.sin(2 * np.pi * 440 * np.arange(num_samples) / sample_rate)
+        audio_right = np.sin(2 * np.pi * 880 * np.arange(num_samples) / sample_rate)
+        stereo_int16 = (np.column_stack((audio_left, audio_right)) * 32767).astype(np.int16)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            stereo_file = f.name
+
+        try:
+            # Create stereo WAV using ffmpeg
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "s16le",
+                "-ar", str(sample_rate),
+                "-ac", "2",
+                "-i", "pipe:",
+                "-loglevel", "error",
+                stereo_file
+            ]
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            proc.communicate(stereo_int16.tobytes())
+
+            # Test that _WavFileStreamWrapper can handle stereo
+            wrapper = _WavFileStreamWrapper(stereo_file, sample_rate)
+            try:
+                assert wrapper._channels == 2
+
+                # Read data - should be converted to mono
+                data = wrapper.read(4000)
+                audio = np.frombuffer(data, dtype=np.float32)
+                assert len(audio) > 0
+            finally:
+                wrapper.close()
+        finally:
+            os.unlink(stereo_file)
