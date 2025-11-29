@@ -128,7 +128,8 @@ def convert_audio_file(file_path, sr=None):
 def load_wave_file(file_path, expected_sample_rate):
     """Load wave file into float32 array.
 
-    Uses ffmpeg if available for conversion, otherwise falls back to scipy for WAV files.
+    For WAV files, uses scipy directly (no ffmpeg needed).
+    For non-WAV files, uses ffmpeg for conversion.
     Resampling is done if sample rate doesn't match the expected rate.
 
     Args:
@@ -138,24 +139,24 @@ def load_wave_file(file_path, expected_sample_rate):
     Returns:
         numpy array of float32 audio samples at expected_sample_rate.
     """
-    # Try ffmpeg first if available - use it for conversion directly
-    if is_ffmpeg_available():
-        return _load_wave_file_ffmpeg_convert(file_path, expected_sample_rate)
+    # For WAV files, use scipy directly (no ffmpeg needed)
+    if file_path.lower().endswith('.wav'):
+        data, sample_rate = load_wav_file_scipy(file_path)
 
-    # Fallback to scipy (WAV files only)
-    if not file_path.lower().endswith('.wav'):
+        # Resample if needed
+        if sample_rate != expected_sample_rate:
+            data = resample_audio(data, sample_rate, expected_sample_rate)
+
+        return data
+
+    # For non-WAV files, use ffmpeg
+    if not is_ffmpeg_available():
         raise ValueError(
             f"ffmpeg not available and file {file_path} is not a WAV file. "
             "Install ffmpeg or use WAV files for patterns."
         )
 
-    data, sample_rate = load_wav_file_scipy(file_path)
-
-    # Resample if needed
-    if sample_rate != expected_sample_rate:
-        data = resample_audio(data, sample_rate, expected_sample_rate)
-
-    return data
+    return _load_wave_file_ffmpeg_convert(file_path, expected_sample_rate)
 
 
 def _load_wave_file_ffmpeg_convert(file_path, target_sample_rate):

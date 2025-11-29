@@ -65,21 +65,21 @@ pipx run --spec . audio-pattern-detector match --audio-file ./sample_audios/cbs_
 
 #### Match CLI Options
 
-| Option | Description | Requires ffmpeg |
-|--------|-------------|-----------------|
-| `--audio-file` | Audio file to search for patterns | Yes |
-| `--audio-folder` | Folder of audio files to process | Yes |
-| `--stdin` | Read WAV format audio from stdin (always outputs JSONL) | No |
-| `--raw-pcm` | With `--stdin`: read raw float32 little-endian PCM instead of WAV (requires `--source-sample-rate`) | No |
-| `--source-sample-rate` | Source sample rate for raw PCM stdin in Hz (only used with `--raw-pcm`) | No |
-| `--target-sample-rate` | Target sample rate for processing in Hz (default: 8000). Use 16000 for AI workflows that require 16kHz audio. | - |
-| `--pattern-file` | Single pattern file to match | Yes* |
-| `--pattern-folder` | Folder of pattern clips to match | Yes* |
-| `--chunk-seconds` | Seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length) | - |
-| `--jsonl` | Output JSONL events as they occur (streaming mode, for file inputs) | - |
-| `--debug` | Enable debug mode | - |
+| Option                 | Description                                                              | Requires ffmpeg |
+|------------------------|--------------------------------------------------------------------------|-----------------|
+| `--audio-file`         | Audio file to search for patterns                                        | Yes             |
+| `--audio-folder`       | Folder of audio files to process                                         | Yes             |
+| `--stdin`              | Read WAV format audio from stdin (always outputs JSONL)                  | No              |
+| `--raw-pcm`            | With `--stdin`: read raw float32 PCM instead of WAV                      | No              |
+| `--source-sample-rate` | Source sample rate for raw PCM stdin in Hz (only with `--raw-pcm`)       | No              |
+| `--target-sample-rate` | Target sample rate for processing in Hz (default: 8000)                  | No              |
+| `--pattern-file`       | Single pattern file to match (WAV format)                                | No              |
+| `--pattern-folder`     | Folder of pattern clips to match (WAV format)                            | No              |
+| `--chunk-seconds`      | Seconds per chunk for sliding window (default: 60, or "auto")            | -               |
+| `--jsonl`              | Output JSONL events as they occur (streaming mode, for file inputs)      | -               |
+| `--debug`              | Enable debug mode                                                        | -               |
 
-*Pattern files require ffmpeg for automatic resampling to the target sample rate. If patterns are already at the target sample rate (default 8kHz), scipy is used as fallback.
+Pattern files (WAV) are loaded and resampled using scipy - no ffmpeg required.
 
 #### Target Sample Rate
 
