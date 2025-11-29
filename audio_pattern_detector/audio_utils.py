@@ -100,7 +100,7 @@ def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> 
     return np.asarray(resampled, dtype=np.float32)
 
 
-def slicing_with_zero_padding(array: NDArray[np.float32], width: int, middle_index: int) -> NDArray[np.float32]:
+def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, middle_index: int) -> NDArray[np.floating[Any]]:
     padding = width / 2
 
     beg = int(middle_index - math.floor(padding))
