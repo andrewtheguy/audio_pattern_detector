@@ -102,7 +102,7 @@ def is_pure_tone(audio_data: NDArray[np.float32], sample_rate: int) -> bool:
     # Define a threshold for pure tone
     #noise_threshold = 0.1
     from scipy.signal import find_peaks
-    peaks, peak_props = find_peaks(positive_magnitude_normalized, prominence=0.05)
+    peaks, _ = find_peaks(positive_magnitude_normalized, prominence=0.05)
 
     peak_freqs = positive_freqs[peaks]
     #peak_magnitudes = positive_magnitude_normalized[peaks]

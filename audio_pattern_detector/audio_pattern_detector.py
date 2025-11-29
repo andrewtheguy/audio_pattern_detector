@@ -373,7 +373,7 @@ class AudioPatternDetector:
         index: int,
         similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
-        clip, clip_name, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
+        clip, _, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
@@ -466,7 +466,7 @@ class AudioPatternDetector:
         index: int,
         similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
-        clip, clip_name, sliding_window, correlation_clip, correlation_clip_absolute_max= (
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
         if clip_cache["is_pure_tone_pattern"].get(clip_name) is None:
@@ -593,8 +593,8 @@ class AudioPatternDetector:
                                                 section_ts=section_ts,
                                                 similarities=similarities,
                                                 peaks_final=peaks_final,
+                                                _clip_cache=clip_cache,
                                                 area_props=area_props,
-                                                clip_cache=clip_cache,
                                                 similarity_debug=similarity_debug)
 
             if debug_mode:
@@ -634,7 +634,7 @@ class AudioPatternDetector:
         section_ts: str,
         similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
         peaks_final: list[int],
-        clip_cache: ClipCache,
+        _clip_cache: ClipCache,
         area_props: list[list[Any]],
         similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> None:

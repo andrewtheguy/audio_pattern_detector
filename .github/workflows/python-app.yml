@@ -22,6 +22,8 @@ jobs:
       run: docker build --build-arg INCLUDE_DEV=true -t audio-pattern-detector-test .
     - name: Lint with ruff
       run: docker run --rm audio-pattern-detector-test uv run ruff check
+    - name: Type check with basedpyright
+      run: docker run --rm audio-pattern-detector-test uv run basedpyright
     - name: Test with pytest
       run: |
         docker run --rm \

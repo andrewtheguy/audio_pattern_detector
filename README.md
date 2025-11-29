@@ -240,7 +240,23 @@ won't work well for patterns that are too short, currently it disallow short cli
 It will miss distorted patterns like this because error score is too high and area overlap ratio is too low:
 ![rthk_beep_39_00:39:00_478782](https://github.com/user-attachments/assets/80669708-b8f9-461c-ae6c-2edddb161904)
 
-## Testing
+## Development
+
+### Type Checking
+
+Use basedpyright for static type checking:
+
+```shell
+uv run basedpyright
+```
+
+### Linting
+
+```shell
+uv run ruff check
+```
+
+### Testing
 
 Use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.
 
