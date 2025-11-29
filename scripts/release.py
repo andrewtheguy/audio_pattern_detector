@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def run_cmd(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
+def run_cmd(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess[str]:
     """Run a command and return the result."""
     return subprocess.run(cmd, check=check, capture_output=capture, text=True)
 
