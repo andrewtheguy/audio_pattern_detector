@@ -26,6 +26,74 @@ def _emit_jsonl(event_type: str, **kwargs: Any) -> None:
     print(json.dumps(event, ensure_ascii=False), flush=True)
 
 
+def _read_uint32(stream: Any) -> int:
+    """Read a uint32 (little-endian) from a binary stream."""
+    data = stream.read(4)
+    if len(data) < 4:
+        raise ValueError(f"Unexpected EOF reading uint32 (got {len(data)} bytes)")
+    return int.from_bytes(data, byteorder='little', signed=False)
+
+
+def _read_patterns_from_multiplexed_stdin(
+    target_sample_rate: int,
+) -> list[AudioClip]:
+    """Read pattern clips from multiplexed stdin protocol.
+
+    Protocol format (all integers are uint32 little-endian):
+        [4 bytes] number_of_patterns
+        For each pattern:
+            [4 bytes] name_length
+            [name_length bytes] name (UTF-8)
+            [4 bytes] data_length
+            [data_length bytes] WAV data
+
+    After patterns are read, the remaining stdin contains audio data.
+
+    Args:
+        target_sample_rate: Target sample rate for pattern clips.
+
+    Returns:
+        List of AudioClip instances loaded from stdin.
+    """
+    stdin = sys.stdin.buffer
+
+    num_patterns = _read_uint32(stdin)
+    if num_patterns == 0:
+        raise ValueError("No patterns provided in multiplexed stdin")
+    if num_patterns > 100:
+        raise ValueError(f"Too many patterns ({num_patterns}), max is 100")
+
+    print(f"Reading {num_patterns} pattern(s) from multiplexed stdin...", file=sys.stderr)
+
+    pattern_clips: list[AudioClip] = []
+    for i in range(num_patterns):
+        # Read pattern name
+        name_length = _read_uint32(stdin)
+        if name_length == 0 or name_length > 1024:
+            raise ValueError(f"Invalid pattern name length: {name_length}")
+        name_bytes = stdin.read(name_length)
+        if len(name_bytes) < name_length:
+            raise ValueError(f"Unexpected EOF reading pattern name {i+1}")
+        name = name_bytes.decode('utf-8')
+
+        # Read pattern WAV data
+        data_length = _read_uint32(stdin)
+        if data_length == 0:
+            raise ValueError(f"Pattern '{name}' has zero-length data")
+        if data_length > 100 * 1024 * 1024:  # 100MB max per pattern
+            raise ValueError(f"Pattern '{name}' data too large: {data_length} bytes")
+        wav_data = stdin.read(data_length)
+        if len(wav_data) < data_length:
+            raise ValueError(f"Unexpected EOF reading pattern '{name}' data")
+
+        # Create AudioClip from WAV bytes
+        clip = AudioClip.from_wav_bytes(wav_data, name, sample_rate=target_sample_rate)
+        pattern_clips.append(clip)
+        print(f"  Loaded pattern '{name}' ({clip.clip_length_seconds():.2f}s)", file=sys.stderr)
+
+    return pattern_clips
+
+
 def match_pattern(
     audio_source: str | None,
     pattern_files: list[str],
@@ -501,6 +569,60 @@ def _match_pattern_wav_stdin(
     return peak_times, total_time
 
 
+def _match_pattern_multiplexed_stdin(
+    debug_mode: bool,
+    on_pattern_detected: PatternDetectedCallback | None,
+    accumulate_results: bool,
+    seconds_per_chunk: int | None,
+    raw_pcm: bool,
+    input_sample_rate: int | None,
+    target_sample_rate: int,
+) -> tuple[dict[str, list[float]] | None, float]:
+    """Internal function to handle multiplexed stdin mode.
+
+    Reads patterns from stdin first using the multiplexed protocol,
+    then reads audio stream from remaining stdin.
+    """
+    # Read patterns from multiplexed protocol
+    pattern_clips = _read_patterns_from_multiplexed_stdin(target_sample_rate)
+
+    # Now read audio from remaining stdin
+    if raw_pcm:
+        if input_sample_rate is None:
+            raise ValueError("--source-sample-rate is required with --raw-pcm")
+        print(f"Reading raw PCM audio from stdin (source sample rate: {input_sample_rate}Hz)...", file=sys.stderr)
+        if input_sample_rate != target_sample_rate:
+            print(f"Resampling from {input_sample_rate}Hz to {target_sample_rate}Hz...", file=sys.stderr)
+        stream_wrapper = _RawPcmStreamWrapper(input_sample_rate, target_sample_rate)
+    else:
+        print("Reading WAV audio from stdin...", file=sys.stderr)
+        stream_wrapper = _WavStdinStreamWrapper(target_sample_rate)
+
+    audio_name = "stdin"
+    full_streaming_audio = AudioStream(
+        name=audio_name,
+        audio_stream=stream_wrapper,
+        sample_rate=target_sample_rate,
+    )
+
+    # Find clip occurrences in the full audio
+    peak_times, total_time = (
+        AudioPatternDetector(
+            debug_mode=debug_mode,
+            audio_clips=pattern_clips,
+            seconds_per_chunk=seconds_per_chunk,
+            target_sample_rate=target_sample_rate,
+        )
+        .find_clip_in_audio(
+            full_streaming_audio,
+            on_pattern_detected=on_pattern_detected,
+            accumulate_results=accumulate_results,
+        )
+    )
+
+    return peak_times, total_time
+
+
 def _match_pattern_raw_pcm(
     pattern_clips: list[AudioClip],
     debug_mode: bool,
@@ -630,7 +752,43 @@ def cmd_match(args: argparse.Namespace) -> None:
 
     # Get target sample rate (None means use default 8000)
     target_sample_rate = getattr(args, 'target_sample_rate', None)
+    sr = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
 
+    # Handle multiplexed stdin mode (patterns + audio all from stdin)
+    multiplexed_stdin = getattr(args, 'multiplexed_stdin', False)
+    if multiplexed_stdin:
+        raw_pcm = getattr(args, 'raw_pcm', False)
+        source_sample_rate = getattr(args, 'source_sample_rate', None)
+
+        # Validate raw_pcm mode requires source_sample_rate
+        if raw_pcm and source_sample_rate is None:
+            print("Error: --source-sample-rate is required when using --raw-pcm", file=sys.stderr)
+            sys.exit(1)
+
+        # source_sample_rate should not be used with WAV mode
+        if not raw_pcm and source_sample_rate is not None:
+            print("Error: --source-sample-rate can only be used with --raw-pcm (WAV mode reads sample rate from header)", file=sys.stderr)
+            sys.exit(1)
+
+        # Multiplexed stdin mode: always JSONL output
+        callback = _make_jsonl_callback()
+        _emit_jsonl("start", source="multiplexed-stdin")
+
+        peak_times, total_time = _match_pattern_multiplexed_stdin(
+            debug_mode=args.debug,
+            on_pattern_detected=callback,
+            accumulate_results=False,
+            seconds_per_chunk=seconds_per_chunk,
+            raw_pcm=raw_pcm,
+            input_sample_rate=source_sample_rate,
+            target_sample_rate=sr,
+        )
+
+        print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
+        _emit_jsonl("end", total_time=total_time, total_time_formatted=seconds_to_time(total_time))
+        return
+
+    # Non-multiplexed modes: require pattern file(s)
     if args.pattern_folder:
         pattern_files = []
         for pattern_file in glob.glob(f'{args.pattern_folder}/*.wav'):
@@ -639,7 +797,7 @@ def cmd_match(args: argparse.Namespace) -> None:
     elif args.pattern_file:
         pattern_files = [args.pattern_file]
     else:
-        print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
+        print("Please provide either --pattern-file, --pattern-folder, or --multiplexed-stdin", file=sys.stderr)
         sys.exit(1)
 
     jsonl_mode = getattr(args, 'jsonl', False)
@@ -699,7 +857,7 @@ def cmd_match(args: argparse.Namespace) -> None:
             target_sample_rate=target_sample_rate,
         )
     else:
-        print("Please provide --audio-file, --audio-folder, or --stdin", file=sys.stderr)
+        print("Please provide --audio-file, --audio-folder, --stdin, or --multiplexed-stdin", file=sys.stderr)
         sys.exit(1)
 
 

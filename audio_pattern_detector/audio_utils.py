@@ -58,25 +58,68 @@ def load_wav_file_scipy(file_path: str) -> tuple[NDArray[np.float32], int]:
     except Exception as e:
         raise ValueError(f"Failed to read WAV file {file_path}: {e}") from e
 
+    return _normalize_wav_data(data, sample_rate, f"file {file_path}")
+
+
+def load_wav_from_bytes(wav_bytes: bytes, name: str = "bytes") -> tuple[NDArray[np.float32], int]:
+    """Load WAV data from bytes without ffmpeg using scipy.io.wavfile.
+
+    Args:
+        wav_bytes: WAV file content as bytes.
+        name: Name for error messages.
+
+    Returns:
+        tuple: (audio_data as float32 normalized to [-1,1], sample_rate)
+
+    Raises:
+        ValueError: If data is not valid WAV or has unsupported format.
+    """
+    import io
+    from scipy.io import wavfile
+
+    try:
+        sample_rate, data = wavfile.read(io.BytesIO(wav_bytes))
+    except Exception as e:
+        raise ValueError(f"Failed to read WAV data from {name}: {e}") from e
+
+    return _normalize_wav_data(data, sample_rate, name)
+
+
+def _normalize_wav_data(
+    data: NDArray[np.integer[Any] | np.floating[Any]],
+    sample_rate: int,
+    source_name: str,
+) -> tuple[NDArray[np.float32], int]:
+    """Normalize WAV data to float32 in range [-1, 1].
+
+    Args:
+        data: Raw WAV data from scipy.io.wavfile.
+        sample_rate: Sample rate of the audio.
+        source_name: Name for error messages.
+
+    Returns:
+        tuple: (audio_data as float32 normalized to [-1,1], sample_rate)
+    """
     # Convert to float32 normalized to [-1, 1]
+    result: NDArray[np.float32]
     if data.dtype == np.int16:
-        data = data.astype(np.float32) / 32768.0
+        result = data.astype(np.float32) / 32768.0
     elif data.dtype == np.int32:
-        data = data.astype(np.float32) / 2147483648.0
+        result = data.astype(np.float32) / 2147483648.0
     elif data.dtype == np.float32:
-        pass  # Already float32
+        result = np.asarray(data, dtype=np.float32)
     elif data.dtype == np.float64:
-        data = data.astype(np.float32)
+        result = data.astype(np.float32)
     elif data.dtype == np.uint8:
-        data = (data.astype(np.float32) - 128.0) / 128.0
+        result = (data.astype(np.float32) - 128.0) / 128.0
     else:
-        raise ValueError(f"Unsupported WAV dtype: {data.dtype}")
+        raise ValueError(f"Unsupported WAV dtype in {source_name}: {data.dtype}")
 
     # Handle stereo -> mono if needed
-    if len(data.shape) > 1:
-        data = data.mean(axis=1).astype(np.float32)
+    if len(result.shape) > 1:
+        result = result.mean(axis=1).astype(np.float32)
 
-    return data, sample_rate
+    return result, sample_rate
 
 
 def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> NDArray[np.float32]:

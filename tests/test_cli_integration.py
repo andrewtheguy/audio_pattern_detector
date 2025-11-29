@@ -667,3 +667,199 @@ def test_stdin_raw_pcm_rejects_wav_input():
     )
     assert result.returncode != 0
     assert b"WAV format" in result.stderr or b"RIFF/WAVE" in result.stderr
+
+
+# --- Match Command: --multiplexed-stdin Tests ---
+
+
+def _build_multiplexed_payload(patterns: list[tuple[str, bytes]], audio_data: bytes) -> bytes:
+    """Build a multiplexed stdin payload.
+
+    Protocol:
+        [4 bytes] number_of_patterns (uint32 little-endian)
+        For each pattern:
+            [4 bytes] name_length (uint32 little-endian)
+            [name_length bytes] name (UTF-8)
+            [4 bytes] data_length (uint32 little-endian)
+            [data_length bytes] WAV data
+        [remaining bytes] audio stream
+    """
+    payload = bytearray()
+
+    # Number of patterns
+    payload.extend(len(patterns).to_bytes(4, byteorder='little', signed=False))
+
+    # Each pattern
+    for name, wav_data in patterns:
+        name_bytes = name.encode('utf-8')
+        payload.extend(len(name_bytes).to_bytes(4, byteorder='little', signed=False))
+        payload.extend(name_bytes)
+        payload.extend(len(wav_data).to_bytes(4, byteorder='little', signed=False))
+        payload.extend(wav_data)
+
+    # Audio stream
+    payload.extend(audio_data)
+
+    return bytes(payload)
+
+
+def test_multiplexed_stdin_help():
+    """Test that --multiplexed-stdin is shown in help."""
+    result = run_cli("match", "--help")
+    assert "--multiplexed-stdin" in result.stdout
+
+
+def test_multiplexed_stdin_single_pattern_wav_audio():
+    """Test --multiplexed-stdin with single pattern and WAV audio."""
+    # Load pattern WAV
+    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+        pattern_data = f.read()
+
+    # Convert audio to WAV
+    audio_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+
+    # Build multiplexed payload
+    payload = _build_multiplexed_payload(
+        patterns=[("rthk_beep", pattern_data)],
+        audio_data=audio_data,
+    )
+
+    result = run_cli_binary(
+        "match",
+        "--multiplexed-stdin",
+        stdin_data=payload,
+    )
+    assert result.returncode == 0
+
+    # multiplexed-stdin mode always outputs JSONL
+    lines = result.stdout.decode().strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Should have start and end events
+    assert events[0]["type"] == "start"
+    assert events[0]["source"] == "multiplexed-stdin"
+    assert events[-1]["type"] == "end"
+
+    # Should have pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0
+    assert pattern_events[0]["clip_name"] == "rthk_beep"
+
+
+def test_multiplexed_stdin_multiple_patterns():
+    """Test --multiplexed-stdin with multiple patterns."""
+    # Load pattern WAVs
+    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+        pattern1_data = f.read()
+    with open("sample_audios/clips/cbs_news.wav", "rb") as f:
+        pattern2_data = f.read()
+
+    # Convert audio to WAV (this audio has RTHK beep but not CBS)
+    audio_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+
+    # Build multiplexed payload with two patterns
+    payload = _build_multiplexed_payload(
+        patterns=[
+            ("rthk_beep", pattern1_data),
+            ("cbs_news", pattern2_data),
+        ],
+        audio_data=audio_data,
+    )
+
+    result = run_cli_binary(
+        "match",
+        "--multiplexed-stdin",
+        stdin_data=payload,
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.decode().strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Should detect rthk_beep but not cbs_news
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    clip_names = {e["clip_name"] for e in pattern_events}
+    assert "rthk_beep" in clip_names
+
+
+def test_multiplexed_stdin_with_raw_pcm_audio():
+    """Test --multiplexed-stdin with --raw-pcm for audio stream."""
+    # Load pattern WAV
+    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+        pattern_data = f.read()
+
+    # Convert audio to raw PCM
+    audio_data = _convert_wav_to_raw_pcm("sample_audios/rthk_section_with_beep.wav")
+
+    # Build multiplexed payload
+    payload = _build_multiplexed_payload(
+        patterns=[("rthk_beep", pattern_data)],
+        audio_data=audio_data,
+    )
+
+    result = run_cli_binary(
+        "match",
+        "--multiplexed-stdin",
+        "--raw-pcm",
+        "--source-sample-rate", "8000",
+        stdin_data=payload,
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.decode().strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "end"
+
+    # Should have pattern_detected events
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0
+    assert pattern_events[0]["clip_name"] == "rthk_beep"
+
+
+def test_multiplexed_stdin_requires_no_pattern_file():
+    """Test --multiplexed-stdin does not require --pattern-file."""
+    # Load pattern WAV
+    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+        pattern_data = f.read()
+
+    # Convert audio to WAV
+    audio_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+
+    # Build multiplexed payload
+    payload = _build_multiplexed_payload(
+        patterns=[("test_pattern", pattern_data)],
+        audio_data=audio_data,
+    )
+
+    # Should work without --pattern-file or --pattern-folder
+    result = run_cli_binary(
+        "match",
+        "--multiplexed-stdin",
+        stdin_data=payload,
+    )
+    assert result.returncode == 0
+
+
+def test_multiplexed_stdin_raw_pcm_requires_source_sample_rate():
+    """Test --multiplexed-stdin with --raw-pcm requires --source-sample-rate."""
+    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+        pattern_data = f.read()
+
+    audio_data = _convert_wav_to_raw_pcm("sample_audios/rthk_section_with_beep.wav")
+    payload = _build_multiplexed_payload(
+        patterns=[("test", pattern_data)],
+        audio_data=audio_data,
+    )
+
+    result = run_cli_binary(
+        "match",
+        "--multiplexed-stdin",
+        "--raw-pcm",
+        # Missing --source-sample-rate
+        stdin_data=payload,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert b"--source-sample-rate is required" in result.stderr
