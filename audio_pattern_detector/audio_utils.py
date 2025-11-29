@@ -346,19 +346,16 @@ def write_wav_file(filepath, audio_data, sample_rate):
         audio_data: numpy array of float32 audio data in range [-1, 1]
         sample_rate: Sample rate in Hz
     """
-    # Convert float32 [-1, 1] to int16
-    audio_int16 = (audio_data * (2**15)).astype(np.int16)
-
-    # Use ffmpeg to write wav file
+    # Use ffmpeg to write wav file, accepting float32 directly
     command = [
         "ffmpeg",
         "-y",  # Overwrite output file
-        "-f", "s16le",  # Input format: signed 16-bit little-endian
+        "-f", "f32le",  # Input format: 32-bit float little-endian
         "-ar", str(sample_rate),  # Sample rate
         "-ac", "1",  # Mono
         "-i", "pipe:",  # Read from stdin
         "-loglevel", "error",
-        filepath
+        filepath,
     ]
 
     process = subprocess.Popen(
@@ -366,7 +363,7 @@ def write_wav_file(filepath, audio_data, sample_rate):
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,  # ffmpeg writes to file, not stdout
     )
-    process.communicate(input=audio_int16.tobytes())
+    process.communicate(input=audio_data.tobytes())
 
     if process.returncode != 0:
         raise ValueError(f"ffmpeg write failed with return code {process.returncode}")
