@@ -10,7 +10,7 @@ from operator import itemgetter
 from typing import Any, TypedDict
 
 import numpy as np
-import pyloudnorm as pyln
+import audio_pattern_detector.loudness as pyln
 from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
@@ -70,7 +70,7 @@ def _mean_squared_error(y_true: NDArray[np.floating[Any]], y_pred: NDArray[np.fl
     return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
 
 #ignore possible clipping
-warnings.filterwarnings('ignore', module='pyloudnorm')
+warnings.filterwarnings('ignore', module='audio_pattern_detector.loudness')
 
 def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rate: int) -> None:
     """Helper function to write audio using ffmpeg"""
@@ -159,7 +159,10 @@ class AudioPatternDetector:
                 else:
                     meter = pyln.Meter(sr)
                 loudness = meter.integrated_loudness(clip)
-                clip = pyln.normalize.loudness(clip, loudness, -16.0)
+                if np.isfinite(loudness):
+                    clip = pyln.normalize.loudness(clip, loudness, -16.0)
+                else:
+                    logger.warning(f"Clip {clip_name} has invalid loudness {loudness}, skipping normalization")
 
             # Compute correlation
             correlation_clip, absolute_max = self._get_clip_correlation(clip)
@@ -406,7 +409,10 @@ class AudioPatternDetector:
             loudness = meter.integrated_loudness(audio_section)
 
             # loudness normalize audio to -16 dB LUFS
-            audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+            if np.isfinite(loudness):
+                audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+            else:
+                pass # Skip normalization for silence/invalid loudness
 
             # keep for debugging
             # if self.debug_mode:
