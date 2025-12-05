@@ -33,22 +33,16 @@ def valid_audio(data: NDArray[np.floating[Any]], rate: float, block_size: float)
     if not np.issubdtype(data.dtype, np.floating):
         raise ValueError("Data must be floating point.")
 
+    if data.ndim > 2:
+        raise ValueError("Audio must be 1D or 2D.")
+
     if data.ndim == 2 and data.shape[1] > 5:
         raise ValueError("Audio must have five channels or less.")
 
     if data.shape[0] < block_size * rate:
-        # It's possible for this to happen if the clip is shorter than the block size
-        # In the original code this raised a ValueError, but for robustness with short clips
-        # we might want to handle it, but for now we keep strict compliance.
-        # However, checking the user's code, they sometimes handle short clips themselves
-        # or rely on pyloudnorm to raise.
-        pass # The original code raised ValueError here.
-        # raise ValueError("Audio must have length greater than the block size.")
-        # But wait, looking at the user's code:
-        # if clip_seconds < 0.5: meter = pyln.Meter(sr, block_size=clip_seconds)
-        # So they adjust block_size.
-        if data.shape[0] < block_size * rate:
-             raise ValueError("Audio must have length greater than the block size.")
+        # Note: Users sometimes adjust block_size for short clips (e.g. if clip_seconds < 0.5)
+        # to ensure this condition is met.
+        raise ValueError("Audio must have length greater than the block size.")
     
     return True
 
@@ -73,9 +67,13 @@ class IIRfilter(object):
         Sampling rate in Hz.
     filter_type: str
         Shape of the filter.
+    passband_gain : float
+        Linear passband gain.
     """
 
     def __init__(self, G: float, Q: float, fc: float, rate: float, filter_type: str, passband_gain: float = 1.0):
+        if Q <= 0:
+            raise ValueError("Q factor must be greater than 0.")
         self.G  = G
         self.Q  = Q
         self.fc = fc
@@ -94,7 +92,7 @@ class IIRfilter(object):
         Q factor      = {Q} 
         Center freq.  = {fc} Hz
         Sample rate   = {rate} Hz
-        Passband gain = {passband_gain} dB
+        Passband gain = {passband_gain}
         ------------------------------
         """.format(type = self.filter_type, 
         G=self.G, Q=self.Q, fc=self.fc, rate=self.rate,
@@ -377,7 +375,7 @@ class Meter(object):
             self._filters['high_pass'] = IIRfilter(0.0, 0.5, 130.0, self.rate, 'high_pass')
             self._filters['peaking'] = IIRfilter(0.0, 1/np.sqrt(2), 500.0, self.rate, 'peaking')
         elif self._filter_class == "Fenton/Lee 2": # not yet implemented 
-            self._filters['high_self'] = IIRfilter(4.0, 1/np.sqrt(2), 1500.0, self.rate, 'high_shelf')
+            self._filters['high_shelf'] = IIRfilter(4.0, 1/np.sqrt(2), 1500.0, self.rate, 'high_shelf')
             self._filters['high_pass'] = IIRfilter(0.0, 0.5, 38.0, self.rate, 'high_pass')
         elif self._filter_class == "Dash et al.":
             self._filters['high_pass'] = IIRfilter(0.0, 0.375, 149.0, self.rate, 'high_pass')
@@ -388,7 +386,7 @@ class Meter(object):
         elif self._filter_class == "custom":
             pass
         else:
-            raise ValueError("Invalid filter class:", self._filter_class)
+            raise ValueError(f"Invalid filter class: {self._filter_class}")
 
 
 # --- From normalize.py ---
@@ -448,8 +446,12 @@ class normalize:
             Loudness normalized output data.
         """    
         # calculate the gain needed to scale to the desired loudness level
-        delta_loudness = target_loudness - input_loudness
-        gain = np.power(10.0, delta_loudness/20.0)
+        # Guard against -inf input_loudness (silence)
+        if np.isneginf(input_loudness):
+            gain = 0.0 # Silence remains silence
+        else:
+            delta_loudness = target_loudness - input_loudness
+            gain = np.power(10.0, delta_loudness/20.0)
 
         output = gain * data
 
