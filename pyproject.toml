@@ -48,6 +48,7 @@ reportImplicitStringConcatenation = false
 reportMissingImports = true
 reportUnusedCallResult = false
 reportImplicitOverride = false
+reportUnnecessaryTypeIgnoreComment = false
 
 [build-system]
 requires = ["hatchling"]
