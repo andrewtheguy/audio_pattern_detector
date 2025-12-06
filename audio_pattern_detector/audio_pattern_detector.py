@@ -611,9 +611,11 @@ class AudioPatternDetector:
             if debug_mode:
                 audio_test_dir = f"./tmp/audio_section/{clip_name}"
                 os.makedirs(audio_test_dir, exist_ok=True)
+                # Clip to [-1.0, 1.0] to avoid clipping distortion in WAV output
+                debug_audio = np.clip(audio_section[peak - len(clip):peak + len(clip)], -1.0, 1.0)
                 _write_audio_file(
                     f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav",
-                    audio_section[peak - len(clip):peak + len(clip)],
+                    debug_audio.astype(np.float32),
                     self.target_sample_rate
                 )
 
