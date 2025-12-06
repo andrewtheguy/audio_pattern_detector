@@ -18,6 +18,13 @@ uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@r
 uv pip install -e .
 ```
 
+### Install with optional debug dependencies
+```shell
+uv pip install -e ".[debug]"
+```
+
+This installs matplotlib for debug visualizations.
+
 ### Run without installing
 ```shell
 # Using uv (from local directory)
