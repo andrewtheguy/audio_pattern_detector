@@ -32,6 +32,7 @@ filterwarnings = [
 ]
 
 [tool.pyright]
+stubPath = "stubs"
 exclude = [".venv", "build", "dist", ".git", "tests"]
 reportUnknownParameterType = true
 reportUninitializedInstanceVariable = true
@@ -48,7 +49,6 @@ reportImplicitStringConcatenation = false
 reportMissingImports = true
 reportUnusedCallResult = false
 reportImplicitOverride = false
-reportUnnecessaryTypeIgnoreComment = false
 
 [build-system]
 requires = ["hatchling"]
