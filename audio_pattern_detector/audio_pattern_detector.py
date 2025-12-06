@@ -184,6 +184,17 @@ class AudioPatternDetector:
                 plt.savefig(f'{graph_dir}/{clip_name}.png')
                 plt.close()
 
+                # Save the original correlation clip graph (used for comparison in slice graphs)
+                graph_dir_original = f"./tmp/graph/cross_correlation_slice_original/{clip_name}"
+                os.makedirs(graph_dir_original, exist_ok=True)
+                plt.figure(figsize=(10, 4))
+                plt.plot(correlation_clip, color='orange')
+                plt.title('Cross-correlation of the audio clip itself (original pattern)')
+                plt.xlabel('Lag')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(f'{graph_dir_original}/{clip_name}.png')
+                plt.close()
+
             self._clip_datas[clip_name] = {
                 "clip": clip,
                 "clip_name": clip_name,
@@ -705,18 +716,6 @@ class AudioPatternDetector:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
-                # Save the original correlation clip graph separately
-                graph_dir_original = f"./tmp/graph/cross_correlation_slice_original/{clip_name}"
-                os.makedirs(graph_dir_original, exist_ok=True)
-                plt.figure(figsize=(10, 4))
-                plt.plot(correlation_clip_graph, color='orange')
-                plt.title('Cross-correlation of the audio clip itself (original pattern)')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir_original}/{clip_name}_{index}_{section_ts}_{peak}.png')
-                plt.close()
-
             area_props.append([diff_overlap_ratio, area_prop])
 
             similarities.append((similarity, {"whole": similarity_whole,
@@ -894,18 +893,6 @@ class AudioPatternDetector:
                 plt.ylabel('Correlation coefficient')
                 plt.savefig(
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-                plt.close()
-
-                # Save the original correlation clip graph separately
-                graph_dir_original = f"./tmp/graph/cross_correlation_slice_original/{clip_name}"
-                os.makedirs(graph_dir_original, exist_ok=True)
-                plt.figure(figsize=(10, 4))
-                plt.plot(correlation_clip_graph, color='orange')
-                plt.title('Cross-correlation of the audio clip itself (original pattern)')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir_original}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
             similarities.append((similarity, {"whole": similarity_whole,
