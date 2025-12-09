@@ -23,7 +23,7 @@ RUN uv sync --locked --no-install-project
 
 # Copy application code (tests and sample_audios should be mounted)
 COPY audio_pattern_detector ./audio_pattern_detector
-COPY stubs ./stubs
+COPY typings ./typings
 
 # Install the project with dev dependencies
 RUN uv sync --locked

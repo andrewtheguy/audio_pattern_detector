@@ -32,7 +32,7 @@ filterwarnings = [
 ]
 
 [tool.pyright]
-stubPath = "stubs"
+#stubPath = "typings"
 exclude = [".venv", "build", "dist", ".git", "tests"]
 reportUnknownParameterType = true
 reportUninitializedInstanceVariable = true
@@ -47,6 +47,7 @@ reportUnknownArgumentType = false
 reportUnknownLambdaType = false
 reportImplicitStringConcatenation = false
 reportMissingImports = true
+reportMissingModuleSource = false
 reportUnusedCallResult = false
 reportImplicitOverride = false
 
