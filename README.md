@@ -10,7 +10,7 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 
 ### Install from GitHub (recommended)
 ```shell
-uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@ref(tag or branch)
+uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@(tag or branch)
 ```
 
 ### Install locally for development
