@@ -109,7 +109,6 @@ pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f
 
     // Compute mean square per block.
     let mut z = vec![0.0_f64; num_blocks];
-    let block_samples = (t_g * rate) as usize;
     for j in 0..num_blocks {
         let l = (t_g * (j as f64 * step) * rate) as usize;
         let u = (t_g * (j as f64 * step + 1.0) * rate) as usize;
@@ -118,7 +117,7 @@ pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f
             continue;
         }
         let sum_sq: f64 = filtered[l..u].iter().map(|&x| x * x).sum();
-        z[j] = sum_sq / block_samples as f64;
+        z[j] = sum_sq / (u - l) as f64;
     }
 
     // Block loudness.

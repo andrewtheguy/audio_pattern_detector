@@ -66,6 +66,7 @@ def _read_wav(wav_file: 'str | IO[bytes]', source_name: str) -> tuple[NDArray[np
         raw = np.frombuffer(raw_bytes, dtype=np.uint8).reshape(-1, 3)
         int32_data = raw[:, 0].astype(np.int32) | (raw[:, 1].astype(np.int32) << 8) | (raw[:, 2].astype(np.int32) << 16)
         int32_data[raw[:, 2] >= 0x80] -= 1 << 24
+        int32_data <<= 8  # left-shift to full int32 range for correct /2^31 normalization
         data = int32_data
     elif sampwidth == 4:
         data = np.frombuffer(raw_bytes, dtype=np.int32)

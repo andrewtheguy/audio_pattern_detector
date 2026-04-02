@@ -35,7 +35,7 @@ def load_wav(path: str) -> tuple[np.ndarray, int]:
         for i in range(n_samples):
             b = raw[3 * i : 3 * i + 3]
             arr[i] = struct.unpack_from("<i", b + (b"\xff" if b[2] & 0x80 else b"\x00"))[0]
-        data = arr.astype(np.float32) / 2147483648.0
+        data = arr.astype(np.float32) / 8388608.0
     elif sampwidth == 4:
         data = np.frombuffer(raw, dtype=np.int32).astype(np.float32) / 2147483648.0
     else:
