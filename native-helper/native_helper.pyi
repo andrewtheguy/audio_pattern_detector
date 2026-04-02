@@ -1,8 +1,10 @@
+from typing import Any
+
 import numpy as np
 import numpy.typing as npt
 
 def find_peaks(
-    data: npt.NDArray[np.floating[object]],
+    data: npt.NDArray[np.floating[Any]],
     *,
     height: float | None = None,
     distance: int | None = None,

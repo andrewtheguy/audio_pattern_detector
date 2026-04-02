@@ -46,23 +46,16 @@ jobs:
           python - <<'PY'
           import os
           import pathlib
-          import re
-          import sys
+          import tomllib
 
           root = pathlib.Path(".")
-          cargo = (root / "Cargo.toml").read_text()
-          pyproject = (root / "pyproject.toml").read_text()
           release_tag = os.environ["RELEASE_TAG"]
           normalized_tag = release_tag[1:] if release_tag.startswith("v") else release_tag
 
-          cargo_match = re.search(r'^version = "([^"]+)"$', cargo, re.MULTILINE)
-          pyproject_match = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE)
-
-          if cargo_match is None or pyproject_match is None:
-            raise SystemExit("Could not determine package versions from Cargo.toml / pyproject.toml")
-
-          cargo_version = cargo_match.group(1)
-          pyproject_version = pyproject_match.group(1)
+          with open(root / "Cargo.toml", "rb") as f:
+            cargo_version = tomllib.load(f)["package"]["version"]
+          with open(root / "pyproject.toml", "rb") as f:
+            pyproject_version = tomllib.load(f)["project"]["version"]
 
           if cargo_version != pyproject_version:
             raise SystemExit(
