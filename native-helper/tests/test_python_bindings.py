@@ -134,6 +134,74 @@ class PythonBindingsTest(unittest.TestCase):
         with self.assertRaises((ValueError, TypeError)):
             self.native_helper.find_peaks(data[:, 0])
 
+    # ── resample ──────────────────────────────────────────────────────
+
+    def test_resample_identity(self):
+        data = np.array([1, 2, 3, 4], dtype=np.float32)
+        out = self.native_helper.resample(data, 4)
+        self.assertIsInstance(out, np.ndarray)
+        self.assertEqual(out.dtype, np.float32)
+        np.testing.assert_allclose(out, data, atol=1e-5)
+
+    def test_resample_compare_with_scipy(self):
+        """Compare resample against scipy.signal.resample."""
+        from scipy.signal import resample as scipy_resample
+
+        rng = np.random.default_rng(99)
+        data = rng.standard_normal(160).astype(np.float32)
+        target = 80
+
+        scipy_out = scipy_resample(data, target).astype(np.float32)
+        rust_out = self.native_helper.resample(data, target)
+        # Allow some tolerance - both are valid FFT-based resamplers with
+        # slightly different Nyquist handling.
+        np.testing.assert_allclose(rust_out, scipy_out, atol=0.2)
+
+    def test_resample_upsample_compare(self):
+        from scipy.signal import resample as scipy_resample
+
+        data = np.array([0, 1, 0, -1, 0], dtype=np.float32)
+        target = 10
+
+        scipy_out = scipy_resample(data, target).astype(np.float32)
+        rust_out = self.native_helper.resample(data, target)
+        np.testing.assert_allclose(rust_out, scipy_out, atol=1e-4)
+
+    def test_resample_accepts_float64(self):
+        data = np.array([1, 2, 3, 4], dtype=np.float64)
+        out = self.native_helper.resample(data, 2)
+        self.assertEqual(out.dtype, np.float32)
+        self.assertEqual(len(out), 2)
+
+    # ── simpson ───────────────────────────────────────────────────────
+
+    def test_simpson_constant(self):
+        y = np.full(5, 2.0, dtype=np.float64)
+        area = self.native_helper.simpson(y)
+        self.assertAlmostEqual(area, 8.0, places=10)
+
+    def test_simpson_compare_with_scipy(self):
+        """Compare simpson against scipy.integrate.simpson."""
+        from scipy.integrate import simpson as scipy_simpson
+
+        rng = np.random.default_rng(77)
+        # Odd length
+        y_odd = rng.standard_normal(101).astype(np.float64)
+        scipy_odd = scipy_simpson(y_odd, x=np.arange(len(y_odd)))
+        rust_odd = self.native_helper.simpson(y_odd)
+        self.assertAlmostEqual(rust_odd, float(scipy_odd), places=8)
+
+        # Even length
+        y_even = rng.standard_normal(100).astype(np.float64)
+        scipy_even = scipy_simpson(y_even, x=np.arange(len(y_even)))
+        rust_even = self.native_helper.simpson(y_even)
+        self.assertAlmostEqual(rust_even, float(scipy_even), places=8)
+
+    def test_simpson_accepts_float32(self):
+        y = np.array([0, 1, 4, 9, 16], dtype=np.float32)
+        area = self.native_helper.simpson(y)
+        self.assertIsInstance(area, float)
+
 
 if __name__ == "__main__":
     unittest.main()

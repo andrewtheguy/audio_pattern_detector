@@ -10,3 +10,10 @@ def find_peaks(
     distance: int | None = None,
     prominence: float | None = None,
 ) -> tuple[npt.NDArray[np.int64], dict[str, npt.NDArray[np.float64]]]: ...
+
+def resample(
+    data: npt.NDArray[np.floating[Any]],
+    num_samples: int,
+) -> npt.NDArray[np.float32]: ...
+
+def simpson(y: npt.NDArray[np.floating[Any]]) -> float: ...

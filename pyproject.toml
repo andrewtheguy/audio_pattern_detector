@@ -10,7 +10,6 @@ dependencies = [
     "numpy>=1.26.4,<2",
     "native-helper",
     "pyloudnorm>=0.1.1,<0.2",
-    "scipy>=1.16.3,<2",
 ]
 
 [project.optional-dependencies]

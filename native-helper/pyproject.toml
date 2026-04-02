@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "native-helper"
 version = "0.0.1"
 description = "Native Rust helper functions for audio-pattern-detector"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = ["numpy>=1.26"]
 
 [dependency-groups]

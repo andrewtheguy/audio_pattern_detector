@@ -39,8 +39,50 @@ def is_ffmpeg_available() -> bool:
     return _ffmpeg_available
 
 
-def load_wav_file_scipy(file_path: str) -> tuple[NDArray[np.float32], int]:
-    """Load WAV file without ffmpeg using scipy.io.wavfile.
+def _read_wav(wav_file: 'str | IO[bytes]', source_name: str) -> tuple[NDArray[np.integer[Any] | np.floating[Any]], int]:
+    """Read WAV data using the stdlib wave module.
+
+    Returns:
+        tuple: (raw numpy array, sample_rate)
+    """
+    import struct
+    import wave
+
+    try:
+        with wave.open(wav_file, 'rb') as wf:
+            sample_rate = wf.getframerate()
+            n_channels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            n_frames = wf.getnframes()
+            raw_bytes = wf.readframes(n_frames)
+    except Exception as e:
+        raise ValueError(f"Failed to read WAV data from {source_name}: {e}") from e
+
+    if sampwidth == 1:
+        data = np.frombuffer(raw_bytes, dtype=np.uint8)
+    elif sampwidth == 2:
+        data = np.frombuffer(raw_bytes, dtype=np.int16)
+    elif sampwidth == 3:
+        # 24-bit: unpack to int32
+        n_samples = len(raw_bytes) // 3
+        int32_data = np.empty(n_samples, dtype=np.int32)
+        for i in range(n_samples):
+            b = raw_bytes[3 * i : 3 * i + 3]
+            int32_data[i] = struct.unpack_from('<i', b + (b'\xff' if b[2] & 0x80 else b'\x00'))[0]
+        data = int32_data
+    elif sampwidth == 4:
+        data = np.frombuffer(raw_bytes, dtype=np.int32)
+    else:
+        raise ValueError(f"Unsupported sample width {sampwidth} in {source_name}")
+
+    if n_channels > 1:
+        data = data.reshape(-1, n_channels)
+
+    return data, sample_rate
+
+
+def load_wav_file(file_path: str) -> tuple[NDArray[np.float32], int]:
+    """Load WAV file using the stdlib wave module.
 
     Args:
         file_path: Path to WAV file.
@@ -51,18 +93,16 @@ def load_wav_file_scipy(file_path: str) -> tuple[NDArray[np.float32], int]:
     Raises:
         ValueError: If file is not a valid WAV file or has unsupported format.
     """
-    from scipy.io import wavfile
-
-    try:
-        sample_rate, data = wavfile.read(file_path)
-    except Exception as e:
-        raise ValueError(f"Failed to read WAV file {file_path}: {e}") from e
-
+    data, sample_rate = _read_wav(file_path, f"file {file_path}")
     return _normalize_wav_data(data, sample_rate, f"file {file_path}")
 
 
+# Keep old name as alias for backwards compatibility.
+load_wav_file_scipy = load_wav_file
+
+
 def load_wav_from_bytes(wav_bytes: bytes, name: str = "bytes") -> tuple[NDArray[np.float32], int]:
-    """Load WAV data from bytes without ffmpeg using scipy.io.wavfile.
+    """Load WAV data from bytes using the stdlib wave module.
 
     Args:
         wav_bytes: WAV file content as bytes.
@@ -75,13 +115,8 @@ def load_wav_from_bytes(wav_bytes: bytes, name: str = "bytes") -> tuple[NDArray[
         ValueError: If data is not valid WAV or has unsupported format.
     """
     import io
-    from scipy.io import wavfile
 
-    try:
-        sample_rate, data = wavfile.read(io.BytesIO(wav_bytes))
-    except Exception as e:
-        raise ValueError(f"Failed to read WAV data from {name}: {e}") from e
-
+    data, sample_rate = _read_wav(io.BytesIO(wav_bytes), name)
     return _normalize_wav_data(data, sample_rate, name)
 
 
@@ -123,7 +158,7 @@ def _normalize_wav_data(
 
 
 def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> NDArray[np.float32]:
-    """Resample audio using scipy (no ffmpeg needed).
+    """Resample audio using FFT-based resampling (no ffmpeg needed).
 
     Args:
         audio: Audio data as numpy array.
@@ -136,11 +171,10 @@ def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> 
     if orig_sr == target_sr:
         return audio
 
-    from scipy import signal
+    from native_helper import resample
 
     num_samples = int(len(audio) * target_sr / orig_sr)
-    resampled = signal.resample(audio, num_samples)
-    return np.asarray(resampled, dtype=np.float32)
+    return resample(audio, num_samples)
 
 
 def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, middle_index: int) -> NDArray[np.floating[Any]]:
