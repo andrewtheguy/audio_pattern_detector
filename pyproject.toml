@@ -6,6 +6,7 @@ authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
 requires-python = "~=3.12.0"
 readme = "README.md"
 dependencies = [
+    "fft-correlation",
     "numpy>=1.26.4,<2",
     "pyloudnorm>=0.1.1,<0.2",
     "scipy>=1.16.3,<2",
@@ -50,6 +51,18 @@ reportMissingImports = true
 reportMissingModuleSource = false
 reportUnusedCallResult = false
 reportImplicitOverride = false
+
+[tool.uv]
+environments = [
+    "platform_machine == 'x86_64'",
+    "platform_machine == 'aarch64'",
+]
+
+[tool.uv.sources]
+fft-correlation = [
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_x86_64.whl", marker = "platform_machine == 'x86_64'" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_aarch64.whl", marker = "platform_machine == 'aarch64'" },
+]
 
 [build-system]
 requires = ["hatchling"]

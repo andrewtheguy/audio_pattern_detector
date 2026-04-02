@@ -360,8 +360,8 @@ class AudioPatternDetector:
 
     def _get_clip_correlation(self, clip: NDArray[np.float32]) -> tuple[NDArray[np.float64], np.floating[Any]]:
         # Cross-correlate and normalize correlation
-        from scipy.signal import correlate
-        correlation_clip: NDArray[np.float64] = correlate(clip, clip, mode='full', method='fft')
+        from fft_correlation import fft_correlate_1d  # pyright: ignore[reportAttributeAccessIssue]
+        correlation_clip: NDArray[np.float64] = np.array(fft_correlate_1d(clip, clip, mode='full'))
 
         # abs
         correlation_clip = np.abs(correlation_clip)
@@ -504,10 +504,10 @@ class AudioPatternDetector:
         # samples_skip_end = zeroes_second_pad * sr + clip_length
 
         # Cross-correlate and normalize correlation
-        from scipy.signal import correlate
-        correlation = correlate(audio_section, clip, mode='full', method='fft')
-        # abs
-        correlation = np.abs(correlation)
+        from fft_correlation import fft_correlate_1d  # pyright: ignore[reportAttributeAccessIssue]
+        # Replace NaN with 0.0 (NaN comes from loudness normalization of silence)
+        audio_section_clean = np.nan_to_num(audio_section, nan=0.0)
+        correlation = np.abs(np.array(fft_correlate_1d(audio_section_clean, clip, mode='full')))
         absolute_max = np.max(correlation)
         max_choose = max(correlation_clip_absolute_max,absolute_max)
         correlation /= max_choose
