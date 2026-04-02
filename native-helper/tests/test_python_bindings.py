@@ -202,6 +202,58 @@ class PythonBindingsTest(unittest.TestCase):
         area = self.native_helper.simpson(y)
         self.assertIsInstance(area, float)
 
+    # ── loudness ──────────────────────────────────────────────────────
+
+    def test_integrated_loudness_silence(self):
+        silence = np.zeros(8000, dtype=np.float32)
+        lufs = self.native_helper.integrated_loudness(silence, 8000)
+        self.assertEqual(lufs, float('-inf'))
+
+    def test_integrated_loudness_sine(self):
+        sr = 8000
+        t = np.arange(sr, dtype=np.float32) / sr
+        data = np.sin(2 * np.pi * 1000 * t).astype(np.float32)
+        lufs = self.native_helper.integrated_loudness(data, sr)
+        self.assertIsInstance(lufs, float)
+        self.assertGreater(lufs, -10.0)
+        self.assertLess(lufs, 0.0)
+
+    def test_integrated_loudness_compare_with_pyloudnorm(self):
+        """Compare against pyloudnorm for a realistic signal."""
+        import pyloudnorm as pyln
+
+        sr = 8000
+        rng = np.random.default_rng(42)
+        data = (rng.standard_normal(sr * 2) * 0.3).astype(np.float32)
+
+        meter = pyln.Meter(sr)
+        pyln_lufs = meter.integrated_loudness(data)
+        rust_lufs = self.native_helper.integrated_loudness(data, sr)
+        self.assertAlmostEqual(rust_lufs, pyln_lufs, places=1)
+
+    def test_integrated_loudness_short_block(self):
+        """Short audio with custom block_size."""
+        sr = 8000
+        t = np.arange(int(sr * 0.3), dtype=np.float32) / sr
+        data = np.sin(2 * np.pi * 440 * t).astype(np.float32)
+        lufs = self.native_helper.integrated_loudness(data, sr, block_size=0.3)
+        self.assertIsInstance(lufs, float)
+        self.assertFalse(np.isinf(lufs))
+
+    def test_loudness_normalize_clips(self):
+        data = np.array([0.5, -0.5, 0.8, -0.8], dtype=np.float32)
+        out = self.native_helper.loudness_normalize(data, -60.0, -20.0)
+        self.assertIsInstance(out, np.ndarray)
+        self.assertEqual(out.dtype, np.float32)
+        self.assertTrue(np.all(out >= -1.0))
+        self.assertTrue(np.all(out <= 1.0))
+
+    def test_loudness_normalize_gain(self):
+        data = np.array([0.1, -0.1], dtype=np.float32)
+        out = self.native_helper.loudness_normalize(data, -22.0, -16.0)
+        expected_gain = 10.0 ** (6.0 / 20.0)
+        np.testing.assert_allclose(out[0], 0.1 * expected_gain, atol=1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

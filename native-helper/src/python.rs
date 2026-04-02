@@ -1,5 +1,6 @@
 use crate::{
-    find_peaks_1d as rust_find_peaks_1d, resample_1d as rust_resample_1d,
+    find_peaks_1d as rust_find_peaks_1d, integrated_loudness as rust_integrated_loudness,
+    loudness_normalize as rust_loudness_normalize, resample_1d as rust_resample_1d,
     simpson_1d as rust_simpson_1d, FindPeaksOptions,
 };
 use numpy::{IntoPyArray, PyArray1, PyArrayMethods};
@@ -95,12 +96,48 @@ fn simpson_py(y: Bound<'_, PyAny>) -> PyResult<f64> {
     Ok(rust_simpson_1d(&data_f64))
 }
 
+#[pyfunction(
+    name = "integrated_loudness",
+    signature = (data, sample_rate, block_size = 0.4)
+)]
+fn integrated_loudness_py(
+    data: Bound<'_, PyAny>,
+    sample_rate: u32,
+    block_size: f64,
+) -> PyResult<f64> {
+    let data_f32 = extract_f32_data(&data)?;
+    Ok(rust_integrated_loudness(&data_f32, sample_rate, block_size))
+}
+
+#[pyfunction(name = "loudness_normalize")]
+fn loudness_normalize_py<'py>(
+    py: Python<'py>,
+    data: Bound<'py, PyAny>,
+    current_lufs: f64,
+    target_lufs: f64,
+) -> PyResult<Bound<'py, PyArray1<f32>>> {
+    let data_f32 = extract_f32_data(&data)?;
+    let result = rust_loudness_normalize(&data_f32, current_lufs, target_lufs);
+    Ok(result.into_pyarray(py))
+}
+
 #[pymodule]
 #[pyo3(name = "native_helper")]
 fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add("__all__", vec!["find_peaks", "resample", "simpson"])?;
+    module.add(
+        "__all__",
+        vec![
+            "find_peaks",
+            "resample",
+            "simpson",
+            "integrated_loudness",
+            "loudness_normalize",
+        ],
+    )?;
     module.add_function(wrap_pyfunction!(find_peaks_py, module)?)?;
     module.add_function(wrap_pyfunction!(resample_py, module)?)?;
     module.add_function(wrap_pyfunction!(simpson_py, module)?)?;
+    module.add_function(wrap_pyfunction!(integrated_loudness_py, module)?)?;
+    module.add_function(wrap_pyfunction!(loudness_normalize_py, module)?)?;
     Ok(())
 }

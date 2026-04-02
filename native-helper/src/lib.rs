@@ -4,6 +4,171 @@ use rustfft::FftPlanner;
 #[cfg(feature = "python")]
 mod python;
 
+// ── BS.1770 Loudness ─────────────────────────────────────────────────
+
+/// Compute K-weighting biquad filter coefficients for a given sample rate.
+///
+/// Returns `(b_shelf, a_shelf, b_hpass, a_hpass)` — two sets of biquad
+/// coefficients per ITU-R BS.1770 (high-shelf at 1500 Hz, high-pass at 38 Hz).
+fn k_weighting_coefficients(rate: f64) -> ([f64; 3], [f64; 3], [f64; 3], [f64; 3]) {
+    // ── High shelf: G=4dB, Q=1/√2, fc=1500Hz ──
+    let g = 4.0_f64;
+    let q = std::f64::consts::FRAC_1_SQRT_2;
+    let fc = 1500.0;
+
+    let a_val = 10.0_f64.powf(g / 40.0);
+    let w0 = 2.0 * std::f64::consts::PI * (fc / rate);
+    let alpha = w0.sin() / (2.0 * q);
+    let cos_w0 = w0.cos();
+    let two_sqrt_a_alpha = 2.0 * a_val.sqrt() * alpha;
+
+    let b0 = a_val * ((a_val + 1.0) + (a_val - 1.0) * cos_w0 + two_sqrt_a_alpha);
+    let b1 = -2.0 * a_val * ((a_val - 1.0) + (a_val + 1.0) * cos_w0);
+    let b2 = a_val * ((a_val + 1.0) + (a_val - 1.0) * cos_w0 - two_sqrt_a_alpha);
+    let a0s = (a_val + 1.0) - (a_val - 1.0) * cos_w0 + two_sqrt_a_alpha;
+    let a1s = 2.0 * ((a_val - 1.0) - (a_val + 1.0) * cos_w0);
+    let a2s = (a_val + 1.0) - (a_val - 1.0) * cos_w0 - two_sqrt_a_alpha;
+
+    let b_shelf = [b0 / a0s, b1 / a0s, b2 / a0s];
+    let a_shelf = [1.0, a1s / a0s, a2s / a0s];
+
+    // ── High pass: Q=0.5, fc=38Hz ──
+    let q2 = 0.5;
+    let fc2 = 38.0;
+    let w0_2 = 2.0 * std::f64::consts::PI * (fc2 / rate);
+    let alpha2 = w0_2.sin() / (2.0 * q2);
+    let cos_w0_2 = w0_2.cos();
+
+    let hb0 = (1.0 + cos_w0_2) / 2.0;
+    let hb1 = -(1.0 + cos_w0_2);
+    let hb2 = (1.0 + cos_w0_2) / 2.0;
+    let ha0 = 1.0 + alpha2;
+    let ha1 = -2.0 * cos_w0_2;
+    let ha2 = 1.0 - alpha2;
+
+    let b_hpass = [hb0 / ha0, hb1 / ha0, hb2 / ha0];
+    let a_hpass = [1.0, ha1 / ha0, ha2 / ha0];
+
+    (b_shelf, a_shelf, b_hpass, a_hpass)
+}
+
+/// Direct-form II transposed IIR filter (biquad), equivalent to
+/// `scipy.signal.lfilter(b, a, data)` for second-order sections.
+fn lfilter_biquad(b: &[f64; 3], a: &[f64; 3], data: &[f64]) -> Vec<f64> {
+    let n = data.len();
+    let mut out = vec![0.0_f64; n];
+    let mut d1 = 0.0_f64;
+    let mut d2 = 0.0_f64;
+
+    for i in 0..n {
+        let x = data[i];
+        let y = b[0] * x + d1;
+        d1 = b[1] * x - a[1] * y + d2;
+        d2 = b[2] * x - a[2] * y;
+        out[i] = y;
+    }
+    out
+}
+
+/// Measure integrated gated loudness per ITU-R BS.1770-4.
+///
+/// Input must be mono f32 samples in [-1, 1].
+/// Returns loudness in dB LUFS (may be `-inf` for silence).
+pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f64 {
+    let rate = sample_rate as f64;
+    let n = data.len();
+    if n == 0 {
+        return f64::NEG_INFINITY;
+    }
+
+    // Convert to f64 for filter precision.
+    let input: Vec<f64> = data.iter().map(|&v| v as f64).collect();
+
+    // Apply K-weighting filters.
+    let (b_shelf, a_shelf, b_hpass, a_hpass) = k_weighting_coefficients(rate);
+    let after_shelf = lfilter_biquad(&b_shelf, &a_shelf, &input);
+    let filtered = lfilter_biquad(&b_hpass, &a_hpass, &after_shelf);
+
+    // Gating parameters.
+    let t_g = block_size; // default 0.4s
+    let gamma_a = -70.0_f64; // absolute threshold
+    let overlap = 0.75_f64;
+    let step = 1.0 - overlap;
+
+    let t = n as f64 / rate;
+    let num_blocks = ((t - t_g) / (t_g * step)).round() as i64 + 1;
+    if num_blocks <= 0 {
+        // Signal shorter than one block — compute mean square directly.
+        let ms: f64 = filtered.iter().map(|&x| x * x).sum::<f64>() / n as f64;
+        if ms <= 0.0 {
+            return f64::NEG_INFINITY;
+        }
+        return -0.691 + 10.0 * ms.log10();
+    }
+    let num_blocks = num_blocks as usize;
+
+    // Compute mean square per block.
+    let mut z = vec![0.0_f64; num_blocks];
+    let block_samples = (t_g * rate) as usize;
+    for j in 0..num_blocks {
+        let l = (t_g * (j as f64 * step) * rate) as usize;
+        let u = (t_g * (j as f64 * step + 1.0) * rate) as usize;
+        let u = u.min(n);
+        if l >= u {
+            continue;
+        }
+        let sum_sq: f64 = filtered[l..u].iter().map(|&x| x * x).sum();
+        z[j] = sum_sq / block_samples as f64;
+    }
+
+    // Block loudness.
+    let l_j: Vec<f64> = z.iter().map(|&zj| -0.691 + 10.0 * zj.log10()).collect();
+
+    // Absolute gating.
+    let j_g_abs: Vec<usize> = l_j
+        .iter()
+        .enumerate()
+        .filter(|(_, &lj)| lj >= gamma_a)
+        .map(|(j, _)| j)
+        .collect();
+
+    if j_g_abs.is_empty() {
+        return f64::NEG_INFINITY;
+    }
+
+    // Average of gated blocks for relative threshold.
+    let z_avg: f64 = j_g_abs.iter().map(|&j| z[j]).sum::<f64>() / j_g_abs.len() as f64;
+    let gamma_r = -0.691 + 10.0 * z_avg.log10() - 10.0;
+
+    // Relative gating.
+    let j_g_rel: Vec<usize> = l_j
+        .iter()
+        .enumerate()
+        .filter(|(_, &lj)| lj > gamma_r && lj >= gamma_a)
+        .map(|(j, _)| j)
+        .collect();
+
+    if j_g_rel.is_empty() {
+        return f64::NEG_INFINITY;
+    }
+
+    let z_avg_final: f64 = j_g_rel.iter().map(|&j| z[j]).sum::<f64>() / j_g_rel.len() as f64;
+    -0.691 + 10.0 * z_avg_final.log10()
+}
+
+/// Normalize audio to a target loudness in dB LUFS with hard clipping.
+///
+/// Applies the gain needed to shift from `current_lufs` to `target_lufs`,
+/// then hard-clips the output to [-1.0, 1.0].
+pub fn loudness_normalize(data: &[f32], current_lufs: f64, target_lufs: f64) -> Vec<f32> {
+    let delta = target_lufs - current_lufs;
+    let gain = 10.0_f64.powf(delta / 20.0);
+
+    data.iter()
+        .map(|&x| ((x as f64) * gain).clamp(-1.0, 1.0) as f32)
+        .collect()
+}
+
 // ── Resampling ───────────────────────────────────────────────────────
 
 /// FFT-based resampling of a 1-D signal, matching `scipy.signal.resample`.
@@ -511,5 +676,68 @@ mod tests {
         assert!((simpson_1d(&[]) - 0.0).abs() < 1e-15);
         assert!((simpson_1d(&[5.0]) - 0.0).abs() < 1e-15);
         assert!((simpson_1d(&[2.0, 4.0]) - 3.0).abs() < 1e-15);
+    }
+
+    // ── loudness ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_k_weighting_coefficients() {
+        let (b_shelf, a_shelf, b_hpass, a_hpass) = k_weighting_coefficients(8000.0);
+        // Compare against known pyloudnorm values for 8kHz.
+        assert!((b_shelf[0] - 1.32773315).abs() < 1e-5);
+        assert!((a_shelf[0] - 1.0).abs() < 1e-10);
+        assert!((b_hpass[0] - 0.97080775).abs() < 1e-5);
+        assert!((a_hpass[0] - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_lfilter_biquad_passthrough() {
+        // Identity filter: b=[1,0,0], a=[1,0,0] should pass data unchanged.
+        let b = [1.0, 0.0, 0.0];
+        let a = [1.0, 0.0, 0.0];
+        let data = [1.0, 2.0, 3.0, 4.0, 5.0];
+        let out = lfilter_biquad(&b, &a, &data);
+        for (x, y) in data.iter().zip(out.iter()) {
+            assert!((x - y).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_integrated_loudness_silence() {
+        let silence = vec![0.0_f32; 8000];
+        let lufs = integrated_loudness(&silence, 8000, 0.4);
+        assert!(lufs.is_infinite() && lufs < 0.0, "silence should be -inf LUFS");
+    }
+
+    #[test]
+    fn test_integrated_loudness_sine() {
+        // 1 second of 1kHz sine at 8kHz sample rate.
+        let sr = 8000;
+        let data: Vec<f32> = (0..sr)
+            .map(|i| (2.0 * std::f32::consts::PI * 1000.0 * i as f32 / sr as f32).sin())
+            .collect();
+        let lufs = integrated_loudness(&data, sr as u32, 0.4);
+        // A full-scale sine should be around -3 dBFS → roughly -3 LUFS.
+        // The K-weighting will shift it somewhat. Just check it's in a sane range.
+        assert!(lufs > -10.0 && lufs < 0.0, "sine LUFS={lufs} out of expected range");
+    }
+
+    #[test]
+    fn test_loudness_normalize_clips() {
+        let data = [0.5_f32, -0.5, 0.8, -0.8];
+        // Apply huge gain (+40 dB) to force clipping.
+        let out = loudness_normalize(&data, -60.0, -20.0);
+        for &v in &out {
+            assert!(v >= -1.0 && v <= 1.0, "value {v} exceeds [-1, 1]");
+        }
+    }
+
+    #[test]
+    fn test_loudness_normalize_gain() {
+        let data = [0.1_f32, -0.1];
+        // +6 dB gain ≈ 2x.
+        let out = loudness_normalize(&data, -22.0, -16.0);
+        let expected_gain = 10.0_f64.powf(6.0 / 20.0); // ~1.995
+        assert!((out[0] as f64 - 0.1 * expected_gain).abs() < 1e-4);
     }
 }

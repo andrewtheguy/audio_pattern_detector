@@ -3,14 +3,12 @@ import logging
 import math
 import os
 import sys
-import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from operator import itemgetter
 from typing import Any, TypedDict
 
 import numpy as np
-import pyloudnorm as pyln
 from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
@@ -68,9 +66,6 @@ PatternDetectedCallback = Callable[[str, float], None]
 def _mean_squared_error(y_true: NDArray[np.floating[Any]], y_pred: NDArray[np.floating[Any]]) -> np.floating[Any]:
     """Simple MSE implementation to avoid sklearn dependency."""
     return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
-
-#ignore possible clipping
-warnings.filterwarnings('ignore', module='pyloudnorm')
 
 def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rate: int) -> None:
     """Helper function to write audio using ffmpeg"""
@@ -153,13 +148,11 @@ class AudioPatternDetector:
 
             # Normalize clip if enabled
             if self.normalize:
+                from native_helper import integrated_loudness, loudness_normalize
                 sr = self.target_sample_rate
-                if clip_seconds < 0.5:
-                    meter = pyln.Meter(sr, block_size=clip_seconds)
-                else:
-                    meter = pyln.Meter(sr)
-                loudness = meter.integrated_loudness(clip)
-                clip = pyln.normalize.loudness(clip, loudness, -16.0)
+                block = clip_seconds if clip_seconds < 0.5 else 0.4
+                loudness = integrated_loudness(clip, sr, block_size=block)
+                clip = loudness_normalize(clip, loudness, -16.0)
 
             # Compute correlation
             correlation_clip, absolute_max = self._get_clip_correlation(clip)
@@ -403,21 +396,12 @@ class AudioPatternDetector:
             audio_section = chunk
 
         if self.normalize:
-            #max_loudness = np.max(np.abs(audio_section))
-            #audio_section = audio_section / max_loudness
+            from native_helper import integrated_loudness, loudness_normalize
             audio_section_seconds = len(audio_section) / sr
-            #normalize loudness
-            if audio_section_seconds < 0.5:
-                # not sure if there are valid use cases for this
-                #raise ValueError("audio_section_seconds < 0.5 second")
-                meter = pyln.Meter(sr, block_size=audio_section_seconds)
-            else:
-                meter = pyln.Meter(sr)  # create BS.1770 meter
-
-            loudness = meter.integrated_loudness(audio_section)
-
+            block = audio_section_seconds if audio_section_seconds < 0.5 else 0.4
+            loudness = integrated_loudness(audio_section, sr, block_size=block)
             # loudness normalize audio to -16 dB LUFS
-            audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+            audio_section = loudness_normalize(audio_section, loudness, -16.0)
 
             # keep for debugging
             # if self.debug_mode:

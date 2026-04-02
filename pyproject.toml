@@ -9,7 +9,6 @@ dependencies = [
     "fft-correlation",
     "numpy>=1.26.4,<2",
     "native-helper",
-    "pyloudnorm>=0.1.1,<0.2",
 ]
 
 [project.optional-dependencies]
@@ -28,9 +27,6 @@ dev = [
 audio-pattern-detector = "audio_pattern_detector.cli:main"
 
 [tool.pytest.ini_options]
-filterwarnings = [
-    "ignore::RuntimeWarning:pyloudnorm.*",
-]
 
 [tool.pyright]
 #stubPath = "typings"
