@@ -45,7 +45,6 @@ def _read_wav(wav_file: 'str | IO[bytes]', source_name: str) -> tuple[NDArray[np
     Returns:
         tuple: (raw numpy array, sample_rate)
     """
-    import struct
     import wave
 
     try:
@@ -63,12 +62,10 @@ def _read_wav(wav_file: 'str | IO[bytes]', source_name: str) -> tuple[NDArray[np
     elif sampwidth == 2:
         data = np.frombuffer(raw_bytes, dtype=np.int16)
     elif sampwidth == 3:
-        # 24-bit: unpack to int32
-        n_samples = len(raw_bytes) // 3
-        int32_data = np.empty(n_samples, dtype=np.int32)
-        for i in range(n_samples):
-            b = raw_bytes[3 * i : 3 * i + 3]
-            int32_data[i] = struct.unpack_from('<i', b + (b'\xff' if b[2] & 0x80 else b'\x00'))[0]
+        # 24-bit: vectorized unpack to int32
+        raw = np.frombuffer(raw_bytes, dtype=np.uint8).reshape(-1, 3)
+        int32_data = raw[:, 0].astype(np.int32) | (raw[:, 1].astype(np.int32) << 8) | (raw[:, 2].astype(np.int32) << 16)
+        int32_data[raw[:, 2] >= 0x80] -= 1 << 24
         data = int32_data
     elif sampwidth == 4:
         data = np.frombuffer(raw_bytes, dtype=np.int32)
@@ -128,7 +125,7 @@ def _normalize_wav_data(
     """Normalize WAV data to float32 in range [-1, 1].
 
     Args:
-        data: Raw WAV data from scipy.io.wavfile.
+        data: Raw WAV data from the stdlib wave module (via _read_wav).
         sample_rate: Sample rate of the audio.
         source_name: Name for error messages.
 
@@ -158,7 +155,7 @@ def _normalize_wav_data(
 
 
 def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> NDArray[np.float32]:
-    """Resample audio using FFT-based resampling (no ffmpeg needed).
+    """Resample audio using FFT-based resampling via native_helper.resample.
 
     Args:
         audio: Audio data as numpy array.
@@ -166,7 +163,7 @@ def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> 
         target_sr: Target sample rate.
 
     Returns:
-        Resampled audio data.
+        Resampled audio data as float32.
     """
     if orig_sr == target_sr:
         return audio
