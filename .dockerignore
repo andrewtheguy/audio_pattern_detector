@@ -163,3 +163,7 @@ archive/
 good_results/
 tests/
 sample_audios/
+
+# Rust build artifacts inside native-helper
+native-helper/target/
+native-helper/.venv/

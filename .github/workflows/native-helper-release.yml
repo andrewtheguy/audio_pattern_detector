@@ -1,4 +1,4 @@
-name: Release
+name: Native Helper Release
 
 on:
   workflow_dispatch:
@@ -35,10 +35,13 @@ jobs:
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native-helper
 
       - name: Validate release version
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
+        working-directory: native-helper
         run: |
           python - <<'PY'
           import os
@@ -78,13 +81,14 @@ jobs:
       - name: Build wheel
         env:
           PYO3_PYTHON: python
+        working-directory: native-helper
         run: maturin build --release --features python -o dist
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: python-wheel-${{ runner.os }}-${{ matrix.arch }}-py313
-          path: dist/*.whl
+          name: native-helper-wheel-${{ runner.os }}-${{ matrix.arch }}-py313
+          path: native-helper/dist/*.whl
           if-no-files-found: error
 
   create-release:
@@ -95,7 +99,7 @@ jobs:
       - name: Download wheel artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: python-wheel-*
+          pattern: native-helper-wheel-*
           path: release-assets
 
       - name: Create GitHub release
@@ -104,25 +108,26 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
+          PREFIXED_TAG="native-helper-${RELEASE_TAG}"
           mapfile -d '' assets < <(find release-assets -type f -name '*.whl' -print0 | sort -z)
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No wheel assets found under release-assets" >&2
             exit 1
           fi
 
-          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+          if gh release view "$PREFIXED_TAG" > /dev/null 2>&1; then
             mapfile -t existing_wheels < <(
-              gh release view "$RELEASE_TAG" --json assets --jq '.assets[] | select(.name | endswith(".whl")) | .name'
+              gh release view "$PREFIXED_TAG" --json assets --jq '.assets[] | select(.name | endswith(".whl")) | .name'
             )
 
             for wheel in "${existing_wheels[@]}"; do
-              gh release delete-asset "$RELEASE_TAG" "$wheel" --yes
+              gh release delete-asset "$PREFIXED_TAG" "$wheel" --yes
             done
 
-            gh release upload "$RELEASE_TAG" "${assets[@]}"
+            gh release upload "$PREFIXED_TAG" "${assets[@]}"
           else
-            gh release create "$RELEASE_TAG" \
-              --title "$RELEASE_TAG" \
+            gh release create "$PREFIXED_TAG" \
+              --title "native-helper ${RELEASE_TAG}" \
               --generate-notes \
               --target "${GITHUB_SHA}" \
               "${assets[@]}"

@@ -1,10 +1,10 @@
 [package]
-name = "peak-finder"
+name = "native-helper"
 version = "0.0.1"
 edition = "2021"
 
 [lib]
-name = "peak_finder"
+name = "native_helper"
 crate-type = ["rlib", "cdylib"]
 
 [features]

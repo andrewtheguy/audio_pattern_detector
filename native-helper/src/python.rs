@@ -52,8 +52,8 @@ fn find_peaks_py<'py>(
 }
 
 #[pymodule]
-#[pyo3(name = "peak_finder")]
-fn peak_finder(module: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pyo3(name = "native_helper")]
+fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("__all__", vec!["find_peaks"])?;
     module.add_function(wrap_pyfunction!(find_peaks_py, module)?)?;
     Ok(())

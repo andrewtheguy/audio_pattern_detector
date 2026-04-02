@@ -3,15 +3,20 @@
 FROM python:3.12-slim-bookworm
 
 RUN apt-get -yqq update && \
-    apt-get install -yq --no-install-recommends ca-certificates libgomp1 tini && \
+    apt-get install -yq --no-install-recommends ca-certificates libgomp1 tini curl build-essential && \
     apt-get autoremove -y && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# Install Rust toolchain (needed for native-helper)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 ENV app=/usr/src/app
 WORKDIR $app
 
 # Copy only dependency files first for better layer caching
 COPY pyproject.toml uv.lock README.md ./
+COPY native-helper ./native-helper
 
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 RUN --mount=from=ghcr.io/astral-sh/uv:0.9.11,source=/uv,target=/uv \

@@ -538,7 +538,7 @@ class AudioPatternDetector:
         # the selected ones are going to be checked for similarity
         # before adding to final peaks
         height_min = 0.25
-        from peak_finder import find_peaks
+        from native_helper import find_peaks
         peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
