@@ -640,7 +640,7 @@ class AudioPatternDetector:
     def _get_peak_times_normal(
         self,
         correlation_clip: NDArray[np.float32],
-        correlation_slice: NDArray[np.float64],
+        correlation_slice: NDArray[np.float32],
         seconds: list[float],
         peak: int,
         clip_name: str,
@@ -836,7 +836,7 @@ class AudioPatternDetector:
     def _get_peak_times_beep_v3(
         self,
         correlation_clip: NDArray[np.float32],
-        correlation_slice: NDArray[np.float64],
+        correlation_slice: NDArray[np.float32],
         seconds: list[float],
         peak: int,
         clip_name: str,
