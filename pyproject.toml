@@ -8,6 +8,7 @@ readme = "README.md"
 dependencies = [
     "fft-correlation",
     "numpy>=1.26.4,<2",
+    "peak-finder",
     "pyloudnorm>=0.1.1,<0.2",
     "scipy>=1.16.3,<2",
 ]
@@ -34,7 +35,7 @@ filterwarnings = [
 
 [tool.pyright]
 #stubPath = "typings"
-exclude = [".venv", "build", "dist", ".git", "tests"]
+exclude = [".venv", "build", "dist", ".git", "tests", "peak-finder"]
 reportUnknownParameterType = true
 reportUninitializedInstanceVariable = true
 # Disable basedpyright-specific strict rules
@@ -63,6 +64,7 @@ fft-correlation = [
     { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl", marker = "platform_machine == 'x86_64'" },
     { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl", marker = "platform_machine == 'aarch64'" },
 ]
+peak-finder = { path = "peak-finder", editable = true }
 
 [build-system]
 requires = ["hatchling"]
