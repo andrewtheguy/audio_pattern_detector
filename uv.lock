@@ -12,11 +12,11 @@ supported-markers = [
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.2.17"
+version = "0.2.18"
 source = { editable = "." }
 dependencies = [
-    { name = "fft-correlation", version = "0.0.1", source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_aarch64.whl" }, marker = "platform_machine == 'aarch64'" },
-    { name = "fft-correlation", version = "0.0.1", source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_x86_64.whl" }, marker = "platform_machine == 'x86_64'" },
+    { name = "fft-correlation", version = "0.0.2", source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl" }, marker = "platform_machine == 'aarch64'" },
+    { name = "fft-correlation", version = "0.0.2", source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl" }, marker = "platform_machine == 'x86_64'" },
     { name = "numpy", marker = "platform_machine == 'aarch64' or platform_machine == 'x86_64'" },
     { name = "pyloudnorm", marker = "platform_machine == 'aarch64' or platform_machine == 'x86_64'" },
     { name = "scipy", marker = "platform_machine == 'aarch64' or platform_machine == 'x86_64'" },
@@ -37,8 +37,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fft-correlation", marker = "platform_machine != 'aarch64' and platform_machine != 'x86_64'" },
-    { name = "fft-correlation", marker = "platform_machine == 'aarch64'", url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_aarch64.whl" },
-    { name = "fft-correlation", marker = "platform_machine == 'x86_64'", url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_x86_64.whl" },
+    { name = "fft-correlation", marker = "platform_machine == 'aarch64'", url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl" },
+    { name = "fft-correlation", marker = "platform_machine == 'x86_64'", url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl" },
     { name = "matplotlib", marker = "extra == 'debug'", specifier = ">=3.9.0,<4" },
     { name = "numpy", specifier = ">=1.26.4,<2" },
     { name = "pyloudnorm", specifier = ">=0.1.1,<0.2" },
@@ -104,25 +104,37 @@ wheels = [
 
 [[package]]
 name = "fft-correlation"
-version = "0.0.1"
-source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_aarch64.whl" }
+version = "0.0.2"
+source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl" }
 resolution-markers = [
     "platform_machine == 'aarch64'",
 ]
-wheels = [
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_aarch64.whl", hash = "sha256:53a31a4537534b18544fb15f51a5ddbe165e31a55d306260292b347785c25823" },
+dependencies = [
+    { name = "numpy", marker = "platform_machine == 'aarch64'" },
 ]
+wheels = [
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl", hash = "sha256:b82eaff5728be803f93514c4b3453666ea04276685bb0b916daceb058de1d9c9" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "numpy", specifier = ">=1.26" }]
 
 [[package]]
 name = "fft-correlation"
-version = "0.0.1"
-source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_x86_64.whl" }
+version = "0.0.2"
+source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl" }
 resolution-markers = [
     "platform_machine == 'x86_64'",
 ]
-wheels = [
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:24917cd51e0b0d6806fc4c2195df60caccd78ca4266cca127084571ceda88ab1" },
+dependencies = [
+    { name = "numpy", marker = "platform_machine == 'x86_64'" },
 ]
+wheels = [
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:25cbbb1fe7ccfdfedb77fc1d861e093b092eb19c2d5149e3575ee9299d4b437c" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "numpy", specifier = ">=1.26" }]
 
 [[package]]
 name = "fonttools"

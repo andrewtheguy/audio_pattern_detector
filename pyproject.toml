@@ -1,6 +1,6 @@
 [project]
 name = "audio-pattern-detector"
-version = "0.2.17"
+version = "0.2.18"
 description = ""
 authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
 requires-python = "~=3.12.0"
@@ -60,8 +60,8 @@ environments = [
 
 [tool.uv.sources]
 fft-correlation = [
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_x86_64.whl", marker = "platform_machine == 'x86_64'" },
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.1/fft_correlation-0.0.1-cp38-abi3-manylinux_2_34_aarch64.whl", marker = "platform_machine == 'aarch64'" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl", marker = "platform_machine == 'x86_64'" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl", marker = "platform_machine == 'aarch64'" },
 ]
 
 [build-system]

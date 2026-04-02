@@ -36,7 +36,7 @@ class ClipData(TypedDict):
     clip: NDArray[np.float32]
     clip_name: str
     sliding_window: int
-    correlation_clip: NDArray[np.float64]
+    correlation_clip: NDArray[np.float32]
     correlation_clip_absolute_max: np.floating[Any]
 
 
@@ -358,10 +358,10 @@ class AudioPatternDetector:
 
         return all_peak_times, total_time
 
-    def _get_clip_correlation(self, clip: NDArray[np.float32]) -> tuple[NDArray[np.float64], np.floating[Any]]:
+    def _get_clip_correlation(self, clip: NDArray[np.float32]) -> tuple[NDArray[np.float32], np.floating[Any]]:
         # Cross-correlate and normalize correlation
-        from fft_correlation import fft_correlate_1d  # pyright: ignore[reportAttributeAccessIssue]
-        correlation_clip: NDArray[np.float64] = np.array(fft_correlate_1d(clip, clip, mode='full'))
+        from fft_correlation import fft_correlate_1d
+        correlation_clip: NDArray[np.float32] = fft_correlate_1d(clip, clip, mode='full')
 
         # abs
         correlation_clip = np.abs(correlation_clip)
@@ -504,10 +504,11 @@ class AudioPatternDetector:
         # samples_skip_end = zeroes_second_pad * sr + clip_length
 
         # Cross-correlate and normalize correlation
-        from fft_correlation import fft_correlate_1d  # pyright: ignore[reportAttributeAccessIssue]
-        # Replace NaN with 0.0 (NaN comes from loudness normalization of silence)
-        audio_section_clean = np.nan_to_num(audio_section, nan=0.0)
-        correlation = np.abs(np.array(fft_correlate_1d(audio_section_clean, clip, mode='full')))
+        from fft_correlation import fft_correlate_1d
+        # Ensure float32 and replace NaN with 0.0 (NaN comes from loudness normalization of silence)
+        audio_section_f32 = np.asarray(audio_section, dtype=np.float32)
+        np.nan_to_num(audio_section_f32, copy=False, nan=0.0)
+        correlation = np.abs(fft_correlate_1d(audio_section_f32, clip, mode='full'))
         absolute_max = np.max(correlation)
         max_choose = max(correlation_clip_absolute_max,absolute_max)
         correlation /= max_choose
@@ -638,7 +639,7 @@ class AudioPatternDetector:
 
     def _get_peak_times_normal(
         self,
-        correlation_clip: NDArray[np.float64],
+        correlation_clip: NDArray[np.float32],
         correlation_slice: NDArray[np.float64],
         seconds: list[float],
         peak: int,
@@ -834,7 +835,7 @@ class AudioPatternDetector:
     # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
     def _get_peak_times_beep_v3(
         self,
-        correlation_clip: NDArray[np.float64],
+        correlation_clip: NDArray[np.float32],
         correlation_slice: NDArray[np.float64],
         seconds: list[float],
         peak: int,
