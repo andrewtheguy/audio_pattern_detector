@@ -394,13 +394,13 @@ class AudioPatternDetector:
                 # no need for sliding window since it is the last piece
                 subtract_seconds = -(chunk_seconds - seconds_per_chunk)
                 audio_section_temp = np.concatenate((previous_chunk, chunk))[(-seconds_per_chunk * sr):]
-                audio_section = np.concatenate((audio_section_temp, np.array([])))
+                audio_section = audio_section_temp
             else:
                 subtract_seconds = sliding_window
-                audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk, np.array([])))
+                audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk))
         else:
             subtract_seconds = 0
-            audio_section = np.concatenate((chunk, np.array([])))
+            audio_section = chunk
 
         if self.normalize:
             #max_loudness = np.max(np.abs(audio_section))

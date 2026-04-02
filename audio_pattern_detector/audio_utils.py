@@ -188,7 +188,7 @@ def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, midd
     if end > len(array):
         array = np.pad(array, (0, end - len(array)), 'constant')
     # slice
-    return np.array(array[beg:end])
+    return array[beg:end]
 
 
 def convert_audio_file(file_path: str, sr: int | None = None) -> NDArray[np.float32]:
@@ -245,7 +245,8 @@ def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: in
     """Downsample a curve while preserving local maxima."""
     n_points = len(curve)
     step_size = n_points / num_samples
-    compressed_curve: list[np.floating[Any]] = []
+    compressed_curve = np.empty(num_samples, dtype=np.float32)
+    count = 0
 
     for i in range(num_samples):
         start_index = int(i * step_size)
@@ -259,16 +260,18 @@ def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: in
             continue
 
         local_max_index = np.argmax(window)
-        compressed_curve.append(window[local_max_index])
+        compressed_curve[count] = window[local_max_index]
+        count += 1
 
     # Adjust the length if necessary by adding the last element of the original curve
-    if len(compressed_curve) < num_samples and len(curve) > 0:
-        compressed_curve.append(curve[-1])
+    if count < num_samples and len(curve) > 0:
+        compressed_curve[count] = curve[-1]
+        count += 1
 
-    if len(compressed_curve) != num_samples:
-        raise ValueError(f"downsampled curve length {len(compressed_curve)} not equal to num_samples {num_samples}")
+    if count != num_samples:
+        raise ValueError(f"downsampled curve length {count} not equal to num_samples {num_samples}")
 
-    return np.array(compressed_curve, dtype=np.float32)
+    return compressed_curve
 
 @contextmanager
 def ffmpeg_get_float32_pcm(
