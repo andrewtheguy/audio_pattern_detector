@@ -2,7 +2,7 @@
 # Using Docker avoids GitHub Actions FIFO stdin issue:
 # https://github.com/actions/runner-images/issues/10959
 
-name: Python application
+name: CI
 
 on:
   push:
