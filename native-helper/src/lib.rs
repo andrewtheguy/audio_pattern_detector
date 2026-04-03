@@ -54,6 +54,7 @@ fn k_weighting_coefficients(rate: f64) -> ([f64; 3], [f64; 3], [f64; 3], [f64; 3
 
 /// Direct-form II transposed IIR filter (biquad), equivalent to
 /// `scipy.signal.lfilter(b, a, data)` for second-order sections.
+#[cfg_attr(not(test), allow(dead_code))]
 fn lfilter_biquad(b: &[f64; 3], a: &[f64; 3], data: &[f64]) -> Vec<f64> {
     let n = data.len();
     let mut out = vec![0.0_f64; n];
@@ -70,89 +71,146 @@ fn lfilter_biquad(b: &[f64; 3], a: &[f64; 3], data: &[f64]) -> Vec<f64> {
     out
 }
 
+#[inline]
+fn biquad_step(b: &[f64; 3], a: &[f64; 3], d1: &mut f64, d2: &mut f64, x: f64) -> f64 {
+    let y = b[0] * x + *d1;
+    *d1 = b[1] * x - a[1] * y + *d2;
+    *d2 = b[2] * x - a[2] * y;
+    y
+}
+
+/// Apply the two BS.1770 K-weighting filters in a single pass and return
+/// a prefix sum of squared output energy.
+fn k_weighted_squared_prefix(
+    data: &[f32],
+    b_shelf: &[f64; 3],
+    a_shelf: &[f64; 3],
+    b_hpass: &[f64; 3],
+    a_hpass: &[f64; 3],
+) -> Vec<f64> {
+    let mut prefix = vec![0.0_f64; data.len() + 1];
+    let mut shelf_d1 = 0.0_f64;
+    let mut shelf_d2 = 0.0_f64;
+    let mut hpass_d1 = 0.0_f64;
+    let mut hpass_d2 = 0.0_f64;
+
+    for (idx, &sample) in data.iter().enumerate() {
+        let shelf_out = biquad_step(
+            b_shelf,
+            a_shelf,
+            &mut shelf_d1,
+            &mut shelf_d2,
+            sample as f64,
+        );
+        let filtered = biquad_step(b_hpass, a_hpass, &mut hpass_d1, &mut hpass_d2, shelf_out);
+        prefix[idx + 1] = prefix[idx] + filtered * filtered;
+    }
+
+    prefix
+}
+
+#[inline]
+fn loudness_block_bounds(
+    block_index: usize,
+    window_samples: f64,
+    hop_samples: f64,
+    signal_len: usize,
+) -> (usize, usize) {
+    let start = (block_index as f64 * hop_samples) as usize;
+    let end = (block_index as f64 * hop_samples + window_samples) as usize;
+    (start, end.min(signal_len))
+}
+
 /// Measure integrated gated loudness per ITU-R BS.1770-4.
 ///
 /// Input must be mono f32 samples in [-1, 1].
 /// Returns loudness in dB LUFS (may be `-inf` for silence).
 pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f64 {
+    const LUFS_OFFSET: f64 = -0.691;
+    const ABSOLUTE_GATE: f64 = -70.0;
+    const OVERLAP: f64 = 0.75;
+
     let rate = sample_rate as f64;
     let n = data.len();
     if n == 0 {
         return f64::NEG_INFINITY;
     }
 
-    // Convert to f64 for filter precision.
-    let input: Vec<f64> = data.iter().map(|&v| v as f64).collect();
-
-    // Apply K-weighting filters.
     let (b_shelf, a_shelf, b_hpass, a_hpass) = k_weighting_coefficients(rate);
-    let after_shelf = lfilter_biquad(&b_shelf, &a_shelf, &input);
-    let filtered = lfilter_biquad(&b_hpass, &a_hpass, &after_shelf);
+    let squared_prefix = k_weighted_squared_prefix(data, &b_shelf, &a_shelf, &b_hpass, &a_hpass);
 
     // Gating parameters.
     let t_g = block_size; // default 0.4s
-    let gamma_a = -70.0_f64; // absolute threshold
-    let overlap = 0.75_f64;
-    let step = 1.0 - overlap;
+    let step = 1.0 - OVERLAP;
+    let window_samples = t_g * rate;
+    let hop_samples = window_samples * step;
 
     let t = n as f64 / rate;
     let num_blocks = ((t - t_g) / (t_g * step)).round() as i64 + 1;
     if num_blocks <= 0 {
         // Signal shorter than one block — compute mean square directly.
-        let ms: f64 = filtered.iter().map(|&x| x * x).sum::<f64>() / n as f64;
+        let ms = squared_prefix[n] / n as f64;
         if ms <= 0.0 {
             return f64::NEG_INFINITY;
         }
-        return -0.691 + 10.0 * ms.log10();
+        return LUFS_OFFSET + 10.0 * ms.log10();
     }
     let num_blocks = num_blocks as usize;
 
-    // Compute mean square per block.
-    let mut z = vec![0.0_f64; num_blocks];
+    // Absolute gating pass.
+    let mut z_abs_sum = 0.0_f64;
+    let mut z_abs_count = 0_usize;
     for j in 0..num_blocks {
-        let l = (t_g * (j as f64 * step) * rate) as usize;
-        let u = (t_g * (j as f64 * step + 1.0) * rate) as usize;
-        let u = u.min(n);
+        let (l, u) = loudness_block_bounds(j, window_samples, hop_samples, n);
         if l >= u {
             continue;
         }
-        let sum_sq: f64 = filtered[l..u].iter().map(|&x| x * x).sum();
-        z[j] = sum_sq / (u - l) as f64;
+        let ms = (squared_prefix[u] - squared_prefix[l]) / (u - l) as f64;
+        if ms <= 0.0 {
+            continue;
+        }
+
+        let loudness = LUFS_OFFSET + 10.0 * ms.log10();
+        if loudness >= ABSOLUTE_GATE {
+            z_abs_sum += ms;
+            z_abs_count += 1;
+        }
     }
 
-    // Block loudness.
-    let l_j: Vec<f64> = z.iter().map(|&zj| -0.691 + 10.0 * zj.log10()).collect();
-
-    // Absolute gating.
-    let j_g_abs: Vec<usize> = l_j
-        .iter()
-        .enumerate()
-        .filter(|(_, &lj)| lj >= gamma_a)
-        .map(|(j, _)| j)
-        .collect();
-
-    if j_g_abs.is_empty() {
+    if z_abs_count == 0 {
         return f64::NEG_INFINITY;
     }
 
     // Average of gated blocks for relative threshold.
-    let z_avg: f64 = j_g_abs.iter().map(|&j| z[j]).sum::<f64>() / j_g_abs.len() as f64;
-    let gamma_r = -0.691 + 10.0 * z_avg.log10() - 10.0;
+    let z_avg = z_abs_sum / z_abs_count as f64;
+    let gamma_r = LUFS_OFFSET + 10.0 * z_avg.log10() - 10.0;
 
-    // Relative gating.
-    let j_g_rel: Vec<usize> = l_j
-        .iter()
-        .enumerate()
-        .filter(|(_, &lj)| lj > gamma_r && lj >= gamma_a)
-        .map(|(j, _)| j)
-        .collect();
+    // Relative gating pass.
+    let mut z_rel_sum = 0.0_f64;
+    let mut z_rel_count = 0_usize;
+    for j in 0..num_blocks {
+        let (l, u) = loudness_block_bounds(j, window_samples, hop_samples, n);
+        if l >= u {
+            continue;
+        }
+        let ms = (squared_prefix[u] - squared_prefix[l]) / (u - l) as f64;
+        if ms <= 0.0 {
+            continue;
+        }
 
-    if j_g_rel.is_empty() {
+        let loudness = LUFS_OFFSET + 10.0 * ms.log10();
+        if loudness > gamma_r && loudness >= ABSOLUTE_GATE {
+            z_rel_sum += ms;
+            z_rel_count += 1;
+        }
+    }
+
+    if z_rel_count == 0 {
         return f64::NEG_INFINITY;
     }
 
-    let z_avg_final: f64 = j_g_rel.iter().map(|&j| z[j]).sum::<f64>() / j_g_rel.len() as f64;
-    -0.691 + 10.0 * z_avg_final.log10()
+    let z_avg_final = z_rel_sum / z_rel_count as f64;
+    LUFS_OFFSET + 10.0 * z_avg_final.log10()
 }
 
 /// Normalize audio to a target loudness in dB LUFS with hard clipping.
@@ -820,6 +878,30 @@ mod tests {
         let out = lfilter_biquad(&b, &a, &data);
         for (x, y) in data.iter().zip(out.iter()) {
             assert!((x - y).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_k_weighted_squared_prefix_matches_two_pass_filter() {
+        let data = [0.25_f32, -0.5, 0.75, -0.25, 0.1, -0.2];
+        let input: Vec<f64> = data.iter().map(|&v| v as f64).collect();
+        let (b_shelf, a_shelf, b_hpass, a_hpass) = k_weighting_coefficients(8000.0);
+
+        let after_shelf = lfilter_biquad(&b_shelf, &a_shelf, &input);
+        let filtered = lfilter_biquad(&b_hpass, &a_hpass, &after_shelf);
+        let prefix = k_weighted_squared_prefix(&data, &b_shelf, &a_shelf, &b_hpass, &a_hpass);
+
+        assert_eq!(prefix.len(), data.len() + 1);
+        assert!(prefix[0].abs() < 1e-15);
+
+        let mut expected = 0.0_f64;
+        for (idx, value) in filtered.iter().enumerate() {
+            expected += value * value;
+            assert!(
+                (prefix[idx + 1] - expected).abs() < 1e-10,
+                "prefix mismatch at {idx}: {} != {expected}",
+                prefix[idx + 1]
+            );
         }
     }
 
