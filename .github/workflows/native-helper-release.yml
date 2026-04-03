@@ -1,10 +1,10 @@
-name: Native Helper Release
+name: Release
 
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Release tag to create, for example v0.0.1
+        description: Release tag to create, for example v0.2.19 or v0.2.19-alpha
         required: true
         type: string
 
@@ -41,7 +41,6 @@ jobs:
       - name: Validate release version
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
-        working-directory: native-helper
         run: |
           python - <<'PY'
           import os
@@ -53,26 +52,19 @@ jobs:
           normalized_tag = release_tag[1:] if release_tag.startswith("v") else release_tag
           base_tag = normalized_tag.split("-", 1)[0]
 
-          with open(root / "Cargo.toml", "rb") as f:
+          with open(root / "native-helper" / "Cargo.toml", "rb") as f:
             cargo_version = tomllib.load(f)["package"]["version"]
           with open(root / "pyproject.toml", "rb") as f:
             pyproject_version = tomllib.load(f)["project"]["version"]
-          with open(root.parent / "pyproject.toml", "rb") as f:
-            main_version = tomllib.load(f)["project"]["version"]
 
           if cargo_version != pyproject_version:
             raise SystemExit(
               f"Version mismatch: Cargo.toml={cargo_version}, pyproject.toml={pyproject_version}"
             )
 
-          if cargo_version != main_version:
+          if base_tag != pyproject_version:
             raise SystemExit(
-              f"Version mismatch: native-helper={cargo_version}, main project={main_version}"
-            )
-
-          if base_tag != cargo_version:
-            raise SystemExit(
-              f"Release tag {release_tag} does not match package version {cargo_version}"
+              f"Release tag {release_tag} does not match package version {pyproject_version}"
             )
           PY
 
@@ -82,14 +74,13 @@ jobs:
       - name: Build wheel
         env:
           PYO3_PYTHON: python
-        working-directory: native-helper
-        run: maturin build --release --features python -o dist
+        run: maturin build --release -o dist
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: native-helper-wheel-${{ runner.os }}-${{ matrix.arch }}-py313
-          path: native-helper/dist/*.whl
+          name: wheel-${{ runner.os }}-${{ matrix.arch }}-py313
+          path: dist/*.whl
           if-no-files-found: error
 
   create-release:
@@ -100,7 +91,7 @@ jobs:
       - name: Download wheel artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: native-helper-wheel-*
+          pattern: wheel-*
           path: release-assets
 
       - name: Create GitHub release
@@ -109,26 +100,25 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          PREFIXED_TAG="native-helper-${RELEASE_TAG}"
           mapfile -d '' assets < <(find release-assets -type f -name '*.whl' -print0 | sort -z)
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No wheel assets found under release-assets" >&2
             exit 1
           fi
 
-          if gh release view "$PREFIXED_TAG" > /dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             mapfile -t existing_wheels < <(
-              gh release view "$PREFIXED_TAG" --json assets --jq '.assets[] | select(.name | endswith(".whl")) | .name'
+              gh release view "$RELEASE_TAG" --json assets --jq '.assets[] | select(.name | endswith(".whl")) | .name'
             )
 
             for wheel in "${existing_wheels[@]}"; do
-              gh release delete-asset "$PREFIXED_TAG" "$wheel" --yes
+              gh release delete-asset "$RELEASE_TAG" "$wheel" --yes
             done
 
-            gh release upload "$PREFIXED_TAG" "${assets[@]}"
+            gh release upload "$RELEASE_TAG" "${assets[@]}"
           else
-            gh release create "$PREFIXED_TAG" \
-              --title "native-helper ${RELEASE_TAG}" \
+            gh release create "$RELEASE_TAG" \
+              --title "audio-pattern-detector ${RELEASE_TAG}" \
               --generate-notes \
               --target "${GITHUB_SHA}" \
               "${assets[@]}"

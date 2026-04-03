@@ -8,7 +8,6 @@ readme = "README.md"
 dependencies = [
     "fft-correlation",
     "numpy>=1.26.4,<2",
-    "native-helper",
 ]
 
 [project.optional-dependencies]
@@ -64,5 +63,10 @@ fft-correlation = [
 native-helper = { path = "native-helper", editable = true }
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.9.4,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+manifest-path = "native-helper/Cargo.toml"
+features = ["python"]
+python-packages = ["audio_pattern_detector"]
