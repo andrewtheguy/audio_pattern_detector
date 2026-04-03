@@ -10,7 +10,6 @@ Usage:
 
 import argparse
 import struct
-import sys
 import wave
 from pathlib import Path
 
@@ -79,7 +78,7 @@ def main() -> None:
     meter = pyln.Meter(sr, block_size=block)
     pyln_lufs = meter.integrated_loudness(audio)
     pyln_out = pyln.normalize.loudness(audio, pyln_lufs, target)
-    print(f"\npyloudnorm:")
+    print("\npyloudnorm:")
     print(f"  measured LUFS: {pyln_lufs:.2f}")
     print(f"  output range:  [{pyln_out.min():.4f}, {pyln_out.max():.4f}]")
     print(f"  clipped:       {np.any(np.abs(pyln_out) > 1.0)}")
@@ -87,16 +86,16 @@ def main() -> None:
     # ── native_helper ──
     rust_lufs = native_helper.integrated_loudness(audio, sr, block_size=block)
     rust_out = native_helper.loudness_normalize(audio, rust_lufs, target)
-    print(f"\nnative_helper:")
+    print("\nnative_helper:")
     print(f"  measured LUFS: {rust_lufs:.2f}")
     print(f"  output range:  [{rust_out.min():.4f}, {rust_out.max():.4f}]")
-    print(f"  clipped:       hard-clipped to [-1, 1]")
+    print("  clipped:       hard-clipped to [-1, 1]")
 
     # ── comparison ──
     # Clip pyloudnorm output to match for fair comparison
     pyln_clipped = np.clip(pyln_out, -1.0, 1.0).astype(np.float32)
     diff = rust_out - pyln_clipped
-    print(f"\ndifference (rust - pyloudnorm_clipped):")
+    print("\ndifference (rust - pyloudnorm_clipped):")
     print(f"  max abs diff:  {np.max(np.abs(diff)):.6f}")
     print(f"  mean abs diff: {np.mean(np.abs(diff)):.6f}")
     print(f"  LUFS diff:     {rust_lufs - pyln_lufs:.4f} dB")
@@ -106,7 +105,7 @@ def main() -> None:
     rust_path = out_dir / f"{stem}_native_helper.wav"
     write_wav(str(pyln_path), pyln_clipped, sr)
     write_wav(str(rust_path), rust_out, sr)
-    print(f"\nWritten:")
+    print("\nWritten:")
     print(f"  {pyln_path}")
     print(f"  {rust_path}")
 

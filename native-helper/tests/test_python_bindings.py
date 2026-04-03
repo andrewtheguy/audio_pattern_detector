@@ -90,6 +90,11 @@ class PythonBindingsTest(unittest.TestCase):
         # Peak at 1: prominence 0.5, filtered out. Peak at 3: prominence 1.5, kept.
         np.testing.assert_array_equal(peaks, np.array([3]))
 
+    def test_prominence_equal_height_peaks(self):
+        data = np.array([0, 5, 0, 5, 0], dtype=np.float32)
+        peaks, _ = self.native_helper.find_peaks(data, prominence=4.0)
+        np.testing.assert_array_equal(peaks, np.array([1, 3]))
+
     def test_empty_array(self):
         data = np.array([], dtype=np.float32)
         peaks, props = self.native_helper.find_peaks(data)

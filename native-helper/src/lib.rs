@@ -188,10 +188,8 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     // Forward complex FFT.
     let mut planner = FftPlanner::<f64>::new();
     let fft_fwd = planner.plan_fft_forward(n);
-    let mut spectrum: Vec<Complex<f64>> = data
-        .iter()
-        .map(|&v| Complex::new(v as f64, 0.0))
-        .collect();
+    let mut spectrum: Vec<Complex<f64>> =
+        data.iter().map(|&v| Complex::new(v as f64, 0.0)).collect();
     fft_fwd.process(&mut spectrum);
 
     // Build new spectrum of length m, matching scipy's slice logic:
@@ -215,10 +213,7 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     // Scale: rustfft inverse is un-normalised (factor m), and scipy applies
     // target/source.  Combined scale: target / (source * target) = 1/source.
     let scale = 1.0 / n as f64;
-    new_spectrum
-        .iter()
-        .map(|c| (c.re * scale) as f32)
-        .collect()
+    new_spectrum.iter().map(|c| (c.re * scale) as f32).collect()
 }
 
 // ── Simpson's rule ───────────────────────────────────────────────────
@@ -243,8 +238,8 @@ pub fn simpson_1d(y: &[f64]) -> f64 {
         // Even points → odd intervals: Simpson's 1/3 on first N-3 intervals,
         // then Cartwright correction for the last interval.
         let base = composite_simpson_13(&y[..n - 1]); // odd slice, covers [0, n-2]
-        // Cartwright correction (h=1):
-        //   alpha = 5/12, beta = 8/12, eta = 1/12
+                                                      // Cartwright correction (h=1):
+                                                      //   alpha = 5/12, beta = 8/12, eta = 1/12
         let correction =
             (5.0 / 12.0) * y[n - 1] + (8.0 / 12.0) * y[n - 2] - (1.0 / 12.0) * y[n - 3];
         base + correction
@@ -395,6 +390,7 @@ fn filter_by_distance(data: &[f32], peaks: &mut Vec<usize>, min_distance: usize)
 /// where `left_base` is the minimum value between the peak and the nearest
 /// higher peak (or array boundary) to the left, and `right_base` likewise
 /// to the right.
+#[cfg_attr(not(test), allow(dead_code))]
 fn compute_prominence(data: &[f32], peak_idx: usize) -> f32 {
     let peak_val = data[peak_idx];
 
@@ -424,9 +420,124 @@ fn compute_prominence(data: &[f32], peak_idx: usize) -> f32 {
     peak_val - left_min.max(right_min)
 }
 
+/// Segment tree for fast range-min queries over the input signal.
+struct RangeMinTree {
+    size: usize,
+    values: Vec<f32>,
+}
+
+impl RangeMinTree {
+    fn new(data: &[f32]) -> Self {
+        let size = data.len().max(1).next_power_of_two();
+        let mut values = vec![f32::INFINITY; size * 2];
+        values[size..size + data.len()].copy_from_slice(data);
+
+        for idx in (1..size).rev() {
+            values[idx] = values[idx * 2].min(values[idx * 2 + 1]);
+        }
+
+        Self { size, values }
+    }
+
+    /// Return the minimum in the half-open interval `[start, end)`.
+    fn min_in_range(&self, start: usize, end: usize) -> f32 {
+        if start >= end {
+            return f32::INFINITY;
+        }
+
+        let mut left = start + self.size;
+        let mut right = end + self.size;
+        let mut result = f32::INFINITY;
+
+        while left < right {
+            if left % 2 == 1 {
+                result = result.min(self.values[left]);
+                left += 1;
+            }
+            if right % 2 == 1 {
+                right -= 1;
+                result = result.min(self.values[right]);
+            }
+            left /= 2;
+            right /= 2;
+        }
+
+        result
+    }
+}
+
+/// Return the nearest strictly higher sample on each side of every index.
+///
+/// Equal-height samples are skipped so prominence matches the current
+/// `compute_prominence` semantics, where only values `>` the peak stop the scan.
+fn nearest_strictly_greater_indices(data: &[f32]) -> (Vec<Option<usize>>, Vec<Option<usize>>) {
+    let n = data.len();
+    let mut left = vec![None; n];
+    let mut right = vec![None; n];
+    let mut stack = Vec::with_capacity(n);
+
+    for idx in 0..n {
+        while let Some(&prev) = stack.last() {
+            if data[prev] <= data[idx] {
+                stack.pop();
+            } else {
+                break;
+            }
+        }
+        left[idx] = stack.last().copied();
+        stack.push(idx);
+    }
+
+    stack.clear();
+
+    for idx in (0..n).rev() {
+        while let Some(&next) = stack.last() {
+            if data[next] <= data[idx] {
+                stack.pop();
+            } else {
+                break;
+            }
+        }
+        right[idx] = stack.last().copied();
+        stack.push(idx);
+    }
+
+    (left, right)
+}
+
+fn compute_prominence_with_preprocessing(
+    data: &[f32],
+    peak_idx: usize,
+    left_greater: &[Option<usize>],
+    right_greater: &[Option<usize>],
+    range_min: &RangeMinTree,
+) -> f32 {
+    let peak_val = data[peak_idx];
+
+    let left_start = left_greater[peak_idx].map_or(0, |idx| idx + 1);
+    let left_min = range_min.min_in_range(left_start, peak_idx).min(peak_val);
+
+    let right_end = right_greater[peak_idx].unwrap_or(data.len());
+    let right_min = range_min
+        .min_in_range(peak_idx + 1, right_end)
+        .min(peak_val);
+
+    peak_val - left_min.max(right_min)
+}
+
 /// Keep only peaks whose prominence is at least `min_prominence`.
 fn filter_by_prominence(data: &[f32], peaks: &mut Vec<usize>, min_prominence: f32) {
-    peaks.retain(|&idx| compute_prominence(data, idx) >= min_prominence);
+    if peaks.is_empty() {
+        return;
+    }
+
+    let (left_greater, right_greater) = nearest_strictly_greater_indices(data);
+    let range_min = RangeMinTree::new(data);
+
+    peaks.retain(|&idx| {
+        compute_prominence_with_preprocessing(data, idx, &left_greater, &right_greater, &range_min)
+            >= min_prominence
+    });
 }
 
 #[cfg(test)]
@@ -541,6 +652,17 @@ mod tests {
             prominence: Some(1.0),
         };
         assert_eq!(find_peaks_1d(&data, &opts), vec![3]);
+    }
+
+    #[test]
+    fn test_prominence_ignores_equal_height_peaks() {
+        let data = [0.0, 5.0, 0.0, 5.0, 0.0];
+        let opts = FindPeaksOptions {
+            height: None,
+            distance: None,
+            prominence: Some(4.0),
+        };
+        assert_eq!(find_peaks_1d(&data, &opts), vec![1, 3]);
     }
 
     // ── combined filters ─────────────────────────────────────────────
@@ -705,7 +827,10 @@ mod tests {
     fn test_integrated_loudness_silence() {
         let silence = vec![0.0_f32; 8000];
         let lufs = integrated_loudness(&silence, 8000, 0.4);
-        assert!(lufs.is_infinite() && lufs < 0.0, "silence should be -inf LUFS");
+        assert!(
+            lufs.is_infinite() && lufs < 0.0,
+            "silence should be -inf LUFS"
+        );
     }
 
     #[test]
@@ -718,7 +843,10 @@ mod tests {
         let lufs = integrated_loudness(&data, sr as u32, 0.4);
         // A full-scale sine should be around -3 dBFS → roughly -3 LUFS.
         // The K-weighting will shift it somewhat. Just check it's in a sane range.
-        assert!(lufs > -10.0 && lufs < 0.0, "sine LUFS={lufs} out of expected range");
+        assert!(
+            lufs > -10.0 && lufs < 0.0,
+            "sine LUFS={lufs} out of expected range"
+        );
     }
 
     #[test]
