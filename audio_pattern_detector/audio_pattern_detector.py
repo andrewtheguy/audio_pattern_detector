@@ -3,14 +3,12 @@ import logging
 import math
 import os
 import sys
-import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from operator import itemgetter
 from typing import Any, TypedDict
 
 import numpy as np
-import pyloudnorm as pyln
 from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
@@ -68,9 +66,6 @@ PatternDetectedCallback = Callable[[str, float], None]
 def _mean_squared_error(y_true: NDArray[np.floating[Any]], y_pred: NDArray[np.floating[Any]]) -> np.floating[Any]:
     """Simple MSE implementation to avoid sklearn dependency."""
     return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
-
-#ignore possible clipping
-warnings.filterwarnings('ignore', module='pyloudnorm')
 
 def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rate: int) -> None:
     """Helper function to write audio using ffmpeg"""
@@ -153,13 +148,11 @@ class AudioPatternDetector:
 
             # Normalize clip if enabled
             if self.normalize:
+                from native_helper import integrated_loudness, loudness_normalize
                 sr = self.target_sample_rate
-                if clip_seconds < 0.5:
-                    meter = pyln.Meter(sr, block_size=clip_seconds)
-                else:
-                    meter = pyln.Meter(sr)
-                loudness = meter.integrated_loudness(clip)
-                clip = pyln.normalize.loudness(clip, loudness, -16.0)
+                block = clip_seconds if clip_seconds < 0.5 else 0.4
+                loudness = integrated_loudness(clip, sr, block_size=block)
+                clip = loudness_normalize(clip, loudness, -16.0)
 
             # Compute correlation
             correlation_clip, absolute_max = self._get_clip_correlation(clip)
@@ -394,30 +387,21 @@ class AudioPatternDetector:
                 # no need for sliding window since it is the last piece
                 subtract_seconds = -(chunk_seconds - seconds_per_chunk)
                 audio_section_temp = np.concatenate((previous_chunk, chunk))[(-seconds_per_chunk * sr):]
-                audio_section = np.concatenate((audio_section_temp, np.array([])))
+                audio_section = audio_section_temp
             else:
                 subtract_seconds = sliding_window
-                audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk, np.array([])))
+                audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk))
         else:
             subtract_seconds = 0
-            audio_section = np.concatenate((chunk, np.array([])))
+            audio_section = chunk
 
         if self.normalize:
-            #max_loudness = np.max(np.abs(audio_section))
-            #audio_section = audio_section / max_loudness
+            from native_helper import integrated_loudness, loudness_normalize
             audio_section_seconds = len(audio_section) / sr
-            #normalize loudness
-            if audio_section_seconds < 0.5:
-                # not sure if there are valid use cases for this
-                #raise ValueError("audio_section_seconds < 0.5 second")
-                meter = pyln.Meter(sr, block_size=audio_section_seconds)
-            else:
-                meter = pyln.Meter(sr)  # create BS.1770 meter
-
-            loudness = meter.integrated_loudness(audio_section)
-
+            block = audio_section_seconds if audio_section_seconds < 0.5 else 0.4
+            loudness = integrated_loudness(audio_section, sr, block_size=block)
             # loudness normalize audio to -16 dB LUFS
-            audio_section = pyln.normalize.loudness(audio_section, loudness, -16.0)
+            audio_section = loudness_normalize(audio_section, loudness, -16.0)
 
             # keep for debugging
             # if self.debug_mode:
@@ -538,7 +522,7 @@ class AudioPatternDetector:
         # the selected ones are going to be checked for similarity
         # before adding to final peaks
         height_min = 0.25
-        from scipy.signal import find_peaks
+        from native_helper import find_peaks
         peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
@@ -616,7 +600,7 @@ class AudioPatternDetector:
                 debug_audio = np.clip(audio_section[peak - len(clip):peak + len(clip)], -1.0, 1.0)
                 _write_audio_file(
                     f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav",
-                    debug_audio.astype(np.float32),
+                    debug_audio,
                     self.target_sample_rate
                 )
 
@@ -664,11 +648,11 @@ class AudioPatternDetector:
 
         partition_size = len(correlation_clip) // partition_count
 
-        similarity_partitions = []
-        for i in range(partition_count):
-            similarity_partitions.append(
-                _mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
-                                   correlation_slice[i * partition_size:(i + 1) * partition_size]))
+        similarity_partitions = np.array([
+            _mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
+                                correlation_slice[i * partition_size:(i + 1) * partition_size])
+            for i in range(partition_count)
+        ], dtype=np.float32)
 
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
         similarity_whole = np.mean(similarity_partitions)

@@ -17,7 +17,7 @@ class OverlapResult(TypedDict):
 
 
 def area_of_overlap_ratio(control: NDArray[np.floating[Any]], variable: NDArray[np.floating[Any]]) -> OverlapResult:
-    from scipy.integrate import simpson
+    from native_helper import simpson
 
     if len(control) != len(variable):
         raise ValueError("Both arrays must have the same length")
@@ -25,14 +25,13 @@ def area_of_overlap_ratio(control: NDArray[np.floating[Any]], variable: NDArray[
     total_rect_control = len(control) * max(control)
 
     y2 = variable
-    x = np.arange(len(control))
 
-    area_control = simpson(control, x=x)
-    area_y2 = simpson(y2, x=x)
+    area_control = simpson(control)
+    area_y2 = simpson(y2)
 
     # To find the overlapping area, take the minimum at each point
     min_curve = np.minimum(control, y2)
-    overlapping_area = simpson(min_curve, x=x)
+    overlapping_area = simpson(min_curve)
 
     # Calculate the sum of area of both curves where the two curves don't overlap
     diff_area = area_control+area_y2-2*overlapping_area
@@ -101,7 +100,7 @@ def is_pure_tone(audio_data: NDArray[np.float32], sample_rate: int) -> bool:
 
     # Define a threshold for pure tone
     #noise_threshold = 0.1
-    from scipy.signal import find_peaks
+    from native_helper import find_peaks
     peaks, _ = find_peaks(positive_magnitude_normalized, prominence=0.05)
 
     peak_freqs = positive_freqs[peaks]

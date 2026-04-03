@@ -39,8 +39,48 @@ def is_ffmpeg_available() -> bool:
     return _ffmpeg_available
 
 
-def load_wav_file_scipy(file_path: str) -> tuple[NDArray[np.float32], int]:
-    """Load WAV file without ffmpeg using scipy.io.wavfile.
+def _read_wav(wav_file: 'str | IO[bytes]', source_name: str) -> tuple[NDArray[np.integer[Any] | np.floating[Any]], int]:
+    """Read WAV data using the stdlib wave module.
+
+    Returns:
+        tuple: (raw numpy array, sample_rate)
+    """
+    import wave
+
+    try:
+        with wave.open(wav_file, 'rb') as wf:
+            sample_rate = wf.getframerate()
+            n_channels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            n_frames = wf.getnframes()
+            raw_bytes = wf.readframes(n_frames)
+    except Exception as e:
+        raise ValueError(f"Failed to read WAV data from {source_name}: {e}") from e
+
+    if sampwidth == 1:
+        data = np.frombuffer(raw_bytes, dtype=np.uint8)
+    elif sampwidth == 2:
+        data = np.frombuffer(raw_bytes, dtype=np.int16)
+    elif sampwidth == 3:
+        # 24-bit: vectorized unpack to int32
+        raw = np.frombuffer(raw_bytes, dtype=np.uint8).reshape(-1, 3)
+        int32_data = raw[:, 0].astype(np.int32) | (raw[:, 1].astype(np.int32) << 8) | (raw[:, 2].astype(np.int32) << 16)
+        int32_data[raw[:, 2] >= 0x80] -= 1 << 24
+        int32_data <<= 8  # left-shift to full int32 range for correct /2^31 normalization
+        data = int32_data
+    elif sampwidth == 4:
+        data = np.frombuffer(raw_bytes, dtype=np.int32)
+    else:
+        raise ValueError(f"Unsupported sample width {sampwidth} in {source_name}")
+
+    if n_channels > 1:
+        data = data.reshape(-1, n_channels)
+
+    return data, sample_rate
+
+
+def load_wav_file(file_path: str) -> tuple[NDArray[np.float32], int]:
+    """Load WAV file using the stdlib wave module.
 
     Args:
         file_path: Path to WAV file.
@@ -51,18 +91,16 @@ def load_wav_file_scipy(file_path: str) -> tuple[NDArray[np.float32], int]:
     Raises:
         ValueError: If file is not a valid WAV file or has unsupported format.
     """
-    from scipy.io import wavfile
-
-    try:
-        sample_rate, data = wavfile.read(file_path)
-    except Exception as e:
-        raise ValueError(f"Failed to read WAV file {file_path}: {e}") from e
-
+    data, sample_rate = _read_wav(file_path, f"file {file_path}")
     return _normalize_wav_data(data, sample_rate, f"file {file_path}")
 
 
+# Keep old name as alias for backwards compatibility.
+load_wav_file_scipy = load_wav_file
+
+
 def load_wav_from_bytes(wav_bytes: bytes, name: str = "bytes") -> tuple[NDArray[np.float32], int]:
-    """Load WAV data from bytes without ffmpeg using scipy.io.wavfile.
+    """Load WAV data from bytes using the stdlib wave module.
 
     Args:
         wav_bytes: WAV file content as bytes.
@@ -75,13 +113,8 @@ def load_wav_from_bytes(wav_bytes: bytes, name: str = "bytes") -> tuple[NDArray[
         ValueError: If data is not valid WAV or has unsupported format.
     """
     import io
-    from scipy.io import wavfile
 
-    try:
-        sample_rate, data = wavfile.read(io.BytesIO(wav_bytes))
-    except Exception as e:
-        raise ValueError(f"Failed to read WAV data from {name}: {e}") from e
-
+    data, sample_rate = _read_wav(io.BytesIO(wav_bytes), name)
     return _normalize_wav_data(data, sample_rate, name)
 
 
@@ -93,7 +126,7 @@ def _normalize_wav_data(
     """Normalize WAV data to float32 in range [-1, 1].
 
     Args:
-        data: Raw WAV data from scipy.io.wavfile.
+        data: Raw WAV data from the stdlib wave module (via _read_wav).
         sample_rate: Sample rate of the audio.
         source_name: Name for error messages.
 
@@ -107,7 +140,7 @@ def _normalize_wav_data(
     elif data.dtype == np.int32:
         result = data.astype(np.float32) / 2147483648.0
     elif data.dtype == np.float32:
-        result = np.asarray(data, dtype=np.float32)
+        result = data.view(np.float32)
     elif data.dtype == np.float64:
         result = data.astype(np.float32)
     elif data.dtype == np.uint8:
@@ -123,7 +156,7 @@ def _normalize_wav_data(
 
 
 def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> NDArray[np.float32]:
-    """Resample audio using scipy (no ffmpeg needed).
+    """Resample audio using FFT-based resampling via native_helper.resample.
 
     Args:
         audio: Audio data as numpy array.
@@ -131,16 +164,15 @@ def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> 
         target_sr: Target sample rate.
 
     Returns:
-        Resampled audio data.
+        Resampled audio data as float32.
     """
     if orig_sr == target_sr:
         return audio
 
-    from scipy import signal
+    from native_helper import resample
 
     num_samples = int(len(audio) * target_sr / orig_sr)
-    resampled = signal.resample(audio, num_samples)
-    return np.asarray(resampled, dtype=np.float32)
+    return resample(audio, num_samples)
 
 
 def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, middle_index: int) -> NDArray[np.floating[Any]]:
@@ -157,7 +189,7 @@ def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, midd
     if end > len(array):
         array = np.pad(array, (0, end - len(array)), 'constant')
     # slice
-    return np.array(array[beg:end])
+    return array[beg:end]
 
 
 def convert_audio_file(file_path: str, sr: int | None = None) -> NDArray[np.float32]:
@@ -214,7 +246,8 @@ def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: in
     """Downsample a curve while preserving local maxima."""
     n_points = len(curve)
     step_size = n_points / num_samples
-    compressed_curve: list[np.floating[Any]] = []
+    compressed_curve = np.empty(num_samples, dtype=np.float32)
+    count = 0
 
     for i in range(num_samples):
         start_index = int(i * step_size)
@@ -228,16 +261,18 @@ def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: in
             continue
 
         local_max_index = np.argmax(window)
-        compressed_curve.append(window[local_max_index])
+        compressed_curve[count] = window[local_max_index]
+        count += 1
 
     # Adjust the length if necessary by adding the last element of the original curve
-    if len(compressed_curve) < num_samples and len(curve) > 0:
-        compressed_curve.append(curve[-1])
+    if count < num_samples and len(curve) > 0:
+        compressed_curve[count] = curve[-1]
+        count += 1
 
-    if len(compressed_curve) != num_samples:
-        raise ValueError(f"downsampled curve length {len(compressed_curve)} not equal to num_samples {num_samples}")
+    if count != num_samples:
+        raise ValueError(f"downsampled curve length {count} not equal to num_samples {num_samples}")
 
-    return np.array(compressed_curve, dtype=np.float32)
+    return compressed_curve
 
 @contextmanager
 def ffmpeg_get_float32_pcm(

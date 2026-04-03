@@ -1,0 +1,127 @@
+name: Native Helper Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to create, for example v0.0.1
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-wheel:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native-helper
+
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        working-directory: native-helper
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path(".")
+          release_tag = os.environ["RELEASE_TAG"]
+          normalized_tag = release_tag[1:] if release_tag.startswith("v") else release_tag
+
+          with open(root / "Cargo.toml", "rb") as f:
+            cargo_version = tomllib.load(f)["package"]["version"]
+          with open(root / "pyproject.toml", "rb") as f:
+            pyproject_version = tomllib.load(f)["project"]["version"]
+
+          if cargo_version != pyproject_version:
+            raise SystemExit(
+              f"Version mismatch: Cargo.toml={cargo_version}, pyproject.toml={pyproject_version}"
+            )
+
+          if cargo_version != normalized_tag:
+            raise SystemExit(
+              f"Release tag {release_tag} does not match package version {cargo_version}"
+            )
+          PY
+
+      - name: Install release build dependencies
+        run: python -m pip install --upgrade pip numpy maturin
+
+      - name: Build wheel
+        env:
+          PYO3_PYTHON: python
+        working-directory: native-helper
+        run: maturin build --release --features python -o dist
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-helper-wheel-${{ runner.os }}-${{ matrix.arch }}-py313
+          path: native-helper/dist/*.whl
+          if-no-files-found: error
+
+  create-release:
+    needs: build-wheel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-helper-wheel-*
+          path: release-assets
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          PREFIXED_TAG="native-helper-${RELEASE_TAG}"
+          mapfile -d '' assets < <(find release-assets -type f -name '*.whl' -print0 | sort -z)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No wheel assets found under release-assets" >&2
+            exit 1
+          fi
+
+          if gh release view "$PREFIXED_TAG" > /dev/null 2>&1; then
+            mapfile -t existing_wheels < <(
+              gh release view "$PREFIXED_TAG" --json assets --jq '.assets[] | select(.name | endswith(".whl")) | .name'
+            )
+
+            for wheel in "${existing_wheels[@]}"; do
+              gh release delete-asset "$PREFIXED_TAG" "$wheel" --yes
+            done
+
+            gh release upload "$PREFIXED_TAG" "${assets[@]}"
+          else
+            gh release create "$PREFIXED_TAG" \
+              --title "native-helper ${RELEASE_TAG}" \
+              --generate-notes \
+              --target "${GITHUB_SHA}" \
+              "${assets[@]}"
+          fi
