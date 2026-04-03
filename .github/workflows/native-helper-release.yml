@@ -62,7 +62,8 @@ jobs:
               f"Version mismatch: Cargo.toml={cargo_version}, pyproject.toml={pyproject_version}"
             )
 
-          if cargo_version != normalized_tag:
+          base_tag = normalized_tag.split("-", 1)[0]
+          if cargo_version != base_tag:
             raise SystemExit(
               f"Release tag {release_tag} does not match package version {cargo_version}"
             )
