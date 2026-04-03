@@ -8,7 +8,15 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 
 ## Installation
 
-### Install from GitHub (recommended)
+### Install from GitHub release (recommended)
+```shell
+# Replace v0.2.19 with the desired version and platform wheel
+uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_x86_64.whl'
+```
+
+Prebuilt wheels are available for x86_64 and aarch64 on the [releases page](https://github.com/andrewtheguy/audio_pattern_detector/releases).
+
+### Install from source (requires Rust toolchain)
 ```shell
 uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@(tag or branch)
 ```
@@ -29,9 +37,6 @@ This installs matplotlib for debug visualizations.
 ```shell
 # Using uv (from local directory)
 uv run audio-pattern-detector [command] [options]
-
-# Using pipx (from GitHub)
-pipx run --spec git+https://github.com/andrewtheguy/audio_pattern_detector.git audio-pattern-detector [command] [options]
 ```
 
 ## Audio Requirements
