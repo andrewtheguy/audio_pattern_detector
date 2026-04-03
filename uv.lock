@@ -36,7 +36,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fft-correlation", marker = "platform_machine != 'aarch64' and platform_machine != 'x86_64'" },
     { name = "fft-correlation", marker = "platform_machine == 'aarch64'", url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl" },
     { name = "fft-correlation", marker = "platform_machine == 'x86_64'", url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_x86_64.whl" },
     { name = "matplotlib", marker = "extra == 'debug'", specifier = ">=3.9.0,<4" },
