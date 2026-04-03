@@ -75,6 +75,7 @@ def benchmark_find_peaks(
         scipy_peaks, _ = scipy.signal.find_peaks(signal, **kwargs)
         scipy_times.append(time.perf_counter() - start)
 
+    for _ in range(repeat):
         start = time.perf_counter()
         rust_peaks, _ = native_helper.find_peaks(signal, **kwargs)
         rust_times.append(time.perf_counter() - start)
@@ -104,7 +105,8 @@ def benchmark_find_peaks(
     print(f"params={kwargs}")
     print(f"scipy_median_sec={scipy_median:.6f}")
     print(f"rust_median_sec={rust_median:.6f}")
-    print(f"speedup={scipy_median / rust_median:.2f}x")
+    speedup = f"{scipy_median / rust_median:.2f}x" if rust_median > 0 else "N/A"
+    print(f"speedup={speedup}")
 
 
 def main() -> None:
