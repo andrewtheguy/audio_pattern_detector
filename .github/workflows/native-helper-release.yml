@@ -51,19 +51,26 @@ jobs:
           root = pathlib.Path(".")
           release_tag = os.environ["RELEASE_TAG"]
           normalized_tag = release_tag[1:] if release_tag.startswith("v") else release_tag
+          base_tag = normalized_tag.split("-", 1)[0]
 
           with open(root / "Cargo.toml", "rb") as f:
             cargo_version = tomllib.load(f)["package"]["version"]
           with open(root / "pyproject.toml", "rb") as f:
             pyproject_version = tomllib.load(f)["project"]["version"]
+          with open(root.parent / "pyproject.toml", "rb") as f:
+            main_version = tomllib.load(f)["project"]["version"]
 
           if cargo_version != pyproject_version:
             raise SystemExit(
               f"Version mismatch: Cargo.toml={cargo_version}, pyproject.toml={pyproject_version}"
             )
 
-          base_tag = normalized_tag.split("-", 1)[0]
-          if cargo_version != base_tag:
+          if cargo_version != main_version:
+            raise SystemExit(
+              f"Version mismatch: native-helper={cargo_version}, main project={main_version}"
+            )
+
+          if base_tag != cargo_version:
             raise SystemExit(
               f"Release tag {release_tag} does not match package version {cargo_version}"
             )
