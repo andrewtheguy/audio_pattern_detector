@@ -140,7 +140,7 @@ def _normalize_wav_data(
     elif data.dtype == np.int32:
         result = data.astype(np.float32) / 2147483648.0
     elif data.dtype == np.float32:
-        result = np.asarray(data, dtype=np.float32)
+        result = data.view(np.float32)
     elif data.dtype == np.float64:
         result = data.astype(np.float32)
     elif data.dtype == np.uint8:

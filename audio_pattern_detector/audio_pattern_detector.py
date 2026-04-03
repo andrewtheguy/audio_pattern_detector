@@ -600,7 +600,7 @@ class AudioPatternDetector:
                 debug_audio = np.clip(audio_section[peak - len(clip):peak + len(clip)], -1.0, 1.0)
                 _write_audio_file(
                     f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav",
-                    debug_audio.astype(np.float32),
+                    debug_audio,
                     self.target_sample_rate
                 )
 
@@ -648,11 +648,11 @@ class AudioPatternDetector:
 
         partition_size = len(correlation_clip) // partition_count
 
-        similarity_partitions = []
-        for i in range(partition_count):
-            similarity_partitions.append(
-                _mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
-                                   correlation_slice[i * partition_size:(i + 1) * partition_size]))
+        similarity_partitions = np.array([
+            _mean_squared_error(correlation_clip[i * partition_size:(i + 1) * partition_size],
+                                correlation_slice[i * partition_size:(i + 1) * partition_size])
+            for i in range(partition_count)
+        ], dtype=np.float32)
 
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
         similarity_whole = np.mean(similarity_partitions)
