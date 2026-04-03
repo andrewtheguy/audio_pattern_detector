@@ -9,12 +9,18 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 ## Installation
 
 ### Install from GitHub release (recommended)
+
+Replace `v0.2.19` with the desired version.
+
+**x86_64 (amd64):**
 ```shell
-# Replace v0.2.19 with the desired version and platform wheel
 uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_x86_64.whl'
 ```
 
-Prebuilt wheels are available for x86_64 and aarch64 on the [releases page](https://github.com/andrewtheguy/audio_pattern_detector/releases).
+**aarch64 (arm64):**
+```shell
+uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_aarch64.whl'
+```
 
 ### Install from source (requires Rust toolchain)
 ```shell
