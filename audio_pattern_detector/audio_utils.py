@@ -193,11 +193,7 @@ def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, midd
 
 
 def load_wave_file(file_path: str, expected_sample_rate: int) -> NDArray[np.float32]:
-    """Load wave file into float32 array.
-
-    For WAV files, uses scipy directly (no ffmpeg needed).
-    For non-WAV files, uses ffmpeg for conversion.
-    Resampling is done if sample rate doesn't match the expected rate.
+    """Load audio file into float32 array.
 
     Args:
         file_path: Path to audio file.
@@ -206,7 +202,6 @@ def load_wave_file(file_path: str, expected_sample_rate: int) -> NDArray[np.floa
     Returns:
         numpy array of float32 audio samples at expected_sample_rate.
     """
-    # For WAV files, use scipy directly (no ffmpeg needed)
     if file_path.lower().endswith('.wav'):
         data, sample_rate = load_wav_file_scipy(file_path)
 
@@ -216,7 +211,6 @@ def load_wave_file(file_path: str, expected_sample_rate: int) -> NDArray[np.floa
 
         return data
 
-    # For non-WAV files, use ffmpeg
     if not is_ffmpeg_available():
         raise ValueError(
             f"ffmpeg not available and file {file_path} is not a WAV file. "
@@ -231,7 +225,6 @@ def _load_wave_file_ffmpeg_convert(file_path: str, target_sample_rate: int) -> N
     with ffmpeg_get_float32_pcm(file_path, target_sample_rate=target_sample_rate, ac=1) as stdout:
         data = stdout.read()
 
-    # ffmpeg f32le output is already normalized to [-1, 1]
     samples: NDArray[np.float32] = np.frombuffer(data, dtype=np.float32)
     return samples
 

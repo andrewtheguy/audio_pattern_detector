@@ -160,7 +160,6 @@ def match_pattern(
     audio_name = Path(audio_source).stem
     print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
 
-    # For WAV files, use scipy (no ffmpeg needed)
     if audio_source.lower().endswith('.wav'):
         stream_wrapper = _WavFileStreamWrapper(audio_source, sr)
         try:
@@ -182,7 +181,6 @@ def match_pattern(
             stream_wrapper.close()
         return peak_times, total_time
 
-    # For non-WAV files, use ffmpeg
     with ffmpeg_get_float32_pcm(
         audio_source,
         target_sample_rate=sr,
@@ -331,7 +329,6 @@ class _WavFileStreamWrapper:
 
     Reads WAV header to get sample rate, then streams audio data.
     Automatically converts to target sample rate if needed.
-    No ffmpeg required - uses Python's wave module and scipy for resampling.
     """
 
     def __init__(self, file_path: str, target_sample_rate: int) -> None:
