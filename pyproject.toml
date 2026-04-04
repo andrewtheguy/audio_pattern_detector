@@ -6,7 +6,7 @@ authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
 requires-python = "~=3.12.0"
 readme = "README.md"
 dependencies = [
-    "fft-correlation>=0.0.3",
+    "fft-correlation==0.0.4",
     "numpy>=1.26.4,<2",
 ]
 
@@ -50,10 +50,13 @@ reportUnusedCallResult = false
 reportImplicitOverride = false
 
 [[tool.uv.index]]
+name = "fft-correlation"
 url = "https://andrewtheguy.github.io/fft-correlation/simple/"
+explicit = true
 
 [tool.uv.sources]
 native-helper = { path = "native-helper", editable = true }
+fft-correlation = { index = "fft-correlation" }
 
 [build-system]
 requires = ["maturin>=1.9.4,<2.0"]
