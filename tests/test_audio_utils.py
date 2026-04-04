@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 
 from audio_pattern_detector.audio_utils import load_wave_file, write_wav_file
-from audio_pattern_detector.convert import convert_audio_to_clip_format
 
 
 class TestWriteWavFile:
@@ -167,198 +166,8 @@ class TestRoundTrip:
             os.unlink(temp_path)
 
 
-class TestConvertAudioToClipFormat:
-    def _get_audio_info(self, filepath):
-        """Helper to get audio file metadata using ffprobe."""
-        import json
-        import subprocess
-
-        cmd = [
-            "ffprobe", "-v", "error",
-            "-select_streams", "a:0",
-            "-show_entries", "stream=channels,sample_rate,bits_per_sample,duration",
-            "-of", "json",
-            filepath
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        data = json.loads(result.stdout)
-        stream = data["streams"][0]
-        return {
-            "channels": stream.get("channels"),
-            "sample_rate": int(stream.get("sample_rate")),
-            "bits_per_sample": stream.get("bits_per_sample"),
-            "duration": float(stream.get("duration", 0)),
-        }
-
-    def test_convert_8khz_file(self):
-        """Test converting an 8kHz file produces valid output."""
-        input_file = "sample_audios/clips/rthk_beep.wav"
-        if not os.path.exists(input_file):
-            pytest.skip("Sample file not found")
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            output_path = f.name
-
-        try:
-            # Get input duration
-            input_info = self._get_audio_info(input_file)
-
-            convert_audio_to_clip_format(input_file, output_path)
-
-            # Verify output file exists
-            assert os.path.exists(output_path)
-            assert os.path.getsize(output_path) > 0
-
-            # Verify output format
-            output_info = self._get_audio_info(output_path)
-            assert output_info["channels"] == 1, "Output should be mono"
-            assert output_info["sample_rate"] == 8000, "Output should be 8kHz"
-            assert output_info["bits_per_sample"] == 16, "Output should be 16-bit"
-
-            # Verify duration is preserved
-            assert abs(output_info["duration"] - input_info["duration"]) < 0.01, \
-                f"Duration mismatch: input={input_info['duration']}, output={output_info['duration']}"
-
-            # Verify we can load the output with load_wave_file
-            audio = load_wave_file(output_path, 8000)
-            assert len(audio) > 0
-            assert audio.dtype == np.float32
-        finally:
-            os.unlink(output_path)
-
-    def test_convert_16khz_file_to_8khz(self):
-        """Test converting a 16kHz file downsamples to 8kHz."""
-        input_file = "sample_audios/test_16khz/clips/rthk_beep_16k.wav"
-        if not os.path.exists(input_file):
-            pytest.skip("16kHz sample file not found")
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            output_path = f.name
-
-        try:
-            # Get input duration
-            input_info = self._get_audio_info(input_file)
-
-            convert_audio_to_clip_format(input_file, output_path)
-
-            # Verify output format is 8kHz
-            output_info = self._get_audio_info(output_path)
-            assert output_info["channels"] == 1, "Output should be mono"
-            assert output_info["sample_rate"] == 8000, "Output should be 8kHz"
-            assert output_info["bits_per_sample"] == 16, "Output should be 16-bit"
-
-            # Verify duration is preserved after resampling
-            assert abs(output_info["duration"] - input_info["duration"]) < 0.01, \
-                f"Duration mismatch: input={input_info['duration']}, output={output_info['duration']}"
-
-            # Verify we can load the output
-            audio = load_wave_file(output_path, 8000)
-            assert len(audio) > 0
-        finally:
-            os.unlink(output_path)
-
-    def test_convert_nonexistent_file_raises(self):
-        """Test that converting nonexistent file raises ValueError."""
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            output_path = f.name
-
-        try:
-            with pytest.raises(ValueError, match="does not exist"):
-                convert_audio_to_clip_format("nonexistent_file.wav", output_path)
-        finally:
-            if os.path.exists(output_path):
-                os.unlink(output_path)
-
-    def test_convert_preserves_audio_content(self):
-        """Test that conversion preserves audio content for same sample rate."""
-        input_file = "sample_audios/clips/cbs_news.wav"
-        if not os.path.exists(input_file):
-            pytest.skip("Sample file not found")
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            output_path = f.name
-
-        try:
-            # Load original
-            original = load_wave_file(input_file, 8000)
-
-            # Convert
-            convert_audio_to_clip_format(input_file, output_path)
-
-            # Load converted
-            converted = load_wave_file(output_path, 8000)
-
-            # Should have same length and similar content
-            assert len(converted) == len(original)
-            np.testing.assert_array_almost_equal(original, converted, decimal=4)
-        finally:
-            os.unlink(output_path)
-
-    def test_output_is_valid_wav(self):
-        """Test that output is a valid wav file that can be used as a clip."""
-        import json
-        import subprocess
-
-        input_file = "sample_audios/rthk_section_with_beep.wav"
-        if not os.path.exists(input_file):
-            pytest.skip("Sample file not found")
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            output_path = f.name
-
-        try:
-            # Get input duration
-            input_info = self._get_audio_info(input_file)
-
-            convert_audio_to_clip_format(input_file, output_path)
-
-            # Verify the output is actually a wav file using ffprobe
-            cmd = [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=format_name",
-                "-show_entries", "stream=codec_name",
-                "-of", "json",
-                output_path
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            assert result.returncode == 0, f"ffprobe failed: {result.stderr}"
-
-            probe_data = json.loads(result.stdout)
-
-            # Verify format is wav
-            format_name = probe_data.get("format", {}).get("format_name", "")
-            assert "wav" in format_name, f"Output is not a wav file, got format: {format_name}"
-
-            # Verify codec is PCM
-            codec_name = probe_data.get("streams", [{}])[0].get("codec_name", "")
-            assert "pcm_s16le" in codec_name, f"Output is not PCM 16-bit, got codec: {codec_name}"
-
-            # Also verify audio properties
-            output_info = self._get_audio_info(output_path)
-            assert output_info["channels"] == 1, "Output should be mono"
-            assert output_info["sample_rate"] == 8000, "Output should be 8kHz"
-            assert output_info["bits_per_sample"] == 16, "Output should be 16-bit"
-
-            # Verify duration is preserved
-            assert abs(output_info["duration"] - input_info["duration"]) < 0.01, \
-                f"Duration mismatch: input={input_info['duration']}, output={output_info['duration']}"
-
-            # Verify the output can be loaded and used
-            audio = load_wave_file(output_path, 8000)
-
-            # Basic sanity checks
-            assert isinstance(audio, np.ndarray)
-            assert audio.dtype == np.float32
-            assert len(audio) > 0
-            # Audio should be in normalized range
-            assert np.max(audio) <= 1.0
-            assert np.min(audio) >= -1.0
-        finally:
-            os.unlink(output_path)
-
-
-class TestFfmpegFreeUtilities:
-    """Tests for ffmpeg-free utilities (scipy-based WAV loading and resampling)."""
+class TestAudioUtilities:
+    """Tests for audio utilities (WAV loading, resampling, ffmpeg availability)."""
 
     def test_is_ffmpeg_available_returns_bool(self):
         """Test that is_ffmpeg_available returns a boolean."""
@@ -377,14 +186,14 @@ class TestFfmpegFreeUtilities:
         # Cache should be set
         assert audio_utils._ffmpeg_available is not None
 
-    def test_load_wav_file_scipy_basic(self):
-        """Test loading WAV file with scipy."""
-        from audio_pattern_detector.audio_utils import load_wav_file_scipy
+    def test_load_wav_file_basic(self):
+        """Test loading WAV file."""
+        from audio_pattern_detector.audio_utils import load_wav_file
         sample_file = "sample_audios/clips/rthk_beep.wav"
         if not os.path.exists(sample_file):
             pytest.skip("Sample file not found")
 
-        audio, sample_rate = load_wav_file_scipy(sample_file)
+        audio, sample_rate = load_wav_file(sample_file)
         assert isinstance(audio, np.ndarray)
         assert audio.dtype == np.float32
         assert sample_rate == 8000
@@ -392,24 +201,24 @@ class TestFfmpegFreeUtilities:
         # Check normalized range
         assert np.max(np.abs(audio)) <= 1.0
 
-    def test_load_wav_file_scipy_int16(self):
-        """Test loading 16-bit WAV file with scipy."""
-        from audio_pattern_detector.audio_utils import load_wav_file_scipy
+    def test_load_wav_file_int16(self):
+        """Test loading 16-bit WAV file."""
+        from audio_pattern_detector.audio_utils import load_wav_file
         # All our sample files are 16-bit
         sample_file = "sample_audios/clips/cbs_news.wav"
         if not os.path.exists(sample_file):
             pytest.skip("Sample file not found")
 
-        audio, sample_rate = load_wav_file_scipy(sample_file)
+        audio, sample_rate = load_wav_file(sample_file)
         # Should be normalized float32
         assert audio.dtype == np.float32
         assert np.max(np.abs(audio)) <= 1.0
 
-    def test_load_wav_file_scipy_nonexistent(self):
+    def test_load_wav_file_nonexistent(self):
         """Test that loading nonexistent file raises ValueError."""
-        from audio_pattern_detector.audio_utils import load_wav_file_scipy
+        from audio_pattern_detector.audio_utils import load_wav_file
         with pytest.raises(ValueError, match="Failed to read"):
-            load_wav_file_scipy("nonexistent_file.wav")
+            load_wav_file("nonexistent_file.wav")
 
     def test_resample_audio_same_rate(self):
         """Test resampling when source and target rates are the same."""
@@ -462,8 +271,8 @@ class TestFfmpegFreeUtilities:
         correlation = np.corrcoef(resampled, reference)[0, 1]
         assert correlation > 0.99, f"Correlation too low: {correlation}"
 
-    def test_load_wave_file_fallback_to_scipy(self):
-        """Test that load_wave_file falls back to scipy when ffmpeg unavailable."""
+    def test_load_wave_file_without_ffmpeg(self):
+        """Test that load_wave_file works for WAV files when ffmpeg is unavailable."""
         from audio_pattern_detector import audio_utils
 
         # Save original ffmpeg state and set to unavailable
@@ -475,7 +284,6 @@ class TestFfmpegFreeUtilities:
             if not os.path.exists(sample_file):
                 pytest.skip("Sample file not found")
 
-            # This should use scipy fallback
             audio = audio_utils.load_wave_file(sample_file, 8000)
             assert isinstance(audio, np.ndarray)
             assert audio.dtype == np.float32

@@ -2,13 +2,6 @@ import argparse
 import sys
 
 
-def _lazy_cmd_convert(args: argparse.Namespace) -> None:
-    """Import convert command lazily to speed up CLI startup."""
-    from audio_pattern_detector.convert import cmd_convert
-
-    return cmd_convert(args)
-
-
 def _lazy_cmd_match(args: argparse.Namespace) -> None:
     """Import match command lazily to speed up CLI startup."""
     from audio_pattern_detector.match import cmd_match
@@ -27,16 +20,10 @@ def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
         prog='audio-pattern-detector',
-        description='Audio pattern detection and conversion tools'
+        description='Audio pattern detection tools'
     )
 
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
-
-    # Add convert subcommand
-    convert_parser = subparsers.add_parser('convert', help='Convert audio files to clip format')
-    convert_parser.add_argument('--audio-file', metavar='audio file', type=str, help='audio file to convert')
-    convert_parser.add_argument('--dest-file', metavar='audio file', type=str, help='dest saved file')
-    convert_parser.set_defaults(func=_lazy_cmd_convert)
 
     # Add match subcommand
     match_parser = subparsers.add_parser('match', help='Find pattern matches in audio files')

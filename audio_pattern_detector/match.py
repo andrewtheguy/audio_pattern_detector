@@ -21,6 +21,14 @@ from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
 )
 
+def _print_peak_times_to_stderr(peak_times: dict[str, list[float]] | None) -> None:
+    """Print formatted peak timestamps to stderr."""
+    if peak_times is not None:
+        for clip_name, timestamps in peak_times.items():
+            formatted = [seconds_to_time(t) for t in timestamps]
+            print(f"{clip_name}: {', '.join(formatted)}", file=sys.stderr)
+
+
 def _emit_jsonl(event_type: str, **kwargs: Any) -> None:
     """Emit a JSONL event to stdout and flush immediately."""
     event = {"type": event_type, **kwargs}
@@ -160,7 +168,6 @@ def match_pattern(
     audio_name = Path(audio_source).stem
     print(f"Finding pattern in audio file {audio_name}...", file=sys.stderr)
 
-    # For WAV files, use scipy (no ffmpeg needed)
     if audio_source.lower().endswith('.wav'):
         stream_wrapper = _WavFileStreamWrapper(audio_source, sr)
         try:
@@ -182,7 +189,6 @@ def match_pattern(
             stream_wrapper.close()
         return peak_times, total_time
 
-    # For non-WAV files, use ffmpeg
     with ffmpeg_get_float32_pcm(
         audio_source,
         target_sample_rate=sr,
@@ -331,7 +337,6 @@ class _WavFileStreamWrapper:
 
     Reads WAV header to get sample rate, then streams audio data.
     Automatically converts to target sample rate if needed.
-    No ffmpeg required - uses Python's wave module and scipy for resampling.
     """
 
     def __init__(self, file_path: str, target_sample_rate: int) -> None:
@@ -568,6 +573,7 @@ def _run_match_with_output(
     if jsonl_mode:
         _emit_jsonl("end", total_time=total_time, total_time_formatted=seconds_to_time(total_time))
     else:
+        _print_peak_times_to_stderr(peak_times)
         print(json.dumps(peak_times, ensure_ascii=False))
 
     return peak_times, total_time
@@ -638,6 +644,7 @@ def cmd_match(args: argparse.Namespace) -> None:
             print(f"Processing {audio_file}...", file=sys.stderr)
             peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
+            _print_peak_times_to_stderr(peak_times)
             all_results[audio_file] = peak_times
 
         # In debug mode, also write to file

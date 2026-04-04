@@ -68,7 +68,7 @@ def _mean_squared_error(y_true: NDArray[np.floating[Any]], y_pred: NDArray[np.fl
     return np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2)
 
 def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rate: int) -> None:
-    """Helper function to write audio using ffmpeg"""
+    """Helper function to write audio to a wav file."""
     write_wav_file(filepath, audio_data, sample_rate)
 
 
@@ -273,7 +273,6 @@ class AudioPatternDetector:
             in_bytes = stdout.read(self._chunk_size)
             if not in_bytes:
                 break
-            # Convert bytes to numpy array (float32 directly from ffmpeg)
             chunk = np.frombuffer(in_bytes, dtype="float32")
 
             total_time += len(chunk) / self.target_sample_rate
