@@ -40,11 +40,11 @@ This produces a `ClipData` dict per clip containing the normalized audio, clip n
 
 ## Chunked Processing
 
-Audio is read as a stream of float32 samples and split into fixed-size chunks (`seconds_per_chunk`, default 60s).
+Audio is read as a stream of float32 samples and split into fixed-size chunks (`seconds_per_chunk`, default 60s). Here, `chunk` means the current chunk being processed and `previous_chunk` means the immediately preceding chunk, if one exists.
 
-The raw chunks themselves are not read with overlap. Instead, for each clip, the detector builds an `audio_section` by prepending the last `sliding_window` seconds from the previous chunk, where `sliding_window = ceil(clip_duration_seconds)`. This ensures patterns near chunk boundaries are not missed.
+The raw chunks themselves are not read with overlap. Instead, for each clip, the detector builds an `audio_section`. In the normal case, it prepends the last `sliding_window` seconds from `previous_chunk` to `chunk`, where `sliding_window = ceil(clip_duration_seconds)`. This ensures patterns near chunk boundaries are not missed.
 
-For the final chunk, if it is shorter than `seconds_per_chunk`, the detector takes the last full `seconds_per_chunk` seconds from `previous_chunk + chunk` rather than using the usual `sliding_window` prepend.
+For the final chunk, if `len(chunk) / sample_rate < seconds_per_chunk`, the detector does not use the usual `sliding_window` prepend. Instead, it first concatenates `previous_chunk` and `chunk`, then extracts the last `seconds_per_chunk` seconds from that combined buffer to form `audio_section`.
 
 Each per-clip `audio_section` is loudness-normalized independently to -16 dB LUFS before correlation.
 
@@ -75,7 +75,7 @@ Verification uses partitioned mean squared error (MSE) plus area overlap:
 
    The middle partitions are checked separately because real distortions tend to appear there.
 
-2. **Area overlap ratio** - for the middle 20% of the curves (the 40%-60% span, corresponding to partitions 4-5 in zero-based indexing), compute the area of each curve via Simpson's rule, the overlapping area (integral of the pointwise minimum), and the non-overlapping area. The metric is `diff_overlap_ratio = non_overlapping_area / overlapping_area`.
+2. **Area overlap ratio** - for the middle 20% of the curves (the 40%-60% span, corresponding to partitions 4-5 in zero-based indexing), compute the area of each curve via Simpson's rule, the overlapping area (integral of the pointwise minimum), and the non-overlapping area. Here, `non_overlapping_area` means the portions of both curves outside their shared overlap: `non_overlapping_area = (area_curve1 + area_curve2) - 2 * overlapping_area` (i.e. the sum of the two curve areas minus twice the overlapping area). The metric is `diff_overlap_ratio = non_overlapping_area / overlapping_area`.
 
 3. **Decision thresholds**:
    - `similarity > 0.01` -> reject
@@ -87,7 +87,12 @@ Verification uses partitioned mean squared error (MSE) plus area overlap:
 Pure tones (beeps) have repetitive, high-frequency correlation curves that are sensitive to slight shifts. To handle this, both curves are downsampled to 101 points before comparison, preserving local maxima in each window.
 
 1. **Downsampled MSE** - MSE between the two 101-point curves.
-2. **Overlap ratio** - `overlapping_area / area_control` via Simpson's rule on the downsampled curves.
+2. **Overlap ratio** - compute Simpson integrals on the two downsampled curves:
+   - `area_control`: area under the downsampled reference/self-correlation curve
+   - `area_y2`: area under the downsampled candidate correlation slice
+   - `overlapping_area`: area under the pointwise minimum of those two curves
+
+   The metric used by the code is `overlap_ratio = overlapping_area / area_control`, so the denominator is the reference curve's area, not the candidate curve's area or a rectangular normalization term.
 
 3. **Decision thresholds**:
    - `similarity > 0.01` -> reject
@@ -108,7 +113,7 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 1. Subtract the section offset used to build `audio_section`:
    - `0` for the first chunk
    - usually `sliding_window` for later full chunks
-   - a negative "missing time" offset for the final short chunk
+   - the negated "missing time" value for the final short chunk. Here, "missing time" means `actual_chunk_duration - seconds_per_chunk`, so it is negative when the final `chunk` is shorter than expected; for example, if `seconds_per_chunk = 10s` but the final `chunk` is only `6s`, the missing time is `6 - 10 = -4s`, and the code subtracts `-(-4s) = 4s` because it had to borrow `4s` from `previous_chunk` when building the final `audio_section`.
 2. Add the chunk's offset from the start of the stream (`index * seconds_per_chunk`).
 3. Shift backward by the clip duration so the timestamp marks the start of the pattern rather than the correlation peak.
 4. Clamp negative results to `0`.
@@ -120,4 +125,4 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 | `AudioClip` | Input pattern: name, audio array, sample rate |
 | `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window |
 | `ClipCache` | Runtime cache: pure-tone classification flags and downsampled self-correlation curves for pure-tone clips |
-| `OverlapResult` | Area metrics from overlap calculation: overlapping area, diff area, control areas, and derived ratios |
+| `OverlapResult` | Return type from `area_of_overlap_ratio`. The control areas are the baseline areas for the reference/control curve: `area_control` is the Simpson area of that reference region, and `total_rect_control` is its bounding-rectangle area. `area_y2` is the candidate curve area. These fields feed the derived ratios, including `diff_overlap_ratio = diff_area / overlapping_area` and the pure-tone `overlap_ratio = overlapping_area / area_control`. |
