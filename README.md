@@ -17,9 +17,14 @@ Replace `v0.2.19` with the desired version.
 uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_x86_64.whl'
 ```
 
-**aarch64 (arm64):**
+**aarch64 (arm64) Linux:**
 ```shell
 uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_aarch64.whl'
+```
+
+**macOS Apple Silicon (arm64):**
+```shell
+uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-macosx_11_0_arm64.whl'
 ```
 
 ### Install from source (requires Rust toolchain)
