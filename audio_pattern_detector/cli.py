@@ -50,8 +50,6 @@ def main():
                               help='read patterns and audio from stdin using multiplexed protocol (always outputs JSONL). '
                                    'Protocol: [uint32 num_patterns] then for each pattern [uint32 name_len][name][uint32 data_len][wav_data], '
                                    'followed by audio stream (WAV or raw PCM with --raw-pcm)')
-    match_parser.add_argument('--raw-pcm', action='store_true', help='stdin audio is raw float32 little-endian PCM instead of WAV (requires --source-sample-rate)')
-    match_parser.add_argument('--source-sample-rate', metavar='rate', type=int, required=False, help='source sample rate for raw PCM stdin in Hz (only used with --raw-pcm)')
     match_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
     match_parser.add_argument('--chunk-seconds', metavar='seconds', type=str, default='60',
