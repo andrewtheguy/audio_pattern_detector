@@ -192,12 +192,6 @@ def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, midd
     return array[beg:end]
 
 
-def convert_audio_file(file_path: str, sr: int | None = None) -> NDArray[np.float32]:
-    """Convert audio file to float32 PCM using ffmpeg."""
-    with ffmpeg_get_float32_pcm(file_path, target_sample_rate=sr, ac=1) as stdout:
-        data = stdout.read()
-    return np.frombuffer(data, dtype=np.float32)
-
 def load_wave_file(file_path: str, expected_sample_rate: int) -> NDArray[np.float32]:
     """Load wave file into float32 array.
 

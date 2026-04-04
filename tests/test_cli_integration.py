@@ -57,7 +57,6 @@ def test_cli_help():
     result = run_cli("--help")
     assert result.returncode == 0
     assert "audio-pattern-detector" in result.stdout
-    assert "convert" in result.stdout
     assert "match" in result.stdout
     assert "show-config" in result.stdout
 
@@ -74,14 +73,6 @@ def test_cli_match_help():
     assert "--target-sample-rate" in result.stdout
     assert "--jsonl" in result.stdout
     assert "--chunk-seconds" in result.stdout
-
-
-def test_cli_convert_help():
-    """Test that convert --help shows options."""
-    result = run_cli("convert", "--help")
-    assert result.returncode == 0
-    assert "--audio-file" in result.stdout
-    assert "--dest-file" in result.stdout
 
 
 def test_cli_show_config_help():
@@ -357,65 +348,6 @@ def test_show_config_clip_info():
 
 
 # --- Convert Command Tests ---
-
-
-def test_convert_creates_output_file():
-    """Test convert command creates output file."""
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        output_file = tmp.name
-
-    try:
-        result = run_cli(
-            "convert",
-            "--audio-file", "sample_audios/test_16khz/rthk_section_with_beep_16k.wav",
-            "--dest-file", output_file,
-        )
-        assert result.returncode == 0
-        assert Path(output_file).exists()
-
-        # Verify output is 8kHz
-        probe_result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "stream=sample_rate",
-             "-of", "default=noprint_wrappers=1:nokey=1", output_file],
-            capture_output=True,
-            text=True,
-        )
-        sample_rate = int(probe_result.stdout.strip())
-        assert sample_rate == 8000
-    finally:
-        if Path(output_file).exists():
-            os.unlink(output_file)
-
-
-def test_convert_output_usable_as_pattern():
-    """Test converted file can be used as pattern for matching."""
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        converted_pattern = tmp.name
-
-    try:
-        # Convert 16kHz pattern to 8kHz
-        run_cli(
-            "convert",
-            "--audio-file", "sample_audios/test_16khz/clips/rthk_beep_16k.wav",
-            "--dest-file", converted_pattern,
-        )
-
-        # Use converted pattern for matching
-        result = run_cli(
-            "match",
-            "--audio-file", "sample_audios/rthk_section_with_beep.wav",
-            "--pattern-file", converted_pattern,
-        )
-        assert result.returncode == 0
-
-        output = json.loads(result.stdout)
-        pattern_name = Path(converted_pattern).stem
-        assert pattern_name in output
-        # Should find matches
-        assert len(output[pattern_name]) > 0
-    finally:
-        if Path(converted_pattern).exists():
-            os.unlink(converted_pattern)
 
 
 # --- Error Handling Tests ---

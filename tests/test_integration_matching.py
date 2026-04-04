@@ -6,8 +6,7 @@ import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
-from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, DEFAULT_TARGET_SAMPLE_RATE
-from audio_pattern_detector.convert import convert_audio_to_clip_format
+from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, load_wave_file, write_wav_file, DEFAULT_TARGET_SAMPLE_RATE
 from audio_pattern_detector.match import match_pattern, _WavFileStreamWrapper
 
 
@@ -534,45 +533,6 @@ def test_verification_stage_filters_false_positives():
 # --- 16kHz Audio Handling Tests ---
 
 
-def test_convert_16khz_pattern_to_8khz():
-    """Test converting 16kHz pattern file to 8kHz format
-
-    The convert function should properly downsample 16kHz audio to 8kHz
-    for use as pattern files.
-    """
-    input_file = "sample_audios/test_16khz/clips/rthk_beep_16k.wav"
-
-    assert Path(input_file).exists(), f"16kHz input file {input_file} not found"
-
-    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-        output_file = tmp.name
-
-    try:
-        # Convert 16kHz to 8kHz
-        convert_audio_to_clip_format(input_file, output_file)
-
-        # Verify output file was created
-        assert Path(output_file).exists(), "Converted file was not created"
-
-        # Verify output is 8kHz using ffprobe
-        import subprocess
-        result = subprocess.run(
-            ['ffprobe', '-v', 'error', '-show_entries',
-             'stream=sample_rate', '-of', 'default=noprint_wrappers=1:nokey=1',
-             output_file],
-            capture_output=True,
-            text=True
-        )
-
-        sample_rate = int(result.stdout.strip())
-        assert sample_rate == 8000, f"Expected 8kHz output, got {sample_rate}Hz"
-
-    finally:
-        # Clean up
-        if Path(output_file).exists():
-            os.unlink(output_file)
-
-
 def test_match_16khz_audio_with_8khz_pattern():
     """Test matching 16kHz audio file against 8kHz pattern
 
@@ -643,8 +603,9 @@ def test_match_16khz_with_converted_16khz_pattern():
         converted_pattern = tmp.name
 
     try:
-        # Step 1: Convert pattern from 16kHz to 8kHz
-        convert_audio_to_clip_format(input_pattern, converted_pattern)
+        # Step 1: Load 16kHz pattern and write as 8kHz
+        audio = load_wave_file(input_pattern, 8000)
+        write_wav_file(converted_pattern, audio, 8000)
 
         # Step 2: Match 16kHz audio against converted pattern
         audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
@@ -689,7 +650,8 @@ def test_multiple_16khz_patterns():
                 output_file = tmp.name
                 temp_files.append(output_file)
 
-            convert_audio_to_clip_format(input_file, output_file)
+            audio = load_wave_file(input_file, 8000)
+            write_wav_file(output_file, audio, 8000)
             converted_patterns.append(output_file)
 
         # Match against 16kHz audio
@@ -786,19 +748,6 @@ def test_sample_rate_preservation_in_results():
     )):
         assert abs(time_8k - time_16k) < 0.1, \
             f"Match {i}: Timestamps differ too much: 8kHz={time_8k}s, 16kHz={time_16k}s"
-
-
-def test_convert_nonexistent_file():
-    """Test error handling when converting nonexistent file"""
-    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-        output_file = tmp.name
-
-    try:
-        with pytest.raises(ValueError, match="does not exist"):
-            convert_audio_to_clip_format("nonexistent_16k.wav", output_file)
-    finally:
-        if Path(output_file).exists():
-            os.unlink(output_file)
 
 
 # --- Streaming Audio Processing Tests ---

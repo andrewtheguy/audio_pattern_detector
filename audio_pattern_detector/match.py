@@ -568,6 +568,10 @@ def _run_match_with_output(
     if jsonl_mode:
         _emit_jsonl("end", total_time=total_time, total_time_formatted=seconds_to_time(total_time))
     else:
+        if peak_times is not None:
+            for clip_name, timestamps in peak_times.items():
+                formatted = [seconds_to_time(t) for t in timestamps]
+                print(f"{clip_name}: {', '.join(formatted)}", file=sys.stderr)
         print(json.dumps(peak_times, ensure_ascii=False))
 
     return peak_times, total_time
@@ -638,6 +642,10 @@ def cmd_match(args: argparse.Namespace) -> None:
             print(f"Processing {audio_file}...", file=sys.stderr)
             peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
+            if peak_times is not None:
+                for clip_name, timestamps in peak_times.items():
+                    formatted = [seconds_to_time(t) for t in timestamps]
+                    print(f"{clip_name}: {', '.join(formatted)}", file=sys.stderr)
             all_results[audio_file] = peak_times
 
         # In debug mode, also write to file
