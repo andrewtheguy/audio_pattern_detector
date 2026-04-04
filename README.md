@@ -10,21 +10,15 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 
 ### Install from GitHub release (recommended)
 
-Replace `v0.2.19` with the desired version.
-
-**x86_64 (amd64):**
 ```shell
-uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_x86_64.whl'
+uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ audio-pattern-detector
 ```
 
-**aarch64 (arm64) Linux:**
-```shell
-uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-manylinux_2_34_aarch64.whl'
-```
+This uses a GitHub Pages package index and automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
 
-**macOS Apple Silicon (arm64):**
+To install a specific version:
 ```shell
-uv tool install 'audio-pattern-detector @ https://github.com/andrewtheguy/audio_pattern_detector/releases/download/v0.2.19/audio_pattern_detector-0.2.19-cp39-abi3-macosx_11_0_arm64.whl'
+uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ audio-pattern-detector==0.0.1
 ```
 
 ### Install from source (requires Rust toolchain)

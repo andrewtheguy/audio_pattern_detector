@@ -12,7 +12,7 @@ supported-markers = [
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.2.19"
+version = "0.2.20"
 source = { editable = "." }
 dependencies = [
     { name = "fft-correlation", version = "0.0.2", source = { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.2/fft_correlation-0.0.2-cp39-abi3-manylinux_2_34_aarch64.whl" }, marker = "platform_machine == 'aarch64'" },
