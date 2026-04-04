@@ -57,14 +57,8 @@ audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav
 audio-pattern-detector match --audio-file audio.wav --pattern-folder ./patterns/
 
 # Streaming from stdin (outputs JSONL)
-ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
+ffmpeg -i input.mp3 -f wav -ac 1 -ar 8000 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
-```
-
-### Convert - Convert audio to clip format
-
-```shell
-audio-pattern-detector convert --audio-file input.wav --dest-file output.wav
 ```
 
 ### Show-config - Show computed configuration
