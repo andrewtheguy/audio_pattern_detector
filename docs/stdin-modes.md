@@ -2,57 +2,33 @@
 
 This document covers all stdin-based input modes for streaming audio processing.
 
-**None of these modes require ffmpeg** - audio is processed using Python's `wave` module and scipy.
+**None of these modes require ffmpeg** - audio is processed using manual WAV header parsing with proper format detection.
 
 ## Stdin Mode (WAV)
 
-Use `--stdin` to read WAV format audio from stdin. This mode always outputs JSONL for real-time streaming detection. The sample rate is automatically read from the WAV header.
+Use `--stdin` to read WAV format audio from stdin. This mode always outputs JSONL for real-time streaming detection. The WAV must be mono at the target sample rate (default: 8000 Hz).
+
+Accepted WAV formats: 16-bit PCM, 32-bit PCM, or 32-bit IEEE float. When the input is already float32, no extra conversion is performed.
 
 ```shell
-# WAV stdin - sample rate read from header, resampled to 8kHz (default target) if different
-ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
+# WAV stdin at 8kHz mono (default target)
+ffmpeg -i input.mp3 -f wav -acodec pcm_s16le -ac 1 -ar 8000 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
 
-# WAV stdin - sample rate read from header, resampled to 16kHz target if different
-ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
+# WAV stdin at 16kHz mono with custom target
+ffmpeg -i input.mp3 -f wav -acodec pcm_s16le -ac 1 -ar 16000 pipe: | \
   audio-pattern-detector match --stdin --target-sample-rate 16000 --pattern-file pattern.wav
 
-# WAV stdin at 8kHz - no resampling needed (source matches default target)
-ffmpeg -i input.mp3 -f wav -ac 1 -ar 8000 pipe: | \
+# WAV stdin with float32 encoding (passed through without conversion)
+ffmpeg -i input.mp3 -f wav -acodec pcm_f32le -ac 1 -ar 8000 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
 ```
 
-**Note**: When using `--stdin` (WAV mode):
-- Input must be WAV format (sample rate, channels, and bit depth are read from header)
-- Stereo audio is automatically mixed to mono
+**Note**: When using `--stdin`:
+- Input must be WAV format (mono, at the target sample rate)
+- Supported encodings: 16-bit PCM, 32-bit PCM, 32-bit IEEE float
+- Float32 input is passed through without extra conversion
 - Output is always JSONL format for real-time streaming
-- **Resampling**: If the WAV header sample rate differs from `--target-sample-rate` (default: 8000), audio is resampled using scipy
-
-## Stdin Mode (Raw PCM)
-
-Use `--stdin --raw-pcm` to read raw float32 little-endian PCM data from stdin. This is useful when integrating with pipelines that produce headerless PCM data.
-
-```shell
-# Raw PCM at 8kHz - no resampling needed (source matches default target)
-ffmpeg -i input.mp3 -f f32le -ac 1 -ar 8000 pipe: | \
-  audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 8000 --pattern-file pattern.wav
-
-# Raw PCM at 16kHz input, target 16kHz - no resampling needed (source matches target)
-ffmpeg -i input.mp3 -f f32le -ac 1 -ar 16000 pipe: | \
-  audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 16000 --target-sample-rate 16000 --pattern-file pattern.wav
-
-# Raw PCM at 16kHz input, target 8kHz (default) - resampled from 16kHz to 8kHz
-some-16khz-source | \
-  audio-pattern-detector match --stdin --raw-pcm --source-sample-rate 16000 --pattern-file pattern.wav
-```
-
-**Note**: When using `--stdin --raw-pcm`:
-- Input must be raw float32 little-endian PCM (f32le)
-- `--source-sample-rate` is required to specify the input sample rate
-- Output is always JSONL format for real-time streaming
-- **Resampling**: If `--source-sample-rate` differs from `--target-sample-rate` (default: 8000), audio is resampled using scipy
-- Pattern files are loaded at the target sample rate (default: 8000)
-- WAV header detection: If WAV data is accidentally sent to raw PCM mode, an error is raised with a helpful message
 
 ## Multiplexed Stdin Mode (for IPC)
 
@@ -75,17 +51,13 @@ FOR EACH PATTERN:
   [data_length bytes] WAV file data
 
 AUDIO STREAM:
-  [remaining bytes until EOF] audio data (WAV format, or raw PCM with --raw-pcm)
+  [remaining bytes until EOF] audio data (WAV format)
 ```
 
 ### Usage
 
 ```shell
-# WAV audio stream (default)
 audio-pattern-detector match --multiplexed-stdin < payload.bin
-
-# Raw PCM audio stream
-audio-pattern-detector match --multiplexed-stdin --raw-pcm --source-sample-rate 16000 < payload.bin
 ```
 
 ### Node.js Example
@@ -241,7 +213,7 @@ func main() {
 **Note**: When using `--multiplexed-stdin`:
 - Patterns are sent as WAV data in the binary protocol (not file paths)
 - Does not require `--pattern-file` or `--pattern-folder`
-- Audio stream can be WAV (default) or raw PCM (with `--raw-pcm --source-sample-rate`)
+- Audio stream must be WAV format (mono, at target sample rate)
 - Output is always JSONL format with `{"type": "start", "source": "multiplexed-stdin"}` as the first event
 
 ## JSONL Output Format

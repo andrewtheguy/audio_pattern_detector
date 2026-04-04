@@ -81,8 +81,6 @@ audio-pattern-detector show-config --pattern-folder ./clips
 | `--audio-folder`       | Folder of audio files to process                                         |
 | `--stdin`              | Read WAV audio from stdin (outputs JSONL)                                |
 | `--multiplexed-stdin`  | Read patterns and audio from stdin via binary protocol (for IPC)         |
-| `--raw-pcm`            | Stdin is raw float32 PCM instead of WAV                                  |
-| `--source-sample-rate` | Source sample rate for raw PCM (required with `--raw-pcm`)               |
 | `--target-sample-rate` | Target sample rate for processing (default: 8000)                        |
 | `--pattern-file`       | Single pattern file (WAV)                                                |
 | `--pattern-folder`     | Folder of pattern clips (WAV)                                            |
