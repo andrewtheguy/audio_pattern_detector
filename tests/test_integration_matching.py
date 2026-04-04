@@ -264,7 +264,7 @@ def test_normal_pattern_detection_algorithm_specifics():
 def test_correlation_peak_finding():
     """Test that correlation peaks are correctly identified
 
-    The algorithm uses scipy.signal.find_peaks with:
+    The algorithm uses find_peaks with:
     - height_min = 0.25
     - distance = clip_length (no repetition within clip duration)
 
@@ -1279,8 +1279,8 @@ class TestWavFileStreamWrapper:
 class TestWavFileMatchingWithoutFfmpeg:
     """Tests for WAV file pattern matching without ffmpeg."""
 
-    def test_wav_match_uses_scipy_directly(self):
-        """Test that WAV file matching uses scipy, not ffmpeg."""
+    def test_wav_match_without_ffmpeg(self):
+        """Test that WAV file matching works without ffmpeg."""
         pattern_file = "sample_audios/clips/rthk_beep.wav"
         audio_file = "sample_audios/rthk_section_with_beep.wav"
 
@@ -1306,7 +1306,7 @@ class TestWavFileMatchingWithoutFfmpeg:
         assert Path(pattern_file).exists()
         assert Path(audio_file).exists()
 
-        # Run match_pattern (uses scipy for WAV)
+        # Run match_pattern
         peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
 
         assert 'cbs_news' in peak_times

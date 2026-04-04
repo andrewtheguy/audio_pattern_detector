@@ -95,10 +95,6 @@ def load_wav_file(file_path: str) -> tuple[NDArray[np.float32], int]:
     return _normalize_wav_data(data, sample_rate, f"file {file_path}")
 
 
-# Keep old name as alias for backwards compatibility.
-load_wav_file_scipy = load_wav_file
-
-
 def load_wav_from_bytes(wav_bytes: bytes, name: str = "bytes") -> tuple[NDArray[np.float32], int]:
     """Load WAV data from bytes using the stdlib wave module.
 
@@ -203,7 +199,7 @@ def load_wave_file(file_path: str, expected_sample_rate: int) -> NDArray[np.floa
         numpy array of float32 audio samples at expected_sample_rate.
     """
     if file_path.lower().endswith('.wav'):
-        data, sample_rate = load_wav_file_scipy(file_path)
+        data, sample_rate = load_wav_file(file_path)
 
         # Resample if needed
         if sample_rate != expected_sample_rate:
