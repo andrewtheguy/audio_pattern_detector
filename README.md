@@ -8,17 +8,12 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 
 ## Installation
 
-### Install from GitHub release (recommended)
+### Install from GitHub Pages package index (recommended)
+
+Automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
 
 ```shell
-uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ audio-pattern-detector
-```
-
-This uses a GitHub Pages package index and automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
-
-To install a specific version:
-```shell
-uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ audio-pattern-detector==0.0.1
+uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ 'audio-pattern-detector==0.2.22'
 ```
 
 ### Install from source (requires Rust toolchain)
