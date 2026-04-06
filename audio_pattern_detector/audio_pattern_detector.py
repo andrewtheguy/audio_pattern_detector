@@ -14,7 +14,6 @@ from numpy.typing import NDArray
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
-    lttb_downsample,
     resample_preserve_maxima,
     seconds_to_time,
     slicing_with_zero_padding,
@@ -653,11 +652,11 @@ class AudioPatternDetector:
         # 3-window Pearson r: try different regions and pick best match
         # Window A: first half (0-50%), B: middle (40-60%), C: second half (50-100%)
         # Downsample count scales with window width so resolution is consistent
-        ds_base = 101  # for 20% window (2 partitions)
+        ds_base = 501  # for 20% window (2 partitions)
         pearson_windows: list[tuple[int, int, int]] = [
-            (0, 5, round(ds_base * 5 / 2)),   # 50% → 252 samples
-            (4, 6, ds_base),                    # 20% → 101 samples
-            (5, 10, round(ds_base * 5 / 2)),   # 50% → 252 samples
+            (0, 5, round(ds_base * 5 / 2)),   # 50% → 1252 samples
+            (4, 6, ds_base),                    # 20% → 501 samples
+            (5, 10, round(ds_base * 5 / 2)),   # 50% → 1252 samples
         ]
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
@@ -666,12 +665,7 @@ class AudioPatternDetector:
             for wl, wr, ds_n in pearson_windows:
                 lo = round(len(correlation_clip) * wl / partition_count)
                 hi = round(len(correlation_clip) * wr / partition_count)
-                segment = correlation_clip[lo:hi]
-                # Smooth with moving average then uniformly downsample
-                window = max(1, len(segment) // ds_n)
-                kernel = np.ones(window, dtype=np.float32) / window
-                smoothed = np.convolve(segment, kernel, mode='same').astype(np.float32)
-                cached_clips.append(lttb_downsample(smoothed, ds_n))
+                cached_clips.append(resample_preserve_maxima(correlation_clip[lo:hi], ds_n))
             self._clip_cache["downsampled_pearson_windows"][clip_name] = cached_clips
 
         best_pearson_r = -1.0
@@ -681,11 +675,7 @@ class AudioPatternDetector:
         for wi, (wl, wr, ds_n) in enumerate(pearson_windows):
             lo = round(len(correlation_slice) * wl / partition_count)
             hi = round(len(correlation_slice) * wr / partition_count)
-            segment = correlation_slice[lo:hi]
-            window = max(1, len(segment) // ds_n)
-            kernel = np.ones(window, dtype=np.float32) / window
-            smoothed = np.convolve(segment, kernel, mode='same').astype(np.float32)
-            ds_s = lttb_downsample(smoothed, ds_n)
+            ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds_n)
             ds_slices.append(ds_s)
             r: float = pearson_correlation(cached_clips[wi], ds_s)
             pearson_per_window[f"pearson_w{wl}_{wr}"] = r
@@ -745,7 +735,7 @@ class AudioPatternDetector:
                                                   **pearson_per_window}))
 
         similarity_hard_limit = 0.03
-        pearson_r_threshold = 0.90
+        pearson_r_threshold = 0.85
 
         if similarity > similarity_hard_limit:
             if debug_mode:
