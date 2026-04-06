@@ -233,18 +233,6 @@ def resample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int)
     return native_resample_preserve_maxima(curve_f32, num_samples)
 
 
-def lttb_downsample(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
-    """Downsample a curve using LTTB (Largest Triangle Three Buckets).
-
-    Preserves the visual shape/contour of the curve, selecting the most
-    visually significant point in each bucket. Better than preserve_maxima
-    for long signals where the envelope shape matters more than individual peaks.
-    """
-    from native_helper import lttb as native_lttb
-
-    curve_f32 = np.ascontiguousarray(curve, dtype=np.float32)
-    return native_lttb(curve_f32, num_samples)
-
 
 @contextmanager
 def ffmpeg_get_float32_pcm(
