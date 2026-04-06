@@ -29,3 +29,8 @@ def loudness_normalize(
     current_lufs: float,
     target_lufs: float,
 ) -> npt.NDArray[np.float32]: ...
+
+def pearson_correlation(
+    x: npt.NDArray[np.floating[Any]],
+    y: npt.NDArray[np.floating[Any]],
+) -> float: ...

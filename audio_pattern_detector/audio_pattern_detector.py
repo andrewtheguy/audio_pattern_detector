@@ -589,7 +589,7 @@ class AudioPatternDetector:
                                                 similarities=similarities,
                                                 peaks_final=peaks_final,
                                                 _clip_cache=clip_cache,
-                                                area_props=area_props,
+                                                _area_props=area_props,
                                                 similarity_debug=similarity_debug)
 
             if debug_mode:
@@ -632,9 +632,11 @@ class AudioPatternDetector:
         similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
         peaks_final: list[int],
         _clip_cache: ClipCache,
-        area_props: list[list[Any]],
+        _area_props: list[list[Any]],
         similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> None:
+
+        from native_helper import pearson_correlation
 
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
@@ -655,31 +657,23 @@ class AudioPatternDetector:
 
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
         similarity_whole = np.mean(similarity_partitions)
-        #similarity_whole = 0
-        similarity_left = 0
-        similarity_right = 0
-        # similarity_left = np.mean(similarity_partitions[0:5])
-        # similarity_right = np.mean(similarity_partitions[5:10])
 
-        #similarity = similarity_middle
         similarity = min(similarity_whole,similarity_middle)
-
-        # similarity = min(similarity_left,similarity_middle,similarity_right)
-        # similarity = similarity_whole = (similarity_left + similarity_right)/2
 
         lower_limit = round(len(correlation_clip) * left_bound / partition_count)
         upper_limit = round(len(correlation_clip) * right_bound / partition_count)
-        area_prop = area_of_overlap_ratio(correlation_clip[lower_limit:upper_limit],
-                                                                              correlation_slice[
-                                                                              lower_limit:upper_limit])
 
-        # ratio of difference between overlapping area and non-overlapping area
-        # needed to check when mean_squared_error is high enough
-        diff_overlap_ratio = area_prop["diff_overlap_ratio"]
+        # Downsample the middle region before Pearson r to compare envelope
+        # shape rather than sample-by-sample noise
+        ds_target = 101
+        ds_clip = downsample_preserve_maxima(correlation_clip[lower_limit:upper_limit], ds_target)
+        ds_slice = downsample_preserve_maxima(correlation_slice[lower_limit:upper_limit], ds_target)
+
+        pearson_r: float = pearson_correlation(ds_clip, ds_slice)
 
         if debug_mode:
             import matplotlib.pyplot as plt
-            print("similarity", similarity,file=sys.stderr)
+            print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug[clip_name].append((index, similarity,))
 
@@ -691,7 +685,6 @@ class AudioPatternDetector:
                 graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
-                # Optional: plot the correlation graph to visualize
                 plt.figure(figsize=(10, 4))
                 plt.plot(correlation_slice_graph)
                 plt.plot(correlation_clip_graph, alpha=0.7)
@@ -702,34 +695,22 @@ class AudioPatternDetector:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
-            area_props.append([diff_overlap_ratio, area_prop])
-
-            similarities.append((similarity, {"whole": similarity_whole,
-                                              "left": similarity_left,
-                                              "middle": similarity_middle,
-                                              "right": similarity_right,
-                                              "left_right_diff": abs(similarity_left - similarity_right),
+            similarities.append((similarity, {"whole": float(similarity_whole),
+                                              "middle": float(similarity_middle),
+                                              "pearson_r": pearson_r,
                                               }))
 
         similarity_threshold = 0.01
-        similarity_threshold_check_area = 0.002
-
-        # reject if similarity is high enough and little area overlap
-        diff_overlap_ratio_threshold = 0.5
-
-        if similarity_threshold <= similarity_threshold_check_area:
-            raise ValueError(
-                f"similarity_threshold {similarity_threshold} needs to be larger than similarity_threshold_check_area {similarity_threshold_check_area}")
+        pearson_r_threshold = 0.85
 
         if similarity > similarity_threshold:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}",file=sys.stderr)
-        # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
-        elif similarity > similarity_threshold_check_area and diff_overlap_ratio > diff_overlap_ratio_threshold:
+        elif pearson_r < pearson_r_threshold:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to diff_overlap_ratio {diff_overlap_ratio} > {diff_overlap_ratio_threshold}",file=sys.stderr)
-        else:  # if similarity is less than similarity_threshold_check_area, no need to check area ratio
+                    f"failed verification for {section_ts} due to pearson_r {pearson_r} < {pearson_r_threshold}",file=sys.stderr)
+        else:
             peaks_final.append(peak)
 
     # # doesn't work well

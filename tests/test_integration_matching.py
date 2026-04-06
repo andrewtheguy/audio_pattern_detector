@@ -240,9 +240,9 @@ def test_normal_pattern_detection_algorithm_specifics():
 
     The normal pattern detection algorithm uses:
     - Partition-based MSE comparison (10 partitions, checks middle 2)
-    - Area overlap ratio
+    - Pearson correlation of middle region for shape verification
     - Similarity threshold (<0.01)
-    - Diff overlap ratio threshold (<0.5)
+    - Pearson r threshold (>=0.85)
 
     This test verifies the algorithm correctly identifies normal audio patterns.
     """

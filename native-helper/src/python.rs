@@ -1,6 +1,7 @@
 use crate::{
     find_peaks_1d as rust_find_peaks_1d, integrated_loudness as rust_integrated_loudness,
-    loudness_normalize as rust_loudness_normalize, resample_1d as rust_resample_1d,
+    loudness_normalize as rust_loudness_normalize,
+    pearson_correlation_1d as rust_pearson_correlation_1d, resample_1d as rust_resample_1d,
     simpson_1d as rust_simpson_1d, FindPeaksOptions,
 };
 use numpy::{IntoPyArray, PyArray1, PyArrayMethods};
@@ -121,6 +122,16 @@ fn loudness_normalize_py<'py>(
     Ok(result.into_pyarray(py))
 }
 
+#[pyfunction(name = "pearson_correlation")]
+fn pearson_correlation_py(x: Bound<'_, PyAny>, y: Bound<'_, PyAny>) -> PyResult<f64> {
+    let x_f32 = extract_f32_data(&x)?;
+    let y_f32 = extract_f32_data(&y)?;
+    if x_f32.len() != y_f32.len() {
+        return Err(PyTypeError::new_err("arrays must have the same length"));
+    }
+    Ok(rust_pearson_correlation_1d(&x_f32, &y_f32))
+}
+
 #[pymodule]
 #[pyo3(name = "native_helper")]
 fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -132,6 +143,7 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
             "simpson",
             "integrated_loudness",
             "loudness_normalize",
+            "pearson_correlation",
         ],
     )?;
     module.add_function(wrap_pyfunction!(find_peaks_py, module)?)?;
@@ -139,5 +151,6 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(simpson_py, module)?)?;
     module.add_function(wrap_pyfunction!(integrated_loudness_py, module)?)?;
     module.add_function(wrap_pyfunction!(loudness_normalize_py, module)?)?;
+    module.add_function(wrap_pyfunction!(pearson_correlation_py, module)?)?;
     Ok(())
 }
