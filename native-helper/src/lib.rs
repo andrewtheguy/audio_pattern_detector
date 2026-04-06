@@ -274,12 +274,13 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     new_spectrum.iter().map(|c| (c.re * scale) as f32).collect()
 }
 
-/// Downsample (or upsample) a 1-D signal by partitioning it into windows
+/// Resample a 1-D signal to `target_len` by partitioning it into windows
 /// and keeping the maximum sample from each window.
 ///
-/// Guarantees `output.len() == target_len`.  When `target_len > data.len()`
-/// (upsampling), windows that map to the same sample simply repeat it.
-pub fn downsample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32> {
+/// Works for both downsampling and upsampling.  Guarantees
+/// `output.len() == target_len`.  When upsampling, windows that map to the
+/// same source sample simply repeat it.
+pub fn resample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     if target_len == 0 || data.is_empty() {
         return Vec::new();
     }
@@ -888,41 +889,70 @@ mod tests {
     }
 
     #[test]
-    fn test_downsample_preserve_maxima_identity() {
+    fn test_resample_preserve_maxima_identity() {
         let data = [1.0_f32, 3.0, 2.0, 4.0];
-        let out = downsample_preserve_maxima_1d(&data, data.len());
+        let out = resample_preserve_maxima_1d(&data, data.len());
         assert_eq!(out, data);
     }
 
     #[test]
-    fn test_downsample_preserve_maxima_window_maxes() {
+    fn test_resample_preserve_maxima_window_maxes() {
         let data = [1.0_f32, 5.0, 2.0, 4.0, 3.0, 6.0];
-        let out = downsample_preserve_maxima_1d(&data, 3);
+        let out = resample_preserve_maxima_1d(&data, 3);
         assert_eq!(out, vec![5.0, 4.0, 6.0]);
     }
 
     #[test]
-    fn test_downsample_preserve_maxima_short_input() {
+    fn test_resample_preserve_maxima_short_input() {
         // Upsampling: 3 samples → 5 windows. Each window maps to the
         // nearest sample(s) and output length always equals target_len.
         let data = [1.0_f32, 2.0, 3.0];
-        let out = downsample_preserve_maxima_1d(&data, 5);
+        let out = resample_preserve_maxima_1d(&data, 5);
         assert_eq!(out.len(), 5);
     }
 
     #[test]
-    fn test_downsample_preserve_maxima_upsample_single() {
+    fn test_resample_preserve_maxima_upsample_single() {
         // Edge case: 1 sample → 4 windows should repeat the value.
         let data = [7.0_f32];
-        let out = downsample_preserve_maxima_1d(&data, 4);
+        let out = resample_preserve_maxima_1d(&data, 4);
         assert_eq!(out, vec![7.0, 7.0, 7.0, 7.0]);
     }
 
     #[test]
-    fn test_downsample_preserve_maxima_empty_and_zero_target() {
-        assert_eq!(downsample_preserve_maxima_1d(&[], 4), Vec::<f32>::new());
+    fn test_resample_preserve_maxima_upsample_two_to_six() {
+        // 2 samples → 6 windows: each source sample maps to 3 windows.
+        let data = [1.0_f32, 5.0];
+        let out = resample_preserve_maxima_1d(&data, 6);
+        assert_eq!(out.len(), 6);
+        // First 3 windows map to data[0], last 3 to data[1]
+        assert!(out.iter().all(|&v| v == 1.0 || v == 5.0));
+    }
+
+    #[test]
+    fn test_resample_preserve_maxima_upsample_preserves_all_values() {
+        // Every source value should appear at least once in the output.
+        let data = [3.0_f32, 1.0, 4.0, 1.0, 5.0];
+        let out = resample_preserve_maxima_1d(&data, 20);
+        assert_eq!(out.len(), 20);
+        for &v in &data {
+            assert!(out.contains(&v), "source value {v} missing from output");
+        }
+    }
+
+    #[test]
+    fn test_resample_preserve_maxima_same_length() {
+        // target_len == data.len() should be identity.
+        let data = [2.0_f32, 8.0, 3.0, 7.0, 1.0];
+        let out = resample_preserve_maxima_1d(&data, 5);
+        assert_eq!(out, data);
+    }
+
+    #[test]
+    fn test_resample_preserve_maxima_empty_and_zero_target() {
+        assert_eq!(resample_preserve_maxima_1d(&[], 4), Vec::<f32>::new());
         assert_eq!(
-            downsample_preserve_maxima_1d(&[1.0, 2.0], 0),
+            resample_preserve_maxima_1d(&[1.0, 2.0], 0),
             Vec::<f32>::new()
         );
     }

@@ -1,5 +1,5 @@
 use crate::{
-    downsample_preserve_maxima_1d as rust_downsample_preserve_maxima_1d,
+    resample_preserve_maxima_1d as rust_resample_preserve_maxima_1d,
     find_peaks_1d as rust_find_peaks_1d, integrated_loudness as rust_integrated_loudness,
     loudness_normalize as rust_loudness_normalize,
     pearson_correlation_1d as rust_pearson_correlation_1d, resample_1d as rust_resample_1d,
@@ -115,8 +115,8 @@ fn resample_py<'py>(
     })
 }
 
-#[pyfunction(name = "downsample_preserve_maxima")]
-fn downsample_preserve_maxima_py<'py>(
+#[pyfunction(name = "resample_preserve_maxima")]
+fn resample_preserve_maxima_py<'py>(
     py: Python<'py>,
     data: Bound<'py, PyAny>,
     num_samples: usize,
@@ -126,7 +126,7 @@ fn downsample_preserve_maxima_py<'py>(
     }
 
     with_f32_slice(&data, |data_f32| {
-        let result = rust_downsample_preserve_maxima_1d(data_f32, num_samples);
+        let result = rust_resample_preserve_maxima_1d(data_f32, num_samples);
         if result.len() != num_samples {
             return Err(PyValueError::new_err(format!(
                 "downsampled curve length {} not equal to num_samples {}",
@@ -188,7 +188,7 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
         vec![
             "find_peaks",
             "resample",
-            "downsample_preserve_maxima",
+            "resample_preserve_maxima",
             "simpson",
             "integrated_loudness",
             "loudness_normalize",
@@ -197,7 +197,7 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     module.add_function(wrap_pyfunction!(find_peaks_py, module)?)?;
     module.add_function(wrap_pyfunction!(resample_py, module)?)?;
-    module.add_function(wrap_pyfunction!(downsample_preserve_maxima_py, module)?)?;
+    module.add_function(wrap_pyfunction!(resample_preserve_maxima_py, module)?)?;
     module.add_function(wrap_pyfunction!(simpson_py, module)?)?;
     module.add_function(wrap_pyfunction!(integrated_loudness_py, module)?)?;
     module.add_function(wrap_pyfunction!(loudness_normalize_py, module)?)?;

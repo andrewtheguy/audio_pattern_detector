@@ -178,24 +178,37 @@ class PythonBindingsTest(unittest.TestCase):
         self.assertEqual(out.dtype, np.float32)
         self.assertEqual(len(out), 2)
 
-    # ── downsample_preserve_maxima ────────────────────────────────────
+    # ── resample_preserve_maxima ─────────────────────────────────────
 
-    def test_downsample_preserve_maxima_basic(self):
+    def test_resample_preserve_maxima_downsample(self):
         data = np.array([1, 5, 2, 4, 3, 6], dtype=np.float32)
-        out = self.native_helper.downsample_preserve_maxima(data, 3)
+        out = self.native_helper.resample_preserve_maxima(data, 3)
         self.assertEqual(out.dtype, np.float32)
         np.testing.assert_array_equal(out, np.array([5, 4, 6], dtype=np.float32))
 
-    def test_downsample_preserve_maxima_accepts_float64(self):
+    def test_resample_preserve_maxima_accepts_float64(self):
         data = np.array([1, 5, 2, 4], dtype=np.float64)
-        out = self.native_helper.downsample_preserve_maxima(data, 2)
+        out = self.native_helper.resample_preserve_maxima(data, 2)
         self.assertEqual(out.dtype, np.float32)
         np.testing.assert_array_equal(out, np.array([5, 4], dtype=np.float32))
 
-    def test_downsample_preserve_maxima_short_input_raises(self):
+    def test_resample_preserve_maxima_upsample(self):
         data = np.array([1, 2, 3], dtype=np.float32)
-        with self.assertRaises(ValueError):
-            self.native_helper.downsample_preserve_maxima(data, 5)
+        out = self.native_helper.resample_preserve_maxima(data, 5)
+        self.assertEqual(out.dtype, np.float32)
+        self.assertEqual(len(out), 5)
+
+    def test_resample_preserve_maxima_upsample_preserves_values(self):
+        data = np.array([3, 1, 4], dtype=np.float32)
+        out = self.native_helper.resample_preserve_maxima(data, 9)
+        self.assertEqual(len(out), 9)
+        for v in data:
+            self.assertIn(v, out)
+
+    def test_resample_preserve_maxima_identity(self):
+        data = np.array([2, 8, 3, 7, 1], dtype=np.float32)
+        out = self.native_helper.resample_preserve_maxima(data, 5)
+        np.testing.assert_array_equal(out, data)
 
     # ── simpson ───────────────────────────────────────────────────────
 

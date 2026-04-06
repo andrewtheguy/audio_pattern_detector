@@ -16,7 +16,7 @@ def resample(
     num_samples: int,
 ) -> npt.NDArray[np.float32]: ...
 
-def downsample_preserve_maxima(
+def resample_preserve_maxima(
     data: npt.NDArray[np.floating[Any]],
     num_samples: int,
 ) -> npt.NDArray[np.float32]: ...

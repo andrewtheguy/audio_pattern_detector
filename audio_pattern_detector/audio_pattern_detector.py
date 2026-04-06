@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
-    downsample_preserve_maxima,
+    resample_preserve_maxima,
     seconds_to_time,
     slicing_with_zero_padding,
     write_wav_file,
@@ -668,9 +668,9 @@ class AudioPatternDetector:
         ds_target = 101
         ds_clip = _clip_cache["downsampled_middle_correlation_clips"].get(clip_name)
         if ds_clip is None:
-            ds_clip = downsample_preserve_maxima(correlation_clip[lower_limit:upper_limit], ds_target)
+            ds_clip = resample_preserve_maxima(correlation_clip[lower_limit:upper_limit], ds_target)
             _clip_cache["downsampled_middle_correlation_clips"][clip_name] = ds_clip
-        ds_slice = downsample_preserve_maxima(correlation_slice[lower_limit:upper_limit], ds_target)
+        ds_slice = resample_preserve_maxima(correlation_slice[lower_limit:upper_limit], ds_target)
 
         pearson_r: float = pearson_correlation(ds_clip, ds_slice)
 
@@ -748,10 +748,10 @@ class AudioPatternDetector:
     #     downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
     #
     #     if downsampled_correlation_clip is None:
-    #         downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
+    #         downsampled_correlation_clip = resample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
     #         clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
     #
-    #     downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
+    #     downsampled_correlation_slice = resample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
     #
     #     correlation_clip = downsampled_correlation_clip
     #     correlation_slice = downsampled_correlation_slice
@@ -824,10 +824,10 @@ class AudioPatternDetector:
         downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
 
         if downsampled_correlation_clip is None:
-            downsampled_correlation_clip = downsample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
+            downsampled_correlation_clip = resample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
             clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
 
-        downsampled_correlation_slice = downsample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
+        downsampled_correlation_slice = resample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
 
         ds_corr_clip = downsampled_correlation_clip
         ds_corr_slice = downsampled_correlation_slice

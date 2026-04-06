@@ -225,12 +225,12 @@ def _load_wave_file_ffmpeg_convert(file_path: str, target_sample_rate: int) -> N
     return samples
 
 
-def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
-    """Downsample a curve while preserving local maxima."""
-    from native_helper import downsample_preserve_maxima as native_downsample_preserve_maxima
+def resample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
+    """Resample a curve to num_samples while preserving local maxima."""
+    from native_helper import resample_preserve_maxima as native_resample_preserve_maxima
 
     curve_f32 = np.ascontiguousarray(curve, dtype=np.float32)
-    return native_downsample_preserve_maxima(curve_f32, num_samples)
+    return native_resample_preserve_maxima(curve_f32, num_samples)
 
 @contextmanager
 def ffmpeg_get_float32_pcm(
