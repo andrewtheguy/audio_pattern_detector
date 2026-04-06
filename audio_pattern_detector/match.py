@@ -112,6 +112,7 @@ def match_pattern(
     seconds_per_chunk: int | None = 60,
     from_stdin: bool = False,
     target_sample_rate: int | None = None,
+    debug_dir: str = './tmp',
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Find pattern matches in audio file or stdin
 
@@ -161,6 +162,7 @@ def match_pattern(
             accumulate_results=accumulate_results,
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=sr,
+            debug_dir=debug_dir,
         )
 
     # File mode - audio_source is guaranteed to be str here since from_stdin=False
@@ -178,6 +180,7 @@ def match_pattern(
                     audio_clips=pattern_clips,
                     seconds_per_chunk=seconds_per_chunk,
                     target_sample_rate=sr,
+                    debug_dir=debug_dir,
                 )
                 .find_clip_in_audio(
                     full_streaming_audio,
@@ -202,6 +205,7 @@ def match_pattern(
                 audio_clips=pattern_clips,
                 seconds_per_chunk=seconds_per_chunk,
                 target_sample_rate=sr,
+                debug_dir=debug_dir,
             )
             .find_clip_in_audio(
                 full_streaming_audio,
@@ -438,6 +442,7 @@ def _match_pattern_wav_stdin(
     accumulate_results: bool,
     seconds_per_chunk: int | None,
     target_sample_rate: int,
+    debug_dir: str = './tmp',
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Internal function to handle WAV stdin mode."""
     # Create stream wrapper that reads WAV header and handles resampling
@@ -459,6 +464,7 @@ def _match_pattern_wav_stdin(
             audio_clips=pattern_clips,
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
+            debug_dir=debug_dir,
         )
         .find_clip_in_audio(
             full_streaming_audio,
@@ -476,6 +482,7 @@ def _match_pattern_multiplexed_stdin(
     accumulate_results: bool,
     seconds_per_chunk: int | None,
     target_sample_rate: int,
+    debug_dir: str = './tmp',
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Internal function to handle multiplexed stdin mode.
 
@@ -502,6 +509,7 @@ def _match_pattern_multiplexed_stdin(
             audio_clips=pattern_clips,
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
+            debug_dir=debug_dir,
         )
         .find_clip_in_audio(
             full_streaming_audio,
@@ -533,6 +541,7 @@ def _run_match_with_output(
     from_stdin: bool = False,
     seconds_per_chunk: int | None = 60,
     target_sample_rate: int | None = None,
+    debug_dir: str = './tmp',
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Run match_pattern and handle output (JSON or JSONL).
 
@@ -559,12 +568,13 @@ def _run_match_with_output(
         seconds_per_chunk=seconds_per_chunk,
         from_stdin=from_stdin,
         target_sample_rate=target_sample_rate,
+        debug_dir=debug_dir,
     )
     print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
 
     # In debug mode, also write to file (only if we accumulated results)
     if args.debug and peak_times is not None:
-        os.makedirs('./tmp', exist_ok=True)
+        os.makedirs(debug_dir, exist_ok=True)
         with open(debug_output_file, 'w') as f:
             print(json.dumps(peak_times, ensure_ascii=False), file=f)
         print(f"Debug output written to {debug_output_file}", file=sys.stderr)
@@ -596,6 +606,8 @@ def cmd_match(args: argparse.Namespace) -> None:
     target_sample_rate = getattr(args, 'target_sample_rate', None)
     sr = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
 
+    debug_dir: str = getattr(args, 'debug_dir', './tmp')
+
     # Handle multiplexed stdin mode (patterns + audio all from stdin)
     multiplexed_stdin = getattr(args, 'multiplexed_stdin', False)
     if multiplexed_stdin:
@@ -609,6 +621,7 @@ def cmd_match(args: argparse.Namespace) -> None:
             accumulate_results=False,
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=sr,
+            debug_dir=debug_dir,
         )
 
         print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
@@ -642,15 +655,15 @@ def cmd_match(args: argparse.Namespace) -> None:
         all_results = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
             print(f"Processing {audio_file}...", file=sys.stderr)
-            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate)
+            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate, debug_dir=debug_dir)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
             _print_peak_times_to_stderr(peak_times)
             all_results[audio_file] = peak_times
 
         # In debug mode, also write to file
         if args.debug:
-            output_file = f'./tmp/{os.path.basename(args.audio_folder)}.json'
-            os.makedirs('./tmp', exist_ok=True)
+            output_file = f'{debug_dir}/{os.path.basename(args.audio_folder)}.json'
+            os.makedirs(debug_dir, exist_ok=True)
             with open(output_file, 'w') as f:
                 print(json.dumps(all_results, ensure_ascii=False), file=f)
             print(f"Debug output written to {output_file}", file=sys.stderr)
@@ -660,17 +673,19 @@ def cmd_match(args: argparse.Namespace) -> None:
     elif args.audio_file:
         _run_match_with_output(
             args, pattern_files, args.audio_file,
-            debug_output_file=f'./tmp/{Path(args.audio_file).stem}.json',
+            debug_output_file=f'{debug_dir}/{Path(args.audio_file).stem}.json',
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
+            debug_dir=debug_dir,
         )
     elif args.stdin:
         _run_match_with_output(
             args, pattern_files, None,
-            debug_output_file='./tmp/stdin_stream.json',
+            debug_output_file=f'{debug_dir}/stdin_stream.json',
             from_stdin=True,
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
+            debug_dir=debug_dir,
         )
     else:
         print("Please provide --audio-file, --audio-folder, --stdin, or --multiplexed-stdin", file=sys.stderr)
