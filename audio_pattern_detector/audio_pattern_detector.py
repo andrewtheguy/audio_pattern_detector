@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
+    lttb_downsample,
     resample_preserve_maxima,
     seconds_to_time,
     slicing_with_zero_padding,
@@ -75,7 +76,7 @@ def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rat
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: list[AudioClip], debug_mode: bool = False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate: int | None = None, debug_dir: str = './tmp') -> None:
+    def __init__(self, audio_clips: list[AudioClip], debug_mode: bool = False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate: int | None = None, debug_dir: str = './tmp', height_min: float | None = None) -> None:
         """Initialize the audio pattern detector.
 
         Args:
@@ -84,10 +85,12 @@ class AudioPatternDetector:
             seconds_per_chunk: Seconds per chunk for sliding window processing.
             target_sample_rate: Target sample rate for all audio. If None, uses DEFAULT_TARGET_SAMPLE_RATE (8000).
             debug_dir: Base directory for debug output files.
+            height_min: Override minimum correlation peak height (default: 0.25).
         """
         self.audio_clips = audio_clips
         self.debug_mode = debug_mode
         self.debug_dir = debug_dir
+        self.height_min = height_min
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
@@ -521,7 +524,7 @@ class AudioPatternDetector:
         # minimum height of the peak of the correlation, don't set it too high otherwise will miss some
         # the selected ones are going to be checked for similarity
         # before adding to final peaks
-        height_min = 0.25
+        height_min = self.height_min if self.height_min is not None else 0.25
         from native_helper import find_peaks
         peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
@@ -663,7 +666,12 @@ class AudioPatternDetector:
             for wl, wr, ds_n in pearson_windows:
                 lo = round(len(correlation_clip) * wl / partition_count)
                 hi = round(len(correlation_clip) * wr / partition_count)
-                cached_clips.append(resample_preserve_maxima(correlation_clip[lo:hi], ds_n))
+                segment = correlation_clip[lo:hi]
+                # Smooth with moving average then uniformly downsample
+                window = max(1, len(segment) // ds_n)
+                kernel = np.ones(window, dtype=np.float32) / window
+                smoothed = np.convolve(segment, kernel, mode='same').astype(np.float32)
+                cached_clips.append(lttb_downsample(smoothed, ds_n))
             self._clip_cache["downsampled_pearson_windows"][clip_name] = cached_clips
 
         best_pearson_r = -1.0
@@ -673,7 +681,11 @@ class AudioPatternDetector:
         for wi, (wl, wr, ds_n) in enumerate(pearson_windows):
             lo = round(len(correlation_slice) * wl / partition_count)
             hi = round(len(correlation_slice) * wr / partition_count)
-            ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds_n)
+            segment = correlation_slice[lo:hi]
+            window = max(1, len(segment) // ds_n)
+            kernel = np.ones(window, dtype=np.float32) / window
+            smoothed = np.convolve(segment, kernel, mode='same').astype(np.float32)
+            ds_s = lttb_downsample(smoothed, ds_n)
             ds_slices.append(ds_s)
             r: float = pearson_correlation(cached_clips[wi], ds_s)
             pearson_per_window[f"pearson_w{wl}_{wr}"] = r

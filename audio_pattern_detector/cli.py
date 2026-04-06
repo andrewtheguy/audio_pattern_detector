@@ -44,6 +44,8 @@ def main():
     match_parser.add_argument('--debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)
     match_parser.add_argument('--debug-dir', metavar='dir', type=str, default='./tmp',
                               help='base directory for debug output (default: ./tmp)')
+    match_parser.add_argument('--height-min', metavar='height', type=float, default=None,
+                              help='override minimum correlation peak height (default: 0.25, lower to find weak matches)')
     match_parser.set_defaults(func=_lazy_cmd_match)
 
     # Add show-config subcommand

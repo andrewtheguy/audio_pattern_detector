@@ -317,6 +317,84 @@ pub fn resample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32> 
     downsampled
 }
 
+// ── LTTB (Largest Triangle Three Buckets) ───────────────────────────
+
+/// Downsample a 1-D signal using the LTTB algorithm, which preserves the
+/// visual shape of the data by selecting the most visually significant
+/// point in each bucket (the one that forms the largest triangle with the
+/// previously selected point and the average of the next bucket).
+///
+/// Returns exactly `target_len` points.  If `target_len >= data.len()`,
+/// returns a copy of `data`.  If `target_len < 3` or `data.len() < 3`,
+/// falls back to first/last selection.
+pub fn lttb_1d(data: &[f32], target_len: usize) -> Vec<f32> {
+    let n = data.len();
+    if target_len == 0 || n == 0 {
+        return Vec::new();
+    }
+    if target_len >= n {
+        return data.to_vec();
+    }
+    if n <= 2 || target_len <= 2 {
+        if target_len == 1 {
+            return vec![data[0]];
+        }
+        return vec![data[0], data[n - 1]];
+    }
+
+    let mut result = Vec::with_capacity(target_len);
+    // Always keep the first point
+    result.push(data[0]);
+
+    let bucket_size = (n - 2) as f64 / (target_len - 2) as f64;
+    let mut prev_selected: usize = 0;
+
+    for i in 1..(target_len - 1) {
+        // Current bucket range
+        let bucket_start = ((i - 1) as f64 * bucket_size) as usize + 1;
+        let bucket_end = (i as f64 * bucket_size) as usize + 1;
+        let bucket_end = bucket_end.min(n - 1);
+
+        // Average of next bucket (used as the third triangle vertex)
+        let next_start = bucket_end;
+        let next_end = (((i + 1) as f64 * bucket_size) as usize + 1).min(n);
+        let next_count = (next_end - next_start).max(1);
+        let avg_y: f64 = data[next_start..next_end.min(n)]
+            .iter()
+            .map(|&v| v as f64)
+            .sum::<f64>()
+            / next_count as f64;
+        let avg_x: f64 = (next_start + next_end.min(n)) as f64 / 2.0;
+
+        // Find point in current bucket forming largest triangle
+        let prev_x = prev_selected as f64;
+        let prev_y = data[prev_selected] as f64;
+        let mut max_area: f64 = -1.0;
+        let mut selected = bucket_start;
+
+        for j in bucket_start..=bucket_end.min(n - 1) {
+            // Triangle area = 0.5 * |x1(y2-y3) + x2(y3-y1) + x3(y1-y2)|
+            let jy = data[j] as f64;
+            let area = ((prev_x * (jy - avg_y)
+                + j as f64 * (avg_y - prev_y)
+                + avg_x * (prev_y - jy))
+                .abs())
+                / 2.0;
+            if area > max_area {
+                max_area = area;
+                selected = j;
+            }
+        }
+
+        result.push(data[selected]);
+        prev_selected = selected;
+    }
+
+    // Always keep the last point
+    result.push(data[n - 1]);
+    result
+}
+
 // ── Simpson's rule ───────────────────────────────────────────────────
 
 /// Composite Simpson's rule for uniformly spaced data with unit spacing (dx=1).
@@ -962,6 +1040,62 @@ mod tests {
             resample_preserve_maxima_1d(&[1.0, 2.0], 0),
             Vec::<f32>::new()
         );
+    }
+
+    // ── lttb_1d ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_lttb_identity() {
+        let data = [1.0_f32, 3.0, 2.0, 4.0];
+        let out = lttb_1d(&data, 4);
+        assert_eq!(out, data);
+    }
+
+    #[test]
+    fn test_lttb_larger_target() {
+        let data = [1.0_f32, 2.0, 3.0];
+        let out = lttb_1d(&data, 10);
+        assert_eq!(out, data);
+    }
+
+    #[test]
+    fn test_lttb_keeps_first_and_last() {
+        let data = [5.0_f32, 1.0, 2.0, 3.0, 1.0, 8.0];
+        let out = lttb_1d(&data, 3);
+        assert_eq!(out.len(), 3);
+        assert_eq!(out[0], 5.0);
+        assert_eq!(out[out.len() - 1], 8.0);
+    }
+
+    #[test]
+    fn test_lttb_preserves_peak() {
+        // A triangle wave — the peak at index 5 should be preserved
+        let data = [0.0_f32, 1.0, 2.0, 3.0, 4.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0];
+        let out = lttb_1d(&data, 5);
+        assert_eq!(out.len(), 5);
+        assert_eq!(out[0], 0.0);
+        assert_eq!(out[out.len() - 1], 0.0);
+        assert!(out.contains(&5.0), "peak value 5.0 should be preserved");
+    }
+
+    #[test]
+    fn test_lttb_output_length() {
+        let data: Vec<f32> = (0..1000).map(|i| (i as f32 / 100.0).sin()).collect();
+        let out = lttb_1d(&data, 50);
+        assert_eq!(out.len(), 50);
+    }
+
+    #[test]
+    fn test_lttb_empty() {
+        assert_eq!(lttb_1d(&[], 5), Vec::<f32>::new());
+        assert_eq!(lttb_1d(&[1.0], 0), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn test_lttb_two_points() {
+        let data = [3.0_f32, 7.0];
+        let out = lttb_1d(&data, 2);
+        assert_eq!(out, vec![3.0, 7.0]);
     }
 
     // ── simpson ──────────────────────────────────────────────────────
