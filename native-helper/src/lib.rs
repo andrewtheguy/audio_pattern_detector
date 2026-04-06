@@ -922,23 +922,29 @@ mod tests {
 
     #[test]
     fn test_resample_preserve_maxima_upsample_two_to_six() {
-        // 2 samples → 6 windows: each source sample maps to 3 windows.
+        // 2 samples → 6 windows (step_size = 0.333): each source sample
+        // maps to 3 windows.
         let data = [1.0_f32, 5.0];
         let out = resample_preserve_maxima_1d(&data, 6);
-        assert_eq!(out.len(), 6);
-        // First 3 windows map to data[0], last 3 to data[1]
-        assert!(out.iter().all(|&v| v == 1.0 || v == 5.0));
+        assert_eq!(out, vec![1.0, 1.0, 1.0, 5.0, 5.0, 5.0]);
     }
 
     #[test]
     fn test_resample_preserve_maxima_upsample_preserves_all_values() {
-        // Every source value should appear at least once in the output.
+        // 5 samples → 20 windows (step_size = 0.25): each source sample
+        // maps to exactly 4 windows.
         let data = [3.0_f32, 1.0, 4.0, 1.0, 5.0];
         let out = resample_preserve_maxima_1d(&data, 20);
-        assert_eq!(out.len(), 20);
-        for &v in &data {
-            assert!(out.contains(&v), "source value {v} missing from output");
-        }
+        assert_eq!(
+            out,
+            vec![
+                3.0, 3.0, 3.0, 3.0,
+                1.0, 1.0, 1.0, 1.0,
+                4.0, 4.0, 4.0, 4.0,
+                1.0, 1.0, 1.0, 1.0,
+                5.0, 5.0, 5.0, 5.0,
+            ]
+        );
     }
 
     #[test]
