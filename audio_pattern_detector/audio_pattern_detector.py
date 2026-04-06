@@ -750,17 +750,12 @@ class AudioPatternDetector:
                                                   **pearson_per_window}))
 
         similarity_hard_limit = 0.03
-        similarity_threshold = 0.01
         pearson_r_threshold = 0.90
 
         if similarity > similarity_hard_limit:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
         elif pearson_r >= pearson_r_threshold:
-            # Shape matches well — accept even if MSE is moderately above threshold
-            peaks_final.append(peak)
-        elif similarity <= similarity_threshold and pearson_r >= pearson_r_threshold:
-            # MSE is low and shape is reasonably close
             peaks_final.append(peak)
         else:
             if debug_mode:
