@@ -729,7 +729,7 @@ class AudioPatternDetector:
                 os.makedirs(ds_graph_dir, exist_ok=True)
 
                 for wi, (wl, wr, _ds_n) in enumerate(pearson_windows):
-                    r_wi: float = pearson_correlation(cached_clips[wi], ds_slices[wi])
+                    r_wi = pearson_per_window[f"pearson_w{wl}_{wr}"]
                     marker = " *best*" if wi == best_window_idx else ""
                     plt.figure(figsize=(10, 4))
                     plt.plot(ds_slices[wi])
