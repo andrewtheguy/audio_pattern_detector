@@ -455,6 +455,18 @@ def test_rainbow_intro_pattern_detection():
     assert total_time > 0, "Total processing time should be positive"
 
 
+def test_rainbow_intro_not_in_rthk_audio():
+    """Test that 天空下的彩虹intro pattern does not match RTHK beep audio"""
+    assert Path(RAINBOW_INTRO_PATTERN).exists()
+    assert Path(RTHK_BEEP_AUDIO).exists()
+
+    peak_times, _ = match_pattern(RTHK_BEEP_AUDIO, [RAINBOW_INTRO_PATTERN], debug_mode=False)
+
+    assert '天空下的彩虹intro' in peak_times
+    assert len(peak_times['天空下的彩虹intro']) == 0, \
+        f"天空下的彩虹intro should not match RTHK audio, but found {len(peak_times['天空下的彩虹intro'])} matches"
+
+
 def test_rainbow_intro_not_in_cbs_audio():
     """Test that 天空下的彩虹intro pattern does not match CBS audio"""
     assert Path(RAINBOW_INTRO_PATTERN).exists(), f"Pattern file {RAINBOW_INTRO_PATTERN} not found"
