@@ -41,6 +41,7 @@ class ClipData(TypedDict):
 class ClipCache(TypedDict):
     """Cache for clip-related computed data."""
     downsampled_correlation_clips: dict[str, NDArray[np.float32]]
+    downsampled_middle_correlation_clips: dict[str, NDArray[np.float32]]
     is_pure_tone_pattern: dict[str, bool]
 
 
@@ -133,6 +134,7 @@ class AudioPatternDetector:
         self._clip_datas: dict[str, ClipData] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
+            "downsampled_middle_correlation_clips": {},
             "is_pure_tone_pattern": {},
         }
 
@@ -663,10 +665,11 @@ class AudioPatternDetector:
         lower_limit = round(len(correlation_clip) * left_bound / partition_count)
         upper_limit = round(len(correlation_clip) * right_bound / partition_count)
 
-        # Downsample the middle region before Pearson r to compare envelope
-        # shape rather than sample-by-sample noise
         ds_target = 101
-        ds_clip = downsample_preserve_maxima(correlation_clip[lower_limit:upper_limit], ds_target)
+        ds_clip = _clip_cache["downsampled_middle_correlation_clips"].get(clip_name)
+        if ds_clip is None:
+            ds_clip = downsample_preserve_maxima(correlation_clip[lower_limit:upper_limit], ds_target)
+            _clip_cache["downsampled_middle_correlation_clips"][clip_name] = ds_clip
         ds_slice = downsample_preserve_maxima(correlation_slice[lower_limit:upper_limit], ds_target)
 
         pearson_r: float = pearson_correlation(ds_clip, ds_slice)

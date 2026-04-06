@@ -178,6 +178,25 @@ class PythonBindingsTest(unittest.TestCase):
         self.assertEqual(out.dtype, np.float32)
         self.assertEqual(len(out), 2)
 
+    # ── downsample_preserve_maxima ────────────────────────────────────
+
+    def test_downsample_preserve_maxima_basic(self):
+        data = np.array([1, 5, 2, 4, 3, 6], dtype=np.float32)
+        out = self.native_helper.downsample_preserve_maxima(data, 3)
+        self.assertEqual(out.dtype, np.float32)
+        np.testing.assert_array_equal(out, np.array([5, 4, 6], dtype=np.float32))
+
+    def test_downsample_preserve_maxima_accepts_float64(self):
+        data = np.array([1, 5, 2, 4], dtype=np.float64)
+        out = self.native_helper.downsample_preserve_maxima(data, 2)
+        self.assertEqual(out.dtype, np.float32)
+        np.testing.assert_array_equal(out, np.array([5, 4], dtype=np.float32))
+
+    def test_downsample_preserve_maxima_short_input_raises(self):
+        data = np.array([1, 2, 3], dtype=np.float32)
+        with self.assertRaises(ValueError):
+            self.native_helper.downsample_preserve_maxima(data, 5)
+
     # ── simpson ───────────────────────────────────────────────────────
 
     def test_simpson_constant(self):

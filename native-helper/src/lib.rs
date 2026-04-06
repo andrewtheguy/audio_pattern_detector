@@ -274,6 +274,44 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     new_spectrum.iter().map(|c| (c.re * scale) as f32).collect()
 }
 
+/// Downsample a 1-D signal by partitioning it into windows and keeping
+/// the maximum sample from each non-empty window.
+pub fn downsample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32> {
+    if target_len == 0 {
+        return Vec::new();
+    }
+
+    let n_points = data.len();
+    let step_size = n_points as f64 / target_len as f64;
+    let mut downsampled = Vec::with_capacity(target_len);
+
+    for i in 0..target_len {
+        let start_index = (i as f64 * step_size) as usize;
+        let end_index = ((i + 1) as f64 * step_size) as usize;
+
+        if start_index >= n_points {
+            break;
+        }
+
+        if start_index == end_index {
+            continue;
+        }
+
+        let max_value = data[start_index..end_index]
+            .iter()
+            .copied()
+            .reduce(f32::max)
+            .expect("non-empty window must have a maximum");
+        downsampled.push(max_value);
+    }
+
+    if downsampled.len() < target_len && !data.is_empty() {
+        downsampled.push(*data.last().expect("non-empty slice has a last value"));
+    }
+
+    downsampled
+}
+
 // ── Simpson's rule ───────────────────────────────────────────────────
 
 /// Composite Simpson's rule for uniformly spaced data with unit spacing (dx=1).
@@ -845,6 +883,36 @@ mod tests {
         assert_eq!(out.len(), 6);
     }
 
+    #[test]
+    fn test_downsample_preserve_maxima_identity() {
+        let data = [1.0_f32, 3.0, 2.0, 4.0];
+        let out = downsample_preserve_maxima_1d(&data, data.len());
+        assert_eq!(out, data);
+    }
+
+    #[test]
+    fn test_downsample_preserve_maxima_window_maxes() {
+        let data = [1.0_f32, 5.0, 2.0, 4.0, 3.0, 6.0];
+        let out = downsample_preserve_maxima_1d(&data, 3);
+        assert_eq!(out, vec![5.0, 4.0, 6.0]);
+    }
+
+    #[test]
+    fn test_downsample_preserve_maxima_short_input() {
+        let data = [1.0_f32, 2.0, 3.0];
+        let out = downsample_preserve_maxima_1d(&data, 5);
+        assert_eq!(out, vec![1.0, 2.0, 3.0, 3.0]);
+    }
+
+    #[test]
+    fn test_downsample_preserve_maxima_empty_and_zero_target() {
+        assert_eq!(downsample_preserve_maxima_1d(&[], 4), Vec::<f32>::new());
+        assert_eq!(
+            downsample_preserve_maxima_1d(&[1.0, 2.0], 0),
+            Vec::<f32>::new()
+        );
+    }
+
     // ── simpson ──────────────────────────────────────────────────────
 
     #[test]
@@ -988,7 +1056,10 @@ mod tests {
     fn test_pearson_identical() {
         let a = [1.0_f32, 2.0, 3.0, 4.0, 5.0];
         let r = pearson_correlation_1d(&a, &a);
-        assert!((r - 1.0).abs() < 1e-12, "identical arrays should give r=1.0, got {r}");
+        assert!(
+            (r - 1.0).abs() < 1e-12,
+            "identical arrays should give r=1.0, got {r}"
+        );
     }
 
     #[test]
@@ -996,7 +1067,10 @@ mod tests {
         let a = [1.0_f32, 2.0, 3.0, 4.0, 5.0];
         let b: Vec<f32> = a.iter().map(|&v| -v).collect();
         let r = pearson_correlation_1d(&a, &b);
-        assert!((r - (-1.0)).abs() < 1e-12, "negated arrays should give r=-1.0, got {r}");
+        assert!(
+            (r - (-1.0)).abs() < 1e-12,
+            "negated arrays should give r=-1.0, got {r}"
+        );
     }
 
     #[test]
@@ -1004,7 +1078,10 @@ mod tests {
         let a = [3.0_f32; 5];
         let b = [1.0_f32, 2.0, 3.0, 4.0, 5.0];
         let r = pearson_correlation_1d(&a, &b);
-        assert!((r).abs() < 1e-12, "constant array should give r=0.0, got {r}");
+        assert!(
+            (r).abs() < 1e-12,
+            "constant array should give r=0.0, got {r}"
+        );
     }
 
     #[test]
@@ -1019,7 +1096,10 @@ mod tests {
         let x = [1.0_f32, 2.0, 3.0];
         let y = [2.0_f32, 4.0, 6.0];
         let r = pearson_correlation_1d(&x, &y);
-        assert!((r - 1.0).abs() < 1e-12, "linearly scaled should give r=1.0, got {r}");
+        assert!(
+            (r - 1.0).abs() < 1e-12,
+            "linearly scaled should give r=1.0, got {r}"
+        );
     }
 
     #[test]
@@ -1028,7 +1108,10 @@ mod tests {
         let x = [1.0_f32, 2.0, 3.0, 4.0, 5.0];
         let y: Vec<f32> = x.iter().map(|&v| 3.0 * v + 10.0).collect();
         let r = pearson_correlation_1d(&x, &y);
-        assert!((r - 1.0).abs() < 1e-12, "affine transform should give r=1.0, got {r}");
+        assert!(
+            (r - 1.0).abs() < 1e-12,
+            "affine transform should give r=1.0, got {r}"
+        );
     }
 
     #[test]
