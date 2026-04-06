@@ -75,7 +75,7 @@ def _write_audio_file(filepath: str, audio_data: NDArray[np.float32], sample_rat
 
 class AudioPatternDetector:
 
-    def __init__(self, audio_clips: list[AudioClip], debug_mode: bool = False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate: int | None = None) -> None:
+    def __init__(self, audio_clips: list[AudioClip], debug_mode: bool = False, seconds_per_chunk: int | None = DEFAULT_SECONDS_PER_CHUNK, target_sample_rate: int | None = None, debug_dir: str = './tmp') -> None:
         """Initialize the audio pattern detector.
 
         Args:
@@ -83,9 +83,11 @@ class AudioPatternDetector:
             debug_mode: Enable debug mode for additional output.
             seconds_per_chunk: Seconds per chunk for sliding window processing.
             target_sample_rate: Target sample rate for all audio. If None, uses DEFAULT_TARGET_SAMPLE_RATE (8000).
+            debug_dir: Base directory for debug output files.
         """
         self.audio_clips = audio_clips
         self.debug_mode = debug_mode
+        self.debug_dir = debug_dir
         #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
@@ -168,7 +170,7 @@ class AudioPatternDetector:
                 print(f"clip_length {clip_name}", len(clip), file=sys.stderr)
                 print(f"clip_length {clip_name} seconds", len(clip) / self.target_sample_rate, file=sys.stderr)
                 print("correlation_clip_length", len(correlation_clip), file=sys.stderr)
-                graph_dir = "../tmp/graph/clip_correlation"
+                graph_dir = f"{self.debug_dir}/graph/clip_correlation"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 plt.figure(figsize=(10, 4))
@@ -180,7 +182,7 @@ class AudioPatternDetector:
                 plt.close()
 
                 # Save the original correlation clip graph (used for comparison in slice graphs)
-                graph_dir_original = f"./tmp/graph/cross_correlation_slice_original/{clip_name}"
+                graph_dir_original = f"{self.debug_dir}/graph/cross_correlation_slice_original/{clip_name}"
                 os.makedirs(graph_dir_original, exist_ok=True)
                 plt.figure(figsize=(10, 4))
                 plt.plot(correlation_clip, color='orange')
@@ -322,7 +324,7 @@ class AudioPatternDetector:
                 clip_name = audio_clip.name
 
                 # similarity debug
-                graph_dir = f"./tmp/graph/mean_squared_error_similarity/{clip_name}"
+                graph_dir = f"{self.debug_dir}/graph/mean_squared_error_similarity/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 x_coords = []
@@ -504,7 +506,7 @@ class AudioPatternDetector:
             import matplotlib.pyplot as plt
             print("---",file=sys.stderr)
             print(f"section_ts: {section_ts}, index {index}",file=sys.stderr)
-            graph_dir = f"./tmp/graph/cross_correlation/{clip_name}"
+            graph_dir = f"{self.debug_dir}/graph/cross_correlation/{clip_name}"
             os.makedirs(graph_dir, exist_ok=True)
 
             #Optional: plot the correlation graph to visualize
@@ -595,7 +597,7 @@ class AudioPatternDetector:
                                                 similarity_debug=similarity_debug)
 
             if debug_mode:
-                audio_test_dir = f"./tmp/audio_section/{clip_name}"
+                audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
                 os.makedirs(audio_test_dir, exist_ok=True)
                 # Clip to [-1.0, 1.0] to avoid clipping distortion in WAV output
                 debug_audio = np.clip(audio_section[peak - len(clip):peak + len(clip)], -1.0, 1.0)
@@ -606,7 +608,7 @@ class AudioPatternDetector:
                 )
 
         if debug_mode and len(peaks) > 0:
-            peak_dir = f"./tmp/debug/cross_correlation_{clip_name}"
+            peak_dir = f"{self.debug_dir}/debug/cross_correlation_{clip_name}"
             os.makedirs(peak_dir, exist_ok=True)
 
             print(json.dumps({"peaks": peaks, "seconds": seconds,
@@ -685,7 +687,7 @@ class AudioPatternDetector:
 
             graph_max = 0.1
             if similarity <= graph_max:
-                graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
+                graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 plt.figure(figsize=(10, 4))
@@ -776,7 +778,7 @@ class AudioPatternDetector:
     #
     #         graph_max = 0.1
     #         if similarity <= graph_max:
-    #             graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
+    #             graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
     #             os.makedirs(graph_dir, exist_ok=True)
     #
     #             # Optional: plot the correlation graph to visualize
@@ -856,7 +858,7 @@ class AudioPatternDetector:
 
             graph_max = 0.1
             if similarity <= graph_max:
-                graph_dir = f"./tmp/graph/cross_correlation_slice/{clip_name}"
+                graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
                 # Optional: plot the correlation graph to visualize
