@@ -274,10 +274,13 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     new_spectrum.iter().map(|c| (c.re * scale) as f32).collect()
 }
 
-/// Downsample a 1-D signal by partitioning it into windows and keeping
-/// the maximum sample from each non-empty window.
+/// Downsample (or upsample) a 1-D signal by partitioning it into windows
+/// and keeping the maximum sample from each window.
+///
+/// Guarantees `output.len() == target_len`.  When `target_len > data.len()`
+/// (upsampling), windows that map to the same sample simply repeat it.
 pub fn downsample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32> {
-    if target_len == 0 {
+    if target_len == 0 || data.is_empty() {
         return Vec::new();
     }
 
@@ -286,15 +289,20 @@ pub fn downsample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32
     let mut downsampled = Vec::with_capacity(target_len);
 
     for i in 0..target_len {
-        let start_index = (i as f64 * step_size) as usize;
-        let end_index = ((i + 1) as f64 * step_size) as usize;
+        let mut start_index = (i as f64 * step_size) as usize;
+        let mut end_index = ((i + 1) as f64 * step_size) as usize;
 
-        if start_index >= n_points {
-            break;
+        // Guarantee at least one sample per window
+        if end_index <= start_index {
+            end_index = start_index + 1;
         }
 
-        if start_index == end_index {
-            continue;
+        // Clamp into [0, n_points)
+        if start_index >= n_points {
+            start_index = n_points - 1;
+        }
+        if end_index > n_points {
+            end_index = n_points;
         }
 
         let max_value = data[start_index..end_index]
@@ -303,10 +311,6 @@ pub fn downsample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32
             .reduce(f32::max)
             .expect("non-empty window must have a maximum");
         downsampled.push(max_value);
-    }
-
-    if downsampled.len() < target_len && !data.is_empty() {
-        downsampled.push(*data.last().expect("non-empty slice has a last value"));
     }
 
     downsampled
@@ -899,9 +903,19 @@ mod tests {
 
     #[test]
     fn test_downsample_preserve_maxima_short_input() {
+        // Upsampling: 3 samples → 5 windows. Each window maps to the
+        // nearest sample(s) and output length always equals target_len.
         let data = [1.0_f32, 2.0, 3.0];
         let out = downsample_preserve_maxima_1d(&data, 5);
-        assert_eq!(out, vec![1.0, 2.0, 3.0, 3.0]);
+        assert_eq!(out.len(), 5);
+    }
+
+    #[test]
+    fn test_downsample_preserve_maxima_upsample_single() {
+        // Edge case: 1 sample → 4 windows should repeat the value.
+        let data = [7.0_f32];
+        let out = downsample_preserve_maxima_1d(&data, 4);
+        assert_eq!(out, vec![7.0, 7.0, 7.0, 7.0]);
     }
 
     #[test]

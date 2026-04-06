@@ -174,7 +174,7 @@ fn loudness_normalize_py<'py>(
 fn pearson_correlation_py(x: Bound<'_, PyAny>, y: Bound<'_, PyAny>) -> PyResult<f64> {
     with_two_f32_slices(&x, &y, |x_f32, y_f32| {
         if x_f32.len() != y_f32.len() {
-            return Err(PyTypeError::new_err("arrays must have the same length"));
+            return Err(PyValueError::new_err("arrays must have the same length"));
         }
         Ok(rust_pearson_correlation_1d(x_f32, y_f32))
     })
