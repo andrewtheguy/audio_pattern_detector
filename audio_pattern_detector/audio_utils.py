@@ -225,37 +225,12 @@ def _load_wave_file_ffmpeg_convert(file_path: str, target_sample_rate: int) -> N
     return samples
 
 
-def downsample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
-    """Downsample a curve while preserving local maxima."""
-    n_points = len(curve)
-    step_size = n_points / num_samples
-    compressed_curve = np.empty(num_samples, dtype=np.float32)
-    count = 0
+def resample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
+    """Resample a curve to num_samples while preserving local maxima."""
+    from native_helper import resample_preserve_maxima as native_resample_preserve_maxima
 
-    for i in range(num_samples):
-        start_index = int(i * step_size)
-        end_index = int((i + 1) * step_size)
-
-        if start_index >= n_points:
-            break
-
-        window = curve[start_index:end_index]
-        if len(window) == 0:
-            continue
-
-        local_max_index = np.argmax(window)
-        compressed_curve[count] = window[local_max_index]
-        count += 1
-
-    # Adjust the length if necessary by adding the last element of the original curve
-    if count < num_samples and len(curve) > 0:
-        compressed_curve[count] = curve[-1]
-        count += 1
-
-    if count != num_samples:
-        raise ValueError(f"downsampled curve length {count} not equal to num_samples {num_samples}")
-
-    return compressed_curve
+    curve_f32 = np.ascontiguousarray(curve, dtype=np.float32)
+    return native_resample_preserve_maxima(curve_f32, num_samples)
 
 @contextmanager
 def ffmpeg_get_float32_pcm(

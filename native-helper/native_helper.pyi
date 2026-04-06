@@ -16,6 +16,11 @@ def resample(
     num_samples: int,
 ) -> npt.NDArray[np.float32]: ...
 
+def resample_preserve_maxima(
+    data: npt.NDArray[np.floating[Any]],
+    num_samples: int,
+) -> npt.NDArray[np.float32]: ...
+
 def simpson(y: npt.NDArray[np.floating[Any]]) -> float: ...
 
 def integrated_loudness(
@@ -29,3 +34,8 @@ def loudness_normalize(
     current_lufs: float,
     target_lufs: float,
 ) -> npt.NDArray[np.float32]: ...
+
+def pearson_correlation(
+    x: npt.NDArray[np.floating[Any]],
+    y: npt.NDArray[np.floating[Any]],
+) -> float: ...

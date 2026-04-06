@@ -178,6 +178,38 @@ class PythonBindingsTest(unittest.TestCase):
         self.assertEqual(out.dtype, np.float32)
         self.assertEqual(len(out), 2)
 
+    # ── resample_preserve_maxima ─────────────────────────────────────
+
+    def test_resample_preserve_maxima_downsample(self):
+        data = np.array([1, 5, 2, 4, 3, 6], dtype=np.float32)
+        out = self.native_helper.resample_preserve_maxima(data, 3)
+        self.assertEqual(out.dtype, np.float32)
+        np.testing.assert_array_equal(out, np.array([5, 4, 6], dtype=np.float32))
+
+    def test_resample_preserve_maxima_accepts_float64(self):
+        data = np.array([1, 5, 2, 4], dtype=np.float64)
+        out = self.native_helper.resample_preserve_maxima(data, 2)
+        self.assertEqual(out.dtype, np.float32)
+        np.testing.assert_array_equal(out, np.array([5, 4], dtype=np.float32))
+
+    def test_resample_preserve_maxima_upsample(self):
+        data = np.array([1, 2, 3], dtype=np.float32)
+        out = self.native_helper.resample_preserve_maxima(data, 5)
+        self.assertEqual(out.dtype, np.float32)
+        self.assertEqual(len(out), 5)
+
+    def test_resample_preserve_maxima_upsample_preserves_values(self):
+        data = np.array([3, 1, 4], dtype=np.float32)
+        out = self.native_helper.resample_preserve_maxima(data, 9)
+        self.assertEqual(len(out), 9)
+        for v in data:
+            self.assertIn(v, out)
+
+    def test_resample_preserve_maxima_identity(self):
+        data = np.array([2, 8, 3, 7, 1], dtype=np.float32)
+        out = self.native_helper.resample_preserve_maxima(data, 5)
+        np.testing.assert_array_equal(out, data)
+
     # ── simpson ───────────────────────────────────────────────────────
 
     def test_simpson_constant(self):
@@ -258,6 +290,36 @@ class PythonBindingsTest(unittest.TestCase):
         out = self.native_helper.loudness_normalize(data, -22.0, -16.0)
         expected_gain = 10.0 ** (6.0 / 20.0)
         np.testing.assert_allclose(out[0], 0.1 * expected_gain, atol=1e-4)
+
+    # ── pearson_correlation ──────────────────────────────────────────
+
+    def test_pearson_identical(self):
+        a = np.array([1, 2, 3, 4, 5], dtype=np.float32)
+        r = self.native_helper.pearson_correlation(a, a)
+        self.assertAlmostEqual(r, 1.0, places=10)
+
+    def test_pearson_negated(self):
+        a = np.array([1, 2, 3, 4, 5], dtype=np.float32)
+        r = self.native_helper.pearson_correlation(a, -a)
+        self.assertAlmostEqual(r, -1.0, places=10)
+
+    def test_pearson_constant_zero(self):
+        a = np.array([5, 5, 5, 5], dtype=np.float32)
+        b = np.array([1, 2, 3, 4], dtype=np.float32)
+        r = self.native_helper.pearson_correlation(a, b)
+        self.assertAlmostEqual(r, 0.0, places=10)
+
+    def test_pearson_scaled_and_shifted(self):
+        x = np.array([1, 2, 3, 4, 5], dtype=np.float32)
+        y = 3.0 * x + 10.0
+        r = self.native_helper.pearson_correlation(x, y)
+        self.assertAlmostEqual(r, 1.0, places=10)
+
+    def test_pearson_accepts_float64(self):
+        x = np.array([1, 2, 3, 4, 5], dtype=np.float64)
+        y = np.array([2, 4, 6, 8, 10], dtype=np.float64)
+        r = self.native_helper.pearson_correlation(x, y)
+        self.assertAlmostEqual(r, 1.0, places=10)
 
 
 if __name__ == "__main__":
