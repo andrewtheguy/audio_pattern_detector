@@ -652,11 +652,11 @@ class AudioPatternDetector:
         # 3-window Pearson r: try different regions and pick best match
         # Window A: first half (0-50%), B: middle (40-60%), C: second half (50-100%)
         # Downsample count scales with window width so resolution is consistent
-        ds_base = 501  # for 20% window (2 partitions)
+        ds_base = 101  # for 20% window (2 partitions)
         pearson_windows: list[tuple[int, int, int]] = [
-            (0, 5, round(ds_base * 5 / 2)),   # 50% → 1252 samples
-            (4, 6, ds_base),                    # 20% → 501 samples
-            (5, 10, round(ds_base * 5 / 2)),   # 50% → 1252 samples
+            (0, 5, round(ds_base * 5 / 2)),   # 50% → 252 samples
+            (4, 6, ds_base),                    # 20% → 101 samples
+            (5, 10, round(ds_base * 5 / 2)),   # 50% → 252 samples
         ]
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
@@ -735,7 +735,7 @@ class AudioPatternDetector:
                                                   **pearson_per_window}))
 
         similarity_hard_limit = 0.03
-        pearson_r_threshold = 0.85
+        pearson_r_threshold = 0.90
 
         if similarity > similarity_hard_limit:
             if debug_mode:
