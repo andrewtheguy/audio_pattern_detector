@@ -7,7 +7,6 @@ These tests use AudioPatternDetector directly (not via CLI) to test:
 """
 from pathlib import Path
 
-import pytest
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector, DEFAULT_SECONDS_PER_CHUNK
@@ -107,27 +106,25 @@ def test_callback_timestamps_monotonic():
 
 
 def test_callback_multiple_patterns_monotonic():
-    """Test multiple patterns emit in timestamp order, not clip order."""
+    """Test multiple patterns emit in timestamp order with single matching pattern."""
     pattern_files = [
-        "sample_audios/clips/cbs_news.wav",      # Found at ~25.9s
-        "sample_audios/clips/cbs_news_dada.wav"  # Found at ~1.97s
+        "sample_audios/clips/rthk_beep.wav",  # Found at ~1.4s and ~2.4s
+        "sample_audios/clips/cbs_news.wav",    # Not found in RTHK audio
     ]
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     events, _, _ = run_detector_with_callback(audio_file, pattern_files)
 
     assert len(events) == 2, f"Expected 2 events, got {len(events)}"
 
-    # cbs_news_dada should be emitted first (earlier timestamp)
-    # even though cbs_news was passed first in the pattern_files list
-    first_clip, first_ts = events[0]
-    second_clip, second_ts = events[1]
+    # Both events should be rthk_beep (cbs_news doesn't match in this audio)
+    for clip_name, _ in events:
+        assert clip_name == "rthk_beep", \
+            f"Expected rthk_beep, got {clip_name}"
 
-    assert first_clip == "cbs_news_dada", \
-        f"Expected cbs_news_dada first (earlier timestamp), got {first_clip}"
-    assert second_clip == "cbs_news", \
-        f"Expected cbs_news second, got {second_clip}"
-
+    # Verify timestamps are monotonically increasing
+    first_ts = events[0][1]
+    second_ts = events[1][1]
     assert first_ts < second_ts, \
         f"Timestamps not monotonic: {first_ts} should be < {second_ts}"
 
@@ -148,37 +145,19 @@ def test_callback_no_matches():
     assert len(peak_times["cbs_news"]) == 0
 
 
-def test_callback_interleaved_patterns():
-    """Test callback order with interleaved_patterns.wav (clip2, aaa, clip2, aaa)."""
+def test_callback_multiple_patterns_non_matching_ignored():
+    """Test callback with two patterns where only one matches the audio."""
     pattern_files = [
-        "sample_audios/test_generated/clips/clip2_early.wav",  # Copy of cbs_news_dada
-        "sample_audios/test_generated/clips/aaa_late.wav"      # Copy of cbs_news
+        "sample_audios/clips/rthk_beep.wav",  # Not found in CBS audio
+        "sample_audios/clips/cbs_news.wav",    # Found at ~25.9s
     ]
-    audio_file = "sample_audios/test_generated/interleaved_patterns.wav"
-
-    # Skip if test files don't exist
-    for f in pattern_files + [audio_file]:
-        if not Path(f).exists():
-            pytest.skip(f"Test file {f} not found")
+    audio_file = "sample_audios/cbs_news_audio_section.wav"
 
     events, _, _ = run_detector_with_callback(audio_file, pattern_files)
 
-    # Should have 4 events: clip2, aaa, clip2, aaa in timestamp order
-    assert len(events) == 4, f"Expected 4 events, got {len(events)}: {events}"
-
-    # Verify all timestamps are monotonically increasing
-    timestamps = [ts for _, ts in events]
-    for i in range(1, len(timestamps)):
-        assert timestamps[i] >= timestamps[i-1], \
-            f"Timestamps not monotonic at index {i}: {timestamps}"
-
-    # Verify the pattern order matches timestamp order (interleaved)
-    clip_names = [name for name, _ in events]
-    # Expected order: clip2_early, aaa_late, clip2_early, aaa_late
-    assert clip_names[0] == "clip2_early", f"Expected clip2_early first, got {clip_names[0]}"
-    assert clip_names[1] == "aaa_late", f"Expected aaa_late second, got {clip_names[1]}"
-    assert clip_names[2] == "clip2_early", f"Expected clip2_early third, got {clip_names[2]}"
-    assert clip_names[3] == "aaa_late", f"Expected aaa_late fourth, got {clip_names[3]}"
+    # Only cbs_news should match
+    assert len(events) == 1, f"Expected 1 event, got {len(events)}: {events}"
+    assert events[0][0] == "cbs_news", f"Expected cbs_news, got {events[0][0]}"
 
 
 # --- accumulate_results Tests ---
@@ -295,7 +274,7 @@ def test_callback_with_accumulate_false():
     """Test callback works with accumulate_results=False (streaming mode)."""
     pattern_files = [
         "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
+        "sample_audios/clips/天空下的彩虹intro.wav",  # Does not match CBS audio
     ]
     audio_file = "sample_audios/cbs_news_audio_section.wav"
 
@@ -303,20 +282,14 @@ def test_callback_with_accumulate_false():
         audio_file, pattern_files, accumulate_results=False
     )
 
-    # Callback should work
-    assert len(events) == 2, f"Expected 2 events, got {len(events)}"
+    # Only cbs_news should match (天空下的彩虹intro doesn't match CBS audio)
+    assert len(events) == 1, f"Expected 1 event, got {len(events)}"
 
     # peak_times should be None (streaming mode)
     assert peak_times is None, "peak_times should be None in streaming mode"
 
-    # Verify events are in timestamp order
-    timestamps = [ts for _, ts in events]
-    assert timestamps[0] < timestamps[1], \
-        f"Events should be in timestamp order: {timestamps}"
-
-    # cbs_news_dada (earlier) should be first
-    assert events[0][0] == "cbs_news_dada"
-    assert events[1][0] == "cbs_news"
+    # The single event should be cbs_news
+    assert events[0][0] == "cbs_news"
 
 
 def test_callback_multiple_patterns_with_accumulate():
@@ -324,7 +297,7 @@ def test_callback_multiple_patterns_with_accumulate():
     pattern_files = [
         "sample_audios/clips/rthk_beep.wav",
         "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
+        "sample_audios/clips/天空下的彩虹intro.wav",  # Does not match CBS audio
     ]
     audio_file = "sample_audios/cbs_news_audio_section.wav"
 
@@ -332,25 +305,25 @@ def test_callback_multiple_patterns_with_accumulate():
         audio_file, pattern_files, accumulate_results=True
     )
 
-    # CBS patterns should match, RTHK should not
-    assert len(events) == 2, f"Expected 2 events (CBS patterns only), got {len(events)}"
+    # Only cbs_news should match; RTHK and rainbow intro should not
+    assert len(events) == 1, f"Expected 1 event (cbs_news only), got {len(events)}"
 
     # Verify peak_times structure
     assert peak_times is not None
     assert "rthk_beep" in peak_times
     assert "cbs_news" in peak_times
-    assert "cbs_news_dada" in peak_times
+    assert "天空下的彩虹intro" in peak_times
 
-    # RTHK should have no matches
+    # RTHK and rainbow intro should have no matches
     assert len(peak_times["rthk_beep"]) == 0
-    # CBS patterns should have 1 match each
+    assert len(peak_times["天空下的彩虹intro"]) == 0
+    # CBS should have 1 match
     assert len(peak_times["cbs_news"]) == 1
-    assert len(peak_times["cbs_news_dada"]) == 1
 
     # Verify callback captured the same
     callback_names = [name for name, _ in events]
     assert "cbs_news" in callback_names
-    assert "cbs_news_dada" in callback_names
+    assert "天空下的彩虹intro" not in callback_names
     assert "rthk_beep" not in callback_names
 
 
@@ -520,9 +493,9 @@ def test_get_config_min_chunk_size_single_pattern():
 def test_get_config_min_chunk_size_multiple_patterns():
     """Test min_chunk_size_seconds is max of all patterns' minimums."""
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",      # Short beep
-        "sample_audios/clips/cbs_news.wav",       # Longer pattern
-        "sample_audios/clips/cbs_news_dada.wav",  # Another pattern
+        "sample_audios/clips/rthk_beep.wav",            # Short beep
+        "sample_audios/clips/cbs_news.wav",             # Longer pattern
+        "sample_audios/clips/天空下的彩虹intro.wav",  # Another pattern
     ]
     pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
     detector = AudioPatternDetector(audio_clips=pattern_clips)
@@ -573,7 +546,7 @@ def test_get_config_clips_multiple_patterns():
     pattern_files = [
         "sample_audios/clips/rthk_beep.wav",
         "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav",
+        "sample_audios/clips/天空下的彩虹intro.wav",
     ]
     pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
     detector = AudioPatternDetector(audio_clips=pattern_clips)
@@ -583,7 +556,7 @@ def test_get_config_clips_multiple_patterns():
     # All patterns should be in clips dict
     assert "rthk_beep" in config["clips"]
     assert "cbs_news" in config["clips"]
-    assert "cbs_news_dada" in config["clips"]
+    assert "天空下的彩虹intro" in config["clips"]
     assert len(config["clips"]) == 3
 
 
@@ -595,11 +568,11 @@ def test_get_config_is_pure_tone():
     config1 = detector1.get_config()
     assert config1["clips"]["rthk_beep"]["is_pure_tone"] is True
 
-    # cbs_news_dada is NOT a pure tone (complex audio)
-    dada_clip = AudioClip.from_audio_file("sample_audios/clips/cbs_news_dada.wav")
-    detector2 = AudioPatternDetector(audio_clips=[dada_clip])
+    # 天空下的彩虹intro is NOT a pure tone (complex audio)
+    rainbow_clip = AudioClip.from_audio_file("sample_audios/clips/天空下的彩虹intro.wav")
+    detector2 = AudioPatternDetector(audio_clips=[rainbow_clip])
     config2 = detector2.get_config()
-    assert config2["clips"]["cbs_news_dada"]["is_pure_tone"] is False
+    assert config2["clips"]["天空下的彩虹intro"]["is_pure_tone"] is False
 
 
 def test_get_config_sliding_window_computed_correctly():

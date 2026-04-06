@@ -113,6 +113,7 @@ def match_pattern(
     from_stdin: bool = False,
     target_sample_rate: int | None = None,
     debug_dir: str = './tmp',
+    height_min: float | None = None,
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Find pattern matches in audio file or stdin
 
@@ -126,6 +127,7 @@ def match_pattern(
         seconds_per_chunk: Seconds per chunk for sliding window (None for auto-compute)
         from_stdin: Whether to read from stdin (WAV format only)
         target_sample_rate: Target sample rate for processing (default: DEFAULT_TARGET_SAMPLE_RATE, 8000)
+        height_min: Override minimum correlation peak height (default: 0.25).
     """
     if not from_stdin:
         if audio_source is None or not os.path.exists(audio_source):
@@ -163,6 +165,7 @@ def match_pattern(
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=sr,
             debug_dir=debug_dir,
+            height_min=height_min,
         )
 
     # File mode - audio_source is guaranteed to be str here since from_stdin=False
@@ -181,6 +184,7 @@ def match_pattern(
                     seconds_per_chunk=seconds_per_chunk,
                     target_sample_rate=sr,
                     debug_dir=debug_dir,
+                    height_min=height_min,
                 )
                 .find_clip_in_audio(
                     full_streaming_audio,
@@ -443,6 +447,7 @@ def _match_pattern_wav_stdin(
     seconds_per_chunk: int | None,
     target_sample_rate: int,
     debug_dir: str = './tmp',
+    height_min: float | None = None,
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Internal function to handle WAV stdin mode."""
     # Create stream wrapper that reads WAV header and handles resampling
@@ -465,6 +470,7 @@ def _match_pattern_wav_stdin(
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
             debug_dir=debug_dir,
+            height_min=height_min,
         )
         .find_clip_in_audio(
             full_streaming_audio,
@@ -483,6 +489,7 @@ def _match_pattern_multiplexed_stdin(
     seconds_per_chunk: int | None,
     target_sample_rate: int,
     debug_dir: str = './tmp',
+    height_min: float | None = None,
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Internal function to handle multiplexed stdin mode.
 
@@ -510,6 +517,7 @@ def _match_pattern_multiplexed_stdin(
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
             debug_dir=debug_dir,
+            height_min=height_min,
         )
         .find_clip_in_audio(
             full_streaming_audio,
@@ -542,6 +550,7 @@ def _run_match_with_output(
     seconds_per_chunk: int | None = 60,
     target_sample_rate: int | None = None,
     debug_dir: str = './tmp',
+    height_min: float | None = None,
 ) -> tuple[dict[str, list[float]] | None, float]:
     """Run match_pattern and handle output (JSON or JSONL).
 
@@ -569,6 +578,7 @@ def _run_match_with_output(
         from_stdin=from_stdin,
         target_sample_rate=target_sample_rate,
         debug_dir=debug_dir,
+        height_min=height_min,
     )
     print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
 
@@ -607,6 +617,7 @@ def cmd_match(args: argparse.Namespace) -> None:
     sr = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
 
     debug_dir: str = getattr(args, 'debug_dir', './tmp')
+    height_min: float | None = getattr(args, 'height_min', None)
 
     # Handle multiplexed stdin mode (patterns + audio all from stdin)
     multiplexed_stdin = getattr(args, 'multiplexed_stdin', False)
@@ -622,6 +633,7 @@ def cmd_match(args: argparse.Namespace) -> None:
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=sr,
             debug_dir=debug_dir,
+            height_min=height_min,
         )
 
         print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
@@ -655,7 +667,7 @@ def cmd_match(args: argparse.Namespace) -> None:
         all_results = {}
         for audio_file in glob.glob(f'{args.audio_folder}/*.m4a'):
             print(f"Processing {audio_file}...", file=sys.stderr)
-            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate, debug_dir=debug_dir)
+            peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=args.debug, seconds_per_chunk=seconds_per_chunk, target_sample_rate=target_sample_rate, debug_dir=debug_dir, height_min=height_min)
             print(f"Total time processed: {seconds_to_time(seconds=total_time)}", file=sys.stderr)
             _print_peak_times_to_stderr(peak_times)
             all_results[audio_file] = peak_times
@@ -677,6 +689,7 @@ def cmd_match(args: argparse.Namespace) -> None:
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
             debug_dir=debug_dir,
+            height_min=height_min,
         )
     elif args.stdin:
         _run_match_with_output(
@@ -686,6 +699,7 @@ def cmd_match(args: argparse.Namespace) -> None:
             seconds_per_chunk=seconds_per_chunk,
             target_sample_rate=target_sample_rate,
             debug_dir=debug_dir,
+            height_min=height_min,
         )
     else:
         print("Please provide --audio-file, --audio-folder, --stdin, or --multiplexed-stdin", file=sys.stderr)
