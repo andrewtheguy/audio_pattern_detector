@@ -700,6 +700,20 @@ class AudioPatternDetector:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
+                # Downsampled middle region used for Pearson r
+                ds_graph_dir = f"{self.debug_dir}/graph/pearson_downsampled/{clip_name}"
+                os.makedirs(ds_graph_dir, exist_ok=True)
+
+                plt.figure(figsize=(10, 4))
+                plt.plot(ds_slice)
+                plt.plot(ds_clip, alpha=0.7)
+                plt.title(f'Downsampled middle region (pearson_r={pearson_r:.4f})')
+                plt.xlabel('Sample')
+                plt.ylabel('Correlation coefficient')
+                plt.savefig(
+                    f'{ds_graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
+                plt.close()
+
             similarities.append((similarity, {"whole": float(similarity_whole),
                                               "middle": float(similarity_middle),
                                               "pearson_r": pearson_r,
