@@ -476,6 +476,8 @@ def test_no_false_positives_in_complex_scenario():
         ("sample_audios/clips/rthk_beep.wav", "sample_audios/cbs_news_audio_section.wav", "rthk_beep"),
         ("sample_audios/clips/cbs_news.wav", "sample_audios/rthk_section_with_beep.wav", "cbs_news"),
         ("sample_audios/clips/cbs_news_dada.wav", "sample_audios/rthk_section_with_beep.wav", "cbs_news_dada"),
+        ("sample_audios/clips/天空下的彩虹intro.wav", "sample_audios/cbs_news_audio_section.wav", "天空下的彩虹intro"),
+        ("sample_audios/clips/天空下的彩虹intro.wav", "sample_audios/rthk_section_with_beep.wav", "天空下的彩虹intro"),
     ]
 
     for pattern_file, audio_file, pattern_name in test_cases:
@@ -528,6 +530,78 @@ def test_verification_stage_filters_false_positives():
     # Verification stage should reject any potential matches
     assert len(peak_times['rthk_beep']) == 0, \
         "Verification stage should filter out false positives"
+
+
+# --- AM1430 Rainbow Intro (Lossy-Encoded Audio) Tests ---
+
+
+def test_rainbow_intro_pattern_detection():
+    """Test detection of 天空下的彩虹intro pattern in lossy-encoded audio
+
+    This tests the normal pattern detection algorithm with audio that has
+    been through Opus encoding, which degrades the cross-correlation shape.
+    The Pearson correlation verification handles this by comparing
+    downsampled envelope shapes rather than raw sample-by-sample values.
+
+    Expected to find match at approximately 15.5s
+    """
+    pattern_file = "sample_audios/clips/天空下的彩虹intro.wav"
+    audio_file = "sample_audios/am1430_section_with_rainbow_intro.wav"
+
+    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+    assert isinstance(peak_times, dict), "peak_times should be a dictionary"
+    assert '天空下的彩虹intro' in peak_times, "天空下的彩虹intro pattern not found in results"
+
+    matches = peak_times['天空下的彩虹intro']
+
+    assert len(matches) == 1, f"Expected 1 match, found {len(matches)}: {matches}"
+
+    expected_time = 15.5
+    actual_time = matches[0]
+    assert abs(actual_time - expected_time) < 1.0, \
+        f"Expected timestamp ~{expected_time}s, got {actual_time}s"
+
+    assert total_time > 0, "Total processing time should be positive"
+
+
+def test_rainbow_intro_not_in_cbs_audio():
+    """Test that 天空下的彩虹intro pattern does not match CBS audio"""
+    pattern_file = "sample_audios/clips/天空下的彩虹intro.wav"
+    audio_file = "sample_audios/cbs_news_audio_section.wav"
+
+    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+    assert '天空下的彩虹intro' in peak_times, "天空下的彩虹intro key should exist in results"
+    assert len(peak_times['天空下的彩虹intro']) == 0, \
+        f"天空下的彩虹intro should not match CBS audio, but found matches: {peak_times['天空下的彩虹intro']}"
+
+
+def test_cbs_pattern_not_in_rainbow_intro_audio():
+    """Test that CBS patterns do not match in AM1430 rainbow intro audio"""
+    test_cases = [
+        ("sample_audios/clips/cbs_news.wav", "cbs_news"),
+        ("sample_audios/clips/cbs_news_dada.wav", "cbs_news_dada"),
+        ("sample_audios/clips/rthk_beep.wav", "rthk_beep"),
+    ]
+    audio_file = "sample_audios/am1430_section_with_rainbow_intro.wav"
+
+    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+    for pattern_file, pattern_name in test_cases:
+        assert Path(pattern_file).exists(), f"Pattern {pattern_file} not found"
+
+        peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+
+        assert pattern_name in peak_times, f"{pattern_name} key missing"
+        assert len(peak_times[pattern_name]) == 0, \
+            f"False positive: {pattern_name} in AM1430 audio produced {len(peak_times[pattern_name])} matches: {peak_times[pattern_name]}"
 
 
 # --- 16kHz Audio Handling Tests ---
