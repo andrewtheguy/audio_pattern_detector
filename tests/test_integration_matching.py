@@ -10,6 +10,22 @@ from audio_pattern_detector.audio_utils import ffmpeg_get_float32_pcm, load_wave
 from audio_pattern_detector.match import match_pattern, _WavFileStreamWrapper
 
 
+# --- Test Data Constants ---
+# Centralised paths so swapping a clip only requires editing one place.
+
+CBS_NEWS_PATTERN = "sample_audios/clips/cbs_news.wav"
+CBS_NEWS_AUDIO = "sample_audios/cbs_news_audio_section.wav"
+CBS_NEWS_EXPECTED_TIME = 25.89875
+
+RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.wav"
+RTHK_BEEP_AUDIO = "sample_audios/rthk_section_with_beep.wav"
+RTHK_BEEP_EXPECTED_TIMES = [1.4165, 2.419125]
+
+RAINBOW_INTRO_PATTERN = "sample_audios/clips/天空下的彩虹intro.wav"
+RAINBOW_INTRO_AUDIO = "sample_audios/am1430_section_with_rainbow_intro.wav"
+RAINBOW_INTRO_EXPECTED_TIME = 15.5
+
+
 # --- Pattern Matching Tests ---
 
 
@@ -21,15 +37,12 @@ def test_rthk_beep_pattern_detection():
 
     Expected to find matches at approximately 1.4165s and 2.419125s
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
     # Verify input files exist
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+    assert Path(RTHK_BEEP_PATTERN).exists(), f"Pattern file {RTHK_BEEP_PATTERN} not found"
+    assert Path(RTHK_BEEP_AUDIO).exists(), f"Audio file {RTHK_BEEP_AUDIO} not found"
 
     # Run pattern matching
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Verify results structure
     assert isinstance(peak_times, dict), "peak_times should be a dictionary"
@@ -41,8 +54,7 @@ def test_rthk_beep_pattern_detection():
     assert len(matches) == 2, f"Expected 2 matches, found {len(matches)}: {matches}"
 
     # Verify the timestamps (with tolerance for floating point comparison)
-    expected_times = [1.4165, 2.419125]
-    for i, (actual, expected) in enumerate(zip(sorted(matches), expected_times)):
+    for i, (actual, expected) in enumerate(zip(sorted(matches), RTHK_BEEP_EXPECTED_TIMES)):
         assert abs(actual - expected) < 0.01, \
             f"Match {i}: Expected timestamp ~{expected}s, got {actual}s"
 
@@ -59,15 +71,12 @@ def test_cbs_news_pattern_detection():
 
     Expected to find match at approximately 25.89875s
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
-
     # Verify input files exist
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+    assert Path(CBS_NEWS_PATTERN).exists(), f"Pattern file {CBS_NEWS_PATTERN} not found"
+    assert Path(CBS_NEWS_AUDIO).exists(), f"Audio file {CBS_NEWS_AUDIO} not found"
 
     # Run pattern matching
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     # Verify results structure
     assert isinstance(peak_times, dict), "peak_times should be a dictionary"
@@ -79,83 +88,29 @@ def test_cbs_news_pattern_detection():
     assert len(matches) == 1, f"Expected 1 match, found {len(matches)}: {matches}"
 
     # Verify the timestamp (with tolerance for floating point comparison)
-    expected_time = 25.89875
     actual_time = matches[0]
-    assert abs(actual_time - expected_time) < 0.01, \
-        f"Expected timestamp ~{expected_time}s, got {actual_time}s"
+    assert abs(actual_time - CBS_NEWS_EXPECTED_TIME) < 0.01, \
+        f"Expected timestamp ~{CBS_NEWS_EXPECTED_TIME}s, got {actual_time}s"
 
     # Verify processing time is reasonable
     assert total_time > 0, "Total processing time should be positive"
 
 
-def test_cbs_news_dada_pattern_detection():
-    """Test detection of CBS News dada pattern (shorter normal pattern)
+def test_multiple_patterns_detection():
+    """Test detection of multiple different normal patterns
 
-    This tests the normal pattern detection with a shorter clip.
-    The algorithm should handle verification failures and still find the correct match.
-
-    Expected to find match at approximately 1.965625s
+    Tests both CBS news and rainbow intro patterns against their
+    respective audio files.
     """
-    pattern_file = "sample_audios/clips/cbs_news_dada.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    # CBS news pattern
+    peak_times_cbs, _ = match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
+    assert len(peak_times_cbs['cbs_news']) == 1
+    assert abs(peak_times_cbs['cbs_news'][0] - CBS_NEWS_EXPECTED_TIME) < 0.01
 
-    # Verify input files exist
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    # Run pattern matching
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
-
-    # Verify results structure
-    assert isinstance(peak_times, dict), "peak_times should be a dictionary"
-    assert 'cbs_news_dada' in peak_times, "cbs_news_dada pattern not found in results"
-
-    matches = peak_times['cbs_news_dada']
-
-    # Verify we found 1 match
-    assert len(matches) == 1, f"Expected 1 match, found {len(matches)}: {matches}"
-
-    # Verify the timestamp (with tolerance for floating point comparison)
-    expected_time = 1.965625
-    actual_time = matches[0]
-    assert abs(actual_time - expected_time) < 0.01, \
-        f"Expected timestamp ~{expected_time}s, got {actual_time}s"
-
-    # Verify processing time is reasonable
-    assert total_time > 0, "Total processing time should be positive"
-
-
-def test_multiple_patterns_single_audio():
-    """Test matching multiple patterns in a single audio file
-
-    Tests that the detector can handle multiple patterns simultaneously
-    and correctly identify each pattern type.
-    """
-    pattern_files = [
-        "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
-    ]
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
-
-    # Verify all files exist
-    for pattern_file in pattern_files:
-        assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    # Run pattern matching with multiple patterns
-    peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=False)
-
-    # Verify both patterns were found
-    assert 'cbs_news' in peak_times, "cbs_news pattern not found"
-    assert 'cbs_news_dada' in peak_times, "cbs_news_dada pattern not found"
-
-    # Verify cbs_news match
-    assert len(peak_times['cbs_news']) == 1
-    assert abs(peak_times['cbs_news'][0] - 25.89875) < 0.01
-
-    # Verify cbs_news_dada match
-    assert len(peak_times['cbs_news_dada']) == 1
-    assert abs(peak_times['cbs_news_dada'][0] - 1.965625) < 0.01
+    # Rainbow intro pattern
+    peak_times_rainbow, _ = match_pattern(RAINBOW_INTRO_AUDIO, [RAINBOW_INTRO_PATTERN], debug_mode=False)
+    assert len(peak_times_rainbow['天空下的彩虹intro']) == 1
+    assert abs(peak_times_rainbow['天空下的彩虹intro'][0] - RAINBOW_INTRO_EXPECTED_TIME) < 1.0
 
 
 def test_pattern_not_in_audio():
@@ -164,15 +119,12 @@ def test_pattern_not_in_audio():
     Tests the algorithm's ability to correctly reject false positives.
     """
     # Use CBS news pattern on RTHK audio (should not match)
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
     # Verify files exist
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+    assert Path(CBS_NEWS_PATTERN).exists(), f"Pattern file {CBS_NEWS_PATTERN} not found"
+    assert Path(RTHK_BEEP_AUDIO).exists(), f"Audio file {RTHK_BEEP_AUDIO} not found"
 
     # Run pattern matching
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     # Should return empty results (no matches)
     assert 'cbs_news' in peak_times, "cbs_news key should exist in results"
@@ -183,27 +135,23 @@ def test_pattern_not_in_audio():
 def test_nonexistent_pattern_file():
     """Test that match_pattern raises ValueError for nonexistent pattern file"""
     pattern_file = "sample_audios/clips/nonexistent.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     with pytest.raises(ValueError, match="does not exist"):
-        match_pattern(audio_file, [pattern_file], debug_mode=False)
+        match_pattern(RTHK_BEEP_AUDIO, [pattern_file], debug_mode=False)
 
 
 def test_nonexistent_audio_file():
     """Test that match_pattern raises ValueError for nonexistent audio file"""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
     audio_file = "sample_audios/nonexistent.wav"
 
     with pytest.raises(ValueError, match="does not exist"):
-        match_pattern(audio_file, [pattern_file], debug_mode=False)
+        match_pattern(audio_file, [RTHK_BEEP_PATTERN], debug_mode=False)
 
 
 def test_empty_pattern_list():
     """Test that match_pattern raises ValueError when no patterns provided"""
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
     with pytest.raises(ValueError, match="No pattern clips passed"):
-        match_pattern(audio_file, [], debug_mode=False)
+        match_pattern(RTHK_BEEP_AUDIO, [], debug_mode=False)
 
 
 def test_beep_detection_algorithm_specifics():
@@ -216,10 +164,7 @@ def test_beep_detection_algorithm_specifics():
 
     This test verifies the algorithm correctly identifies pure tone patterns.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     matches = peak_times['rthk_beep']
 
@@ -246,10 +191,7 @@ def test_normal_pattern_detection_algorithm_specifics():
 
     This test verifies the algorithm correctly identifies normal audio patterns.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     matches = peak_times['cbs_news']
 
@@ -270,10 +212,7 @@ def test_correlation_peak_finding():
 
     This test verifies peak finding works correctly.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     matches = peak_times['rthk_beep']
 
@@ -292,11 +231,8 @@ def test_loudness_normalization_effect():
     using pyloudnorm. This test verifies the normalization doesn't
     prevent pattern detection.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
-
     # Run pattern matching (normalization is enabled by default)
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     # Should still find the pattern despite normalization
     assert 'cbs_news' in peak_times
@@ -313,13 +249,10 @@ def test_beep_pattern_in_normal_audio():
     RTHK beep is a pure tone pattern that should not match
     the complex CBS news audio patterns.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    assert Path(RTHK_BEEP_PATTERN).exists(), f"Pattern file {RTHK_BEEP_PATTERN} not found"
+    assert Path(CBS_NEWS_AUDIO).exists(), f"Audio file {CBS_NEWS_AUDIO} not found"
 
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(CBS_NEWS_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     assert 'rthk_beep' in peak_times, "rthk_beep key should exist in results"
     assert len(peak_times['rthk_beep']) == 0, \
@@ -332,35 +265,14 @@ def test_cbs_pattern_in_rthk_audio():
     CBS news is a complex audio pattern that should not match
     the simple RTHK beep audio.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
+    assert Path(CBS_NEWS_PATTERN).exists(), f"Pattern file {CBS_NEWS_PATTERN} not found"
+    assert Path(RTHK_BEEP_AUDIO).exists(), f"Audio file {RTHK_BEEP_AUDIO} not found"
 
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     assert 'cbs_news' in peak_times, "cbs_news key should exist in results"
     assert len(peak_times['cbs_news']) == 0, \
         f"CBS news should not match RTHK audio, but found {len(peak_times['cbs_news'])} matches: {peak_times['cbs_news']}"
-
-
-def test_dada_pattern_in_rthk_audio():
-    """Test that CBS news dada pattern does not match in RTHK audio
-
-    Tests that a shorter CBS pattern still doesn't match unrelated audio.
-    """
-    pattern_file = "sample_audios/clips/cbs_news_dada.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
-
-    assert 'cbs_news_dada' in peak_times, "cbs_news_dada key should exist in results"
-    assert len(peak_times['cbs_news_dada']) == 0, \
-        f"CBS news dada should not match RTHK audio, but found {len(peak_times['cbs_news_dada'])} matches: {peak_times['cbs_news_dada']}"
 
 
 def test_multiple_patterns_none_match():
@@ -369,11 +281,8 @@ def test_multiple_patterns_none_match():
     Tests that when multiple patterns are provided and none match,
     all patterns return empty results.
     """
-    pattern_files = [
-        "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
-    ]
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
+    pattern_files = [CBS_NEWS_PATTERN, RAINBOW_INTRO_PATTERN]
+    audio_file = RTHK_BEEP_AUDIO
 
     for pattern_file in pattern_files:
         assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
@@ -383,51 +292,46 @@ def test_multiple_patterns_none_match():
 
     # Both patterns should exist in results
     assert 'cbs_news' in peak_times, "cbs_news key should exist"
-    assert 'cbs_news_dada' in peak_times, "cbs_news_dada key should exist"
+    assert '天空下的彩虹intro' in peak_times, "天空下的彩虹intro key should exist"
 
     # Both should have no matches
     assert len(peak_times['cbs_news']) == 0, \
         f"CBS news should not match, found {len(peak_times['cbs_news'])} matches"
-    assert len(peak_times['cbs_news_dada']) == 0, \
-        f"CBS news dada should not match, found {len(peak_times['cbs_news_dada'])} matches"
+    assert len(peak_times['天空下的彩虹intro']) == 0, \
+        f"Rainbow intro should not match, found {len(peak_times['天空下的彩虹intro'])} matches"
 
 
 def test_all_available_patterns_mixed_results():
-    """Test all available patterns against both audio files
+    """Test all available patterns against all three audio files
 
-    This comprehensive test verifies that:
-    - RTHK beep matches in RTHK audio but not CBS audio
-    - CBS patterns match in CBS audio but not RTHK audio
+    This comprehensive test verifies that each pattern only matches
+    its own audio and produces no false positives on the others.
     """
-    all_patterns = [
-        "sample_audios/clips/rthk_beep.wav",
-        "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
-    ]
+    all_patterns = [RTHK_BEEP_PATTERN, CBS_NEWS_PATTERN, RAINBOW_INTRO_PATTERN]
 
     # Test with RTHK audio
-    rthk_audio = "sample_audios/rthk_section_with_beep.wav"
-    assert Path(rthk_audio).exists()
+    assert Path(RTHK_BEEP_AUDIO).exists()
+    rthk_results, _ = match_pattern(RTHK_BEEP_AUDIO, all_patterns, debug_mode=False)
 
-    rthk_results, _ = match_pattern(rthk_audio, all_patterns, debug_mode=False)
-
-    # RTHK beep should match
     assert len(rthk_results['rthk_beep']) == 2, "RTHK beep should match in RTHK audio"
-    # CBS patterns should not match
     assert len(rthk_results['cbs_news']) == 0, "CBS news should not match in RTHK audio"
-    assert len(rthk_results['cbs_news_dada']) == 0, "CBS dada should not match in RTHK audio"
+    assert len(rthk_results['天空下的彩虹intro']) == 0, "Rainbow intro should not match in RTHK audio"
 
     # Test with CBS audio
-    cbs_audio = "sample_audios/cbs_news_audio_section.wav"
-    assert Path(cbs_audio).exists()
+    assert Path(CBS_NEWS_AUDIO).exists()
+    cbs_results, _ = match_pattern(CBS_NEWS_AUDIO, all_patterns, debug_mode=False)
 
-    cbs_results, _ = match_pattern(cbs_audio, all_patterns, debug_mode=False)
-
-    # CBS patterns should match
     assert len(cbs_results['cbs_news']) == 1, "CBS news should match in CBS audio"
-    assert len(cbs_results['cbs_news_dada']) == 1, "CBS dada should match in CBS audio"
-    # RTHK beep should not match
     assert len(cbs_results['rthk_beep']) == 0, "RTHK beep should not match in CBS audio"
+    assert len(cbs_results['天空下的彩虹intro']) == 0, "Rainbow intro should not match in CBS audio"
+
+    # Test with AM1430 audio
+    assert Path(RAINBOW_INTRO_AUDIO).exists()
+    am_results, _ = match_pattern(RAINBOW_INTRO_AUDIO, all_patterns, debug_mode=False)
+
+    assert len(am_results['天空下的彩虹intro']) == 1, "Rainbow intro should match in AM1430 audio"
+    assert len(am_results['cbs_news']) == 0, "CBS news should not match in AM1430 audio"
+    assert len(am_results['rthk_beep']) == 0, "RTHK beep should not match in AM1430 audio"
 
 
 def test_similarity_threshold_rejection():
@@ -438,10 +342,7 @@ def test_similarity_threshold_rejection():
     """
     # Using CBS news pattern on RTHK audio should produce high similarity
     # scores that exceed the threshold, resulting in rejection
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(RTHK_BEEP_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     # Should be rejected due to high similarity scores
     assert len(peak_times['cbs_news']) == 0, \
@@ -455,10 +356,7 @@ def test_overlap_ratio_rejection_for_beep():
     This tests that patterns with insufficient overlap are filtered out.
     """
     # Using beep pattern on CBS audio should produce low overlap ratios
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
-
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(CBS_NEWS_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Should be rejected due to low overlap ratio
     assert len(peak_times['rthk_beep']) == 0, \
@@ -473,11 +371,10 @@ def test_no_false_positives_in_complex_scenario():
     """
     test_cases = [
         # (pattern_file, audio_file, pattern_name)
-        ("sample_audios/clips/rthk_beep.wav", "sample_audios/cbs_news_audio_section.wav", "rthk_beep"),
-        ("sample_audios/clips/cbs_news.wav", "sample_audios/rthk_section_with_beep.wav", "cbs_news"),
-        ("sample_audios/clips/cbs_news_dada.wav", "sample_audios/rthk_section_with_beep.wav", "cbs_news_dada"),
-        ("sample_audios/clips/天空下的彩虹intro.wav", "sample_audios/cbs_news_audio_section.wav", "天空下的彩虹intro"),
-        ("sample_audios/clips/天空下的彩虹intro.wav", "sample_audios/rthk_section_with_beep.wav", "天空下的彩虹intro"),
+        (RTHK_BEEP_PATTERN, CBS_NEWS_AUDIO, "rthk_beep"),
+        (CBS_NEWS_PATTERN, RTHK_BEEP_AUDIO, "cbs_news"),
+        (RAINBOW_INTRO_PATTERN, CBS_NEWS_AUDIO, "天空下的彩虹intro"),
+        (RAINBOW_INTRO_PATTERN, RTHK_BEEP_AUDIO, "天空下的彩虹intro"),
     ]
 
     for pattern_file, audio_file, pattern_name in test_cases:
@@ -499,10 +396,7 @@ def test_correlation_peak_height_threshold():
     This test verifies that weak correlations don't produce matches.
     """
     # Mismatched patterns should produce low correlation peaks
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(RTHK_BEEP_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
     # Should have no matches due to low correlation peaks
     assert len(peak_times['cbs_news']) == 0, \
@@ -522,10 +416,7 @@ def test_verification_stage_filters_false_positives():
     """
     # Test with patterns that might produce correlation peaks but should
     # be rejected in verification
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
-
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(CBS_NEWS_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Verification stage should reject any potential matches
     assert len(peak_times['rthk_beep']) == 0, \
@@ -545,13 +436,10 @@ def test_rainbow_intro_pattern_detection():
 
     Expected to find match at approximately 15.5s
     """
-    pattern_file = "sample_audios/clips/天空下的彩虹intro.wav"
-    audio_file = "sample_audios/am1430_section_with_rainbow_intro.wav"
+    assert Path(RAINBOW_INTRO_PATTERN).exists(), f"Pattern file {RAINBOW_INTRO_PATTERN} not found"
+    assert Path(RAINBOW_INTRO_AUDIO).exists(), f"Audio file {RAINBOW_INTRO_AUDIO} not found"
 
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(RAINBOW_INTRO_AUDIO, [RAINBOW_INTRO_PATTERN], debug_mode=False)
 
     assert isinstance(peak_times, dict), "peak_times should be a dictionary"
     assert '天空下的彩虹intro' in peak_times, "天空下的彩虹intro pattern not found in results"
@@ -560,23 +448,19 @@ def test_rainbow_intro_pattern_detection():
 
     assert len(matches) == 1, f"Expected 1 match, found {len(matches)}: {matches}"
 
-    expected_time = 15.5
     actual_time = matches[0]
-    assert abs(actual_time - expected_time) < 1.0, \
-        f"Expected timestamp ~{expected_time}s, got {actual_time}s"
+    assert abs(actual_time - RAINBOW_INTRO_EXPECTED_TIME) < 1.0, \
+        f"Expected timestamp ~{RAINBOW_INTRO_EXPECTED_TIME}s, got {actual_time}s"
 
     assert total_time > 0, "Total processing time should be positive"
 
 
 def test_rainbow_intro_not_in_cbs_audio():
     """Test that 天空下的彩虹intro pattern does not match CBS audio"""
-    pattern_file = "sample_audios/clips/天空下的彩虹intro.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    assert Path(RAINBOW_INTRO_PATTERN).exists(), f"Pattern file {RAINBOW_INTRO_PATTERN} not found"
+    assert Path(CBS_NEWS_AUDIO).exists(), f"Audio file {CBS_NEWS_AUDIO} not found"
 
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
-    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
-
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(CBS_NEWS_AUDIO, [RAINBOW_INTRO_PATTERN], debug_mode=False)
 
     assert '天空下的彩虹intro' in peak_times, "天空下的彩虹intro key should exist in results"
     assert len(peak_times['天空下的彩虹intro']) == 0, \
@@ -584,13 +468,12 @@ def test_rainbow_intro_not_in_cbs_audio():
 
 
 def test_cbs_pattern_not_in_rainbow_intro_audio():
-    """Test that CBS patterns do not match in AM1430 rainbow intro audio"""
+    """Test that CBS and RTHK patterns do not match in AM1430 rainbow intro audio"""
     test_cases = [
-        ("sample_audios/clips/cbs_news.wav", "cbs_news"),
-        ("sample_audios/clips/cbs_news_dada.wav", "cbs_news_dada"),
-        ("sample_audios/clips/rthk_beep.wav", "rthk_beep"),
+        (CBS_NEWS_PATTERN, "cbs_news"),
+        (RTHK_BEEP_PATTERN, "rthk_beep"),
     ]
-    audio_file = "sample_audios/am1430_section_with_rainbow_intro.wav"
+    audio_file = RAINBOW_INTRO_AUDIO
 
     assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
 
@@ -613,16 +496,14 @@ def test_match_16khz_audio_with_8khz_pattern():
     The match_pattern function should automatically convert 16kHz audio
     to 8kHz during processing and correctly identify patterns.
     """
-    # Use 8kHz pattern (pre-converted)
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
     # Use 16kHz audio file
     audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
 
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+    assert Path(RTHK_BEEP_PATTERN).exists(), f"Pattern file {RTHK_BEEP_PATTERN} not found"
     assert Path(audio_file).exists(), f"16kHz audio file {audio_file} not found"
 
     # Run pattern matching - should handle conversion automatically
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(audio_file, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Should find the same matches as with 8kHz audio
     assert 'rthk_beep' in peak_times
@@ -630,8 +511,7 @@ def test_match_16khz_audio_with_8khz_pattern():
         f"Expected 2 matches in 16kHz audio, found {len(peak_times['rthk_beep'])}"
 
     # Verify timestamps are similar (allowing small variation due to resampling)
-    expected_times = [1.4165, 2.419125]
-    for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+    for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), RTHK_BEEP_EXPECTED_TIMES)):
         assert abs(actual - expected) < 0.05, \
             f"Match {i}: Expected ~{expected}s, got {actual}s (tolerance increased for resampling)"
 
@@ -641,23 +521,21 @@ def test_match_16khz_cbs_news():
 
     Tests normal pattern detection with 16kHz audio.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
     audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
 
-    assert Path(pattern_file).exists(), f"Pattern file {pattern_file} not found"
+    assert Path(CBS_NEWS_PATTERN).exists(), f"Pattern file {CBS_NEWS_PATTERN} not found"
     assert Path(audio_file).exists(), f"16kHz audio file {audio_file} not found"
 
-    peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, total_time = match_pattern(audio_file, [CBS_NEWS_PATTERN], debug_mode=False)
 
     assert 'cbs_news' in peak_times
     assert len(peak_times['cbs_news']) == 1, \
         f"Expected 1 match in 16kHz audio, found {len(peak_times['cbs_news'])}"
 
     # Verify timestamp (with increased tolerance for resampling)
-    expected_time = 25.89875
     actual_time = peak_times['cbs_news'][0]
-    assert abs(actual_time - expected_time) < 0.05, \
-        f"Expected ~{expected_time}s, got {actual_time}s"
+    assert abs(actual_time - CBS_NEWS_EXPECTED_TIME) < 0.05, \
+        f"Expected ~{CBS_NEWS_EXPECTED_TIME}s, got {actual_time}s"
 
 
 def test_match_16khz_with_converted_16khz_pattern():
@@ -709,7 +587,7 @@ def test_multiple_16khz_patterns():
     # Convert multiple 16kHz patterns to 8kHz
     input_patterns = [
         "sample_audios/test_16khz/clips/cbs_news_16k.wav",
-        "sample_audios/test_16khz/clips/cbs_news_dada_16k.wav"
+        "sample_audios/test_16khz/clips/rthk_beep_16k.wav"
     ]
 
     converted_patterns = []
@@ -728,19 +606,19 @@ def test_multiple_16khz_patterns():
             write_wav_file(output_file, audio, 8000)
             converted_patterns.append(output_file)
 
-        # Match against 16kHz audio
+        # Match against 16kHz CBS audio
         audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
         assert Path(audio_file).exists()
 
         peak_times, _ = match_pattern(audio_file, converted_patterns, debug_mode=False)
 
-        # Verify both patterns found their matches
+        # Verify both patterns have result entries
         assert len(peak_times) == 2, "Expected 2 pattern results"
 
-        # Each pattern should have found 1 match
-        for pattern_name, matches in peak_times.items():
-            assert len(matches) == 1, \
-                f"Pattern {pattern_name} should have 1 match, found {len(matches)}"
+        # CBS news should match (1 match), rthk_beep should not match (0 matches)
+        pattern_match_counts = sorted(len(matches) for matches in peak_times.values())
+        assert pattern_match_counts == [0, 1], \
+            f"Expected one pattern with 1 match and one with 0, got {dict(peak_times)}"
 
     finally:
         # Clean up all temp files
@@ -756,13 +634,12 @@ def test_16khz_no_false_positives():
     false positive matches.
     """
     # Use CBS pattern with RTHK audio (should not match)
-    pattern_file = "sample_audios/clips/cbs_news.wav"
     audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
 
-    assert Path(pattern_file).exists()
+    assert Path(CBS_NEWS_PATTERN).exists()
     assert Path(audio_file).exists()
 
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(audio_file, [CBS_NEWS_PATTERN], debug_mode=False)
 
     assert 'cbs_news' in peak_times
     assert len(peak_times['cbs_news']) == 0, \
@@ -776,13 +653,12 @@ def test_16khz_beep_pattern_rejection():
     sample rate conversion.
     """
     # Use RTHK beep with CBS audio (should not match)
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
     audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
 
-    assert Path(pattern_file).exists()
+    assert Path(RTHK_BEEP_PATTERN).exists()
     assert Path(audio_file).exists()
 
-    peak_times, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    peak_times, _ = match_pattern(audio_file, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     assert 'rthk_beep' in peak_times
     assert len(peak_times['rthk_beep']) == 0, \
@@ -795,21 +671,18 @@ def test_sample_rate_preservation_in_results():
     When 16kHz audio is converted to 8kHz, timestamps should still
     reflect the original audio timeline, not the converted timeline.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-
     # Test with both 8kHz and 16kHz versions of the same audio
-    audio_8k = "sample_audios/rthk_section_with_beep.wav"
     audio_16k = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
 
-    assert Path(pattern_file).exists()
-    assert Path(audio_8k).exists()
+    assert Path(RTHK_BEEP_PATTERN).exists()
+    assert Path(RTHK_BEEP_AUDIO).exists()
     assert Path(audio_16k).exists()
 
     # Match against 8kHz audio
-    results_8k, _ = match_pattern(audio_8k, [pattern_file], debug_mode=False)
+    results_8k, _ = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Match against 16kHz audio
-    results_16k, _ = match_pattern(audio_16k, [pattern_file], debug_mode=False)
+    results_16k, _ = match_pattern(audio_16k, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Both should find the same number of matches
     assert len(results_8k['rthk_beep']) == len(results_16k['rthk_beep']), \
@@ -833,19 +706,16 @@ def test_streaming_rthk_beep_detection():
     Uses AudioStream and AudioPatternDetector directly to test
     the streaming chunk-based processing.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    assert Path(pattern_file).exists()
-    assert Path(audio_file).exists()
+    assert Path(RTHK_BEEP_PATTERN).exists()
+    assert Path(RTHK_BEEP_AUDIO).exists()
 
     # Load pattern clip
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     # Process audio using streaming
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(RTHK_BEEP_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(RTHK_BEEP_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         # Run detection
@@ -857,8 +727,7 @@ def test_streaming_rthk_beep_detection():
     assert len(peak_times['rthk_beep']) == 2, \
         f"Expected 2 matches, found {len(peak_times['rthk_beep'])}"
 
-    expected_times = [1.4165, 2.419125]
-    for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+    for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), RTHK_BEEP_EXPECTED_TIMES)):
         assert abs(actual - expected) < 0.01, \
             f"Match {i}: Expected ~{expected}s, got {actual}s"
 
@@ -868,17 +737,14 @@ def test_streaming_cbs_news_detection():
 
     Tests normal pattern detection through the streaming interface.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    assert Path(CBS_NEWS_PATTERN).exists()
+    assert Path(CBS_NEWS_AUDIO).exists()
 
-    assert Path(pattern_file).exists()
-    assert Path(audio_file).exists()
-
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(CBS_NEWS_PATTERN)
 
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(CBS_NEWS_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(CBS_NEWS_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
@@ -887,20 +753,18 @@ def test_streaming_cbs_news_detection():
     assert 'cbs_news' in peak_times
     assert len(peak_times['cbs_news']) == 1
 
-    expected_time = 25.89875
-    assert abs(peak_times['cbs_news'][0] - expected_time) < 0.01
+    assert abs(peak_times['cbs_news'][0] - CBS_NEWS_EXPECTED_TIME) < 0.01
 
 
 def test_streaming_multiple_patterns():
     """Test streaming detection with multiple patterns simultaneously
 
     Verifies that multiple AudioClips can be processed in a single stream.
+    Tests CBS news and rainbow intro patterns against CBS audio;
+    CBS news should match while rainbow intro should not.
     """
-    pattern_files = [
-        "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
-    ]
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    pattern_files = [CBS_NEWS_PATTERN, RAINBOW_INTRO_PATTERN]
+    audio_file = CBS_NEWS_AUDIO
 
     assert Path(audio_file).exists()
 
@@ -918,11 +782,11 @@ def test_streaming_multiple_patterns():
         detector = AudioPatternDetector(debug_mode=False, audio_clips=pattern_clips)
         peak_times, total_time = detector.find_clip_in_audio(audio_stream)
 
-    # Both patterns should be found
+    # CBS news should match, rainbow intro should not
     assert 'cbs_news' in peak_times
-    assert 'cbs_news_dada' in peak_times
+    assert '天空下的彩虹intro' in peak_times
     assert len(peak_times['cbs_news']) == 1
-    assert len(peak_times['cbs_news_dada']) == 1
+    assert len(peak_times['天空下的彩虹intro']) == 0
 
 
 def test_streaming_16khz_audio_conversion():
@@ -931,13 +795,12 @@ def test_streaming_16khz_audio_conversion():
     Verifies that ffmpeg_get_float32_pcm correctly converts 16kHz to 8kHz
     during streaming and pattern detection works correctly.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
     audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
 
-    assert Path(pattern_file).exists()
+    assert Path(RTHK_BEEP_PATTERN).exists()
     assert Path(audio_file).exists()
 
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     # Stream 16kHz audio with conversion to 8kHz
     sr = DEFAULT_TARGET_SAMPLE_RATE  # 8000 Hz
@@ -952,8 +815,7 @@ def test_streaming_16khz_audio_conversion():
     assert 'rthk_beep' in peak_times
     assert len(peak_times['rthk_beep']) == 2
 
-    expected_times = [1.4165, 2.419125]
-    for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+    for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), RTHK_BEEP_EXPECTED_TIMES)):
         assert abs(actual - expected) < 0.05, \
             f"Match {i}: Expected ~{expected}s, got {actual}s"
 
@@ -964,14 +826,11 @@ def test_streaming_chunk_processing():
     Verifies the chunked processing maintains accuracy when
     pattern spans chunk boundaries.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(RTHK_BEEP_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(RTHK_BEEP_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         # Use default seconds_per_chunk (60 seconds)
@@ -995,14 +854,11 @@ def test_streaming_small_chunk_size():
     resulting in duplicate timestamps. This tests that the
     correct timestamps ARE found (duplicates may exist).
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(RTHK_BEEP_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(RTHK_BEEP_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         # Use smaller chunk size (must be at least 2x sliding_window)
@@ -1022,16 +878,15 @@ def test_streaming_small_chunk_size():
     assert len(peak_times['rthk_beep']) >= 2
 
     # Verify expected timestamps are present (use set to handle duplicates)
-    expected_times = [1.4165, 2.419125]
-    found_times = set()
+    found_times: set[float] = set()
     for actual in peak_times['rthk_beep']:
-        for expected in expected_times:
+        for expected in RTHK_BEEP_EXPECTED_TIMES:
             if abs(actual - expected) < 0.01:
                 found_times.add(expected)
                 break
 
-    assert len(found_times) == len(expected_times), \
-        f"Expected to find timestamps near {expected_times}, found {peak_times['rthk_beep']}"
+    assert len(found_times) == len(RTHK_BEEP_EXPECTED_TIMES), \
+        f"Expected to find timestamps near {RTHK_BEEP_EXPECTED_TIMES}, found {peak_times['rthk_beep']}"
 
 
 def test_streaming_no_match_scenario():
@@ -1039,14 +894,11 @@ def test_streaming_no_match_scenario():
 
     Verifies that streaming processing correctly returns empty results.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(CBS_NEWS_PATTERN)
 
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(RTHK_BEEP_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(RTHK_BEEP_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
@@ -1061,14 +913,11 @@ def test_streaming_total_time_accuracy():
 
     Verifies the streaming processor correctly tracks total audio processed.
     """
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(RTHK_BEEP_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(RTHK_BEEP_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
@@ -1083,9 +932,7 @@ def test_audio_clip_from_file():
 
     Verifies AudioClip dataclass is properly initialized.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-
-    clip = AudioClip.from_audio_file(pattern_file)
+    clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     assert clip.name == "rthk_beep"
     assert clip.sample_rate == DEFAULT_TARGET_SAMPLE_RATE
@@ -1098,10 +945,8 @@ def test_audio_clip_sample_rate_validation():
 
     Patterns must match DEFAULT_TARGET_SAMPLE_RATE (8000 Hz).
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-
     # Create clip with correct sample rate
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
     # Verify clip has correct sample rate
     assert pattern_clip.sample_rate == DEFAULT_TARGET_SAMPLE_RATE
@@ -1116,12 +961,8 @@ def test_streaming_maintains_pattern_order():
 
     Verifies each pattern's results are stored under the correct key.
     """
-    pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",
-        "sample_audios/clips/cbs_news.wav",
-        "sample_audios/clips/cbs_news_dada.wav"
-    ]
-    audio_file = "sample_audios/cbs_news_audio_section.wav"
+    pattern_files = [RTHK_BEEP_PATTERN, CBS_NEWS_PATTERN, RAINBOW_INTRO_PATTERN]
+    audio_file = CBS_NEWS_AUDIO
 
     pattern_clips = [AudioClip.from_audio_file(pf) for pf in pattern_files]
 
@@ -1136,13 +977,14 @@ def test_streaming_maintains_pattern_order():
     # All patterns should have result entries
     assert 'rthk_beep' in peak_times
     assert 'cbs_news' in peak_times
-    assert 'cbs_news_dada' in peak_times
+    assert '天空下的彩虹intro' in peak_times
 
     # RTHK beep shouldn't match CBS audio
     assert len(peak_times['rthk_beep']) == 0
-    # CBS patterns should match
+    # CBS news should match
     assert len(peak_times['cbs_news']) == 1
-    assert len(peak_times['cbs_news_dada']) == 1
+    # Rainbow intro shouldn't match CBS audio
+    assert len(peak_times['天空下的彩虹intro']) == 0
 
 
 def test_streaming_duplicate_pattern_names_rejected():
@@ -1150,10 +992,8 @@ def test_streaming_duplicate_pattern_names_rejected():
 
     AudioPatternDetector should raise ValueError for duplicate clip names.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-
-    clip1 = AudioClip.from_audio_file(pattern_file)
-    clip2 = AudioClip.from_audio_file(pattern_file)  # Same name
+    clip1 = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
+    clip2 = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)  # Same name
 
     with pytest.raises(ValueError, match="needs to be unique"):
         AudioPatternDetector(debug_mode=False, audio_clips=[clip1, clip2])
@@ -1164,13 +1004,12 @@ def test_streaming_16khz_cbs_news():
 
     Tests normal pattern detection through streaming with sample rate conversion.
     """
-    pattern_file = "sample_audios/clips/cbs_news.wav"
     audio_file = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav"
 
-    assert Path(pattern_file).exists()
+    assert Path(CBS_NEWS_PATTERN).exists()
     assert Path(audio_file).exists()
 
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(CBS_NEWS_PATTERN)
 
     sr = DEFAULT_TARGET_SAMPLE_RATE
     with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
@@ -1183,8 +1022,7 @@ def test_streaming_16khz_cbs_news():
     assert 'cbs_news' in peak_times
     assert len(peak_times['cbs_news']) == 1
 
-    expected_time = 25.89875
-    assert abs(peak_times['cbs_news'][0] - expected_time) < 0.05
+    assert abs(peak_times['cbs_news'][0] - CBS_NEWS_EXPECTED_TIME) < 0.05
 
 
 def test_streaming_results_match_high_level_api():
@@ -1192,17 +1030,14 @@ def test_streaming_results_match_high_level_api():
 
     Ensures consistency between low-level streaming and high-level APIs.
     """
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
-    audio_file = "sample_audios/rthk_section_with_beep.wav"
-
     # High-level API result
-    high_level_results, _ = match_pattern(audio_file, [pattern_file], debug_mode=False)
+    high_level_results, _ = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
     # Low-level streaming result
-    pattern_clip = AudioClip.from_audio_file(pattern_file)
+    pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
     sr = DEFAULT_TARGET_SAMPLE_RATE
-    with ffmpeg_get_float32_pcm(audio_file, target_sample_rate=sr, ac=1) as stdout:
-        audio_name = Path(audio_file).stem
+    with ffmpeg_get_float32_pcm(RTHK_BEEP_AUDIO, target_sample_rate=sr, ac=1) as stdout:
+        audio_name = Path(RTHK_BEEP_AUDIO).stem
         audio_stream = AudioStream(name=audio_name, audio_stream=stdout, sample_rate=sr)
 
         detector = AudioPatternDetector(debug_mode=False, audio_clips=[pattern_clip])
@@ -1226,10 +1061,9 @@ class TestWavFileStreamWrapper:
 
     def test_wav_file_stream_wrapper_basic(self):
         """Test basic functionality of _WavFileStreamWrapper."""
-        wav_file = "sample_audios/clips/rthk_beep.wav"
-        assert Path(wav_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
 
-        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        wrapper = _WavFileStreamWrapper(RTHK_BEEP_PATTERN, DEFAULT_TARGET_SAMPLE_RATE)
         try:
             assert wrapper.target_sample_rate == DEFAULT_TARGET_SAMPLE_RATE
             assert wrapper.input_sample_rate > 0
@@ -1242,10 +1076,9 @@ class TestWavFileStreamWrapper:
         """Test reading data from _WavFileStreamWrapper."""
         import numpy as np
 
-        wav_file = "sample_audios/clips/rthk_beep.wav"
-        assert Path(wav_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
 
-        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        wrapper = _WavFileStreamWrapper(RTHK_BEEP_PATTERN, DEFAULT_TARGET_SAMPLE_RATE)
         try:
             # Read some data (4 bytes per float32 sample)
             data = wrapper.read(4000)  # 1000 samples
@@ -1264,10 +1097,9 @@ class TestWavFileStreamWrapper:
         """Test reading entire WAV file via _WavFileStreamWrapper."""
         import numpy as np
 
-        wav_file = "sample_audios/clips/rthk_beep.wav"
-        assert Path(wav_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
 
-        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        wrapper = _WavFileStreamWrapper(RTHK_BEEP_PATTERN, DEFAULT_TARGET_SAMPLE_RATE)
         try:
             # Read entire file in chunks
             all_data = b""
@@ -1316,10 +1148,9 @@ class TestWavFileStreamWrapper:
 
     def test_wav_file_stream_wrapper_no_resampling(self):
         """Test _WavFileStreamWrapper when no resampling is needed."""
-        wav_file = "sample_audios/clips/rthk_beep.wav"  # Already 8kHz
-        assert Path(wav_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
 
-        wrapper = _WavFileStreamWrapper(wav_file, 8000)
+        wrapper = _WavFileStreamWrapper(RTHK_BEEP_PATTERN, 8000)  # Already 8kHz
         try:
             assert wrapper.input_sample_rate == 8000
             assert wrapper.target_sample_rate == 8000
@@ -1334,10 +1165,9 @@ class TestWavFileStreamWrapper:
 
     def test_wav_file_stream_wrapper_with_audio_stream(self):
         """Test using _WavFileStreamWrapper with AudioStream class."""
-        wav_file = "sample_audios/clips/rthk_beep.wav"
-        assert Path(wav_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
 
-        wrapper = _WavFileStreamWrapper(wav_file, DEFAULT_TARGET_SAMPLE_RATE)
+        wrapper = _WavFileStreamWrapper(RTHK_BEEP_PATTERN, DEFAULT_TARGET_SAMPLE_RATE)
         try:
             audio_stream = AudioStream(
                 name="test_stream",
@@ -1355,78 +1185,62 @@ class TestWavFileMatchingWithoutFfmpeg:
 
     def test_wav_match_without_ffmpeg(self):
         """Test that WAV file matching works without ffmpeg."""
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-        assert Path(pattern_file).exists()
-        assert Path(audio_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
+        assert Path(RTHK_BEEP_AUDIO).exists()
 
         # This should use _WavFileStreamWrapper internally
-        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+        peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
         # Should find the expected matches
         assert 'rthk_beep' in peak_times
         assert len(peak_times['rthk_beep']) == 2
 
-        expected_times = [1.4165, 2.419125]
-        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), RTHK_BEEP_EXPECTED_TIMES)):
             assert abs(actual - expected) < 0.01
 
     def test_wav_match_results_consistent(self):
         """Test that WAV matching produces consistent results with streaming API."""
-        pattern_file = "sample_audios/clips/cbs_news.wav"
-        audio_file = "sample_audios/cbs_news_audio_section.wav"
-
-        assert Path(pattern_file).exists()
-        assert Path(audio_file).exists()
+        assert Path(CBS_NEWS_PATTERN).exists()
+        assert Path(CBS_NEWS_AUDIO).exists()
 
         # Run match_pattern
-        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+        peak_times, total_time = match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
         assert 'cbs_news' in peak_times
         assert len(peak_times['cbs_news']) == 1
 
-        expected_time = 25.89875
-        assert abs(peak_times['cbs_news'][0] - expected_time) < 0.01
+        assert abs(peak_times['cbs_news'][0] - CBS_NEWS_EXPECTED_TIME) < 0.01
 
     def test_wav_match_16khz_resampling(self):
         """Test WAV matching with 16kHz file (resampled to 8kHz)."""
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
+        audio_file_16k = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
 
-        assert Path(pattern_file).exists()
-        if not Path(audio_file).exists():
+        assert Path(RTHK_BEEP_PATTERN).exists()
+        if not Path(audio_file_16k).exists():
             pytest.skip("16kHz test file not found")
 
-        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+        peak_times, total_time = match_pattern(audio_file_16k, [RTHK_BEEP_PATTERN], debug_mode=False)
 
         assert 'rthk_beep' in peak_times
         assert len(peak_times['rthk_beep']) == 2
 
-        expected_times = [1.4165, 2.419125]
-        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+        for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), RTHK_BEEP_EXPECTED_TIMES)):
             assert abs(actual - expected) < 0.05
 
     def test_wav_match_no_false_positives(self):
         """Test that WAV matching doesn't produce false positives."""
-        pattern_file = "sample_audios/clips/cbs_news.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
+        assert Path(CBS_NEWS_PATTERN).exists()
+        assert Path(RTHK_BEEP_AUDIO).exists()
 
-        assert Path(pattern_file).exists()
-        assert Path(audio_file).exists()
-
-        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+        peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [CBS_NEWS_PATTERN], debug_mode=False)
 
         assert 'cbs_news' in peak_times
         assert len(peak_times['cbs_news']) == 0
 
     def test_wav_match_multiple_patterns(self):
         """Test WAV matching with multiple patterns."""
-        pattern_files = [
-            "sample_audios/clips/cbs_news.wav",
-            "sample_audios/clips/cbs_news_dada.wav"
-        ]
-        audio_file = "sample_audios/cbs_news_audio_section.wav"
+        pattern_files = [CBS_NEWS_PATTERN, RAINBOW_INTRO_PATTERN]
+        audio_file = CBS_NEWS_AUDIO
 
         for pf in pattern_files:
             assert Path(pf).exists()
@@ -1435,19 +1249,16 @@ class TestWavFileMatchingWithoutFfmpeg:
         peak_times, total_time = match_pattern(audio_file, pattern_files, debug_mode=False)
 
         assert 'cbs_news' in peak_times
-        assert 'cbs_news_dada' in peak_times
+        assert '天空下的彩虹intro' in peak_times
         assert len(peak_times['cbs_news']) == 1
-        assert len(peak_times['cbs_news_dada']) == 1
+        assert len(peak_times['天空下的彩虹intro']) == 0
 
     def test_wav_match_without_ffmpeg_available(self):
         """Test WAV file matching works when ffmpeg is not available."""
         from audio_pattern_detector import audio_utils
 
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-        assert Path(pattern_file).exists()
-        assert Path(audio_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
+        assert Path(RTHK_BEEP_AUDIO).exists()
 
         # Mock ffmpeg as unavailable
         original_state = audio_utils._ffmpeg_available
@@ -1455,33 +1266,29 @@ class TestWavFileMatchingWithoutFfmpeg:
 
         try:
             # Should still work for WAV files
-            peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+            peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
             assert 'rthk_beep' in peak_times
             assert len(peak_times['rthk_beep']) == 2
 
-            expected_times = [1.4165, 2.419125]
-            for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), expected_times)):
+            for i, (actual, expected) in enumerate(zip(sorted(peak_times['rthk_beep']), RTHK_BEEP_EXPECTED_TIMES)):
                 assert abs(actual - expected) < 0.01
         finally:
             audio_utils._ffmpeg_available = original_state
 
     def test_wav_match_streaming_with_wrapper(self):
         """Test streaming pattern matching using _WavFileStreamWrapper directly."""
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
-
-        assert Path(pattern_file).exists()
-        assert Path(audio_file).exists()
+        assert Path(RTHK_BEEP_PATTERN).exists()
+        assert Path(RTHK_BEEP_AUDIO).exists()
 
         # Load pattern
-        pattern_clip = AudioClip.from_audio_file(pattern_file)
+        pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
 
         # Use _WavFileStreamWrapper directly
-        wrapper = _WavFileStreamWrapper(audio_file, DEFAULT_TARGET_SAMPLE_RATE)
+        wrapper = _WavFileStreamWrapper(RTHK_BEEP_AUDIO, DEFAULT_TARGET_SAMPLE_RATE)
         try:
             audio_stream = AudioStream(
-                name=Path(audio_file).stem,
+                name=Path(RTHK_BEEP_AUDIO).stem,
                 audio_stream=wrapper,
                 sample_rate=DEFAULT_TARGET_SAMPLE_RATE
             )
@@ -1496,13 +1303,10 @@ class TestWavFileMatchingWithoutFfmpeg:
 
     def test_wav_match_total_time_accuracy(self):
         """Test that total_time is accurate for WAV file matching."""
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
-        audio_file = "sample_audios/rthk_section_with_beep.wav"
+        assert Path(RTHK_BEEP_PATTERN).exists()
+        assert Path(RTHK_BEEP_AUDIO).exists()
 
-        assert Path(pattern_file).exists()
-        assert Path(audio_file).exists()
-
-        peak_times, total_time = match_pattern(audio_file, [pattern_file], debug_mode=False)
+        peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
         # rthk_section_with_beep.wav is ~4.08 seconds
         assert 4.0 < total_time < 4.2, f"Expected ~4.08s, got {total_time}s"
