@@ -633,7 +633,7 @@ class AudioPatternDetector:
         clip_name: str,
         index: int,
         section_ts: str,
-        similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
+        similarities: list[Any],
         peaks_final: list[int],
         _clip_cache: ClipCache,
         _area_props: list[list[Any]],
@@ -686,12 +686,14 @@ class AudioPatternDetector:
         best_pearson_r = -1.0
         best_window_idx = 0
         ds_slices: list[NDArray[np.float32]] = []
+        pearson_per_window: dict[str, float] = {}
         for wi, (wl, wr, ds_n) in enumerate(pearson_windows):
             lo = round(len(correlation_slice) * wl / partition_count)
             hi = round(len(correlation_slice) * wr / partition_count)
             ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds_n)
             ds_slices.append(ds_s)
             r: float = pearson_correlation(cached_clips[wi], ds_s)
+            pearson_per_window[f"pearson_w{wl}_{wr}"] = r
             if r > best_pearson_r:
                 best_pearson_r = r
                 best_window_idx = wi
@@ -742,10 +744,10 @@ class AudioPatternDetector:
             best_wl, best_wr, _best_ds_n = pearson_windows[best_window_idx]
             similarities.append((similarity, {"whole": float(similarity_whole),
                                               "middle": float(similarity_middle),
-                                              "pearson_r": pearson_r,
-                                              "best_window_left": float(best_wl),
-                                              "best_window_right": float(best_wr),
-                                              }))
+                                              }, {"pearson_r": pearson_r,
+                                                  "best_window_left": float(best_wl),
+                                                  "best_window_right": float(best_wr),
+                                                  **pearson_per_window}))
 
         similarity_hard_limit = 0.03
         similarity_threshold = 0.01
@@ -858,7 +860,7 @@ class AudioPatternDetector:
         clip_name: str,
         index: int,
         section_ts: str,
-        similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
+        similarities: list[Any],
         peaks_final: list[int],
         clip_cache: ClipCache,
         area_props: list[list[Any]],
