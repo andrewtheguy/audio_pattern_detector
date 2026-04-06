@@ -11,15 +11,17 @@ Denoising the pattern clip improves match accuracy in two scenarios:
 
 In both cases, background noise in the pattern correlates with unrelated parts of the audio stream, widening the cross-correlation envelope and reducing the Pearson r shape similarity score. Removing noise isolates the distinctive signal, making the pattern more reliably matchable across different recordings.
 
+3. **Repeating background sounds**: If the pattern clip contains repeating elements (e.g. background beeps, music loops, jingle tails) that also appear elsewhere in the audio stream, the detector may produce duplicate detections a few seconds apart from a single real occurrence. Filtering out the repeating frequency range eliminates these ghost matches.
+
 ## FFmpeg filter strategies
 
-### Speech-range bandpass + denoise (recommended for speech/jingles)
+### Speech-range bandpass + denoise (recommended default)
 
 ```bash
 ffmpeg -i input.wav -af "highpass=f=300,lowpass=f=3400,afftdn=nf=-25" -y output.wav
 ```
 
-Removes frequencies outside the human speech range (300-3400 Hz) and applies FFT-based noise reduction. Works well for spoken jingles and vocal patterns.
+Removes frequencies outside the human speech range (300-3400 Hz) and applies FFT-based noise reduction. Works well for spoken jingles and vocal patterns. Also effective at removing repeating background beeps or tones that sit outside the speech range, which prevents duplicate detections from those sounds correlating with later occurrences in the stream.
 
 ### Narrow bandpass (for tonal patterns like bells/chimes)
 
@@ -49,13 +51,16 @@ This produces the highest Pearson r scores since the synthesized pattern has zer
 
 ## Choosing a strategy
 
-| Pattern type | Strategy | Expected Pearson r improvement |
+| Pattern type | Strategy | Expected improvement |
 |---|---|---|
-| Speech/jingles | Speech-range bandpass | 0.6 -> 0.9 |
-| Tonal (bells, chimes) | Narrow bandpass or synthesize | 0.5 -> 0.93+ |
-| Music with vocals | Speech-range bandpass | Moderate |
+| Speech/jingles | Speech-range bandpass | Pearson r 0.6 -> 0.9 |
+| Tonal (bells, chimes) | Narrow bandpass or synthesize | Pearson r 0.5 -> 0.93+ |
+| Music with vocals | Speech-range bandpass | Moderate Pearson r gain |
 | Short clips (<1.5s) | Narrow bandpass or synthesize | Most impactful |
 | Long clips (>3s) | Light denoise or none | Minimal difference |
+| Clips with repeating background sounds | Speech-range bandpass | Eliminates duplicate detections |
+
+**General rule**: if a pattern clip contains sounds that repeat elsewhere in the broadcast (beeps, music loops, jingle tails), filter them out. The distinctive part of the clip — typically the speech or a unique tonal signature — is what the detector should match against. Leaving in repeating elements causes the detector to find those elements at multiple nearby offsets, producing cluster duplicates from a single real occurrence.
 
 ## afftdn parameter reference
 

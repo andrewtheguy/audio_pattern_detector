@@ -41,7 +41,7 @@ class ClipData(TypedDict):
 class ClipCache(TypedDict):
     """Cache for clip-related computed data."""
     downsampled_correlation_clips: dict[str, NDArray[np.float32]]
-    downsampled_middle_correlation_clips: dict[str, NDArray[np.float32]]
+    downsampled_pearson_windows: dict[str, list[NDArray[np.float32]]]
     is_pure_tone_pattern: dict[str, bool]
 
 
@@ -136,7 +136,7 @@ class AudioPatternDetector:
         self._clip_datas: dict[str, ClipData] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
-            "downsampled_middle_correlation_clips": {},
+            "downsampled_pearson_windows": {},
             "is_pure_tone_pattern": {},
         }
 
@@ -633,7 +633,7 @@ class AudioPatternDetector:
         clip_name: str,
         index: int,
         section_ts: str,
-        similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
+        similarities: list[Any],
         peaks_final: list[int],
         _clip_cache: ClipCache,
         _area_props: list[list[Any]],
@@ -664,17 +664,41 @@ class AudioPatternDetector:
 
         similarity = min(similarity_whole,similarity_middle)
 
-        lower_limit = round(len(correlation_clip) * left_bound / partition_count)
-        upper_limit = round(len(correlation_clip) * right_bound / partition_count)
+        # 3-window Pearson r: try different regions and pick best match
+        # Window A: first half (0-50%), B: middle (40-60%), C: second half (50-100%)
+        # Downsample count scales with window width so resolution is consistent
+        ds_base = 101  # for 20% window (2 partitions)
+        pearson_windows: list[tuple[int, int, int]] = [
+            (0, 5, round(ds_base * 5 / 2)),   # 50% → 252 samples
+            (4, 6, ds_base),                    # 20% → 101 samples
+            (5, 10, round(ds_base * 5 / 2)),   # 50% → 252 samples
+        ]
 
-        ds_target = 101
-        ds_clip = _clip_cache["downsampled_middle_correlation_clips"].get(clip_name)
-        if ds_clip is None:
-            ds_clip = resample_preserve_maxima(correlation_clip[lower_limit:upper_limit], ds_target)
-            _clip_cache["downsampled_middle_correlation_clips"][clip_name] = ds_clip
-        ds_slice = resample_preserve_maxima(correlation_slice[lower_limit:upper_limit], ds_target)
+        cached_clips = _clip_cache["downsampled_pearson_windows"].get(clip_name)
+        if cached_clips is None:
+            cached_clips = []
+            for wl, wr, ds_n in pearson_windows:
+                lo = round(len(correlation_clip) * wl / partition_count)
+                hi = round(len(correlation_clip) * wr / partition_count)
+                cached_clips.append(resample_preserve_maxima(correlation_clip[lo:hi], ds_n))
+            _clip_cache["downsampled_pearson_windows"][clip_name] = cached_clips
 
-        pearson_r: float = pearson_correlation(ds_clip, ds_slice)
+        best_pearson_r = -1.0
+        best_window_idx = 0
+        ds_slices: list[NDArray[np.float32]] = []
+        pearson_per_window: dict[str, float] = {}
+        for wi, (wl, wr, ds_n) in enumerate(pearson_windows):
+            lo = round(len(correlation_slice) * wl / partition_count)
+            hi = round(len(correlation_slice) * wr / partition_count)
+            ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds_n)
+            ds_slices.append(ds_s)
+            r: float = pearson_correlation(cached_clips[wi], ds_s)
+            pearson_per_window[f"pearson_w{wl}_{wr}"] = r
+            if r > best_pearson_r:
+                best_pearson_r = r
+                best_window_idx = wi
+
+        pearson_r = best_pearson_r
 
         if debug_mode:
             import matplotlib.pyplot as plt
@@ -700,24 +724,38 @@ class AudioPatternDetector:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
+                # Downsampled windows used for Pearson r
+                ds_graph_dir = f"{self.debug_dir}/graph/pearson_downsampled/{clip_name}"
+                os.makedirs(ds_graph_dir, exist_ok=True)
+
+                for wi, (wl, wr, _ds_n) in enumerate(pearson_windows):
+                    r_wi = pearson_per_window[f"pearson_w{wl}_{wr}"]
+                    marker = " *best*" if wi == best_window_idx else ""
+                    plt.figure(figsize=(10, 4))
+                    plt.plot(ds_slices[wi])
+                    plt.plot(cached_clips[wi], alpha=0.7)
+                    plt.title(f'Partitions {wl}-{wr} (pearson_r={r_wi:.4f}){marker}')
+                    plt.xlabel('Sample')
+                    plt.ylabel('Correlation coefficient')
+                    plt.savefig(
+                        f'{ds_graph_dir}/{clip_name}_{index}_{section_ts}_{peak}_w{wl}_{wr}.png')
+                    plt.close()
+
+            best_wl, best_wr, _best_ds_n = pearson_windows[best_window_idx]
             similarities.append((similarity, {"whole": float(similarity_whole),
                                               "middle": float(similarity_middle),
-                                              "pearson_r": pearson_r,
-                                              }))
+                                              }, {"pearson_r": pearson_r,
+                                                  "best_window_left": float(best_wl),
+                                                  "best_window_right": float(best_wr),
+                                                  **pearson_per_window}))
 
         similarity_hard_limit = 0.03
-        similarity_threshold = 0.01
-        pearson_r_threshold = 0.85
-        pearson_r_threshold_low_mse = 0.85
+        pearson_r_threshold = 0.90
 
         if similarity > similarity_hard_limit:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
         elif pearson_r >= pearson_r_threshold:
-            # Shape matches well — accept even if MSE is moderately above threshold
-            peaks_final.append(peak)
-        elif similarity <= similarity_threshold and pearson_r >= pearson_r_threshold_low_mse:
-            # MSE is low and shape is reasonably close
             peaks_final.append(peak)
         else:
             if debug_mode:
@@ -817,7 +855,7 @@ class AudioPatternDetector:
         clip_name: str,
         index: int,
         section_ts: str,
-        similarities: list[tuple[np.floating[Any], dict[str, float | np.floating[Any]]]],
+        similarities: list[Any],
         peaks_final: list[int],
         clip_cache: ClipCache,
         area_props: list[list[Any]],

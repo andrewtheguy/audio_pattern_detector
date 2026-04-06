@@ -23,7 +23,7 @@ Raw audio stream (float32 PCM)
         |
    For each candidate peak:
         |--- Pure tone pattern ---> Downsampled MSE + overlap ratio check
-        |--- Normal pattern -----> Partitioned MSE + downsampled Pearson r check
+        |--- Normal pattern -----> Partitioned MSE + multi-window Pearson r check
         |
    Accepted peaks converted to timestamps
 ```
@@ -75,13 +75,27 @@ Verification uses partitioned mean squared error (MSE) plus Pearson correlation 
 
    The middle partitions are checked separately because real distortions tend to appear there.
 
-2. **Pearson correlation** - the middle 20% of both curves (partitions 4-5) is downsampled to 101 points using `resample_preserve_maxima`, then the Pearson correlation coefficient is computed. This measures shape similarity in a scale-invariant way — it doesn't care about amplitude differences, only whether the curves have the same shape. This is important for lossy-encoded audio (e.g. Opus HLS streams) where codec artifacts inflate the correlation envelope but preserve the overall shape.
+2. **Multi-window Pearson correlation** - three overlapping regions of the curves are compared to find the best shape match:
+   - Window A: first half (partitions 0-4, 0-50%), downsampled to 252 points
+   - Window B: center (partitions 4-5, 40-60%), downsampled to 101 points
+   - Window C: second half (partitions 5-9, 50-100%), downsampled to 252 points
+
+   Each window is downsampled using `resample_preserve_maxima` (sample count proportional to window width for consistent resolution), then the Pearson correlation coefficient is computed between the pattern's self-correlation window and the candidate's cross-correlation window. The best (highest) Pearson r across the three windows is used.
+
+   Pearson r is scale-invariant — it measures shape similarity regardless of amplitude differences. This is important for lossy-encoded audio (e.g. Opus HLS streams) where codec artifacts inflate the correlation envelope but preserve the overall shape. The multi-window approach handles cases where the peak shape is slightly asymmetric or off-center.
 
 3. **Decision thresholds**:
    - `similarity > 0.03` -> reject (hard MSE ceiling)
-   - `pearson_r >= 0.85` -> accept (shape matches well, even if MSE is moderately elevated)
-   - `similarity <= 0.01` -> accept (MSE low enough without strong shape match)
-   - Otherwise -> reject (MSE too high and shape doesn't match)
+   - `pearson_r >= 0.90` -> accept (shape matches well, even if MSE is moderately elevated)
+   - Otherwise -> reject (shape doesn't match well enough)
+
+### Pattern Clip Quality
+
+Detection accuracy depends heavily on the quality of the pattern clip. Clips with background noise, repeating sounds (beeps, music loops), or frequencies outside the distinctive signal range can cause:
+- **False negatives**: noise widens the cross-correlation envelope, reducing Pearson r below the threshold
+- **Duplicate detections**: repeating elements in the clip (e.g. background beeps) correlate with later occurrences of those same sounds in the stream, producing ghost matches a few seconds after the real detection
+
+Denoising the pattern clip with bandpass filtering (e.g. speech range 300-3400 Hz) removes these issues. For tonal patterns, synthesizing a clean version from the dominant frequencies produces the best results. See [denoise-strategy.md](denoise-strategy.md).
 
 ### Pure Tone Patterns
 
