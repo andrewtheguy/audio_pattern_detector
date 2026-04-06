@@ -904,11 +904,12 @@ mod tests {
 
     #[test]
     fn test_resample_preserve_maxima_short_input() {
-        // Upsampling: 3 samples → 5 windows. Each window maps to the
-        // nearest sample(s) and output length always equals target_len.
+        // Upsampling: 3 samples → 5 windows (step_size = 0.6).
+        // i=0: [0..1)→1.0, i=1: [0..1)→1.0, i=2: [1..2)→2.0,
+        // i=3: [1..2)→2.0, i=4: [2..3)→3.0
         let data = [1.0_f32, 2.0, 3.0];
         let out = resample_preserve_maxima_1d(&data, 5);
-        assert_eq!(out.len(), 5);
+        assert_eq!(out, vec![1.0, 1.0, 2.0, 2.0, 3.0]);
     }
 
     #[test]
