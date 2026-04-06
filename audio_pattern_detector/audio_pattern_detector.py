@@ -708,6 +708,7 @@ class AudioPatternDetector:
         similarity_hard_limit = 0.03
         similarity_threshold = 0.01
         pearson_r_threshold = 0.85
+        pearson_r_threshold_low_mse = 0.85
 
         if similarity > similarity_hard_limit:
             if debug_mode:
@@ -715,13 +716,13 @@ class AudioPatternDetector:
         elif pearson_r >= pearson_r_threshold:
             # Shape matches well — accept even if MSE is moderately above threshold
             peaks_final.append(peak)
-        elif similarity <= similarity_threshold:
-            # MSE is low enough to accept without strong shape match
+        elif similarity <= similarity_threshold and pearson_r >= pearson_r_threshold_low_mse:
+            # MSE is low and shape is reasonably close
             peaks_final.append(peak)
         else:
             if debug_mode:
                 print(
-                    f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold} and pearson_r {pearson_r} < {pearson_r_threshold}",file=sys.stderr)
+                    f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
 
     # # doesn't work well
     # def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
