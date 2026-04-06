@@ -23,7 +23,7 @@ Raw audio stream (float32 PCM)
         |
    For each candidate peak:
         |--- Pure tone pattern ---> Downsampled MSE + overlap ratio check
-        |--- Normal pattern -----> Partitioned MSE + area overlap check
+        |--- Normal pattern -----> Partitioned MSE + downsampled Pearson r check
         |
    Accepted peaks converted to timestamps
 ```
@@ -66,7 +66,7 @@ The self-correlation curve acts as the "ideal" shape. The verification asks: doe
 
 ### Normal Patterns
 
-Verification uses partitioned mean squared error (MSE) plus area overlap:
+Verification uses partitioned mean squared error (MSE) plus Pearson correlation of the downsampled envelope:
 
 1. **Partitioned MSE** - both curves are divided into 10 equal partitions. MSE is computed per partition. Two summary metrics are derived:
    - `similarity_middle`: mean MSE of partitions 4-5 (the center 20%)
@@ -75,12 +75,13 @@ Verification uses partitioned mean squared error (MSE) plus area overlap:
 
    The middle partitions are checked separately because real distortions tend to appear there.
 
-2. **Area overlap ratio** - for the middle 20% of the curves (the 40%-60% span, corresponding to partitions 4-5 in zero-based indexing), compute the area of each curve via Simpson's rule, the overlapping area (integral of the pointwise minimum), and the non-overlapping area. Here, `non_overlapping_area` means the portions of both curves outside their shared overlap: `non_overlapping_area = (area_curve1 + area_curve2) - 2 * overlapping_area` (i.e. the sum of the two curve areas minus twice the overlapping area). The metric is `diff_overlap_ratio = non_overlapping_area / overlapping_area`.
+2. **Pearson correlation** - the middle 20% of both curves (partitions 4-5) is downsampled to 101 points using `resample_preserve_maxima`, then the Pearson correlation coefficient is computed. This measures shape similarity in a scale-invariant way — it doesn't care about amplitude differences, only whether the curves have the same shape. This is important for lossy-encoded audio (e.g. Opus HLS streams) where codec artifacts inflate the correlation envelope but preserve the overall shape.
 
 3. **Decision thresholds**:
-   - `similarity > 0.01` -> reject
-   - `0.002 < similarity <= 0.01` and `diff_overlap_ratio > 0.5` -> reject
-   - `similarity <= 0.002` -> accept (no area check needed)
+   - `similarity > 0.03` -> reject (hard MSE ceiling)
+   - `pearson_r >= 0.85` -> accept (shape matches well, even if MSE is moderately elevated)
+   - `similarity <= 0.01` -> accept (MSE low enough without strong shape match)
+   - Otherwise -> reject (MSE too high and shape doesn't match)
 
 ### Pure Tone Patterns
 
@@ -125,4 +126,4 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 | `AudioClip` | Input pattern: name, audio array, sample rate |
 | `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window |
 | `ClipCache` | Runtime cache: pure-tone classification flags and downsampled self-correlation curves for pure-tone clips |
-| `OverlapResult` | Return type from `area_of_overlap_ratio`. The control areas are the baseline areas for the reference/control curve: `area_control` is the Simpson area of that reference region, and `total_rect_control` is its bounding-rectangle area. `area_y2` is the candidate curve area. These fields feed the derived ratios, including `diff_overlap_ratio = diff_area / overlapping_area` and the pure-tone `overlap_ratio = overlapping_area / area_control`. |
+| `OverlapResult` | Return type from `area_of_overlap_ratio` (used by pure tone path). The control areas are the baseline areas for the reference/control curve: `area_control` is the Simpson area of that reference region, and `total_rect_control` is its bounding-rectangle area. `area_y2` is the candidate curve area. These fields feed the derived ratios, including `overlap_ratio = overlapping_area / area_control`. |

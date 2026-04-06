@@ -4,7 +4,7 @@ Detects audio patterns specified by audio clips in target audio files. Designed 
 
 Useful for AI workflows to efficiently segment audio files before processing (e.g., OpenAI Whisper transcription preprocessing).
 
-Uses cross-correlation to detect potential matches, then uses mean square error and overlapping areas to eliminate false positives.
+Uses cross-correlation to detect potential matches, then uses mean square error and Pearson correlation to eliminate false positives. Robust against lossy-encoded audio (Opus, AAC).
 
 ## Installation
 
@@ -81,6 +81,7 @@ audio-pattern-detector show-config --pattern-folder ./clips
 | `--chunk-seconds`      | Seconds per chunk (default: 60, or "auto")                               |
 | `--jsonl`              | Output JSONL events for file inputs                                      |
 | `--debug`              | Enable debug mode                                                        |
+| `--debug-dir`          | Base directory for debug output (default: ./tmp)                         |
 
 ## JSONL Output Format
 
@@ -94,6 +95,8 @@ When using `--stdin`, `--multiplexed-stdin`, or `--jsonl`:
 
 ## Documentation
 
+- **[Pattern Matching](docs/pattern-matching.md)** - Detailed description of the detection pipeline, verification logic, and thresholds
+- **[Denoise Strategy](docs/denoise-strategy.md)** - How to denoise pattern clips for better matching with lossy-encoded or noisy audio
 - **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin, raw PCM stdin, and multiplexed stdin (IPC) with code examples for Node.js, Python, Go
 - **[Development](docs/development.md)** - Type checking, linting, testing, Docker, detection algorithm details
 
