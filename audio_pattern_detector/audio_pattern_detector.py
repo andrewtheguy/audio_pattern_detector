@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 # Default seconds per chunk for sliding window processing
 DEFAULT_SECONDS_PER_CHUNK = 60
 
+# Clips shorter than this go through the normal path with 0-100% window
+SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
+
 
 # Type definitions
 class ClipData(TypedDict):
@@ -199,7 +202,7 @@ class AudioPatternDetector:
                 "sliding_window": sliding_window,
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
-                "dominant_frequency": get_pure_tone_frequency(clip, self.target_sample_rate),
+                "dominant_frequency": get_pure_tone_frequency(clip, self.target_sample_rate) if clip_name == "rthk_beep" else None,
             }
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
@@ -446,8 +449,6 @@ class AudioPatternDetector:
     #     return max_distance,max_distance_index
 
 
-    # won't work well for very short clips like single beep
-    # because it is more likely to have false positives or miss good ones
     def _correlation_method(
         self,
         clip_data: ClipData,
@@ -551,6 +552,7 @@ class AudioPatternDetector:
                 if len(correlation_slice) != len(correlation_clip):
                     raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
+                is_short_clip = clip_length / sr < SHORT_CLIP_DURATION_THRESHOLD
                 self._get_peak_times_normal(correlation_clip=correlation_clip,
                                                 correlation_slice=correlation_slice,
                                                 seconds=seconds,
@@ -559,7 +561,8 @@ class AudioPatternDetector:
                                                 index=index,
                                                 section_ts=section_ts,
                                                 similarities=similarities,
-                                                peaks_final=peaks_final)
+                                                peaks_final=peaks_final,
+                                                is_short_clip=is_short_clip)
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -705,6 +708,7 @@ class AudioPatternDetector:
         section_ts: str,
         similarities: list[Any],
         peaks_final: list[int],
+        is_short_clip: bool = False,
     ) -> None:
 
         from native_helper import pearson_correlation
@@ -729,16 +733,24 @@ class AudioPatternDetector:
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
         similarity_whole = np.mean(similarity_partitions)
 
-        similarity = min(similarity_whole,similarity_middle)
+        if is_short_clip:
+            similarity = float(similarity_whole)
+        else:
+            similarity = min(similarity_whole,similarity_middle)
 
         # Multi-window Pearson r: try different regions and pick best match
         # Downsample count scales with window width so resolution is consistent
         ds_base = 101  # for 20% window (2 partitions)
-        pearson_windows: list[tuple[int, int, int]] = [
-            (0, 5, round(ds_base * 5 / 2)),      # 0-50% → 252 samples
-            (4, 6, ds_base),                      # 40-60% → 101 samples
-            (5, 10, round(ds_base * 5 / 2)),      # 50-100% → 252 samples
-        ]
+        if is_short_clip:
+            pearson_windows: list[tuple[int, int, int]] = [
+                (0, 10, round(ds_base * 10 / 2)),    # 0-100% → 505 samples
+            ]
+        else:
+            pearson_windows = [
+                (0, 5, round(ds_base * 5 / 2)),      # 0-50% → 252 samples
+                (4, 6, ds_base),                      # 40-60% → 101 samples
+                (5, 10, round(ds_base * 5 / 2)),      # 50-100% → 252 samples
+            ]
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
         if cached_clips is None:
