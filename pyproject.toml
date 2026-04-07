@@ -21,6 +21,7 @@ dev = [
     "ruff>=0.14.6",
     "basedpyright>=1.29.0",
     "pyloudnorm>=0.1.1,<0.2.0",
+    "scipy>=1.16,<2",
 ]
 
 [project.scripts]
@@ -54,7 +55,6 @@ url = "https://andrewtheguy.github.io/fft-correlation/simple/"
 explicit = true
 
 [tool.uv.sources]
-native-helper = { path = "native-helper", editable = true }
 fft-correlation = { index = "fft-correlation" }
 
 [build-system]

@@ -22,6 +22,7 @@ dev = [
     { name = "pyloudnorm" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "scipy" },
 ]
 
 [package.metadata]
@@ -38,6 +39,7 @@ dev = [
     { name = "pyloudnorm", specifier = ">=0.1.1,<0.2.0" },
     { name = "pytest", specifier = ">=8.2.1,<9" },
     { name = "ruff", specifier = ">=0.14.6" },
+    { name = "scipy", specifier = ">=1.16,<2" },
 ]
 
 [[package]]

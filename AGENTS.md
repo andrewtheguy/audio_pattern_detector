@@ -10,7 +10,8 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 - Run Python binding tests with `uv run pytest native-helper/tests/`.
 - Follow the existing PyO3 binding pattern in `src/python.rs`: use `extract_f32_data`/`extract_f64_data` helpers, register in `__all__` and `add_function`.
 - Update both type stubs: `native-helper/native_helper.pyi` and `typings/native_helper/__init__.pyi`.
-- Prefer implementing computationally heavy algorithms in Rust even if they seem simple (e.g. Pearson correlation) — the user prefers Rust over scipy dependencies.
+- Prefer implementing computationally heavy algorithms in Rust even if they seem simple (e.g. Pearson correlation) — the user prefers Rust over scipy dependencies. See `docs/native-helper.md` for rationale.
+- native-helper has no separate `pyproject.toml` — it is built by the root project's maturin config. Comparison scripts in `native-helper/scripts/` use scipy/pyloudnorm from the root dev group.
 
 ## Testing
 
@@ -28,4 +29,4 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Version bumping
 
-- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together, then run `cargo check --manifest-path native-helper/Cargo.toml` and `uv lock` on project root and native-helper to update the lockfile.
+- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together, then run `cargo check --manifest-path native-helper/Cargo.toml` and `uv lock` to update the lockfile.
