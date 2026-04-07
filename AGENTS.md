@@ -22,6 +22,7 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Debugging opus/lossy audio
 
+- Debug graphs require matplotlib, which is not installed by default. Run `uv sync --group debug` to enable.
 - Use `--debug` and `--debug-dir <dir>` to save graphs per run. Use separate debug dirs for A/B comparisons.
 - The Pearson downsampled graphs in `graph/pearson_downsampled/` show the 101-point curves actually used for verification — check these first when troubleshooting.
 - Debug audio sections in `audio_section/` can be listened to for ground truth verification. Don't assume old detection results are correct.

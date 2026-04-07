@@ -10,17 +10,17 @@ dependencies = [
     "numpy>=1.26.4,<2",
 ]
 
-[project.optional-dependencies]
-debug = [
-    "matplotlib>=3.9.0,<4",
-]
-
 [dependency-groups]
 dev = [
     "pytest>=8.2.1,<9",
     "ruff>=0.14.6",
     "basedpyright>=1.29.0",
     "scipy>=1.16,<2",  # QA only: reference impl for native-helper comparison scripts/tests, not used in production
+]
+# Debug graphs for detection tuning. Install with: uv sync --group debug
+debug = [
+    { include-group = "dev" },
+    "matplotlib>=3.9.0,<4",
 ]
 
 [project.scripts]

@@ -22,6 +22,16 @@ Use pytest to test because not all of them are written using default python unit
 uv run pytest
 ```
 
+## Debug graphs
+
+matplotlib is required for `--debug` graph output but is not installed by default. Enable it with:
+
+```shell
+uv sync --group debug
+```
+
+This installs the `debug` dependency group (which includes `dev` plus matplotlib). Only needed during local development when tuning detection parameters.
+
 ## Docker
 
 ### Testing with Docker

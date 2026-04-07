@@ -11,12 +11,14 @@ dependencies = [
     { name = "numpy" },
 ]
 
-[package.optional-dependencies]
-debug = [
-    { name = "matplotlib" },
-]
-
 [package.dev-dependencies]
+debug = [
+    { name = "basedpyright" },
+    { name = "matplotlib" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "scipy" },
+]
 dev = [
     { name = "basedpyright" },
     { name = "pytest" },
@@ -27,12 +29,17 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fft-correlation", specifier = "==0.0.4", index = "https://andrewtheguy.github.io/fft-correlation/simple/" },
-    { name = "matplotlib", marker = "extra == 'debug'", specifier = ">=3.9.0,<4" },
     { name = "numpy", specifier = ">=1.26.4,<2" },
 ]
-provides-extras = ["debug"]
 
 [package.metadata.requires-dev]
+debug = [
+    { name = "basedpyright", specifier = ">=1.29.0" },
+    { name = "matplotlib", specifier = ">=3.9.0,<4" },
+    { name = "pytest", specifier = ">=8.2.1,<9" },
+    { name = "ruff", specifier = ">=0.14.6" },
+    { name = "scipy", specifier = ">=1.16,<2" },
+]
 dev = [
     { name = "basedpyright", specifier = ">=1.29.0" },
     { name = "pytest", specifier = ">=8.2.1,<9" },
