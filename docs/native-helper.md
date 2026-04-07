@@ -14,6 +14,10 @@ scipy is a large package (~40 MB installed) that pulls in a substantial dependen
 
 scipy has significant warm-up cost on first use: lazy-loading shared libraries, JIT-compiling via internal dispatch, and importing large submodules. In containerized environments (Docker, serverless) where the process starts fresh on every invocation, this overhead is paid repeatedly and adds noticeable latency to each run. The standard workaround is pre-warming hacks (dummy imports at container build time, keeping containers alive longer, etc.), which add complexity. A compiled Rust extension has near-zero cold-start cost since all code is ahead-of-time compiled into a single shared library.
 
+## scipy as a dev-only QA dependency
+
+scipy is included in the root `dev` dependency group solely for QA: the comparison scripts in `native-helper/scripts/` and some binding tests use scipy as a reference implementation to verify the Rust routines produce correct results. It is never imported by production code and is not included in production Docker images.
+
 ## Structure
 
 - `src/lib.rs` -- core Rust implementations (pure Rust, no Python dependency)

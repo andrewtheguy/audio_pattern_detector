@@ -256,17 +256,18 @@ class PythonBindingsTest(unittest.TestCase):
         self.assertLess(lufs, 0.0)
 
     def test_integrated_loudness_compare_with_pyloudnorm(self):
-        """Compare against pyloudnorm for a realistic signal."""
-        import pyloudnorm as pyln
+        """Compare against pyloudnorm reference value for a realistic signal.
 
+        Expected LUFS was pre-computed with pyloudnorm 0.1.1 using the same
+        seeded input (np.random.default_rng(42), sr=8000, 2s, *0.3).
+        """
         sr = 8000
         rng = np.random.default_rng(42)
         data = (rng.standard_normal(sr * 2) * 0.3).astype(np.float32)
 
-        meter = pyln.Meter(sr)
-        pyln_lufs = meter.integrated_loudness(data)
+        expected_lufs = -8.438312960262843
         rust_lufs = self.native_helper.integrated_loudness(data, sr)
-        self.assertAlmostEqual(rust_lufs, pyln_lufs, places=1)
+        self.assertAlmostEqual(rust_lufs, expected_lufs, places=1)
 
     def test_integrated_loudness_short_block(self):
         """Short audio with custom block_size."""
