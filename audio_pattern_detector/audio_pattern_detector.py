@@ -35,6 +35,7 @@ class ClipData(TypedDict):
     sliding_window: int
     correlation_clip: NDArray[np.float32]
     correlation_clip_absolute_max: np.floating[Any]
+    short_clip: bool
 
 
 class ClipCache(TypedDict):
@@ -47,7 +48,6 @@ class ClipConfig(TypedDict):
     """Configuration for a single clip in get_config output."""
     duration_seconds: float
     sliding_window_seconds: int
-    short_clip: bool
 
 
 class DetectorConfig(TypedDict):
@@ -88,9 +88,9 @@ class AudioPatternDetector:
         self.debug_mode = debug_mode
         self.debug_dir = debug_dir
         self.height_min = height_min
-        #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
+        self._similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]] = defaultdict(list)
 
         clips_already = set()
         max_clip_length = 0
@@ -194,6 +194,7 @@ class AudioPatternDetector:
                 "sliding_window": sliding_window,
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
+                "short_clip": clip_seconds < 0.5,
             }
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
@@ -204,7 +205,7 @@ class AudioPatternDetector:
 
         Returns:
             DetectorConfig: Configuration including seconds_per_chunk, chunk_size_bytes,
-                  min_chunk_size_seconds, and per-clip data (duration, sliding_window, short_clip).
+                  min_chunk_size_seconds, and per-clip data (duration, sliding_window).
         """
         clips_config: dict[str, ClipConfig] = {}
         for clip_name, clip_data in self._clip_datas.items():
@@ -212,7 +213,6 @@ class AudioPatternDetector:
             clips_config[clip_name] = {
                 "duration_seconds": round(clip_duration, 6),
                 "sliding_window_seconds": clip_data["sliding_window"],
-                "short_clip": clip_duration < 0.5,
             }
 
         return {
@@ -263,8 +263,8 @@ class AudioPatternDetector:
 
         i = 0
 
-        # similarity_debug is per-run (for debug output), not pre-computed
-        similarity_debug = defaultdict(list)
+        # Reset per-run debug state
+        self._similarity_debug = defaultdict(list)
 
         total_time = 0.0
 
@@ -284,11 +284,9 @@ class AudioPatternDetector:
                 clip_data = self._clip_datas[audio_clip.name]
 
                 peak_times = self._process_chunk(chunk=chunk,
-                                                 sr=self.target_sample_rate,
                                                  previous_chunk=previous_chunk,
                                                  index=i,
                                                  clip_data=clip_data,
-                                                 similarity_debug=similarity_debug,
                                                  )
 
                 # Collect matches for sorting
@@ -325,7 +323,7 @@ class AudioPatternDetector:
                 x_coords = []
                 y_coords = []
 
-                for index,similarity in similarity_debug[clip_name]:
+                for index,similarity in self._similarity_debug[clip_name]:
                     x_coords.append(index)
                     y_coords.append(similarity)
 
@@ -369,12 +367,11 @@ class AudioPatternDetector:
         self,
         chunk: NDArray[np.float32],
         clip_data: ClipData,
-        sr: int,
         previous_chunk: NDArray[np.float32] | None,
         index: int,
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
         clip, _, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
+        sr = self.target_sample_rate
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
@@ -415,9 +412,7 @@ class AudioPatternDetector:
         #         audio_section, sr)
 
         # samples_skip_end does not skip results from being included yet
-        peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                              similarity_debug=similarity_debug,
-                                              )
+        peak_times = self._correlation_method(clip_data, audio_section=audio_section, index=index)
 
         # subtract sliding window seconds from peak times
         peak_times = [peak_time - subtract_seconds for peak_time in peak_times]
@@ -452,21 +447,15 @@ class AudioPatternDetector:
         self,
         clip_data: ClipData,
         audio_section: NDArray[np.float32],
-        sr: int,
         index: int,
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
-        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max= (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, short_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","short_clip")(clip_data))
 
-        seconds_per_chunk = self.seconds_per_chunk
-
+        sr = self.target_sample_rate
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
-        clip_length_seconds = clip_length / sr
-
-        short_clip = clip_length_seconds < 0.5
 
         # zeroes_second_pad = 1
         # # pad zeros between audio and clip
@@ -484,7 +473,7 @@ class AudioPatternDetector:
         max_choose = max(correlation_clip_absolute_max,absolute_max)
         correlation /= max_choose
 
-        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+        section_ts = seconds_to_time(seconds=index * self.seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
             import matplotlib.pyplot as plt
@@ -543,28 +532,16 @@ class AudioPatternDetector:
             if len(correlation_slice) != len(correlation_clip):
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
-            if short_clip:
-                self._get_peak_times_beep_v3(correlation_clip=correlation_clip,
-                                          correlation_slice=correlation_slice,
-                                          seconds=seconds,
-                                          peak=peak,
-                                          clip_name=clip_name,
-                                          index=index,
-                                          section_ts=section_ts,
-                                          similarities=similarities,
-                                          peaks_final=peaks_final,
-                                          similarity_debug=similarity_debug)
-            else:
-                self._get_peak_times_normal(correlation_clip=correlation_clip,
-                                                correlation_slice=correlation_slice,
-                                                seconds=seconds,
-                                                peak=peak,
-                                                clip_name=clip_name,
-                                                index=index,
-                                                section_ts=section_ts,
-                                                similarities=similarities,
-                                                peaks_final=peaks_final,
-                                                similarity_debug=similarity_debug)
+            self._get_peak_times_normal(correlation_clip=correlation_clip,
+                                            correlation_slice=correlation_slice,
+                                            seconds=seconds,
+                                            peak=peak,
+                                            clip_name=clip_name,
+                                            index=index,
+                                            section_ts=section_ts,
+                                            similarities=similarities,
+                                            peaks_final=peaks_final,
+                                            short_clip=short_clip)
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -603,7 +580,7 @@ class AudioPatternDetector:
         section_ts: str,
         similarities: list[Any],
         peaks_final: list[int],
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
+        short_clip: bool,
     ) -> None:
 
         from native_helper import pearson_correlation
@@ -630,15 +607,16 @@ class AudioPatternDetector:
 
         similarity = min(similarity_whole,similarity_middle)
 
-        # 3-window Pearson r: try different regions and pick best match
-        # Window A: first half (0-50%), B: middle (40-60%), C: second half (50-100%)
+        # Multi-window Pearson r: try different regions and pick best match
         # Downsample count scales with window width so resolution is consistent
         ds_base = 101  # for 20% window (2 partitions)
         pearson_windows: list[tuple[int, int, int]] = [
-            (0, 5, round(ds_base * 5 / 2)),   # 50% → 252 samples
-            (4, 6, ds_base),                    # 20% → 101 samples
-            (5, 10, round(ds_base * 5 / 2)),   # 50% → 252 samples
+            (0, 5, round(ds_base * 5 / 2)),      # 0-50% → 252 samples
+            (4, 6, ds_base),                      # 40-60% → 101 samples
+            (5, 10, round(ds_base * 5 / 2)),      # 50-100% → 252 samples
         ]
+        if short_clip:
+            pearson_windows.append((0, 10, ds_base))  # 0-100% → 101 samples
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
         if cached_clips is None:
@@ -670,7 +648,7 @@ class AudioPatternDetector:
             import matplotlib.pyplot as plt
             print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
             seconds.append(peak / sr)
-            similarity_debug[clip_name].append((index, similarity,))
+            self._similarity_debug[clip_name].append((index, similarity,))
 
             correlation_slice_graph = correlation_slice
             correlation_clip_graph = correlation_clip
@@ -728,108 +706,3 @@ class AudioPatternDetector:
                 print(
                     f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
 
-    def _get_peak_times_beep_v3(
-        self,
-        correlation_clip: NDArray[np.float32],
-        correlation_slice: NDArray[np.float32],
-        seconds: list[float],
-        peak: int,
-        clip_name: str,
-        index: int,
-        section_ts: str,
-        similarities: list[Any],
-        peaks_final: list[int],
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
-    ) -> None:
-
-        from native_helper import pearson_correlation
-
-        debug_mode = self.debug_mode
-        sr = self.target_sample_rate
-
-        # Single Pearson window covering 0-100%, downsampled to 101 points
-        partition_count = 10
-        ds_n = 101
-        pearson_windows: list[tuple[int, int, int]] = [
-            (0, 10, ds_n),  # 0-100%
-        ]
-
-        cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
-        if cached_clips is None:
-            cached_clips = []
-            for wl, wr, ds in pearson_windows:
-                lo = round(len(correlation_clip) * wl / partition_count)
-                hi = round(len(correlation_clip) * wr / partition_count)
-                cached_clips.append(resample_preserve_maxima(correlation_clip[lo:hi], ds))
-            self._clip_cache["downsampled_pearson_windows"][clip_name] = cached_clips
-
-        ds_slices: list[NDArray[np.float32]] = []
-        pearson_per_window: dict[str, float] = {}
-        for wi, (wl, wr, ds) in enumerate(pearson_windows):
-            lo = round(len(correlation_slice) * wl / partition_count)
-            hi = round(len(correlation_slice) * wr / partition_count)
-            ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds)
-            ds_slices.append(ds_s)
-            r: float = pearson_correlation(cached_clips[wi], ds_s)
-            pearson_per_window[f"pearson_w{wl}_{wr}"] = r
-
-        pearson_r = pearson_per_window["pearson_w0_10"]
-
-        # MSE on the downsampled curves (smooths oscillatory beep correlations)
-        similarity = _mean_squared_error(cached_clips[0], ds_slices[0])
-
-        if debug_mode:
-            import matplotlib.pyplot as plt
-            print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
-            seconds.append(peak / sr)
-            similarity_debug[clip_name].append((index, similarity,))
-
-            correlation_slice_graph = correlation_slice
-            correlation_clip_graph = correlation_clip
-
-            graph_max = 0.1
-            if similarity <= graph_max:
-                graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                plt.figure(figsize=(10, 4))
-                plt.plot(correlation_slice_graph)
-                plt.plot(correlation_clip_graph, alpha=0.7)
-                plt.title('Cross-correlation between the audio clip and full track before slicing')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-                plt.close()
-
-                # Downsampled window used for Pearson r
-                ds_graph_dir = f"{self.debug_dir}/graph/pearson_downsampled/{clip_name}"
-                os.makedirs(ds_graph_dir, exist_ok=True)
-
-                for wi, (wl, wr, _ds) in enumerate(pearson_windows):
-                    r_wi = pearson_per_window[f"pearson_w{wl}_{wr}"]
-                    plt.figure(figsize=(10, 4))
-                    plt.plot(ds_slices[wi])
-                    plt.plot(cached_clips[wi], alpha=0.7)
-                    plt.title(f'Partitions {wl}-{wr} (pearson_r={r_wi:.4f})')
-                    plt.xlabel('Sample')
-                    plt.ylabel('Correlation coefficient')
-                    plt.savefig(
-                        f'{ds_graph_dir}/{clip_name}_{index}_{section_ts}_{peak}_w{wl}_{wr}.png')
-                    plt.close()
-
-            similarities.append((similarity, {"whole": float(similarity)},
-                                 {"pearson_r": pearson_r, **pearson_per_window}))
-
-        similarity_hard_limit = 0.01
-        pearson_r_threshold = 0.90
-
-        if similarity > similarity_hard_limit:
-            if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
-        elif pearson_r >= pearson_r_threshold:
-            peaks_final.append(peak)
-        else:
-            if debug_mode:
-                print(
-                    f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
