@@ -21,6 +21,7 @@ from audio_pattern_detector.audio_utils import (
 )
 from audio_pattern_detector.detection_utils import (
     analyze_pure_tone_candidate,
+    extract_padded_segment,
     get_pure_tone_frequency,
 )
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
@@ -602,9 +603,14 @@ class AudioPatternDetector:
         harmonic speech segments that still produce a strong correlation peak.
         """
         debug_mode = self.debug_mode
-        half = clip_length // 2
-        center = audio_section[max(0, peak - half):peak + half]
-        metrics = analyze_pure_tone_candidate(center, sr, dominant_frequency)
+        match_start = peak - clip_length + 1
+        matched_segment = extract_padded_segment(audio_section, match_start, clip_length)
+        left_flank = extract_padded_segment(audio_section, match_start - clip_length, clip_length)
+        right_flank = extract_padded_segment(audio_section, match_start + clip_length, clip_length)
+
+        metrics = analyze_pure_tone_candidate(matched_segment, sr, dominant_frequency)
+        left_metrics = analyze_pure_tone_candidate(left_flank, sr, dominant_frequency)
+        right_metrics = analyze_pure_tone_candidate(right_flank, sr, dominant_frequency)
 
         if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
             if debug_mode:
@@ -616,29 +622,39 @@ class AudioPatternDetector:
                 )
             return False
 
-        if metrics.overall_band_purity < 0.85:
+        if metrics.overall_band_purity < 0.80:
             if debug_mode:
                 print(
                     f"failed pure tone check for {section_ts}: band purity="
-                    f"{metrics.overall_band_purity:.3f} < 0.85",
+                    f"{metrics.overall_band_purity:.3f} < 0.80",
                     file=sys.stderr,
                 )
             return False
 
-        if metrics.longest_active_run < 6:
+        if metrics.longest_active_run < 15:
             if debug_mode:
                 print(
                     f"failed pure tone check for {section_ts}: longest run="
-                    f"{metrics.longest_active_run} < 6",
+                    f"{metrics.longest_active_run} < 15",
                     file=sys.stderr,
                 )
             return False
 
-        if metrics.active_frame_mean_purity < 0.90:
+        if metrics.active_frame_mean_purity < 0.84:
             if debug_mode:
                 print(
                     f"failed pure tone check for {section_ts}: active purity="
-                    f"{metrics.active_frame_mean_purity:.3f} < 0.90",
+                    f"{metrics.active_frame_mean_purity:.3f} < 0.84",
+                    file=sys.stderr,
+                )
+            return False
+
+        if left_metrics.overall_band_purity > 0.15 or right_metrics.overall_band_purity > 0.15:
+            if debug_mode:
+                print(
+                    f"failed pure tone check for {section_ts}: flank purity="
+                    f"({left_metrics.overall_band_purity:.3f}, "
+                    f"{right_metrics.overall_band_purity:.3f}) exceeds 0.15",
                     file=sys.stderr,
                 )
             return False
@@ -650,7 +666,9 @@ class AudioPatternDetector:
                 f"{metrics.active_frame_ratio:.3f} run="
                 f"{metrics.longest_active_run} active_purity="
                 f"{metrics.active_frame_mean_purity:.3f} freq="
-                f"{metrics.detected_frequency:.1f}Hz",
+                f"{metrics.detected_frequency:.1f}Hz flank_purity="
+                f"({left_metrics.overall_band_purity:.3f}, "
+                f"{right_metrics.overall_band_purity:.3f})",
                 file=sys.stderr,
             )
         return True

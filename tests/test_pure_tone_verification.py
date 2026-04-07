@@ -19,7 +19,7 @@ def _active_envelope(active_samples: int) -> np.ndarray:
 
 
 def _build_clean_candidate(length: int, sample_rate: int, frequency: float) -> np.ndarray:
-    active_samples = length // 2
+    active_samples = length
     signal = np.zeros(length, dtype=np.float32)
     t = np.arange(active_samples, dtype=np.float32) / sample_rate
     signal[:active_samples] = 0.9 * np.sin(2 * np.pi * frequency * t) * _active_envelope(active_samples)
@@ -27,7 +27,7 @@ def _build_clean_candidate(length: int, sample_rate: int, frequency: float) -> n
 
 
 def _build_harmonic_stack_candidate(length: int, sample_rate: int) -> np.ndarray:
-    active_samples = length // 2
+    active_samples = length
     signal = np.zeros(length, dtype=np.float32)
     t = np.arange(active_samples, dtype=np.float32) / sample_rate
     envelope = _active_envelope(active_samples)
@@ -44,7 +44,7 @@ def _build_harmonic_stack_candidate(length: int, sample_rate: int) -> np.ndarray
 
 
 def _build_swept_candidate(length: int, sample_rate: int) -> np.ndarray:
-    active_samples = length // 2
+    active_samples = length
     signal = np.zeros(length, dtype=np.float32)
     instantaneous_frequency = np.linspace(
         SWEEP_START_FREQUENCY,
@@ -60,7 +60,7 @@ def _build_swept_candidate(length: int, sample_rate: int) -> np.ndarray:
 def _run_verify(detector: AudioPatternDetector, audio_section: np.ndarray, dominant_frequency: float) -> bool:
     return detector._verify_pure_tone(
         audio_section=audio_section.astype(np.float32),
-        peak=len(audio_section) // 2,
+        peak=len(audio_section) - 1,
         clip_length=len(audio_section),
         dominant_frequency=dominant_frequency,
         sr=DEFAULT_TARGET_SAMPLE_RATE,

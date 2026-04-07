@@ -123,6 +123,23 @@ def analyze_pure_tone_candidate(
     )
 
 
+def extract_padded_segment(
+    audio_data: NDArray[np.float32],
+    start: int,
+    length: int,
+) -> NDArray[np.float32]:
+    """Extract a fixed-length segment, padding with zeros when out of bounds."""
+    stop = start + length
+    left_pad = max(0, -start)
+    right_pad = max(0, stop - len(audio_data))
+    bounded_start = max(0, start)
+    bounded_stop = min(len(audio_data), stop)
+    segment = audio_data[bounded_start:bounded_stop]
+    if left_pad > 0 or right_pad > 0:
+        segment = np.pad(segment, (left_pad, right_pad))
+    return np.asarray(segment, dtype=np.float32)
+
+
 def max_distance(sorted_data: list[float]) -> float:
     """Find the maximum distance between consecutive elements in sorted data."""
     max_dist: float = 0
