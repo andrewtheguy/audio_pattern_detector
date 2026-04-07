@@ -5,8 +5,6 @@ not the pure tone verification path.
 """
 
 import io
-import struct
-import wave
 
 import numpy as np
 

@@ -1,6 +1,6 @@
 [project]
 name = "audio-pattern-detector"
-version = "0.3.6"
+version = "0.3.7"
 description = ""
 authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
 requires-python = "~=3.12.0"
@@ -20,7 +20,7 @@ dev = [
     "pytest>=8.2.1,<9",
     "ruff>=0.14.6",
     "basedpyright>=1.29.0",
-    "pyloudnorm>=0.1.1,<0.2.0",
+    "scipy>=1.16,<2",  # QA only: reference impl for native-helper comparison scripts/tests, not used in production
 ]
 
 [project.scripts]
@@ -54,7 +54,6 @@ url = "https://andrewtheguy.github.io/fft-correlation/simple/"
 explicit = true
 
 [tool.uv.sources]
-native-helper = { path = "native-helper", editable = true }
 fft-correlation = { index = "fft-correlation" }
 
 [build-system]
