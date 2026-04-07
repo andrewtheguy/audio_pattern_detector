@@ -4,7 +4,7 @@ This document describes how audio pattern detection works, from raw audio data t
 
 ## Overview
 
-The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths: one for normal patterns and one for pure tone patterns (e.g. beeps).
+The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths: a normal correlation-envelope path (for all clips including short ones) and a special pure-tone path (triggered by clip name `rthk_beep`).
 
 ## Pipeline
 
@@ -22,8 +22,12 @@ Raw audio stream (float32 PCM)
    Peak detection (height >= 0.25, min distance = clip length)
         |
    For each candidate peak:
-        |--- Pure tone pattern ---> Downsampled MSE + overlap ratio check
-        |--- Normal pattern -----> Partitioned MSE + multi-window Pearson r check
+        |
+   ┌─ clip name == "rthk_beep"? ──────────────────────┐
+   │  YES: Pure tone verification                      │
+   │  NO:  Partitioned MSE + Pearson r check           │
+   │       (short clips < 0.5s use 0-100% window only) │
+   └───────────────────────────────────────────────────┘
         |
    Accepted peaks converted to timestamps
 ```
@@ -34,9 +38,9 @@ Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
 2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, mode='full')`), producing a reference correlation curve. The absolute max is stored for normalization later.
-3. **Pure tone detection** - FFT of the clip is analyzed: if the spectrum has exactly one prominent peak matching the dominant frequency, the clip is classified as a pure tone.
+3. **Pure tone detection** - for the `rthk_beep` clip only, the dominant frequency is computed via FFT (`get_pure_tone_frequency`). All other clips set `dominant_frequency = None`.
 
-This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, and its absolute max. Pure-tone classification is pre-computed separately in `ClipCache`.
+This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, and the dominant frequency (non-None only for `rthk_beep`).
 
 ## Chunked Processing
 
@@ -97,29 +101,33 @@ Detection accuracy depends heavily on the quality of the pattern clip. Clips wit
 
 Denoising the pattern clip with bandpass filtering (e.g. speech range 300-3400 Hz) removes these issues. For tonal patterns, synthesizing a clean version from the dominant frequencies produces the best results. See [denoise-strategy.md](denoise-strategy.md).
 
-### Pure Tone Patterns
+### Short Clips (< 0.5s)
 
-Pure tones (beeps) have repetitive, high-frequency correlation curves that are sensitive to slight shifts. To handle this, both curves are downsampled to 101 points before comparison, preserving local maxima in each window.
+Short clips go through the normal correlation-envelope path but with simplified windowing:
 
-1. **Downsampled MSE** - MSE between the two 101-point curves.
-2. **Overlap ratio** - compute Simpson integrals on the two downsampled curves:
-   - `area_control`: area under the downsampled reference/self-correlation curve
-   - `area_y2`: area under the downsampled candidate correlation slice
-   - `overlapping_area`: area under the pointwise minimum of those two curves
+1. **MSE** — only `similarity_whole` is used (no middle partition emphasis). The correlation envelope is too short for sub-region analysis to be meaningful.
 
-   The metric used by the code is `overlap_ratio = overlapping_area / area_control`, so the denominator is the reference curve's area, not the candidate curve's area or a rectangular normalization term.
+2. **Pearson correlation** — a single 0-100% window (505 downsampled points) instead of the three partial windows. The full window captures the overall shape without splitting into regions that would be too small.
 
-3. **Decision thresholds**:
-   - `similarity > 0.01` -> reject
-   - `0.003 < similarity <= 0.01` and `overlap_ratio < 0.99` -> reject
-   - `0.002 < similarity <= 0.003` and `overlap_ratio < 0.98` -> reject
-   - `similarity <= 0.002` -> accept
+3. **Same thresholds** — `similarity > 0.03` rejects, `pearson_r >= 0.90` accepts.
 
-Pure tone thresholds require higher overlap ratios because a matching beep should almost perfectly overlap the reference.
+**Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. `rthk_beep.wav`) need their own special-case path instead.
+
+### RTHK Beep (Pure Tone Special Case)
+
+The `rthk_beep` clip is handled independently from the short clip path. It is triggered by clip name (`rthk_beep`), not by FFT analysis of the clip content. The `rthk_beep.wav` file does not cross-correlate well enough for the normal verification path, so it uses a dedicated pure tone verification instead.
+
+When `clip_name == "rthk_beep"`:
+1. The dominant frequency is computed via `get_pure_tone_frequency()` during initialization.
+2. At verification time, `_verify_pure_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
+3. Flanks (adjacent segments) must have low purity to reject neighboring tones.
+4. Multiple acceptance criteria with varying strictness levels handle different signal conditions.
+
+This path is completely independent of the short clip path — it could theoretically be used for clips of any length, but currently only `rthk_beep` triggers it.
 
 ## Pure Tone Classification
 
-A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) and that peak's frequency matches the dominant frequency within 1% relative tolerance.
+A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification is only used for the `rthk_beep` clip.
 
 ## Timestamp Conversion
 
@@ -139,5 +147,4 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 |-----------|-------------|
 | `AudioClip` | Input pattern: name, audio array, sample rate |
 | `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window |
-| `ClipCache` | Runtime cache: pure-tone classification flags and downsampled self-correlation curves for pure-tone clips |
-| `OverlapResult` | Return type from `area_of_overlap_ratio` (used by pure tone path). The control areas are the baseline areas for the reference/control curve: `area_control` is the Simpson area of that reference region, and `total_rect_control` is its bounding-rectangle area. `area_y2` is the candidate curve area. These fields feed the derived ratios, including `overlap_ratio = overlapping_area / area_control`. |
+| `ClipCache` | Runtime cache: downsampled Pearson windows per clip |

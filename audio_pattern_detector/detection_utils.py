@@ -1,116 +1,145 @@
+from dataclasses import dataclass
 import math
-from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
 
-class OverlapResult(TypedDict):
-    """Result of area_of_overlap_ratio calculation."""
-    total_rect_control: float
-    diff_area: float
-    overlapping_area: float
-    area_control: float
-    area_y2: float
-    diff_overlap_ratio: float
-    percent_control_area: float
+@dataclass(frozen=True)
+class PureToneMetrics:
+    """Frequency-domain metrics for validating a pure-tone candidate window."""
+
+    detected_frequency: float
+    overall_band_purity: float
+    active_frame_ratio: float
+    longest_active_run: int
+    active_frame_mean_purity: float
 
 
-def area_of_overlap_ratio(control: NDArray[np.floating[Any]], variable: NDArray[np.floating[Any]]) -> OverlapResult:
-    from native_helper import simpson
+def get_pure_tone_frequency(audio_data: NDArray[np.float32], sample_rate: int) -> float | None:
+    """Return the dominant frequency if the audio is a pure tone, else None."""
+    fft_result = np.fft.rfft(audio_data)
+    freqs = np.fft.rfftfreq(len(audio_data), d=1 / sample_rate)
 
-    if len(control) != len(variable):
-        raise ValueError("Both arrays must have the same length")
-
-    total_rect_control = len(control) * max(control)
-
-    y2 = variable
-
-    area_control = simpson(control)
-    area_y2 = simpson(y2)
-
-    # To find the overlapping area, take the minimum at each point
-    min_curve = np.minimum(control, y2)
-    overlapping_area = simpson(min_curve)
-
-    # Calculate the sum of area of both curves where the two curves don't overlap
-    diff_area = area_control+area_y2-2*overlapping_area
-
-
-    # Calculate percentage overlap with respect to each curve
-    #percentage_overlap_y1 = (overlapping_area / area_y1) * 100
-    #percentage_overlap_y2 = (overlapping_area / area_y2) * 100
-    #print(f"diff_area {diff_area} area_y1 {area_y1} area_y2 {area_y2}")
-    result: OverlapResult = {
-        "total_rect_control": float(total_rect_control),
-        "diff_area": float(diff_area),
-        "overlapping_area": float(overlapping_area),
-        "area_control": float(area_control),
-        "area_y2": float(area_y2),
-        "diff_overlap_ratio": float(diff_area / overlapping_area),
-        "percent_control_area": float(area_control / total_rect_control),
-    }
-    return result
-
-
-def is_pure_tone(audio_data: NDArray[np.float32], sample_rate: int) -> bool:
-    """
-    Determine if the given audio data represents a pure tone.
-
-    Parameters:
-        audio_data: The audio data as a floating-point array.
-        sample_rate: The sample rate of the audio data in Hz.
-
-    Returns:
-        True if the audio is a pure tone, False otherwise.
-    """
-
-    #audio_data = audio_data[0:3662]
-
-    # Perform FFT
-    fft_result = np.fft.fft(audio_data)
-    freqs = np.fft.fftfreq(len(audio_data), d=1 / sample_rate)
-
-    # Analyze the magnitude spectrum
     magnitude = np.abs(fft_result)
-    positive_freqs = freqs[:len(freqs) // 2]
-    positive_magnitude = magnitude[:len(freqs) // 2]
+    dominant_freq_idx = np.argmax(magnitude)
+    dominant_magnitude = magnitude[dominant_freq_idx]
+    if dominant_magnitude == 0.0:
+        return None
+    magnitude_normalized = magnitude / dominant_magnitude
 
-
-    # Find the dominant frequency
-    dominant_freq_idx = np.argmax(positive_magnitude)
-    dominant_magnitude = positive_magnitude[dominant_freq_idx]
-
-    #print(f"positive_magnitude: {positive_magnitude}")
-
-    positive_magnitude_normalized = positive_magnitude / dominant_magnitude
-
-    #
-    # graph_dir = f"./tmp/graph/pure_tone"
-    # os.makedirs(graph_dir, exist_ok=True)
-    #
-    # plt.plot(positive_freqs, positive_magnitude_normalized)
-    # plt.xlabel('Frequency (Hz)')
-    # plt.ylabel('Magnitude')
-    # plt.title('Frequency Spectrum')
-    # #plt.show()
-    # plt.savefig(
-    #     f'{graph_dir}/{graph_file_name}.png')
-    # plt.close()
-
-    # Define a threshold for pure tone
-    #noise_threshold = 0.1
     from native_helper import find_peaks
-    peaks, _ = find_peaks(positive_magnitude_normalized, prominence=0.05)
+    peaks, _ = find_peaks(magnitude_normalized, prominence=0.05)
 
-    peak_freqs = positive_freqs[peaks]
-    #peak_magnitudes = positive_magnitude_normalized[peaks]
-    dominant_freq = positive_freqs[dominant_freq_idx]
-    # print(f"peak_freqs: {peak_freqs}")
-    # print(f"peak_props: {peak_props}")
-    # print(f"peak_magnitudes: {peak_magnitudes}")
-    # print(f"dominant_freq: {dominant_freq}")
-    return len(peaks) == 1 and math.isclose(peak_freqs[0],dominant_freq,rel_tol=0.01)
+    peak_freqs = freqs[peaks]
+    dominant_freq = float(freqs[dominant_freq_idx])
+    if len(peaks) == 1 and math.isclose(peak_freqs[0], dominant_freq, rel_tol=0.01):
+        return dominant_freq
+    return None
+
+
+def analyze_pure_tone_candidate(
+    audio_data: NDArray[np.float32],
+    sample_rate: int,
+    dominant_frequency: float,
+) -> PureToneMetrics:
+    """Measure how strongly a candidate window behaves like a single pure tone."""
+    if len(audio_data) == 0:
+        return PureToneMetrics(
+            detected_frequency=0.0,
+            overall_band_purity=0.0,
+            active_frame_ratio=0.0,
+            longest_active_run=0,
+            active_frame_mean_purity=0.0,
+        )
+
+    target_band_hz = max(40.0, dominant_frequency * 0.08)
+    target_lock_hz = max(20.0, dominant_frequency * 0.04)
+
+    windowed_audio = audio_data * np.hanning(len(audio_data))
+    spectrum = np.abs(np.fft.rfft(windowed_audio))
+    freqs = np.fft.rfftfreq(len(audio_data), d=1 / sample_rate)
+    detected_frequency = float(freqs[int(np.argmax(spectrum))])
+
+    total_energy = float(np.sum(spectrum**2))
+    if total_energy == 0.0:
+        return PureToneMetrics(
+            detected_frequency=detected_frequency,
+            overall_band_purity=0.0,
+            active_frame_ratio=0.0,
+            longest_active_run=0,
+            active_frame_mean_purity=0.0,
+        )
+
+    target_band = np.abs(freqs - dominant_frequency) <= target_band_hz
+    overall_band_purity = float(np.sum(spectrum[target_band] ** 2)) / total_energy
+
+    window_len = max(int(round(0.025 * sample_rate)), 32)
+    hop = max(window_len // 2, 1)
+    frame_window = np.hanning(window_len)
+
+    frame_count = 0
+    active_frame_count = 0
+    longest_active_run = 0
+    current_active_run = 0
+    active_frame_purities: list[float] = []
+
+    for start in range(0, len(audio_data) - window_len, hop):
+        chunk = audio_data[start:start + window_len] * frame_window
+        chunk_spectrum = np.abs(np.fft.rfft(chunk))
+        chunk_energy = float(np.sum(chunk_spectrum**2))
+        if chunk_energy == 0.0:
+            current_active_run = 0
+            continue
+
+        chunk_freqs = np.fft.rfftfreq(window_len, d=1 / sample_rate)
+        frame_count += 1
+        dominant_idx = int(np.argmax(chunk_spectrum))
+        frame_dominant_frequency = float(chunk_freqs[dominant_idx])
+        frame_target_band = np.abs(chunk_freqs - dominant_frequency) <= target_band_hz
+        frame_target_purity = float(np.sum(chunk_spectrum[frame_target_band] ** 2)) / chunk_energy
+
+        is_active = (
+            math.isclose(frame_dominant_frequency, dominant_frequency, abs_tol=target_lock_hz)
+            and frame_target_purity >= 0.55
+        )
+        if is_active:
+            active_frame_count += 1
+            current_active_run += 1
+            longest_active_run = max(longest_active_run, current_active_run)
+            active_frame_purities.append(frame_target_purity)
+        else:
+            current_active_run = 0
+
+    active_frame_ratio = active_frame_count / frame_count if frame_count > 0 else 0.0
+    active_frame_mean_purity = (
+        float(np.mean(active_frame_purities)) if active_frame_purities else 0.0
+    )
+
+    return PureToneMetrics(
+        detected_frequency=detected_frequency,
+        overall_band_purity=overall_band_purity,
+        active_frame_ratio=active_frame_ratio,
+        longest_active_run=longest_active_run,
+        active_frame_mean_purity=active_frame_mean_purity,
+    )
+
+
+def extract_padded_segment(
+    audio_data: NDArray[np.float32],
+    start: int,
+    length: int,
+) -> NDArray[np.float32]:
+    """Extract a fixed-length segment, padding with zeros when out of bounds."""
+    stop = start + length
+    left_pad = max(0, -start)
+    right_pad = max(0, stop - len(audio_data))
+    bounded_start = max(0, start)
+    bounded_stop = min(len(audio_data), stop)
+    segment = audio_data[bounded_start:bounded_stop]
+    if left_pad > 0 or right_pad > 0:
+        segment = np.pad(segment, (left_pad, right_pad))
+    return np.asarray(segment, dtype=np.float32)
 
 
 def max_distance(sorted_data: list[float]) -> float:

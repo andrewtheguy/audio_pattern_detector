@@ -19,21 +19,22 @@ CBS_NEWS_EXPECTED_TIME = 25.89875
 
 RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.wav"
 RTHK_BEEP_AUDIO = "sample_audios/rthk_section_with_beep.wav"
-RTHK_BEEP_EXPECTED_TIMES = [1.4165, 2.419125]
+RTHK_BEEP_EXPECTED_TIMES = [1.407375, 2.419125]
 
 RAINBOW_INTRO_PATTERN = "sample_audios/clips/天空下的彩虹intro.wav"
 RAINBOW_INTRO_AUDIO = "sample_audios/am1430_section_with_rainbow_intro.wav"
 RAINBOW_INTRO_EXPECTED_TIME = 15.5
 
 
+
 # --- Pattern Matching Tests ---
 
 
 def test_rthk_beep_pattern_detection():
-    """Test detection of RTHK beep pattern (pure tone/beep detection)
+    """Test detection of RTHK beep pattern (short clip detection)
 
-    This tests the beep detection algorithm (_get_peak_times_beep_v3)
-    which uses overlap_ratio and downsampled correlation matching.
+    This tests the short clip detection algorithm (_get_peak_times_beep_v3)
+    which uses downsampled MSE + Pearson r correlation matching.
 
     Expected to find matches at approximately 1.4165s and 2.419125s
     """
@@ -155,14 +156,11 @@ def test_empty_pattern_list():
 
 
 def test_beep_detection_algorithm_specifics():
-    """Test specific behavior of beep detection algorithm
+    """Test specific behavior of pure tone beep detection.
 
-    The beep detection algorithm uses:
-    - Downsampled correlation matching
-    - Overlap ratio threshold (>0.98 or >0.99 depending on similarity)
-    - MSE similarity threshold (<0.01)
-
-    This test verifies the algorithm correctly identifies pure tone patterns.
+    Pure tone clips use the same correlation-based verification as normal
+    clips (partitioned MSE + multi-window Pearson r) plus a frequency-domain
+    post-check that verifies the audio contains energy at the expected frequency.
     """
     peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
@@ -349,18 +347,15 @@ def test_similarity_threshold_rejection():
         "Pattern should be rejected due to similarity threshold"
 
 
-def test_overlap_ratio_rejection_for_beep():
-    """Test that beep patterns with low overlap ratio are rejected
+def test_beep_rejection_in_non_matching_audio():
+    """Test that beep patterns are rejected in non-matching audio.
 
-    The beep detection algorithm requires overlap_ratio > 0.98 or 0.99.
-    This tests that patterns with insufficient overlap are filtered out.
+    Using beep pattern on CBS audio should not produce any matches.
     """
-    # Using beep pattern on CBS audio should produce low overlap ratios
     peak_times, _ = match_pattern(CBS_NEWS_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
-    # Should be rejected due to low overlap ratio
     assert len(peak_times['rthk_beep']) == 0, \
-        "Beep pattern should be rejected due to low overlap ratio"
+        "Beep pattern should not match in CBS news audio"
 
 
 def test_no_false_positives_in_complex_scenario():

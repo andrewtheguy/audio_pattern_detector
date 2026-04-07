@@ -1,6 +1,8 @@
 no backward compatibility, so feel free to make breaking changes as needed. Just make sure to
 do `uv run basedpyright` `uv run ruff check` after changes to make sure code style is correct and then `uv run pytest` as needed.
 
+- Use `./tmp` as the temporary working directory for debug output, scratch files, etc. It is gitignored.
+
 ## Native helper (Rust)
 
 - Rust code lives in `native-helper/`. After changing Rust source, rebuild with `uv run maturin develop --manifest-path native-helper/Cargo.toml`.
@@ -26,4 +28,4 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Version bumping
 
-- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together, then run `cargo check --manifest-path native-helper/Cargo.toml` and `uv lock` to update the lockfile.
+- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together, then run `cargo check --manifest-path native-helper/Cargo.toml` and `uv lock` on project root and native-helper to update the lockfile.

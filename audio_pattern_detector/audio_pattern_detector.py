@@ -19,13 +19,23 @@ from audio_pattern_detector.audio_utils import (
     slicing_with_zero_padding,
     write_wav_file,
 )
-from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
+from audio_pattern_detector.detection_utils import (
+    analyze_pure_tone_candidate,
+    extract_padded_segment,
+    get_pure_tone_frequency,
+)
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
 
 # Default seconds per chunk for sliding window processing
 DEFAULT_SECONDS_PER_CHUNK = 60
+
+# Clips shorter than this go through the normal path with 0-100% window
+SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
+
+# Clip name that triggers the pure tone verification path
+PURE_TONE_CLIP_NAME = "rthk_beep"
 
 
 # Type definitions
@@ -42,14 +52,12 @@ class ClipCache(TypedDict):
     """Cache for clip-related computed data."""
     downsampled_correlation_clips: dict[str, NDArray[np.float32]]
     downsampled_pearson_windows: dict[str, list[NDArray[np.float32]]]
-    is_pure_tone_pattern: dict[str, bool]
 
 
 class ClipConfig(TypedDict):
     """Configuration for a single clip in get_config output."""
     duration_seconds: float
     sliding_window_seconds: int
-    is_pure_tone: bool
 
 
 class DetectorConfig(TypedDict):
@@ -90,9 +98,9 @@ class AudioPatternDetector:
         self.debug_mode = debug_mode
         self.debug_dir = debug_dir
         self.height_min = height_min
-        #self.correlation_cache_correlation_method = {}
         self.normalize = True
         self.target_sample_rate = target_sample_rate if target_sample_rate is not None else DEFAULT_TARGET_SAMPLE_RATE
+        self._similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]] = defaultdict(list)
 
         clips_already = set()
         max_clip_length = 0
@@ -136,10 +144,10 @@ class AudioPatternDetector:
 
         # Pre-compute clip data that doesn't depend on audio_stream
         self._clip_datas: dict[str, ClipData] = {}
+        self._pure_tone_frequencies: dict[str, float] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
             "downsampled_pearson_windows": {},
-            "is_pure_tone_pattern": {},
         }
 
         for audio_clip in self.audio_clips:
@@ -162,9 +170,6 @@ class AudioPatternDetector:
 
             # Compute correlation
             correlation_clip, absolute_max = self._get_clip_correlation(clip)
-
-            # Pre-compute is_pure_tone
-            self._clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, self.target_sample_rate)
 
             # Debug output for correlation
             if self.debug_mode:
@@ -202,6 +207,11 @@ class AudioPatternDetector:
                 "correlation_clip_absolute_max": absolute_max,
             }
 
+            if clip_name == PURE_TONE_CLIP_NAME:
+                freq = get_pure_tone_frequency(clip, self.target_sample_rate)
+                if freq is not None:
+                    self._pure_tone_frequencies[clip_name] = freq
+
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
         self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
 
@@ -210,7 +220,7 @@ class AudioPatternDetector:
 
         Returns:
             DetectorConfig: Configuration including seconds_per_chunk, chunk_size_bytes,
-                  min_chunk_size_seconds, and per-clip data (duration, sliding_window, is_pure_tone).
+                  min_chunk_size_seconds, and per-clip data (duration, sliding_window).
         """
         clips_config: dict[str, ClipConfig] = {}
         for clip_name, clip_data in self._clip_datas.items():
@@ -218,7 +228,6 @@ class AudioPatternDetector:
             clips_config[clip_name] = {
                 "duration_seconds": round(clip_duration, 6),
                 "sliding_window_seconds": clip_data["sliding_window"],
-                "is_pure_tone": self._clip_cache["is_pure_tone_pattern"][clip_name],
             }
 
         return {
@@ -269,8 +278,8 @@ class AudioPatternDetector:
 
         i = 0
 
-        # similarity_debug is per-run (for debug output), not pre-computed
-        similarity_debug = defaultdict(list)
+        # Reset per-run debug state
+        self._similarity_debug = defaultdict(list)
 
         total_time = 0.0
 
@@ -290,11 +299,9 @@ class AudioPatternDetector:
                 clip_data = self._clip_datas[audio_clip.name]
 
                 peak_times = self._process_chunk(chunk=chunk,
-                                                 sr=self.target_sample_rate,
                                                  previous_chunk=previous_chunk,
                                                  index=i,
                                                  clip_data=clip_data,
-                                                 similarity_debug=similarity_debug,
                                                  )
 
                 # Collect matches for sorting
@@ -331,7 +338,7 @@ class AudioPatternDetector:
                 x_coords = []
                 y_coords = []
 
-                for index,similarity in similarity_debug[clip_name]:
+                for index,similarity in self._similarity_debug[clip_name]:
                     x_coords.append(index)
                     y_coords.append(similarity)
 
@@ -375,12 +382,11 @@ class AudioPatternDetector:
         self,
         chunk: NDArray[np.float32],
         clip_data: ClipData,
-        sr: int,
         previous_chunk: NDArray[np.float32] | None,
         index: int,
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
         clip, _, sliding_window = itemgetter("clip","clip_name","sliding_window")(clip_data)
+        sr = self.target_sample_rate
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
@@ -421,9 +427,7 @@ class AudioPatternDetector:
         #         audio_section, sr)
 
         # samples_skip_end does not skip results from being included yet
-        peak_times = self._correlation_method(clip_data, audio_section=audio_section, sr=sr, index=index,
-                                              similarity_debug=similarity_debug,
-                                              )
+        peak_times = self._correlation_method(clip_data, audio_section=audio_section, index=index)
 
         # subtract sliding window seconds from peak times
         peak_times = [peak_time - subtract_seconds for peak_time in peak_times]
@@ -452,36 +456,19 @@ class AudioPatternDetector:
     #     return max_distance,max_distance_index
 
 
-    # won't work well for very short clips like single beep
-    # because it is more likely to have false positives or miss good ones
     def _correlation_method(
         self,
         clip_data: ClipData,
         audio_section: NDArray[np.float32],
-        sr: int,
         index: int,
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> list[float]:
-        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max= (
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max = (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
-        clip_cache = self._clip_cache
-        if clip_cache["is_pure_tone_pattern"].get(clip_name) is None:
-            clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, sr)
-
-        seconds_per_chunk = self.seconds_per_chunk
-
-        is_pure_tone_pattern = clip_cache["is_pure_tone_pattern"][clip_name]
-
+        sr = self.target_sample_rate
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
-        clip_length_seconds = clip_length / sr
-
-        very_short_clip = clip_length_seconds < 0.5
-
-        if very_short_clip and not is_pure_tone_pattern:
-            raise ValueError(f"very short clip {clip_name} is not supported yet unless it is pure tone pattern, it has {clip_length_seconds} seconds")
 
         # zeroes_second_pad = 1
         # # pad zeros between audio and clip
@@ -499,7 +486,7 @@ class AudioPatternDetector:
         max_choose = max(correlation_clip_absolute_max,absolute_max)
         correlation /= max_choose
 
-        section_ts = seconds_to_time(seconds=index * seconds_per_chunk, include_decimals=False)
+        section_ts = seconds_to_time(seconds=index * self.seconds_per_chunk, include_decimals=False)
 
         if debug_mode:
             import matplotlib.pyplot as plt
@@ -530,7 +517,6 @@ class AudioPatternDetector:
         peaks_final = []
 
         # for debugging
-        area_props = []
         similarities = []
         seconds = []
         #distances = []
@@ -552,36 +538,20 @@ class AudioPatternDetector:
                 logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping")
                 continue
 
-            # slice with the center on the peak
-            correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
-            correlation_slice = correlation_slice/np.max(correlation_slice)
-
-            if len(correlation_slice) != len(correlation_clip):
-                raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
-
-            if is_pure_tone_pattern:
-                self._get_peak_times_beep_v3(correlation_clip=correlation_clip,
-                                          correlation_slice=correlation_slice,
-                                          seconds=seconds,
-                                          peak=peak,
-                                          clip_name=clip_name,
-                                          index=index,
-                                          section_ts=section_ts,
-                                          similarities=similarities,
-                                          peaks_final=peaks_final,
-                                          area_props=area_props,
-                                          similarity_debug=similarity_debug)
-            else:
-                self._get_peak_times_normal(correlation_clip=correlation_clip,
-                                                correlation_slice=correlation_slice,
-                                                seconds=seconds,
-                                                peak=peak,
-                                                clip_name=clip_name,
-                                                index=index,
-                                                section_ts=section_ts,
-                                                similarities=similarities,
-                                                peaks_final=peaks_final,
-                                                similarity_debug=similarity_debug)
+            self._verify_peak_candidate(
+                clip_name=clip_name,
+                audio_section=audio_section,
+                correlation=correlation,
+                correlation_clip=correlation_clip,
+                peak=peak,
+                clip_length=clip_length,
+                sr=sr,
+                index=index,
+                section_ts=section_ts,
+                seconds=seconds,
+                similarities=similarities,
+                peaks_final=peaks_final,
+            )
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -599,8 +569,6 @@ class AudioPatternDetector:
             os.makedirs(peak_dir, exist_ok=True)
 
             print(json.dumps({"peaks": peaks, "seconds": seconds,
-                              "area_props":area_props,
-                              #"distances": distances,
                               "similarities": similarities}, indent=2, cls=NumpyEncoder),
                   file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
@@ -610,6 +578,181 @@ class AudioPatternDetector:
         peak_times = [peak / sr for peak in peaks_final]
 
         return peak_times
+
+    def _verify_peak_candidate(
+        self,
+        clip_name: str,
+        audio_section: NDArray[np.float32],
+        correlation: NDArray[np.float32],
+        correlation_clip: NDArray[np.float32],
+        peak: int,
+        clip_length: int,
+        sr: int,
+        index: int,
+        section_ts: str,
+        seconds: list[float],
+        similarities: list[Any],
+        peaks_final: list[int],
+    ) -> None:
+        """Route a candidate peak to the appropriate verification method."""
+        dominant_frequency = self._pure_tone_frequencies.get(clip_name)
+        if dominant_frequency is not None:
+            accepted = self._verify_pure_tone(
+                audio_section=audio_section,
+                peak=peak,
+                clip_length=clip_length,
+                dominant_frequency=dominant_frequency,
+                sr=sr,
+                section_ts=section_ts,
+            )
+            if accepted:
+                peaks_final.append(peak)
+        else:
+            correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
+            correlation_slice = correlation_slice / np.max(correlation_slice)
+
+            if len(correlation_slice) != len(correlation_clip):
+                raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
+
+            is_short_clip = clip_length / sr < SHORT_CLIP_DURATION_THRESHOLD
+            self._get_peak_times_normal(
+                correlation_clip=correlation_clip,
+                correlation_slice=correlation_slice,
+                seconds=seconds,
+                peak=peak,
+                clip_name=clip_name,
+                index=index,
+                section_ts=section_ts,
+                similarities=similarities,
+                peaks_final=peaks_final,
+                is_short_clip=is_short_clip,
+            )
+
+    def _verify_pure_tone(
+        self,
+        audio_section: NDArray[np.float32],
+        peak: int,
+        clip_length: int,
+        dominant_frequency: float,
+        sr: int,
+        section_ts: str,
+    ) -> bool:
+        """Verify a candidate peak is a pure tone with the expected frequency and duration.
+
+        This is the RTHK beep special-case path, triggered by clip name (see
+        PURE_TONE_CLIP_NAME). It exists because rthk_beep.wav does not
+        cross-correlate well enough for the normal MSE+Pearson verification.
+
+        Uses short-time spectral analysis to require a contiguous run of
+        narrowband energy at the expected frequency. This rejects voiced or
+        harmonic speech segments that still produce a strong correlation peak.
+
+        Four acceptance criteria handle different signal conditions. All were
+        tuned against the regression test suite in tests/test_real_data_regressions.py
+        (stray clips, hourly lead-ins, hourly openings). Adjust thresholds
+        there first, then re-run those tests to validate.
+        """
+        debug_mode = self.debug_mode
+        match_start = peak - clip_length + 1
+        matched_segment = extract_padded_segment(audio_section, match_start, clip_length)
+        left_flank = extract_padded_segment(audio_section, match_start - clip_length, clip_length)
+        right_flank = extract_padded_segment(audio_section, match_start + clip_length, clip_length)
+
+        metrics = analyze_pure_tone_candidate(matched_segment, sr, dominant_frequency)
+        left_metrics = analyze_pure_tone_candidate(left_flank, sr, dominant_frequency)
+        right_metrics = analyze_pure_tone_candidate(right_flank, sr, dominant_frequency)
+        max_flank_purity = max(
+            left_metrics.overall_band_purity,
+            right_metrics.overall_band_purity,
+        )
+
+        if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
+            if debug_mode:
+                print(
+                    f"failed pure tone check for {section_ts}: dominant "
+                    f"{metrics.detected_frequency:.1f}Hz != expected "
+                    f"{dominant_frequency:.1f}Hz",
+                    file=sys.stderr,
+                )
+            return False
+
+        # Strong, clean beep with high purity throughout. Allows slightly
+        # noisy flanks since the signal itself is unambiguous.
+        strict_accept = (
+            metrics.overall_band_purity >= 0.80
+            and metrics.longest_active_run >= 15
+            and metrics.active_frame_mean_purity >= 0.84
+            and max_flank_purity <= 0.15
+        )
+
+        # Weaker beep (e.g. lossy codec, lower SNR) but still clearly
+        # isolated from surrounding content. Requires quieter flanks.
+        isolated_accept = (
+            metrics.overall_band_purity >= 0.65
+            and metrics.longest_active_run >= 10
+            and metrics.active_frame_mean_purity >= 0.77
+            and max_flank_purity <= 0.12
+        )
+
+        # Beep with consistent frame-level activity (high active_frame_ratio)
+        # but slightly lower per-frame purity — typical of beeps embedded in
+        # background hiss or low-level music.
+        stable_isolated_accept = (
+            metrics.overall_band_purity >= 0.72
+            and metrics.active_frame_ratio >= 0.85
+            and metrics.longest_active_run >= 14
+            and metrics.active_frame_mean_purity >= 0.76
+            and max_flank_purity <= 0.12
+        )
+
+        # Very short beep (few active frames) that is highly pure where it
+        # does appear. Strictest flank requirement to avoid false positives
+        # from brief tonal artifacts in speech.
+        short_isolated_accept = (
+            metrics.overall_band_purity >= 0.72
+            and metrics.active_frame_ratio >= 0.65
+            and metrics.longest_active_run >= 7
+            and metrics.active_frame_mean_purity >= 0.84
+            and max_flank_purity <= 0.06
+        )
+
+        if not (
+            strict_accept
+            or isolated_accept
+            or stable_isolated_accept
+            or short_isolated_accept
+        ):
+            if debug_mode:
+                print(
+                    f"failed pure tone check for {section_ts}: band={metrics.overall_band_purity:.3f} "
+                    f"run={metrics.longest_active_run} active={metrics.active_frame_mean_purity:.3f} "
+                    f"flank=({left_metrics.overall_band_purity:.3f}, "
+                    f"{right_metrics.overall_band_purity:.3f})",
+                    file=sys.stderr,
+                )
+            return False
+
+        if debug_mode:
+            if strict_accept:
+                acceptance_mode = "strict"
+            elif isolated_accept:
+                acceptance_mode = "isolated"
+            elif stable_isolated_accept:
+                acceptance_mode = "stable_isolated"
+            else:
+                acceptance_mode = "short_isolated"
+            print(
+                f"accepted pure tone {section_ts} ({acceptance_mode}): band_purity="
+                f"{metrics.overall_band_purity:.3f} active_ratio="
+                f"{metrics.active_frame_ratio:.3f} run="
+                f"{metrics.longest_active_run} active_purity="
+                f"{metrics.active_frame_mean_purity:.3f} freq="
+                f"{metrics.detected_frequency:.1f}Hz flank_purity="
+                f"({left_metrics.overall_band_purity:.3f}, "
+                f"{right_metrics.overall_band_purity:.3f})",
+                file=sys.stderr,
+            )
+        return True
 
     def _get_peak_times_normal(
         self,
@@ -622,7 +765,7 @@ class AudioPatternDetector:
         section_ts: str,
         similarities: list[Any],
         peaks_final: list[int],
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
+        is_short_clip: bool = False,
     ) -> None:
 
         from native_helper import pearson_correlation
@@ -647,17 +790,24 @@ class AudioPatternDetector:
         similarity_middle = np.mean(similarity_partitions[left_bound:right_bound])
         similarity_whole = np.mean(similarity_partitions)
 
-        similarity = min(similarity_whole,similarity_middle)
+        if is_short_clip:
+            similarity = similarity_whole
+        else:
+            similarity = min(similarity_whole,similarity_middle)
 
-        # 3-window Pearson r: try different regions and pick best match
-        # Window A: first half (0-50%), B: middle (40-60%), C: second half (50-100%)
+        # Multi-window Pearson r: try different regions and pick best match
         # Downsample count scales with window width so resolution is consistent
         ds_base = 101  # for 20% window (2 partitions)
-        pearson_windows: list[tuple[int, int, int]] = [
-            (0, 5, round(ds_base * 5 / 2)),   # 50% → 252 samples
-            (4, 6, ds_base),                    # 20% → 101 samples
-            (5, 10, round(ds_base * 5 / 2)),   # 50% → 252 samples
-        ]
+        if is_short_clip:
+            pearson_windows: list[tuple[int, int, int]] = [
+                (0, 10, round(ds_base * 10 / 2)),    # 0-100% → 505 samples
+            ]
+        else:
+            pearson_windows = [
+                (0, 5, round(ds_base * 5 / 2)),      # 0-50% → 252 samples
+                (4, 6, ds_base),                      # 40-60% → 101 samples
+                (5, 10, round(ds_base * 5 / 2)),      # 50-100% → 252 samples
+            ]
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
         if cached_clips is None:
@@ -689,7 +839,7 @@ class AudioPatternDetector:
             import matplotlib.pyplot as plt
             print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
             seconds.append(peak / sr)
-            similarity_debug[clip_name].append((index, similarity,))
+            self._similarity_debug[clip_name].append((index, similarity,))
 
             correlation_slice_graph = correlation_slice
             correlation_clip_graph = correlation_clip
@@ -728,11 +878,11 @@ class AudioPatternDetector:
 
             best_wl, best_wr, _best_ds_n = pearson_windows[best_window_idx]
             similarities.append((similarity, {"whole": float(similarity_whole),
-                                              "middle": float(similarity_middle),
-                                              }, {"pearson_r": pearson_r,
-                                                  "best_window_left": float(best_wl),
-                                                  "best_window_right": float(best_wr),
-                                                  **pearson_per_window}))
+                                              "middle": float(similarity_middle)},
+                                 {"pearson_r": pearson_r,
+                                  "best_window_left": float(best_wl),
+                                  "best_window_right": float(best_wr),
+                                  **pearson_per_window}))
 
         similarity_hard_limit = 0.03
         pearson_r_threshold = 0.90
@@ -746,185 +896,3 @@ class AudioPatternDetector:
             if debug_mode:
                 print(
                     f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
-
-    # # doesn't work well
-    # def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
-    #
-    #     sr = self.target_sample_rate
-    #     debug_mode = self.debug_mode
-    #
-    #     result = is_news_report_beep(audio, sr,f"{clip_name}_{index}_{section_ts}_{peak}")
-    #     detected = result['is_news_report_clip']
-    #
-    #     if debug_mode:
-    #         print("detected", detected)
-    #         area_props.append({"detect_sine_tone_result": result})
-    #         audio_test_dir = f"./tmp/clip_audio_news_beep"
-    #         os.makedirs(audio_test_dir, exist_ok=True)
-    #         sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio, self.target_sample_rate)
-    #
-    #     if detected:
-    #         peaks_final.append(peak)
-
-    # # no longer in use, it sometimes misses those in between beeps
-    # def _get_peak_times_beep_v1(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
-    #     # short beep is very sensitive, it is better to miss some than to have false positives
-    #     similarity_threshold = 0.002
-    #
-    #     sr = self.target_sample_rate
-    #     debug_mode = self.debug_mode
-    #
-    #     beep_target_num_sample_after_resample = 101
-    #
-    #     downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
-    #
-    #     if downsampled_correlation_clip is None:
-    #         downsampled_correlation_clip = resample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
-    #         clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
-    #
-    #     downsampled_correlation_slice = resample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
-    #
-    #     correlation_clip = downsampled_correlation_clip
-    #     correlation_slice = downsampled_correlation_slice
-    #
-    #     similarity = mean_squared_error(correlation_clip, correlation_slice)
-    #
-    #     similarity_whole = similarity
-    #
-    #     if debug_mode:
-    #         print("similarity", similarity)
-    #         seconds.append(peak / sr)
-    #         similarity_debug = clip_cache["similarity_debug"]
-    #         similarity_debug[clip_name].append((index, similarity,))
-    #
-    #         correlation_slice_graph = correlation_slice
-    #         correlation_clip_graph = correlation_clip
-    #
-    #         graph_max = 0.1
-    #         if similarity <= graph_max:
-    #             graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
-    #             os.makedirs(graph_dir, exist_ok=True)
-    #
-    #             # Optional: plot the correlation graph to visualize
-    #             plt.figure(figsize=(10, 4))
-    #             plt.plot(correlation_slice_graph)
-    #             plt.plot(correlation_clip_graph, alpha=0.7)
-    #             plt.title('Cross-correlation between the audio clip and full track before slicing')
-    #             plt.xlabel('Lag')
-    #             plt.ylabel('Correlation coefficient')
-    #             plt.savefig(
-    #                 f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-    #             plt.close()
-    #
-    #         similarities.append((similarity, {"whole": similarity_whole,
-    #                                           "left": 0,
-    #                                           "middle": 0,
-    #                                           "right": 0,
-    #                                           "left_right_diff": 0,
-    #                                           }))
-    #
-    #         if similarity > similarity_threshold:
-    #             if debug_mode:
-    #                 print(
-    #                     f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
-    #         else:
-    #             peaks_final.append(peak)
-
-    # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
-    def _get_peak_times_beep_v3(
-        self,
-        correlation_clip: NDArray[np.float32],
-        correlation_slice: NDArray[np.float32],
-        seconds: list[float],
-        peak: int,
-        clip_name: str,
-        index: int,
-        section_ts: str,
-        similarities: list[Any],
-        peaks_final: list[int],
-        area_props: list[list[Any]],
-        similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
-    ) -> None:
-
-        sr = self.target_sample_rate
-        debug_mode = self.debug_mode
-
-        beep_target_num_sample_after_resample = 101
-
-        downsampled_correlation_clip = self._clip_cache["downsampled_correlation_clips"].get(clip_name)
-
-        if downsampled_correlation_clip is None:
-            downsampled_correlation_clip = resample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
-            self._clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
-
-        downsampled_correlation_slice = resample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
-
-        ds_corr_clip = downsampled_correlation_clip
-        ds_corr_slice = downsampled_correlation_slice
-
-        area_prop = area_of_overlap_ratio(ds_corr_clip, ds_corr_slice)
-
-        overlap_ratio = area_prop["overlapping_area"]/area_prop["area_control"]
-
-        similarity = _mean_squared_error(ds_corr_clip, ds_corr_slice)
-
-        similarity_whole = similarity
-
-        if debug_mode:
-            import matplotlib.pyplot as plt
-            print("similarity", similarity,file=sys.stderr)
-            seconds.append(peak / sr)
-            similarity_debug[clip_name].append((index, similarity,))
-
-            correlation_slice_graph = correlation_slice
-            correlation_clip_graph = correlation_clip
-
-            graph_max = 0.1
-            if similarity <= graph_max:
-                graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
-                os.makedirs(graph_dir, exist_ok=True)
-
-                # Optional: plot the correlation graph to visualize
-                plt.figure(figsize=(10, 4))
-                plt.plot(correlation_slice_graph)
-                plt.plot(correlation_clip_graph, alpha=0.7)
-                plt.title('Cross-correlation between the audio clip and full track before slicing')
-                plt.xlabel('Lag')
-                plt.ylabel('Correlation coefficient')
-                plt.savefig(
-                    f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-                plt.close()
-
-            similarities.append((similarity, {"whole": similarity_whole,
-                                              "left": 0,
-                                              "middle": 0,
-                                              "right": 0,
-                                              "left_right_diff": 0,
-                                              }))
-            area_props.append([overlap_ratio, area_prop])
-
-
-        similarity_threshold = 0.01
-
-        similarity_threshold_check_area_upper = 0.003
-
-        similarity_threshold_check_area = 0.002
-
-        if similarity > similarity_threshold:
-            if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}",file=sys.stderr)
-        # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
-        elif similarity > similarity_threshold_check_area_upper and overlap_ratio < 0.99:
-            if debug_mode:
-                print(
-                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.99",file=sys.stderr)
-        # similar enough, lower area ratio threshold
-        elif similarity > similarity_threshold_check_area and overlap_ratio < 0.98:
-            if debug_mode:
-                print(
-                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.98",file=sys.stderr)
-        else:
-            if debug_mode:
-                print(
-                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio}",file=sys.stderr)
-            peaks_final.append(peak)

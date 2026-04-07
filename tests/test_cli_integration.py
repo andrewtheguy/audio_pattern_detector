@@ -121,7 +121,6 @@ def test_match_pattern_folder_passes_multiple_patterns():
 
     # All patterns from folder should be in output
     assert "cbs_news" in output
-    assert "cbs_news_dada" in output
     assert "rthk_beep" in output
 
 
@@ -219,7 +218,7 @@ def test_match_stdin_with_pattern_folder():
     pattern_names = {e["clip_name"] for e in events if e["type"] == "pattern_detected"}
 
     # CBS news patterns should be detected in CBS audio
-    assert "cbs_news" in pattern_names or "cbs_news_dada" in pattern_names
+    assert "cbs_news" in pattern_names
 
 
 # --- Match Command: --jsonl Output Format Tests ---
@@ -329,7 +328,6 @@ def test_show_config_with_pattern_folder():
 
     config = json.loads(result.stdout)
     assert "cbs_news" in config["clips"]
-    assert "cbs_news_dada" in config["clips"]
     assert "rthk_beep" in config["clips"]
 
 
@@ -344,7 +342,6 @@ def test_show_config_clip_info():
     clip_config = config["clips"]["rthk_beep"]
     assert "duration_seconds" in clip_config
     assert "sliding_window_seconds" in clip_config
-    assert "is_pure_tone" in clip_config
 
 
 # --- Convert Command Tests ---
