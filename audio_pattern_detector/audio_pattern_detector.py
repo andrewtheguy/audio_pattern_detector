@@ -19,6 +19,7 @@ from audio_pattern_detector.audio_utils import (
     slicing_with_zero_padding,
     write_wav_file,
 )
+from audio_pattern_detector.detection_utils import is_pure_tone
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class ClipData(TypedDict):
     correlation_clip: NDArray[np.float32]
     correlation_clip_absolute_max: np.floating[Any]
     short_clip: bool
+    is_pure_tone: bool
 
 
 class ClipCache(TypedDict):
@@ -195,6 +197,7 @@ class AudioPatternDetector:
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
                 "short_clip": clip_seconds < 0.5,
+                "is_pure_tone": is_pure_tone(clip, self.target_sample_rate),
             }
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
@@ -449,8 +452,8 @@ class AudioPatternDetector:
         audio_section: NDArray[np.float32],
         index: int,
     ) -> list[float]:
-        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, short_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","short_clip")(clip_data))
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, short_clip, is_pure_tone_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","short_clip","is_pure_tone")(clip_data))
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -541,7 +544,8 @@ class AudioPatternDetector:
                                             section_ts=section_ts,
                                             similarities=similarities,
                                             peaks_final=peaks_final,
-                                            short_clip=short_clip)
+                                            short_clip=short_clip,
+                                            is_pure_tone_clip=is_pure_tone_clip)
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -581,6 +585,7 @@ class AudioPatternDetector:
         similarities: list[Any],
         peaks_final: list[int],
         short_clip: bool,
+        is_pure_tone_clip: bool,
     ) -> None:
 
         from native_helper import pearson_correlation
@@ -606,6 +611,15 @@ class AudioPatternDetector:
         similarity_whole = np.mean(similarity_partitions)
 
         similarity = min(similarity_whole,similarity_middle)
+
+        # For short pure tone clips: check that both halves match the reference well.
+        # False positives from similar-frequency tones show low overall MSE but
+        # one half diverges (asymmetric envelope).
+        max_half_mse: float | None = None
+        if short_clip and is_pure_tone_clip:
+            left_half_mse = float(np.mean(similarity_partitions[:partition_count // 2]))
+            right_half_mse = float(np.mean(similarity_partitions[partition_count // 2:]))
+            max_half_mse = max(left_half_mse, right_half_mse)
 
         # Multi-window Pearson r: try different regions and pick best match
         # Downsample count scales with window width so resolution is consistent
@@ -646,7 +660,8 @@ class AudioPatternDetector:
 
         if debug_mode:
             import matplotlib.pyplot as plt
-            print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
+            max_half_str = f" max_half_mse {max_half_mse:.6f}" if max_half_mse is not None else ""
+            print(f"similarity {similarity} pearson_r {pearson_r}{max_half_str}",file=sys.stderr)
             seconds.append(peak / sr)
             self._similarity_debug[clip_name].append((index, similarity,))
 
@@ -686,19 +701,26 @@ class AudioPatternDetector:
                     plt.close()
 
             best_wl, best_wr, _best_ds_n = pearson_windows[best_window_idx]
-            similarities.append((similarity, {"whole": float(similarity_whole),
-                                              "middle": float(similarity_middle),
-                                              }, {"pearson_r": pearson_r,
-                                                  "best_window_left": float(best_wl),
-                                                  "best_window_right": float(best_wr),
-                                                  **pearson_per_window}))
+            sim_dict: dict[str, float] = {"whole": float(similarity_whole),
+                                          "middle": float(similarity_middle)}
+            if max_half_mse is not None:
+                sim_dict["max_half_mse"] = max_half_mse
+            similarities.append((similarity, sim_dict,
+                                 {"pearson_r": pearson_r,
+                                  "best_window_left": float(best_wl),
+                                  "best_window_right": float(best_wr),
+                                  **pearson_per_window}))
 
         similarity_hard_limit = 0.03
         pearson_r_threshold = 0.90
+        max_half_mse_limit = 0.01  # short clips only: reject if worst half MSE is too high
 
         if similarity > similarity_hard_limit:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
+        elif max_half_mse is not None and max_half_mse > max_half_mse_limit:
+            if debug_mode:
+                print(f"failed verification for {section_ts} due to max_half_mse {max_half_mse:.6f} > {max_half_mse_limit}",file=sys.stderr)
         elif pearson_r >= pearson_r_threshold:
             peaks_final.append(peak)
         else:

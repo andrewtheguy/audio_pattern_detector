@@ -183,14 +183,12 @@ def test_empty_pattern_list():
 
 
 def test_beep_detection_algorithm_specifics():
-    """Test specific behavior of short clip detection algorithm
+    """Test specific behavior of short pure tone clip detection.
 
-    The short clip detection algorithm uses:
-    - Downsampled correlation matching (101 points, 0-100%)
-    - Pearson r threshold (>= 0.90)
-    - MSE similarity threshold (< 0.01)
-
-    This test verifies the algorithm correctly identifies short clip patterns.
+    Short pure tone clips use the same verification as normal clips
+    (partitioned MSE + multi-window Pearson r) plus:
+    - An extra 0-100% Pearson window
+    - A max_half_mse check to reject asymmetric false positives
     """
     peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
