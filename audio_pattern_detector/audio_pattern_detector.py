@@ -611,6 +611,10 @@ class AudioPatternDetector:
         metrics = analyze_pure_tone_candidate(matched_segment, sr, dominant_frequency)
         left_metrics = analyze_pure_tone_candidate(left_flank, sr, dominant_frequency)
         right_metrics = analyze_pure_tone_candidate(right_flank, sr, dominant_frequency)
+        max_flank_purity = max(
+            left_metrics.overall_band_purity,
+            right_metrics.overall_band_purity,
+        )
 
         if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
             if debug_mode:
@@ -622,46 +626,63 @@ class AudioPatternDetector:
                 )
             return False
 
-        if metrics.overall_band_purity < 0.80:
-            if debug_mode:
-                print(
-                    f"failed pure tone check for {section_ts}: band purity="
-                    f"{metrics.overall_band_purity:.3f} < 0.80",
-                    file=sys.stderr,
-                )
-            return False
+        strict_accept = (
+            metrics.overall_band_purity >= 0.80
+            and metrics.longest_active_run >= 15
+            and metrics.active_frame_mean_purity >= 0.84
+            and max_flank_purity <= 0.15
+        )
 
-        if metrics.longest_active_run < 15:
-            if debug_mode:
-                print(
-                    f"failed pure tone check for {section_ts}: longest run="
-                    f"{metrics.longest_active_run} < 15",
-                    file=sys.stderr,
-                )
-            return False
+        isolated_accept = (
+            metrics.overall_band_purity >= 0.65
+            and metrics.longest_active_run >= 10
+            and metrics.active_frame_mean_purity >= 0.77
+            and max_flank_purity <= 0.12
+        )
 
-        if metrics.active_frame_mean_purity < 0.84:
-            if debug_mode:
-                print(
-                    f"failed pure tone check for {section_ts}: active purity="
-                    f"{metrics.active_frame_mean_purity:.3f} < 0.84",
-                    file=sys.stderr,
-                )
-            return False
+        stable_isolated_accept = (
+            metrics.overall_band_purity >= 0.72
+            and metrics.active_frame_ratio >= 0.85
+            and metrics.longest_active_run >= 14
+            and metrics.active_frame_mean_purity >= 0.76
+            and max_flank_purity <= 0.12
+        )
 
-        if left_metrics.overall_band_purity > 0.15 or right_metrics.overall_band_purity > 0.15:
+        short_isolated_accept = (
+            metrics.overall_band_purity >= 0.72
+            and metrics.active_frame_ratio >= 0.65
+            and metrics.longest_active_run >= 7
+            and metrics.active_frame_mean_purity >= 0.84
+            and max_flank_purity <= 0.06
+        )
+
+        if not (
+            strict_accept
+            or isolated_accept
+            or stable_isolated_accept
+            or short_isolated_accept
+        ):
             if debug_mode:
                 print(
-                    f"failed pure tone check for {section_ts}: flank purity="
-                    f"({left_metrics.overall_band_purity:.3f}, "
-                    f"{right_metrics.overall_band_purity:.3f}) exceeds 0.15",
+                    f"failed pure tone check for {section_ts}: band={metrics.overall_band_purity:.3f} "
+                    f"run={metrics.longest_active_run} active={metrics.active_frame_mean_purity:.3f} "
+                    f"flank=({left_metrics.overall_band_purity:.3f}, "
+                    f"{right_metrics.overall_band_purity:.3f})",
                     file=sys.stderr,
                 )
             return False
 
         if debug_mode:
+            if strict_accept:
+                acceptance_mode = "strict"
+            elif isolated_accept:
+                acceptance_mode = "isolated"
+            elif stable_isolated_accept:
+                acceptance_mode = "stable_isolated"
+            else:
+                acceptance_mode = "short_isolated"
             print(
-                f"accepted pure tone {section_ts}: band_purity="
+                f"accepted pure tone {section_ts} ({acceptance_mode}): band_purity="
                 f"{metrics.overall_band_purity:.3f} active_ratio="
                 f"{metrics.active_frame_ratio:.3f} run="
                 f"{metrics.longest_active_run} active_purity="
