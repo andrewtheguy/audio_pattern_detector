@@ -604,9 +604,18 @@ class AudioPatternDetector:
     ) -> bool:
         """Verify a candidate peak is a pure tone with the expected frequency and duration.
 
+        This is the RTHK beep special-case path, triggered by clip name (see
+        PURE_TONE_CLIP_NAME). It exists because rthk_beep.wav does not
+        cross-correlate well enough for the normal MSE+Pearson verification.
+
         Uses short-time spectral analysis to require a contiguous run of
         narrowband energy at the expected frequency. This rejects voiced or
         harmonic speech segments that still produce a strong correlation peak.
+
+        Four acceptance criteria handle different signal conditions. All were
+        tuned against the regression test suite in tests/test_real_data_regressions.py
+        (stray clips, hourly lead-ins, hourly openings). Adjust thresholds
+        there first, then re-run those tests to validate.
         """
         debug_mode = self.debug_mode
         match_start = peak - clip_length + 1
@@ -632,6 +641,8 @@ class AudioPatternDetector:
                 )
             return False
 
+        # Strong, clean beep with high purity throughout. Allows slightly
+        # noisy flanks since the signal itself is unambiguous.
         strict_accept = (
             metrics.overall_band_purity >= 0.80
             and metrics.longest_active_run >= 15
@@ -639,6 +650,8 @@ class AudioPatternDetector:
             and max_flank_purity <= 0.15
         )
 
+        # Weaker beep (e.g. lossy codec, lower SNR) but still clearly
+        # isolated from surrounding content. Requires quieter flanks.
         isolated_accept = (
             metrics.overall_band_purity >= 0.65
             and metrics.longest_active_run >= 10
@@ -646,6 +659,9 @@ class AudioPatternDetector:
             and max_flank_purity <= 0.12
         )
 
+        # Beep with consistent frame-level activity (high active_frame_ratio)
+        # but slightly lower per-frame purity — typical of beeps embedded in
+        # background hiss or low-level music.
         stable_isolated_accept = (
             metrics.overall_band_purity >= 0.72
             and metrics.active_frame_ratio >= 0.85
@@ -654,6 +670,9 @@ class AudioPatternDetector:
             and max_flank_purity <= 0.12
         )
 
+        # Very short beep (few active frames) that is highly pure where it
+        # does appear. Strictest flank requirement to avoid false positives
+        # from brief tonal artifacts in speech.
         short_isolated_accept = (
             metrics.overall_band_purity >= 0.72
             and metrics.active_frame_ratio >= 0.65

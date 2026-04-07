@@ -34,18 +34,6 @@ def _audio_clip_from_array(name: str, audio: np.ndarray) -> AudioClip:
     return AudioClip(name=name, audio=np.asarray(audio, dtype=np.float32), sample_rate=SR)
 
 
-def _wav_bytes(audio: np.ndarray, sr: int = SR) -> bytes:
-    """Encode float32 audio as 16-bit WAV bytes."""
-    buf = io.BytesIO()
-    pcm = (audio * 32767).astype(np.int16)
-    with wave.open(buf, "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sr)
-        wf.writeframes(pcm.tobytes())
-    return buf.getvalue()
-
-
 def _audio_stream_from_array(name: str, audio: np.ndarray) -> AudioStream:
     """Create an AudioStream from a float32 numpy array (raw PCM, no WAV header)."""
     raw = audio.astype(np.float32).tobytes()
@@ -64,8 +52,8 @@ def test_short_chirp_does_not_trigger_pure_tone_path():
     assert detector._clip_datas["my_chirp"]["dominant_frequency"] is None
 
 
-def test_short_clip_below_threshold():
-    """Clips shorter than SHORT_CLIP_DURATION_THRESHOLD are classified as short."""
+def test_make_chirp_produces_sub_threshold_length():
+    """Sanity check: _make_chirp with duration just under the threshold produces a short clip."""
     chirp = _make_chirp(SHORT_CLIP_DURATION_THRESHOLD - 0.01, 400, 1200)
     assert len(chirp) / SR < SHORT_CLIP_DURATION_THRESHOLD
 

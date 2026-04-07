@@ -58,6 +58,8 @@ def _build_swept_candidate(length: int, sample_rate: int) -> np.ndarray:
 
 
 def _run_verify(detector: AudioPatternDetector, audio_section: np.ndarray, dominant_frequency: float) -> bool:
+    # peak = len-1 and clip_length = len → match_start = 0, so the
+    # entire audio_section is used as the matched segment.
     return detector._verify_pure_tone(
         audio_section=audio_section.astype(np.float32),
         peak=len(audio_section) - 1,
