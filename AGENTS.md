@@ -26,4 +26,4 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Version bumping
 
-- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together and then cargo check and uv sync.
+- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together, then run `cargo check --manifest-path native-helper/Cargo.toml` and `uv lock` to update the lockfile.
