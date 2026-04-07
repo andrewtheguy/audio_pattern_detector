@@ -791,7 +791,7 @@ class AudioPatternDetector:
         similarity_whole = np.mean(similarity_partitions)
 
         if is_short_clip:
-            similarity = float(similarity_whole)
+            similarity = similarity_whole
         else:
             similarity = min(similarity_whole,similarity_middle)
 
