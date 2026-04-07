@@ -24,6 +24,8 @@ def get_pure_tone_frequency(audio_data: NDArray[np.float32], sample_rate: int) -
     magnitude = np.abs(fft_result)
     dominant_freq_idx = np.argmax(magnitude)
     dominant_magnitude = magnitude[dominant_freq_idx]
+    if dominant_magnitude == 0.0:
+        return None
     magnitude_normalized = magnitude / dominant_magnitude
 
     from native_helper import find_peaks

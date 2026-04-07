@@ -342,7 +342,6 @@ def test_show_config_clip_info():
     clip_config = config["clips"]["rthk_beep"]
     assert "duration_seconds" in clip_config
     assert "sliding_window_seconds" in clip_config
-    assert "duration_seconds" in clip_config
 
 
 # --- Convert Command Tests ---

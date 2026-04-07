@@ -34,6 +34,9 @@ DEFAULT_SECONDS_PER_CHUNK = 60
 # Clips shorter than this go through the normal path with 0-100% window
 SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
 
+# Clip name that triggers the pure tone verification path
+PURE_TONE_CLIP_NAME = "rthk_beep"
+
 
 # Type definitions
 class ClipData(TypedDict):
@@ -202,7 +205,7 @@ class AudioPatternDetector:
                 "sliding_window": sliding_window,
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
-                "dominant_frequency": get_pure_tone_frequency(clip, self.target_sample_rate) if clip_name == "rthk_beep" else None,
+                "dominant_frequency": get_pure_tone_frequency(clip, self.target_sample_rate) if clip_name == PURE_TONE_CLIP_NAME else None,
             }
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)

@@ -87,7 +87,7 @@ def _assert_expected_timestamps(
         f"Expected {len(expected_timestamps)} matches, found "
         f"{len(actual_timestamps)}: {actual_timestamps}"
     )
-    for actual, expected in zip(sorted(actual_timestamps), expected_timestamps):
+    for actual, expected in zip(sorted(actual_timestamps), sorted(expected_timestamps)):
         assert abs(actual - expected) < 0.01, (
             f"Expected timestamp ~{expected}s, got {actual}s"
         )
