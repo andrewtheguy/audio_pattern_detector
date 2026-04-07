@@ -65,13 +65,15 @@ Currently only supports cross-correlation.
 
 ### Default Cross-Correlation
 
-Picks all peaks that are above a certain threshold, and then eliminates false positives using partitioned MSE and multi-window Pearson correlation (for clips >= 0.5s) or downsampled MSE and single-window Pearson correlation (for short clips < 0.5s).
+Picks all peaks that are above a certain threshold, and then eliminates false positives using partitioned MSE and multi-window Pearson correlation.
 
-For normal patterns, the verification downsamples overlapping regions of the cross-correlation curves and computes the Pearson correlation coefficient across 3 windows. This is scale-invariant, making it robust against lossy codec artifacts (Opus, AAC) that inflate the correlation envelope but preserve shape. High Pearson r (>= 0.90) can override moderate MSE, allowing detection even with degraded audio. See [docs/denoise-strategy.md](denoise-strategy.md) for improving pattern clip quality.
+For normal patterns (>= 0.5s), the verification downsamples overlapping regions of the cross-correlation curves and computes the Pearson correlation coefficient across 3 windows (0-50%, 40-60%, 50-100%). This is scale-invariant, making it robust against lossy codec artifacts (Opus, AAC) that inflate the correlation envelope but preserve shape. High Pearson r (>= 0.90) can override moderate MSE, allowing detection even with degraded audio. See [docs/denoise-strategy.md](denoise-strategy.md) for improving pattern clip quality.
 
 Works well with repeating or non-repeating patterns that are loud enough within the audio section because it adds the normalized clip at the end of the audio section, which helps to eliminate false positives that are much softer or non-related to the clip.
 
-Short clips (< 0.5s) must be pure tone patterns. They use the same verification plus an extra 0-100% Pearson window and a max_half_mse check to reject asymmetric false positives.
+Short clips (< 0.5s) use the same verification but with a single 0-100% Pearson window and whole-only MSE (no middle partition emphasis), since the correlation envelope is too short for sub-region analysis. Short clips must cross-correlate well — this is the user's responsibility when providing the clip.
+
+The `rthk_beep` clip is a special case: it uses a dedicated pure tone verification path (triggered by clip name, not FFT analysis) because `rthk_beep.wav` does not cross-correlate well enough for the normal path. This is independent of the short clip path.
 
 It will miss distorted patterns like this because error score is too high and Pearson r is too low:
 
