@@ -49,7 +49,7 @@ def test_short_chirp_does_not_trigger_pure_tone_path():
     clip = _audio_clip_from_array("my_chirp", chirp)
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
     # Even if FFT might detect a dominant frequency, non-rthk_beep clips use normal path
-    assert detector._clip_datas["my_chirp"]["dominant_frequency"] is None
+    assert "my_chirp" not in detector._pure_tone_frequencies
 
 
 def test_make_chirp_produces_sub_threshold_length():
@@ -115,9 +115,8 @@ def test_rthk_beep_still_uses_pure_tone_path():
     clip = _audio_clip_from_array("rthk_beep", tone)
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
 
-    clip_data = detector._clip_datas["rthk_beep"]
-    assert clip_data["dominant_frequency"] is not None, \
-        "rthk_beep should have dominant_frequency set (pure tone path)"
+    assert "rthk_beep" in detector._pure_tone_frequencies, \
+        "rthk_beep should have a pure tone frequency set"
 
 
 def test_non_rthk_pure_tone_uses_normal_path():
@@ -135,6 +134,5 @@ def test_non_rthk_pure_tone_uses_normal_path():
     clip = _audio_clip_from_array("other_tone", tone)
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
 
-    clip_data = detector._clip_datas["other_tone"]
-    assert clip_data["dominant_frequency"] is None, \
-        "Non-rthk_beep clips should have dominant_frequency=None (normal path)"
+    assert "other_tone" not in detector._pure_tone_frequencies, \
+        "Non-rthk_beep clips should not have a pure tone frequency"

@@ -46,7 +46,6 @@ class ClipData(TypedDict):
     sliding_window: int
     correlation_clip: NDArray[np.float32]
     correlation_clip_absolute_max: np.floating[Any]
-    dominant_frequency: float | None
 
 
 class ClipCache(TypedDict):
@@ -145,6 +144,7 @@ class AudioPatternDetector:
 
         # Pre-compute clip data that doesn't depend on audio_stream
         self._clip_datas: dict[str, ClipData] = {}
+        self._pure_tone_frequencies: dict[str, float] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
             "downsampled_pearson_windows": {},
@@ -205,8 +205,12 @@ class AudioPatternDetector:
                 "sliding_window": sliding_window,
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
-                "dominant_frequency": get_pure_tone_frequency(clip, self.target_sample_rate) if clip_name == PURE_TONE_CLIP_NAME else None,
             }
+
+            if clip_name == PURE_TONE_CLIP_NAME:
+                freq = get_pure_tone_frequency(clip, self.target_sample_rate)
+                if freq is not None:
+                    self._pure_tone_frequencies[clip_name] = freq
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
         self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
@@ -458,8 +462,8 @@ class AudioPatternDetector:
         audio_section: NDArray[np.float32],
         index: int,
     ) -> list[float]:
-        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, dominant_frequency = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","dominant_frequency")(clip_data))
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -534,38 +538,20 @@ class AudioPatternDetector:
                 logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping")
                 continue
 
-            if dominant_frequency is not None:
-                # Pure tone verification: check the centered audio for the
-                # expected frequency and duration directly
-                accepted = self._verify_pure_tone(
-                    audio_section=audio_section,
-                    peak=peak,
-                    clip_length=clip_length,
-                    dominant_frequency=dominant_frequency,
-                    sr=sr,
-                    section_ts=section_ts,
-                )
-                if accepted:
-                    peaks_final.append(peak)
-            else:
-                # Normal pattern: correlation envelope verification
-                correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
-                correlation_slice = correlation_slice/np.max(correlation_slice)
-
-                if len(correlation_slice) != len(correlation_clip):
-                    raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
-
-                is_short_clip = clip_length / sr < SHORT_CLIP_DURATION_THRESHOLD
-                self._get_peak_times_normal(correlation_clip=correlation_clip,
-                                                correlation_slice=correlation_slice,
-                                                seconds=seconds,
-                                                peak=peak,
-                                                clip_name=clip_name,
-                                                index=index,
-                                                section_ts=section_ts,
-                                                similarities=similarities,
-                                                peaks_final=peaks_final,
-                                                is_short_clip=is_short_clip)
+            self._verify_peak_candidate(
+                clip_name=clip_name,
+                audio_section=audio_section,
+                correlation=correlation,
+                correlation_clip=correlation_clip,
+                peak=peak,
+                clip_length=clip_length,
+                sr=sr,
+                index=index,
+                section_ts=section_ts,
+                seconds=seconds,
+                similarities=similarities,
+                peaks_final=peaks_final,
+            )
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -592,6 +578,55 @@ class AudioPatternDetector:
         peak_times = [peak / sr for peak in peaks_final]
 
         return peak_times
+
+    def _verify_peak_candidate(
+        self,
+        clip_name: str,
+        audio_section: NDArray[np.float32],
+        correlation: NDArray[np.float32],
+        correlation_clip: NDArray[np.float32],
+        peak: int,
+        clip_length: int,
+        sr: int,
+        index: int,
+        section_ts: str,
+        seconds: list[float],
+        similarities: list[Any],
+        peaks_final: list[int],
+    ) -> None:
+        """Route a candidate peak to the appropriate verification method."""
+        dominant_frequency = self._pure_tone_frequencies.get(clip_name)
+        if dominant_frequency is not None:
+            accepted = self._verify_pure_tone(
+                audio_section=audio_section,
+                peak=peak,
+                clip_length=clip_length,
+                dominant_frequency=dominant_frequency,
+                sr=sr,
+                section_ts=section_ts,
+            )
+            if accepted:
+                peaks_final.append(peak)
+        else:
+            correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
+            correlation_slice = correlation_slice / np.max(correlation_slice)
+
+            if len(correlation_slice) != len(correlation_clip):
+                raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
+
+            is_short_clip = clip_length / sr < SHORT_CLIP_DURATION_THRESHOLD
+            self._get_peak_times_normal(
+                correlation_clip=correlation_clip,
+                correlation_slice=correlation_slice,
+                seconds=seconds,
+                peak=peak,
+                clip_name=clip_name,
+                index=index,
+                section_ts=section_ts,
+                similarities=similarities,
+                peaks_final=peaks_final,
+                is_short_clip=is_short_clip,
+            )
 
     def _verify_pure_tone(
         self,
