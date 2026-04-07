@@ -1,5 +1,4 @@
 use crate::{
-    lttb_1d as rust_lttb_1d,
     resample_preserve_maxima_1d as rust_resample_preserve_maxima_1d,
     find_peaks_1d as rust_find_peaks_1d, integrated_loudness as rust_integrated_loudness,
     loudness_normalize as rust_loudness_normalize,
@@ -181,18 +180,6 @@ fn pearson_correlation_py(x: Bound<'_, PyAny>, y: Bound<'_, PyAny>) -> PyResult<
     })
 }
 
-#[pyfunction(name = "lttb")]
-fn lttb_py<'py>(
-    py: Python<'py>,
-    data: Bound<'py, PyAny>,
-    num_samples: usize,
-) -> PyResult<Bound<'py, PyArray1<f32>>> {
-    with_f32_slice(&data, |data_f32| {
-        let result = rust_lttb_1d(data_f32, num_samples);
-        Ok(result.into_pyarray(py))
-    })
-}
-
 #[pymodule]
 #[pyo3(name = "native_helper")]
 fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -206,7 +193,6 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
             "integrated_loudness",
             "loudness_normalize",
             "pearson_correlation",
-            "lttb",
         ],
     )?;
     module.add_function(wrap_pyfunction!(find_peaks_py, module)?)?;
@@ -216,6 +202,5 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(integrated_loudness_py, module)?)?;
     module.add_function(wrap_pyfunction!(loudness_normalize_py, module)?)?;
     module.add_function(wrap_pyfunction!(pearson_correlation_py, module)?)?;
-    module.add_function(wrap_pyfunction!(lttb_py, module)?)?;
     Ok(())
 }

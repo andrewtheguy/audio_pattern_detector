@@ -39,8 +39,3 @@ def pearson_correlation(
     x: npt.NDArray[np.floating[Any]],
     y: npt.NDArray[np.floating[Any]],
 ) -> float: ...
-
-def lttb(
-    data: npt.NDArray[np.floating[Any]],
-    num_samples: int,
-) -> npt.NDArray[np.float32]: ...
