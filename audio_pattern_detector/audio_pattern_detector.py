@@ -19,7 +19,10 @@ from audio_pattern_detector.audio_utils import (
     slicing_with_zero_padding,
     write_wav_file,
 )
-from audio_pattern_detector.detection_utils import get_pure_tone_frequency
+from audio_pattern_detector.detection_utils import (
+    analyze_pure_tone_candidate,
+    get_pure_tone_frequency,
+)
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
@@ -583,18 +586,6 @@ class AudioPatternDetector:
 
         return peak_times
 
-    @staticmethod
-    def _band_energy_ratio(audio: NDArray[np.float32], sr: int, freq: float, bandwidth: float = 50.0) -> float:
-        """Fraction of energy in freq ± bandwidth Hz band."""
-        fft_mag = np.abs(np.fft.fft(audio))
-        fft_freqs = np.fft.fftfreq(len(audio), 1 / sr)
-        pos_mag = fft_mag[:len(fft_mag) // 2]
-        pos_freqs = fft_freqs[:len(fft_freqs) // 2]
-        band = (pos_freqs >= freq - bandwidth) & (pos_freqs <= freq + bandwidth)
-        band_e = float(np.sum(pos_mag[band] ** 2))
-        total_e = float(np.sum(pos_mag ** 2))
-        return band_e / total_e if total_e > 0 else 0.0
-
     def _verify_pure_tone(
         self,
         audio_section: NDArray[np.float32],
@@ -604,51 +595,64 @@ class AudioPatternDetector:
         sr: int,
         section_ts: str,
     ) -> bool:
-        """Verify a candidate peak is a pure tone with the expected frequency and duration."""
+        """Verify a candidate peak is a pure tone with the expected frequency and duration.
+
+        Uses short-time spectral analysis to require a contiguous run of
+        narrowband energy at the expected frequency. This rejects voiced or
+        harmonic speech segments that still produce a strong correlation peak.
+        """
         debug_mode = self.debug_mode
         half = clip_length // 2
-
-        # Center window: dominant frequency must match and no strong competing frequencies
         center = audio_section[max(0, peak - half):peak + half]
-        fft_mag = np.abs(np.fft.fft(center))
-        fft_freqs = np.fft.fftfreq(len(center), 1 / sr)
-        pos_mag = fft_mag[:len(fft_mag) // 2]
-        pos_freqs = fft_freqs[:len(fft_freqs) // 2]
-        dom_idx = int(np.argmax(pos_mag))
-        detected_freq = float(pos_freqs[dom_idx])
-        dom_mag = float(pos_mag[dom_idx])
+        metrics = analyze_pure_tone_candidate(center, sr, dominant_frequency)
 
-        if not math.isclose(detected_freq, dominant_frequency, rel_tol=0.05):
+        if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
             if debug_mode:
-                print(f"failed pure tone check for {section_ts}: dominant {detected_freq:.1f}Hz != expected {dominant_frequency:.1f}Hz", file=sys.stderr)
+                print(
+                    f"failed pure tone check for {section_ts}: dominant "
+                    f"{metrics.detected_frequency:.1f}Hz != expected "
+                    f"{dominant_frequency:.1f}Hz",
+                    file=sys.stderr,
+                )
             return False
 
-        # Reject if any frequency far from the target is nearly as strong (not a pure tone)
-        non_target_mask = np.abs(pos_freqs - dominant_frequency) > 100
-        max_non_target = float(np.max(pos_mag[non_target_mask])) if np.any(non_target_mask) else 0.0
-        non_target_ratio = max_non_target / dom_mag if dom_mag > 0 else 1.0
-        if non_target_ratio > 0.5:
+        if metrics.overall_band_purity < 0.85:
             if debug_mode:
-                print(f"failed pure tone check for {section_ts}: non-target frequency too strong (ratio={non_target_ratio:.3f})", file=sys.stderr)
+                print(
+                    f"failed pure tone check for {section_ts}: band purity="
+                    f"{metrics.overall_band_purity:.3f} < 0.85",
+                    file=sys.stderr,
+                )
             return False
 
-        # Flanking windows: should have low energy at the target frequency
-        # (if high, the tone extends beyond clip duration — wrong duration)
-        left_start = max(0, peak - half - clip_length)
-        left_flank = audio_section[left_start:max(0, peak - half)]
-        right_flank = audio_section[peak + half:peak + half + clip_length]
-
-        left_ratio = self._band_energy_ratio(left_flank, sr, dominant_frequency) if len(left_flank) > 10 else 0.0
-        right_ratio = self._band_energy_ratio(right_flank, sr, dominant_frequency) if len(right_flank) > 10 else 0.0
-
-        flank_threshold = 0.3
-        if left_ratio > flank_threshold and right_ratio > flank_threshold:
+        if metrics.longest_active_run < 6:
             if debug_mode:
-                print(f"failed pure tone check for {section_ts}: both flanks have energy (left={left_ratio:.4f} right={right_ratio:.4f}), tone too long", file=sys.stderr)
+                print(
+                    f"failed pure tone check for {section_ts}: longest run="
+                    f"{metrics.longest_active_run} < 6",
+                    file=sys.stderr,
+                )
+            return False
+
+        if metrics.active_frame_mean_purity < 0.90:
+            if debug_mode:
+                print(
+                    f"failed pure tone check for {section_ts}: active purity="
+                    f"{metrics.active_frame_mean_purity:.3f} < 0.90",
+                    file=sys.stderr,
+                )
             return False
 
         if debug_mode:
-            print(f"accepted pure tone {section_ts}: freq={detected_freq:.1f}Hz left={left_ratio:.4f} right={right_ratio:.4f}", file=sys.stderr)
+            print(
+                f"accepted pure tone {section_ts}: band_purity="
+                f"{metrics.overall_band_purity:.3f} active_ratio="
+                f"{metrics.active_frame_ratio:.3f} run="
+                f"{metrics.longest_active_run} active_purity="
+                f"{metrics.active_frame_mean_purity:.3f} freq="
+                f"{metrics.detected_frequency:.1f}Hz",
+                file=sys.stderr,
+            )
         return True
 
     def _get_peak_times_normal(
@@ -784,4 +788,3 @@ class AudioPatternDetector:
             if debug_mode:
                 print(
                     f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
-
