@@ -25,6 +25,10 @@ RAINBOW_INTRO_PATTERN = "sample_audios/clips/天空下的彩虹intro.wav"
 RAINBOW_INTRO_AUDIO = "sample_audios/am1430_section_with_rainbow_intro.wav"
 RAINBOW_INTRO_EXPECTED_TIME = 15.5
 
+CBS_NEWS_DADA_PATTERN = "sample_audios/clips/cbs_news_dada.wav"
+CBS_NEWS_DADA_AUDIO = "sample_audios/cbs_news_audio_section.wav"
+CBS_NEWS_DADA_EXPECTED_TIME = 1.965625
+
 
 # --- Pattern Matching Tests ---
 
@@ -94,6 +98,30 @@ def test_cbs_news_pattern_detection():
 
     # Verify processing time is reasonable
     assert total_time > 0, "Total processing time should be positive"
+
+
+def test_cbs_news_dada_pattern_detection():
+    """Test detection of CBS News dada short clip pattern.
+
+    This tests the short clip path (< 0.5s) which adds a 0-100% Pearson window.
+    Expected to find match at approximately 1.965625s.
+    """
+    assert Path(CBS_NEWS_DADA_PATTERN).exists(), f"Pattern file {CBS_NEWS_DADA_PATTERN} not found"
+    assert Path(CBS_NEWS_DADA_AUDIO).exists(), f"Audio file {CBS_NEWS_DADA_AUDIO} not found"
+
+    peak_times, total_time = match_pattern(CBS_NEWS_DADA_AUDIO, [CBS_NEWS_DADA_PATTERN], debug_mode=False)
+
+    assert isinstance(peak_times, dict)
+    assert 'cbs_news_dada' in peak_times
+
+    matches = peak_times['cbs_news_dada']
+    assert len(matches) == 1, f"Expected 1 match, found {len(matches)}: {matches}"
+
+    actual_time = matches[0]
+    assert abs(actual_time - CBS_NEWS_DADA_EXPECTED_TIME) < 0.01, \
+        f"Expected timestamp ~{CBS_NEWS_DADA_EXPECTED_TIME}s, got {actual_time}s"
+
+    assert total_time > 0
 
 
 def test_multiple_patterns_detection():
@@ -349,18 +377,15 @@ def test_similarity_threshold_rejection():
         "Pattern should be rejected due to similarity threshold"
 
 
-def test_overlap_ratio_rejection_for_beep():
-    """Test that beep patterns with low overlap ratio are rejected
+def test_beep_rejection_in_non_matching_audio():
+    """Test that beep patterns are rejected in non-matching audio.
 
-    The beep detection algorithm requires overlap_ratio > 0.98 or 0.99.
-    This tests that patterns with insufficient overlap are filtered out.
+    Using beep pattern on CBS audio should not produce any matches.
     """
-    # Using beep pattern on CBS audio should produce low overlap ratios
     peak_times, _ = match_pattern(CBS_NEWS_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 
-    # Should be rejected due to low overlap ratio
     assert len(peak_times['rthk_beep']) == 0, \
-        "Beep pattern should be rejected due to low overlap ratio"
+        "Beep pattern should not match in CBS news audio"
 
 
 def test_no_false_positives_in_complex_scenario():
