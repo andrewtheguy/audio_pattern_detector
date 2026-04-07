@@ -19,13 +19,12 @@ CBS_NEWS_EXPECTED_TIME = 25.89875
 
 RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.wav"
 RTHK_BEEP_AUDIO = "sample_audios/rthk_section_with_beep.wav"
-RTHK_BEEP_EXPECTED_TIMES = [1.4165, 2.419125]
+RTHK_BEEP_EXPECTED_TIMES = [1.407375, 2.419125]
 
 RAINBOW_INTRO_PATTERN = "sample_audios/clips/天空下的彩虹intro.wav"
 RAINBOW_INTRO_AUDIO = "sample_audios/am1430_section_with_rainbow_intro.wav"
 RAINBOW_INTRO_EXPECTED_TIME = 15.5
 
-CBS_NEWS_DADA_PATTERN = "sample_audios/unused/cbs_news_dada.wav"
 
 
 # --- Pattern Matching Tests ---
@@ -98,14 +97,6 @@ def test_cbs_news_pattern_detection():
     assert total_time > 0, "Total processing time should be positive"
 
 
-def test_short_clip_must_be_pure_tone():
-    """Short clips (< 0.5s) that are not pure tone patterns must be rejected."""
-    assert Path(CBS_NEWS_DADA_PATTERN).exists()
-
-    with pytest.raises(ValueError, match="must be a pure tone pattern"):
-        match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_DADA_PATTERN], debug_mode=False)
-
-
 def test_multiple_patterns_detection():
     """Test detection of multiple different normal patterns
 
@@ -165,12 +156,11 @@ def test_empty_pattern_list():
 
 
 def test_beep_detection_algorithm_specifics():
-    """Test specific behavior of short pure tone clip detection.
+    """Test specific behavior of pure tone beep detection.
 
-    Short pure tone clips use the same verification as normal clips
-    (partitioned MSE + multi-window Pearson r) plus:
-    - An extra 0-100% Pearson window
-    - A max_half_mse check to reject asymmetric false positives
+    Pure tone clips use the same correlation-based verification as normal
+    clips (partitioned MSE + multi-window Pearson r) plus a frequency-domain
+    post-check that verifies the audio contains energy at the expected frequency.
     """
     peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 

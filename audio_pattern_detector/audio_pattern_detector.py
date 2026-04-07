@@ -19,7 +19,7 @@ from audio_pattern_detector.audio_utils import (
     slicing_with_zero_padding,
     write_wav_file,
 )
-from audio_pattern_detector.detection_utils import is_pure_tone
+from audio_pattern_detector.detection_utils import get_pure_tone_frequency
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class ClipData(TypedDict):
     sliding_window: int
     correlation_clip: NDArray[np.float32]
     correlation_clip_absolute_max: np.floating[Any]
-    short_clip: bool
+    dominant_frequency: float | None
 
 
 class ClipCache(TypedDict):
@@ -189,18 +189,13 @@ class AudioPatternDetector:
                 plt.savefig(f'{graph_dir_original}/{clip_name}.png')
                 plt.close()
 
-            short_clip = clip_seconds < 0.5
-
-            if short_clip and not is_pure_tone(clip, self.target_sample_rate):
-                raise ValueError(f"short clip '{clip_name}' ({clip_seconds:.3f}s) must be a pure tone pattern")
-
             self._clip_datas[clip_name] = {
                 "clip": clip,
                 "clip_name": clip_name,
                 "sliding_window": sliding_window,
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
-                "short_clip": short_clip,
+                "dominant_frequency": get_pure_tone_frequency(clip, self.target_sample_rate),
             }
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
@@ -455,8 +450,8 @@ class AudioPatternDetector:
         audio_section: NDArray[np.float32],
         index: int,
     ) -> list[float]:
-        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, short_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","short_clip")(clip_data))
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, dominant_frequency = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","dominant_frequency")(clip_data))
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -531,23 +526,36 @@ class AudioPatternDetector:
                 logger.warning(f"{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping")
                 continue
 
-            # slice with the center on the peak
-            correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
-            correlation_slice = correlation_slice/np.max(correlation_slice)
+            if dominant_frequency is not None:
+                # Pure tone verification: check the centered audio for the
+                # expected frequency and duration directly
+                accepted = self._verify_pure_tone(
+                    audio_section=audio_section,
+                    peak=peak,
+                    clip_length=clip_length,
+                    dominant_frequency=dominant_frequency,
+                    sr=sr,
+                    section_ts=section_ts,
+                )
+                if accepted:
+                    peaks_final.append(peak)
+            else:
+                # Normal pattern: correlation envelope verification
+                correlation_slice = slicing_with_zero_padding(correlation, len(correlation_clip), peak)
+                correlation_slice = correlation_slice/np.max(correlation_slice)
 
-            if len(correlation_slice) != len(correlation_clip):
-                raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
+                if len(correlation_slice) != len(correlation_clip):
+                    raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
-            self._get_peak_times_normal(correlation_clip=correlation_clip,
-                                            correlation_slice=correlation_slice,
-                                            seconds=seconds,
-                                            peak=peak,
-                                            clip_name=clip_name,
-                                            index=index,
-                                            section_ts=section_ts,
-                                            similarities=similarities,
-                                            peaks_final=peaks_final,
-                                            short_clip=short_clip)
+                self._get_peak_times_normal(correlation_clip=correlation_clip,
+                                                correlation_slice=correlation_slice,
+                                                seconds=seconds,
+                                                peak=peak,
+                                                clip_name=clip_name,
+                                                index=index,
+                                                section_ts=section_ts,
+                                                similarities=similarities,
+                                                peaks_final=peaks_final)
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -575,6 +583,74 @@ class AudioPatternDetector:
 
         return peak_times
 
+    @staticmethod
+    def _band_energy_ratio(audio: NDArray[np.float32], sr: int, freq: float, bandwidth: float = 50.0) -> float:
+        """Fraction of energy in freq ± bandwidth Hz band."""
+        fft_mag = np.abs(np.fft.fft(audio))
+        fft_freqs = np.fft.fftfreq(len(audio), 1 / sr)
+        pos_mag = fft_mag[:len(fft_mag) // 2]
+        pos_freqs = fft_freqs[:len(fft_freqs) // 2]
+        band = (pos_freqs >= freq - bandwidth) & (pos_freqs <= freq + bandwidth)
+        band_e = float(np.sum(pos_mag[band] ** 2))
+        total_e = float(np.sum(pos_mag ** 2))
+        return band_e / total_e if total_e > 0 else 0.0
+
+    def _verify_pure_tone(
+        self,
+        audio_section: NDArray[np.float32],
+        peak: int,
+        clip_length: int,
+        dominant_frequency: float,
+        sr: int,
+        section_ts: str,
+    ) -> bool:
+        """Verify a candidate peak is a pure tone with the expected frequency and duration."""
+        debug_mode = self.debug_mode
+        half = clip_length // 2
+
+        # Center window: dominant frequency must match and no strong competing frequencies
+        center = audio_section[max(0, peak - half):peak + half]
+        fft_mag = np.abs(np.fft.fft(center))
+        fft_freqs = np.fft.fftfreq(len(center), 1 / sr)
+        pos_mag = fft_mag[:len(fft_mag) // 2]
+        pos_freqs = fft_freqs[:len(fft_freqs) // 2]
+        dom_idx = int(np.argmax(pos_mag))
+        detected_freq = float(pos_freqs[dom_idx])
+        dom_mag = float(pos_mag[dom_idx])
+
+        if not math.isclose(detected_freq, dominant_frequency, rel_tol=0.05):
+            if debug_mode:
+                print(f"failed pure tone check for {section_ts}: dominant {detected_freq:.1f}Hz != expected {dominant_frequency:.1f}Hz", file=sys.stderr)
+            return False
+
+        # Reject if any frequency far from the target is nearly as strong (not a pure tone)
+        non_target_mask = np.abs(pos_freqs - dominant_frequency) > 100
+        max_non_target = float(np.max(pos_mag[non_target_mask])) if np.any(non_target_mask) else 0.0
+        non_target_ratio = max_non_target / dom_mag if dom_mag > 0 else 1.0
+        if non_target_ratio > 0.5:
+            if debug_mode:
+                print(f"failed pure tone check for {section_ts}: non-target frequency too strong (ratio={non_target_ratio:.3f})", file=sys.stderr)
+            return False
+
+        # Flanking windows: should have low energy at the target frequency
+        # (if high, the tone extends beyond clip duration — wrong duration)
+        left_start = max(0, peak - half - clip_length)
+        left_flank = audio_section[left_start:max(0, peak - half)]
+        right_flank = audio_section[peak + half:peak + half + clip_length]
+
+        left_ratio = self._band_energy_ratio(left_flank, sr, dominant_frequency) if len(left_flank) > 10 else 0.0
+        right_ratio = self._band_energy_ratio(right_flank, sr, dominant_frequency) if len(right_flank) > 10 else 0.0
+
+        flank_threshold = 0.3
+        if left_ratio > flank_threshold and right_ratio > flank_threshold:
+            if debug_mode:
+                print(f"failed pure tone check for {section_ts}: both flanks have energy (left={left_ratio:.4f} right={right_ratio:.4f}), tone too long", file=sys.stderr)
+            return False
+
+        if debug_mode:
+            print(f"accepted pure tone {section_ts}: freq={detected_freq:.1f}Hz left={left_ratio:.4f} right={right_ratio:.4f}", file=sys.stderr)
+        return True
+
     def _get_peak_times_normal(
         self,
         correlation_clip: NDArray[np.float32],
@@ -586,7 +662,6 @@ class AudioPatternDetector:
         section_ts: str,
         similarities: list[Any],
         peaks_final: list[int],
-        short_clip: bool,
     ) -> None:
 
         from native_helper import pearson_correlation
@@ -613,15 +688,6 @@ class AudioPatternDetector:
 
         similarity = min(similarity_whole,similarity_middle)
 
-        # For short clips (guaranteed pure tone): check that both halves match
-        # the reference well. False positives from similar-frequency tones show
-        # low overall MSE but one half diverges (asymmetric envelope).
-        max_half_mse: float | None = None
-        if short_clip:
-            left_half_mse = float(np.mean(similarity_partitions[:partition_count // 2]))
-            right_half_mse = float(np.mean(similarity_partitions[partition_count // 2:]))
-            max_half_mse = max(left_half_mse, right_half_mse)
-
         # Multi-window Pearson r: try different regions and pick best match
         # Downsample count scales with window width so resolution is consistent
         ds_base = 101  # for 20% window (2 partitions)
@@ -630,8 +696,6 @@ class AudioPatternDetector:
             (4, 6, ds_base),                      # 40-60% → 101 samples
             (5, 10, round(ds_base * 5 / 2)),      # 50-100% → 252 samples
         ]
-        if short_clip:
-            pearson_windows.append((0, 10, ds_base))  # 0-100% → 101 samples
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
         if cached_clips is None:
@@ -661,8 +725,7 @@ class AudioPatternDetector:
 
         if debug_mode:
             import matplotlib.pyplot as plt
-            max_half_str = f" max_half_mse {max_half_mse:.6f}" if max_half_mse is not None else ""
-            print(f"similarity {similarity} pearson_r {pearson_r}{max_half_str}",file=sys.stderr)
+            print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
             seconds.append(peak / sr)
             self._similarity_debug[clip_name].append((index, similarity,))
 
@@ -702,11 +765,8 @@ class AudioPatternDetector:
                     plt.close()
 
             best_wl, best_wr, _best_ds_n = pearson_windows[best_window_idx]
-            sim_dict: dict[str, float] = {"whole": float(similarity_whole),
-                                          "middle": float(similarity_middle)}
-            if max_half_mse is not None:
-                sim_dict["max_half_mse"] = max_half_mse
-            similarities.append((similarity, sim_dict,
+            similarities.append((similarity, {"whole": float(similarity_whole),
+                                              "middle": float(similarity_middle)},
                                  {"pearson_r": pearson_r,
                                   "best_window_left": float(best_wl),
                                   "best_window_right": float(best_wr),
@@ -714,14 +774,10 @@ class AudioPatternDetector:
 
         similarity_hard_limit = 0.03
         pearson_r_threshold = 0.90
-        max_half_mse_limit = 0.01  # short clips only: reject if worst half MSE is too high
 
         if similarity > similarity_hard_limit:
             if debug_mode:
                 print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
-        elif max_half_mse is not None and max_half_mse > max_half_mse_limit:
-            if debug_mode:
-                print(f"failed verification for {section_ts} due to max_half_mse {max_half_mse:.6f} > {max_half_mse_limit}",file=sys.stderr)
         elif pearson_r >= pearson_r_threshold:
             peaks_final.append(peak)
         else:

@@ -4,8 +4,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def is_pure_tone(audio_data: NDArray[np.float32], sample_rate: int) -> bool:
-    """Determine if the given audio data represents a pure tone."""
+def get_pure_tone_frequency(audio_data: NDArray[np.float32], sample_rate: int) -> float | None:
+    """Return the dominant frequency if the audio is a pure tone, else None."""
     fft_result = np.fft.fft(audio_data)
     freqs = np.fft.fftfreq(len(audio_data), d=1 / sample_rate)
 
@@ -21,8 +21,10 @@ def is_pure_tone(audio_data: NDArray[np.float32], sample_rate: int) -> bool:
     peaks, _ = find_peaks(positive_magnitude_normalized, prominence=0.05)
 
     peak_freqs = positive_freqs[peaks]
-    dominant_freq = positive_freqs[dominant_freq_idx]
-    return len(peaks) == 1 and math.isclose(peak_freqs[0], dominant_freq, rel_tol=0.01)
+    dominant_freq = float(positive_freqs[dominant_freq_idx])
+    if len(peaks) == 1 and math.isclose(peak_freqs[0], dominant_freq, rel_tol=0.01):
+        return dominant_freq
+    return None
 
 
 def max_distance(sorted_data: list[float]) -> float:
