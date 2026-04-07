@@ -37,7 +37,6 @@ class ClipData(TypedDict):
     correlation_clip: NDArray[np.float32]
     correlation_clip_absolute_max: np.floating[Any]
     short_clip: bool
-    is_pure_tone: bool
 
 
 class ClipCache(TypedDict):
@@ -190,14 +189,18 @@ class AudioPatternDetector:
                 plt.savefig(f'{graph_dir_original}/{clip_name}.png')
                 plt.close()
 
+            short_clip = clip_seconds < 0.5
+
+            if short_clip and not is_pure_tone(clip, self.target_sample_rate):
+                raise ValueError(f"short clip '{clip_name}' ({clip_seconds:.3f}s) must be a pure tone pattern")
+
             self._clip_datas[clip_name] = {
                 "clip": clip,
                 "clip_name": clip_name,
                 "sliding_window": sliding_window,
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
-                "short_clip": clip_seconds < 0.5,
-                "is_pure_tone": is_pure_tone(clip, self.target_sample_rate),
+                "short_clip": short_clip,
             }
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
@@ -452,8 +455,8 @@ class AudioPatternDetector:
         audio_section: NDArray[np.float32],
         index: int,
     ) -> list[float]:
-        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, short_clip, is_pure_tone_clip = (
-            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","short_clip","is_pure_tone")(clip_data))
+        clip, clip_name, _, correlation_clip, correlation_clip_absolute_max, short_clip = (
+            itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max","short_clip")(clip_data))
 
         sr = self.target_sample_rate
         debug_mode = self.debug_mode
@@ -544,8 +547,7 @@ class AudioPatternDetector:
                                             section_ts=section_ts,
                                             similarities=similarities,
                                             peaks_final=peaks_final,
-                                            short_clip=short_clip,
-                                            is_pure_tone_clip=is_pure_tone_clip)
+                                            short_clip=short_clip)
 
             if debug_mode:
                 audio_test_dir = f"{self.debug_dir}/audio_section/{clip_name}"
@@ -585,7 +587,6 @@ class AudioPatternDetector:
         similarities: list[Any],
         peaks_final: list[int],
         short_clip: bool,
-        is_pure_tone_clip: bool,
     ) -> None:
 
         from native_helper import pearson_correlation
@@ -612,11 +613,11 @@ class AudioPatternDetector:
 
         similarity = min(similarity_whole,similarity_middle)
 
-        # For short pure tone clips: check that both halves match the reference well.
-        # False positives from similar-frequency tones show low overall MSE but
-        # one half diverges (asymmetric envelope).
+        # For short clips (guaranteed pure tone): check that both halves match
+        # the reference well. False positives from similar-frequency tones show
+        # low overall MSE but one half diverges (asymmetric envelope).
         max_half_mse: float | None = None
-        if short_clip and is_pure_tone_clip:
+        if short_clip:
             left_half_mse = float(np.mean(similarity_partitions[:partition_count // 2]))
             right_half_mse = float(np.mean(similarity_partitions[partition_count // 2:]))
             max_half_mse = max(left_half_mse, right_half_mse)

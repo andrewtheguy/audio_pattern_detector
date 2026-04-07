@@ -25,9 +25,7 @@ RAINBOW_INTRO_PATTERN = "sample_audios/clips/天空下的彩虹intro.wav"
 RAINBOW_INTRO_AUDIO = "sample_audios/am1430_section_with_rainbow_intro.wav"
 RAINBOW_INTRO_EXPECTED_TIME = 15.5
 
-CBS_NEWS_DADA_PATTERN = "sample_audios/clips/cbs_news_dada.wav"
-CBS_NEWS_DADA_AUDIO = "sample_audios/cbs_news_audio_section.wav"
-CBS_NEWS_DADA_EXPECTED_TIME = 1.965625
+CBS_NEWS_DADA_PATTERN = "sample_audios/unused/cbs_news_dada.wav"
 
 
 # --- Pattern Matching Tests ---
@@ -100,28 +98,12 @@ def test_cbs_news_pattern_detection():
     assert total_time > 0, "Total processing time should be positive"
 
 
-def test_cbs_news_dada_pattern_detection():
-    """Test detection of CBS News dada short clip pattern.
+def test_short_clip_must_be_pure_tone():
+    """Short clips (< 0.5s) that are not pure tone patterns must be rejected."""
+    assert Path(CBS_NEWS_DADA_PATTERN).exists()
 
-    This tests the short clip path (< 0.5s) which adds a 0-100% Pearson window.
-    Expected to find match at approximately 1.965625s.
-    """
-    assert Path(CBS_NEWS_DADA_PATTERN).exists(), f"Pattern file {CBS_NEWS_DADA_PATTERN} not found"
-    assert Path(CBS_NEWS_DADA_AUDIO).exists(), f"Audio file {CBS_NEWS_DADA_AUDIO} not found"
-
-    peak_times, total_time = match_pattern(CBS_NEWS_DADA_AUDIO, [CBS_NEWS_DADA_PATTERN], debug_mode=False)
-
-    assert isinstance(peak_times, dict)
-    assert 'cbs_news_dada' in peak_times
-
-    matches = peak_times['cbs_news_dada']
-    assert len(matches) == 1, f"Expected 1 match, found {len(matches)}: {matches}"
-
-    actual_time = matches[0]
-    assert abs(actual_time - CBS_NEWS_DADA_EXPECTED_TIME) < 0.01, \
-        f"Expected timestamp ~{CBS_NEWS_DADA_EXPECTED_TIME}s, got {actual_time}s"
-
-    assert total_time > 0
+    with pytest.raises(ValueError, match="must be a pure tone pattern"):
+        match_pattern(CBS_NEWS_AUDIO, [CBS_NEWS_DADA_PATTERN], debug_mode=False)
 
 
 def test_multiple_patterns_detection():

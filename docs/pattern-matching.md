@@ -4,7 +4,7 @@ This document describes how audio pattern detection works, from raw audio data t
 
 ## Overview
 
-The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths based on clip duration: one for short clips (< 0.5s) using a single-window Pearson r check, and one for longer clips using a multi-window Pearson r check.
+The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. All clips use the same verification (partitioned MSE + multi-window Pearson r). Short clips (< 0.5s, must be pure tone) get additional checks: an extra 0-100% Pearson window and a max_half_mse asymmetry filter.
 
 ## Pipeline
 
@@ -22,8 +22,9 @@ Raw audio stream (float32 PCM)
    Peak detection (height >= 0.25, min distance = clip length)
         |
    For each candidate peak:
-        |--- Pure tone pattern ---> Downsampled MSE + Pearson r check (0-100%)
-        |--- Normal pattern -----> Partitioned MSE + multi-window Pearson r check
+        |
+   Partitioned MSE + multi-window Pearson r check
+   (short clips add 0-100% window + max_half_mse filter)
         |
    Accepted peaks converted to timestamps
 ```
@@ -34,9 +35,9 @@ Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
 2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, mode='full')`), producing a reference correlation curve. The absolute max is stored for normalization later.
-3. **Short clip classification** - clips shorter than 0.5s are classified as short clips and use a simplified single-window Pearson r verification path.
+3. **Short clip validation** - clips shorter than 0.5s must be pure tone patterns (validated via FFT). Non-pure-tone short clips are rejected with an error.
 
-This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, and its absolute max. Pure-tone classification is pre-computed separately in `ClipCache`.
+This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, and the short clip flag.
 
 ## Chunked Processing
 
@@ -97,21 +98,19 @@ Detection accuracy depends heavily on the quality of the pattern clip. Clips wit
 
 Denoising the pattern clip with bandpass filtering (e.g. speech range 300-3400 Hz) removes these issues. For tonal patterns, synthesizing a clean version from the dominant frequencies produces the best results. See [denoise-strategy.md](denoise-strategy.md).
 
-### Short Clips (< 0.5s)
+### Short Clips (< 0.5s, pure tone only)
 
-Short clips have fewer samples in their correlation curves, making multi-window analysis unreliable. The verification uses the same Pearson correlation approach as normal patterns, but with a single window covering the full 0-100% range. Both curves are downsampled to 101 points before comparison, preserving local maxima.
+Short clips must be pure tone patterns (e.g. beeps). Non-pure-tone clips shorter than 0.5 seconds are rejected at initialization because their correlation envelopes are too short for reliable verification.
 
-1. **Downsampled MSE** - MSE between the two 101-point curves.
-2. **Pearson correlation** - Pearson r is computed on the same 101-point downsampled curves covering 0-100% of the correlation envelope. A single full-range window suffices because short clip correlation envelopes don't benefit from partial-window analysis.
+Short clips use the same verification as normal patterns (partitioned MSE + multi-window Pearson r) with two additions:
 
-3. **Decision thresholds**:
-   - `similarity > 0.01` -> reject (hard MSE ceiling, tighter than normal patterns)
-   - `pearson_r >= 0.90` -> accept
-   - Otherwise -> reject
+1. **Extra 0-100% Pearson window** — an additional full-range window (101 downsampled points) is included alongside the three partial windows. This helps when the partial windows are too small to be meaningful.
 
-## Short Clip Classification
+2. **`max_half_mse` filter** — MSE is computed separately for the left half (partitions 0-4) and right half (partitions 5-9) of the correlation envelope. If the worse half exceeds 0.01, the candidate is rejected. This catches false positives from similar-frequency tones that produce an asymmetric correlation envelope — one half matches the reference well but the other diverges due to the tone having a different duration or adjacent content.
 
-A clip is classified as a short clip if its duration is less than 0.5 seconds. Short clips use a single-window Pearson r verification path instead of the multi-window approach used for longer clips.
+## Pure Tone Classification
+
+A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. Clips shorter than 0.5 seconds are required to be pure tone patterns.
 
 ## Timestamp Conversion
 

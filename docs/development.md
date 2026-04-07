@@ -71,7 +71,7 @@ For normal patterns, the verification downsamples overlapping regions of the cro
 
 Works well with repeating or non-repeating patterns that are loud enough within the audio section because it adds the normalized clip at the end of the audio section, which helps to eliminate false positives that are much softer or non-related to the clip.
 
-Short clips (< 0.5s) use a single 0-100% Pearson window with tighter MSE thresholds.
+Short clips (< 0.5s) must be pure tone patterns. They use the same verification plus an extra 0-100% Pearson window and a max_half_mse check to reject asymmetric false positives.
 
 It will miss distorted patterns like this because error score is too high and Pearson r is too low:
 
