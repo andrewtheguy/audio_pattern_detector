@@ -529,12 +529,12 @@ def test_get_config_clips_info():
     # Verify required fields
     assert "duration_seconds" in clip_config
     assert "sliding_window_seconds" in clip_config
-    assert "is_pure_tone" in clip_config
+    assert "short_clip" in clip_config
 
     # Verify types
     assert isinstance(clip_config["duration_seconds"], float)
     assert isinstance(clip_config["sliding_window_seconds"], int)
-    assert isinstance(clip_config["is_pure_tone"], bool)
+    assert isinstance(clip_config["short_clip"], bool)
 
     # Verify reasonable values
     assert clip_config["duration_seconds"] > 0
@@ -560,19 +560,19 @@ def test_get_config_clips_multiple_patterns():
     assert len(config["clips"]) == 3
 
 
-def test_get_config_is_pure_tone():
-    """Test is_pure_tone is correctly computed."""
-    # rthk_beep is a pure tone pattern (beep)
+def test_get_config_short_clip():
+    """Test short_clip is correctly computed based on duration < 0.5s."""
+    # rthk_beep is a short clip (< 0.5s)
     beep_clip = AudioClip.from_audio_file("sample_audios/clips/rthk_beep.wav")
     detector1 = AudioPatternDetector(audio_clips=[beep_clip])
     config1 = detector1.get_config()
-    assert config1["clips"]["rthk_beep"]["is_pure_tone"] is True
+    assert config1["clips"]["rthk_beep"]["short_clip"] is True
 
-    # 天空下的彩虹intro is NOT a pure tone (complex audio)
+    # 天空下的彩虹intro is NOT a short clip (>= 0.5s)
     rainbow_clip = AudioClip.from_audio_file("sample_audios/clips/天空下的彩虹intro.wav")
     detector2 = AudioPatternDetector(audio_clips=[rainbow_clip])
     config2 = detector2.get_config()
-    assert config2["clips"]["天空下的彩虹intro"]["is_pure_tone"] is False
+    assert config2["clips"]["天空下的彩虹intro"]["short_clip"] is False
 
 
 def test_get_config_sliding_window_computed_correctly():

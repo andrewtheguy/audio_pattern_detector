@@ -19,7 +19,6 @@ from audio_pattern_detector.audio_utils import (
     slicing_with_zero_padding,
     write_wav_file,
 )
-from audio_pattern_detector.detection_utils import area_of_overlap_ratio, is_pure_tone
 from audio_pattern_detector.numpy_encoder import NumpyEncoder
 
 logger = logging.getLogger(__name__)
@@ -42,14 +41,13 @@ class ClipCache(TypedDict):
     """Cache for clip-related computed data."""
     downsampled_correlation_clips: dict[str, NDArray[np.float32]]
     downsampled_pearson_windows: dict[str, list[NDArray[np.float32]]]
-    is_pure_tone_pattern: dict[str, bool]
 
 
 class ClipConfig(TypedDict):
     """Configuration for a single clip in get_config output."""
     duration_seconds: float
     sliding_window_seconds: int
-    is_pure_tone: bool
+    short_clip: bool
 
 
 class DetectorConfig(TypedDict):
@@ -139,7 +137,6 @@ class AudioPatternDetector:
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
             "downsampled_pearson_windows": {},
-            "is_pure_tone_pattern": {},
         }
 
         for audio_clip in self.audio_clips:
@@ -162,9 +159,6 @@ class AudioPatternDetector:
 
             # Compute correlation
             correlation_clip, absolute_max = self._get_clip_correlation(clip)
-
-            # Pre-compute is_pure_tone
-            self._clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, self.target_sample_rate)
 
             # Debug output for correlation
             if self.debug_mode:
@@ -210,7 +204,7 @@ class AudioPatternDetector:
 
         Returns:
             DetectorConfig: Configuration including seconds_per_chunk, chunk_size_bytes,
-                  min_chunk_size_seconds, and per-clip data (duration, sliding_window, is_pure_tone).
+                  min_chunk_size_seconds, and per-clip data (duration, sliding_window, short_clip).
         """
         clips_config: dict[str, ClipConfig] = {}
         for clip_name, clip_data in self._clip_datas.items():
@@ -218,7 +212,7 @@ class AudioPatternDetector:
             clips_config[clip_name] = {
                 "duration_seconds": round(clip_duration, 6),
                 "sliding_window_seconds": clip_data["sliding_window"],
-                "is_pure_tone": self._clip_cache["is_pure_tone_pattern"][clip_name],
+                "short_clip": clip_duration < 0.5,
             }
 
         return {
@@ -465,23 +459,14 @@ class AudioPatternDetector:
         clip, clip_name, _, correlation_clip, correlation_clip_absolute_max= (
             itemgetter("clip","clip_name","sliding_window","correlation_clip","correlation_clip_absolute_max")(clip_data))
 
-        clip_cache = self._clip_cache
-        if clip_cache["is_pure_tone_pattern"].get(clip_name) is None:
-            clip_cache["is_pure_tone_pattern"][clip_name] = is_pure_tone(clip, sr)
-
         seconds_per_chunk = self.seconds_per_chunk
-
-        is_pure_tone_pattern = clip_cache["is_pure_tone_pattern"][clip_name]
 
         debug_mode = self.debug_mode
 
         clip_length = len(clip)
         clip_length_seconds = clip_length / sr
 
-        very_short_clip = clip_length_seconds < 0.5
-
-        if very_short_clip and not is_pure_tone_pattern:
-            raise ValueError(f"very short clip {clip_name} is not supported yet unless it is pure tone pattern, it has {clip_length_seconds} seconds")
+        short_clip = clip_length_seconds < 0.5
 
         # zeroes_second_pad = 1
         # # pad zeros between audio and clip
@@ -530,7 +515,6 @@ class AudioPatternDetector:
         peaks_final = []
 
         # for debugging
-        area_props = []
         similarities = []
         seconds = []
         #distances = []
@@ -559,7 +543,7 @@ class AudioPatternDetector:
             if len(correlation_slice) != len(correlation_clip):
                 raise ValueError(f"correlation_slice length {len(correlation_slice)} not equal to correlation_clip length {len(correlation_clip)}")
 
-            if is_pure_tone_pattern:
+            if short_clip:
                 self._get_peak_times_beep_v3(correlation_clip=correlation_clip,
                                           correlation_slice=correlation_slice,
                                           seconds=seconds,
@@ -569,7 +553,6 @@ class AudioPatternDetector:
                                           section_ts=section_ts,
                                           similarities=similarities,
                                           peaks_final=peaks_final,
-                                          area_props=area_props,
                                           similarity_debug=similarity_debug)
             else:
                 self._get_peak_times_normal(correlation_clip=correlation_clip,
@@ -599,8 +582,6 @@ class AudioPatternDetector:
             os.makedirs(peak_dir, exist_ok=True)
 
             print(json.dumps({"peaks": peaks, "seconds": seconds,
-                              "area_props":area_props,
-                              #"distances": distances,
                               "similarities": similarities}, indent=2, cls=NumpyEncoder),
                   file=open(f'{peak_dir}/{index}_{section_ts}.txt', 'w'))
 
@@ -747,90 +728,6 @@ class AudioPatternDetector:
                 print(
                     f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
 
-    # # doesn't work well
-    # def _get_peak_times_beep_v2(self,audio,peak,peaks_final,clip_cache,area_props,clip_name,index,section_ts):
-    #
-    #     sr = self.target_sample_rate
-    #     debug_mode = self.debug_mode
-    #
-    #     result = is_news_report_beep(audio, sr,f"{clip_name}_{index}_{section_ts}_{peak}")
-    #     detected = result['is_news_report_clip']
-    #
-    #     if debug_mode:
-    #         print("detected", detected)
-    #         area_props.append({"detect_sine_tone_result": result})
-    #         audio_test_dir = f"./tmp/clip_audio_news_beep"
-    #         os.makedirs(audio_test_dir, exist_ok=True)
-    #         sf.write(f"{audio_test_dir}/{clip_name}_{index}_{section_ts}_{peak}.wav", audio, self.target_sample_rate)
-    #
-    #     if detected:
-    #         peaks_final.append(peak)
-
-    # # no longer in use, it sometimes misses those in between beeps
-    # def _get_peak_times_beep_v1(self,correlation_clip,correlation_slice,seconds,peak,clip_name,index,section_ts,similarities,peaks_final,clip_cache,area_props):
-    #     # short beep is very sensitive, it is better to miss some than to have false positives
-    #     similarity_threshold = 0.002
-    #
-    #     sr = self.target_sample_rate
-    #     debug_mode = self.debug_mode
-    #
-    #     beep_target_num_sample_after_resample = 101
-    #
-    #     downsampled_correlation_clip = clip_cache["downsampled_correlation_clips"].get(clip_name)
-    #
-    #     if downsampled_correlation_clip is None:
-    #         downsampled_correlation_clip = resample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
-    #         clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
-    #
-    #     downsampled_correlation_slice = resample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
-    #
-    #     correlation_clip = downsampled_correlation_clip
-    #     correlation_slice = downsampled_correlation_slice
-    #
-    #     similarity = mean_squared_error(correlation_clip, correlation_slice)
-    #
-    #     similarity_whole = similarity
-    #
-    #     if debug_mode:
-    #         print("similarity", similarity)
-    #         seconds.append(peak / sr)
-    #         similarity_debug = clip_cache["similarity_debug"]
-    #         similarity_debug[clip_name].append((index, similarity,))
-    #
-    #         correlation_slice_graph = correlation_slice
-    #         correlation_clip_graph = correlation_clip
-    #
-    #         graph_max = 0.1
-    #         if similarity <= graph_max:
-    #             graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
-    #             os.makedirs(graph_dir, exist_ok=True)
-    #
-    #             # Optional: plot the correlation graph to visualize
-    #             plt.figure(figsize=(10, 4))
-    #             plt.plot(correlation_slice_graph)
-    #             plt.plot(correlation_clip_graph, alpha=0.7)
-    #             plt.title('Cross-correlation between the audio clip and full track before slicing')
-    #             plt.xlabel('Lag')
-    #             plt.ylabel('Correlation coefficient')
-    #             plt.savefig(
-    #                 f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
-    #             plt.close()
-    #
-    #         similarities.append((similarity, {"whole": similarity_whole,
-    #                                           "left": 0,
-    #                                           "middle": 0,
-    #                                           "right": 0,
-    #                                           "left_right_diff": 0,
-    #                                           }))
-    #
-    #         if similarity > similarity_threshold:
-    #             if debug_mode:
-    #                 print(
-    #                     f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}")
-    #         else:
-    #             peaks_final.append(peak)
-
-    # matching pattern should overlap almost completely with beep pattern, unless they are too dissimilar
     def _get_peak_times_beep_v3(
         self,
         correlation_clip: NDArray[np.float32],
@@ -842,37 +739,48 @@ class AudioPatternDetector:
         section_ts: str,
         similarities: list[Any],
         peaks_final: list[int],
-        area_props: list[list[Any]],
         similarity_debug: defaultdict[str, list[tuple[int, np.floating[Any]]]],
     ) -> None:
 
-        sr = self.target_sample_rate
+        from native_helper import pearson_correlation
+
         debug_mode = self.debug_mode
+        sr = self.target_sample_rate
 
-        beep_target_num_sample_after_resample = 101
+        # Single Pearson window covering 0-100%, downsampled to 101 points
+        partition_count = 10
+        ds_n = 101
+        pearson_windows: list[tuple[int, int, int]] = [
+            (0, 10, ds_n),  # 0-100%
+        ]
 
-        downsampled_correlation_clip = self._clip_cache["downsampled_correlation_clips"].get(clip_name)
+        cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
+        if cached_clips is None:
+            cached_clips = []
+            for wl, wr, ds in pearson_windows:
+                lo = round(len(correlation_clip) * wl / partition_count)
+                hi = round(len(correlation_clip) * wr / partition_count)
+                cached_clips.append(resample_preserve_maxima(correlation_clip[lo:hi], ds))
+            self._clip_cache["downsampled_pearson_windows"][clip_name] = cached_clips
 
-        if downsampled_correlation_clip is None:
-            downsampled_correlation_clip = resample_preserve_maxima(correlation_clip, beep_target_num_sample_after_resample)
-            self._clip_cache["downsampled_correlation_clips"][clip_name] = downsampled_correlation_clip
+        ds_slices: list[NDArray[np.float32]] = []
+        pearson_per_window: dict[str, float] = {}
+        for wi, (wl, wr, ds) in enumerate(pearson_windows):
+            lo = round(len(correlation_slice) * wl / partition_count)
+            hi = round(len(correlation_slice) * wr / partition_count)
+            ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds)
+            ds_slices.append(ds_s)
+            r: float = pearson_correlation(cached_clips[wi], ds_s)
+            pearson_per_window[f"pearson_w{wl}_{wr}"] = r
 
-        downsampled_correlation_slice = resample_preserve_maxima(correlation_slice, beep_target_num_sample_after_resample)
+        pearson_r = pearson_per_window["pearson_w0_10"]
 
-        ds_corr_clip = downsampled_correlation_clip
-        ds_corr_slice = downsampled_correlation_slice
-
-        area_prop = area_of_overlap_ratio(ds_corr_clip, ds_corr_slice)
-
-        overlap_ratio = area_prop["overlapping_area"]/area_prop["area_control"]
-
-        similarity = _mean_squared_error(ds_corr_clip, ds_corr_slice)
-
-        similarity_whole = similarity
+        # MSE on the downsampled curves (smooths oscillatory beep correlations)
+        similarity = _mean_squared_error(cached_clips[0], ds_slices[0])
 
         if debug_mode:
             import matplotlib.pyplot as plt
-            print("similarity", similarity,file=sys.stderr)
+            print(f"similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)
             seconds.append(peak / sr)
             similarity_debug[clip_name].append((index, similarity,))
 
@@ -884,7 +792,6 @@ class AudioPatternDetector:
                 graph_dir = f"{self.debug_dir}/graph/cross_correlation_slice/{clip_name}"
                 os.makedirs(graph_dir, exist_ok=True)
 
-                # Optional: plot the correlation graph to visualize
                 plt.figure(figsize=(10, 4))
                 plt.plot(correlation_slice_graph)
                 plt.plot(correlation_clip_graph, alpha=0.7)
@@ -895,36 +802,34 @@ class AudioPatternDetector:
                     f'{graph_dir}/{clip_name}_{index}_{section_ts}_{peak}.png')
                 plt.close()
 
-            similarities.append((similarity, {"whole": similarity_whole,
-                                              "left": 0,
-                                              "middle": 0,
-                                              "right": 0,
-                                              "left_right_diff": 0,
-                                              }))
-            area_props.append([overlap_ratio, area_prop])
+                # Downsampled window used for Pearson r
+                ds_graph_dir = f"{self.debug_dir}/graph/pearson_downsampled/{clip_name}"
+                os.makedirs(ds_graph_dir, exist_ok=True)
 
+                for wi, (wl, wr, _ds) in enumerate(pearson_windows):
+                    r_wi = pearson_per_window[f"pearson_w{wl}_{wr}"]
+                    plt.figure(figsize=(10, 4))
+                    plt.plot(ds_slices[wi])
+                    plt.plot(cached_clips[wi], alpha=0.7)
+                    plt.title(f'Partitions {wl}-{wr} (pearson_r={r_wi:.4f})')
+                    plt.xlabel('Sample')
+                    plt.ylabel('Correlation coefficient')
+                    plt.savefig(
+                        f'{ds_graph_dir}/{clip_name}_{index}_{section_ts}_{peak}_w{wl}_{wr}.png')
+                    plt.close()
 
-        similarity_threshold = 0.01
+            similarities.append((similarity, {"whole": float(similarity)},
+                                 {"pearson_r": pearson_r, **pearson_per_window}))
 
-        similarity_threshold_check_area_upper = 0.003
+        similarity_hard_limit = 0.01
+        pearson_r_threshold = 0.90
 
-        similarity_threshold_check_area = 0.002
-
-        if similarity > similarity_threshold:
+        if similarity > similarity_hard_limit:
             if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_threshold}",file=sys.stderr)
-        # if similarity is between similarity_threshold and similarity_threshold_check_area, check shape ratio
-        elif similarity > similarity_threshold_check_area_upper and overlap_ratio < 0.99:
-            if debug_mode:
-                print(
-                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.99",file=sys.stderr)
-        # similar enough, lower area ratio threshold
-        elif similarity > similarity_threshold_check_area and overlap_ratio < 0.98:
-            if debug_mode:
-                print(
-                    f"failed verification for {section_ts} due to similarity {similarity} overlap_ratio {overlap_ratio} < 0.98",file=sys.stderr)
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
+        elif pearson_r >= pearson_r_threshold:
+            peaks_final.append(peak)
         else:
             if debug_mode:
                 print(
-                    f"accepted {section_ts} with similarity {similarity} and overlap_ratio {overlap_ratio}",file=sys.stderr)
-            peaks_final.append(peak)
+                    f"failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}",file=sys.stderr)

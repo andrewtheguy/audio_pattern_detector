@@ -30,10 +30,10 @@ RAINBOW_INTRO_EXPECTED_TIME = 15.5
 
 
 def test_rthk_beep_pattern_detection():
-    """Test detection of RTHK beep pattern (pure tone/beep detection)
+    """Test detection of RTHK beep pattern (short clip detection)
 
-    This tests the beep detection algorithm (_get_peak_times_beep_v3)
-    which uses overlap_ratio and downsampled correlation matching.
+    This tests the short clip detection algorithm (_get_peak_times_beep_v3)
+    which uses downsampled MSE + Pearson r correlation matching.
 
     Expected to find matches at approximately 1.4165s and 2.419125s
     """
@@ -155,14 +155,14 @@ def test_empty_pattern_list():
 
 
 def test_beep_detection_algorithm_specifics():
-    """Test specific behavior of beep detection algorithm
+    """Test specific behavior of short clip detection algorithm
 
-    The beep detection algorithm uses:
-    - Downsampled correlation matching
-    - Overlap ratio threshold (>0.98 or >0.99 depending on similarity)
-    - MSE similarity threshold (<0.01)
+    The short clip detection algorithm uses:
+    - Downsampled correlation matching (101 points, 0-100%)
+    - Pearson r threshold (>= 0.90)
+    - MSE similarity threshold (< 0.01)
 
-    This test verifies the algorithm correctly identifies pure tone patterns.
+    This test verifies the algorithm correctly identifies short clip patterns.
     """
     peak_times, total_time = match_pattern(RTHK_BEEP_AUDIO, [RTHK_BEEP_PATTERN], debug_mode=False)
 

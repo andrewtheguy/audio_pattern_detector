@@ -4,7 +4,7 @@ This document describes how audio pattern detection works, from raw audio data t
 
 ## Overview
 
-The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths: one for normal patterns and one for pure tone patterns (e.g. beeps).
+The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths based on clip duration: one for short clips (< 0.5s) using a single-window Pearson r check, and one for longer clips using a multi-window Pearson r check.
 
 ## Pipeline
 
@@ -22,7 +22,7 @@ Raw audio stream (float32 PCM)
    Peak detection (height >= 0.25, min distance = clip length)
         |
    For each candidate peak:
-        |--- Pure tone pattern ---> Downsampled MSE + overlap ratio check
+        |--- Pure tone pattern ---> Downsampled MSE + Pearson r check (0-100%)
         |--- Normal pattern -----> Partitioned MSE + multi-window Pearson r check
         |
    Accepted peaks converted to timestamps
@@ -34,7 +34,7 @@ Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
 2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, mode='full')`), producing a reference correlation curve. The absolute max is stored for normalization later.
-3. **Pure tone detection** - FFT of the clip is analyzed: if the spectrum has exactly one prominent peak matching the dominant frequency, the clip is classified as a pure tone.
+3. **Short clip classification** - clips shorter than 0.5s are classified as short clips and use a simplified single-window Pearson r verification path.
 
 This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, and its absolute max. Pure-tone classification is pre-computed separately in `ClipCache`.
 
@@ -97,29 +97,21 @@ Detection accuracy depends heavily on the quality of the pattern clip. Clips wit
 
 Denoising the pattern clip with bandpass filtering (e.g. speech range 300-3400 Hz) removes these issues. For tonal patterns, synthesizing a clean version from the dominant frequencies produces the best results. See [denoise-strategy.md](denoise-strategy.md).
 
-### Pure Tone Patterns
+### Short Clips (< 0.5s)
 
-Pure tones (beeps) have repetitive, high-frequency correlation curves that are sensitive to slight shifts. To handle this, both curves are downsampled to 101 points before comparison, preserving local maxima in each window.
+Short clips have fewer samples in their correlation curves, making multi-window analysis unreliable. The verification uses the same Pearson correlation approach as normal patterns, but with a single window covering the full 0-100% range. Both curves are downsampled to 101 points before comparison, preserving local maxima.
 
 1. **Downsampled MSE** - MSE between the two 101-point curves.
-2. **Overlap ratio** - compute Simpson integrals on the two downsampled curves:
-   - `area_control`: area under the downsampled reference/self-correlation curve
-   - `area_y2`: area under the downsampled candidate correlation slice
-   - `overlapping_area`: area under the pointwise minimum of those two curves
-
-   The metric used by the code is `overlap_ratio = overlapping_area / area_control`, so the denominator is the reference curve's area, not the candidate curve's area or a rectangular normalization term.
+2. **Pearson correlation** - Pearson r is computed on the same 101-point downsampled curves covering 0-100% of the correlation envelope. A single full-range window suffices because short clip correlation envelopes don't benefit from partial-window analysis.
 
 3. **Decision thresholds**:
-   - `similarity > 0.01` -> reject
-   - `0.003 < similarity <= 0.01` and `overlap_ratio < 0.99` -> reject
-   - `0.002 < similarity <= 0.003` and `overlap_ratio < 0.98` -> reject
-   - `similarity <= 0.002` -> accept
+   - `similarity > 0.01` -> reject (hard MSE ceiling, tighter than normal patterns)
+   - `pearson_r >= 0.90` -> accept
+   - Otherwise -> reject
 
-Pure tone thresholds require higher overlap ratios because a matching beep should almost perfectly overlap the reference.
+## Short Clip Classification
 
-## Pure Tone Classification
-
-A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) and that peak's frequency matches the dominant frequency within 1% relative tolerance.
+A clip is classified as a short clip if its duration is less than 0.5 seconds. Short clips use a single-window Pearson r verification path instead of the multi-window approach used for longer clips.
 
 ## Timestamp Conversion
 
@@ -139,5 +131,4 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 |-----------|-------------|
 | `AudioClip` | Input pattern: name, audio array, sample rate |
 | `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window |
-| `ClipCache` | Runtime cache: pure-tone classification flags and downsampled self-correlation curves for pure-tone clips |
-| `OverlapResult` | Return type from `area_of_overlap_ratio` (used by pure tone path). The control areas are the baseline areas for the reference/control curve: `area_control` is the Simpson area of that reference region, and `total_rect_control` is its bounding-rectangle area. `area_y2` is the candidate curve area. These fields feed the derived ratios, including `overlap_ratio = overlapping_area / area_control`. |
+| `ClipCache` | Runtime cache: downsampled Pearson windows per clip |
