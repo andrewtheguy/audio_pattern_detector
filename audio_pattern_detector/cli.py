@@ -39,6 +39,8 @@ def main():
                                    'followed by audio stream (WAV or raw PCM with --raw-pcm)')
     match_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     match_parser.add_argument('--jsonl', action='store_true', help='output JSONL events (start, pattern_detected, end) as they occur')
+    match_parser.add_argument('--timestamp-format', choices=['ms', 'formatted'], default='ms',
+                              help='timestamp format in JSONL output: "ms" for integer milliseconds (default), "formatted" for HH:MM:SS.mmm strings')
     match_parser.add_argument('--chunk-seconds', metavar='seconds', type=str, default='60',
                               help='seconds per chunk for sliding window (default: 60, use "auto" to auto-compute based on pattern length)')
     match_parser.add_argument('--debug', action=argparse.BooleanOptionalAction, help='debug mode (audio file only)', default=False)

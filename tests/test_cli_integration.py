@@ -242,17 +242,46 @@ def test_match_jsonl_output_format():
     assert events[0]["type"] == "start"
     assert "source" in events[0]
 
-    # Last event should be "end"
+    # Last event should be "end" with ms format by default
     assert events[-1]["type"] == "end"
-    assert "total_time" in events[-1]
-    assert "total_time_formatted" in events[-1]
+    assert "total_time_ms" in events[-1]
+    assert isinstance(events[-1]["total_time_ms"], int)
+    assert "total_time_formatted" not in events[-1]
 
-    # Middle events should be "pattern_detected"
+    # Middle events should be "pattern_detected" with ms format by default
     for event in events[1:-1]:
         assert event["type"] == "pattern_detected"
         assert "clip_name" in event
-        assert "timestamp" in event
+        assert "timestamp_ms" in event
+        assert isinstance(event["timestamp_ms"], int)
+        assert "timestamp_formatted" not in event
+
+
+def test_match_jsonl_timestamp_format_formatted():
+    """Test --timestamp-format formatted produces HH:MM:SS.mmm strings."""
+    result = run_cli(
+        "match",
+        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--jsonl",
+        "--timestamp-format", "formatted",
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # End event should have formatted total_time
+    assert "total_time_formatted" in events[-1]
+    assert isinstance(events[-1]["total_time_formatted"], str)
+    assert "total_time_ms" not in events[-1]
+
+    # Pattern events should have formatted timestamps
+    for event in events[1:-1]:
+        assert event["type"] == "pattern_detected"
         assert "timestamp_formatted" in event
+        assert isinstance(event["timestamp_formatted"], str)
+        assert "timestamp_ms" not in event
 
 
 def test_match_jsonl_start_event_source():
