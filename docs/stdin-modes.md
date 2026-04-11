@@ -218,12 +218,14 @@ func main() {
 
 ## JSONL Output Format
 
-All stdin modes output JSONL (one JSON object per line):
+All stdin modes output JSONL (one JSON object per line). By default, timestamp
+events include both millisecond and formatted fields. Use `--timestamp-format
+ms` or `--timestamp-format formatted` to limit the output to one form:
 
 ```jsonl
 {"type": "start", "source": "stdin"}
-{"type": "pattern_detected", "clip_name": "pattern", "timestamp": 5.5, "timestamp_formatted": "00:00:05.500"}
-{"type": "end", "total_time": 60.0, "total_time_formatted": "00:01:00.000"}
+{"type": "pattern_detected", "clip_name": "pattern", "timestamp_ms": 5500, "timestamp_formatted": "00:00:05.500"}
+{"type": "end", "total_time_ms": 60000, "total_time_formatted": "00:01:00.000"}
 ```
 
 Event types:

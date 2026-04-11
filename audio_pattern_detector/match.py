@@ -529,7 +529,7 @@ def _match_pattern_multiplexed_stdin(
     return peak_times, total_time
 
 
-def _make_jsonl_callback(timestamp_format: str = "ms") -> PatternDetectedCallback:
+def _make_jsonl_callback(timestamp_format: str = "both") -> PatternDetectedCallback:
     """Create a callback that emits pattern_detected JSONL events."""
     def callback(clip_name: str, timestamp: float) -> None:
         if timestamp_format == "formatted":
@@ -538,21 +538,34 @@ def _make_jsonl_callback(timestamp_format: str = "ms") -> PatternDetectedCallbac
                 clip_name=clip_name,
                 timestamp_formatted=seconds_to_time(timestamp),
             )
-        else:
+        elif timestamp_format == "ms":
             _emit_jsonl(
                 "pattern_detected",
                 clip_name=clip_name,
                 timestamp_ms=round(timestamp * 1000),
             )
+        else:
+            _emit_jsonl(
+                "pattern_detected",
+                clip_name=clip_name,
+                timestamp_ms=round(timestamp * 1000),
+                timestamp_formatted=seconds_to_time(timestamp),
+            )
     return callback
 
 
-def _emit_jsonl_end(total_time: float, timestamp_format: str = "ms") -> None:
+def _emit_jsonl_end(total_time: float, timestamp_format: str = "both") -> None:
     """Emit a JSONL end event with the appropriate timestamp format."""
     if timestamp_format == "formatted":
         _emit_jsonl("end", total_time_formatted=seconds_to_time(total_time))
-    else:
+    elif timestamp_format == "ms":
         _emit_jsonl("end", total_time_ms=round(total_time * 1000))
+    else:
+        _emit_jsonl(
+            "end",
+            total_time_ms=round(total_time * 1000),
+            total_time_formatted=seconds_to_time(total_time),
+        )
 
 
 def _run_match_with_output(
@@ -573,7 +586,7 @@ def _run_match_with_output(
     """
     # stdin mode always uses JSONL
     jsonl_mode = from_stdin or getattr(args, 'jsonl', False)
-    timestamp_format: str = getattr(args, 'timestamp_format', 'ms')
+    timestamp_format: str = getattr(args, 'timestamp_format', 'both')
 
     # Create callback for JSONL mode
     callback = _make_jsonl_callback(timestamp_format) if jsonl_mode else None
@@ -636,7 +649,7 @@ def cmd_match(args: argparse.Namespace) -> None:
 
     # Handle multiplexed stdin mode (patterns + audio all from stdin)
     multiplexed_stdin = getattr(args, 'multiplexed_stdin', False)
-    timestamp_format: str = getattr(args, 'timestamp_format', 'ms')
+    timestamp_format: str = getattr(args, 'timestamp_format', 'both')
 
     if multiplexed_stdin:
         # Multiplexed stdin mode: always JSONL output
