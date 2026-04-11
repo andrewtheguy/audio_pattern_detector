@@ -45,3 +45,9 @@ jobs:
           -v ${{ github.workspace }}/tests:/usr/src/app/tests:ro \
           -v ${{ github.workspace }}/sample_audios:/usr/src/app/sample_audios:ro \
           audio-pattern-detector-test
+    - name: Test native-helper Python bindings
+      run: |
+        docker run --rm audio-pattern-detector-test sh -lc '
+          uv run maturin develop --manifest-path native-helper/Cargo.toml --skip-install
+          uv run pytest -v native-helper/tests/
+        '

@@ -30,7 +30,7 @@ audio-pattern-detector = "audio_pattern_detector.cli:main"
 
 [tool.pyright]
 #stubPath = "typings"
-exclude = [".venv", "build", "dist", ".git", "tests", "native-helper"]
+exclude = [".venv", "build", "dist", ".git", "tests", "native-helper","tmp"]
 reportUnknownParameterType = true
 reportUninitializedInstanceVariable = true
 # Disable basedpyright-specific strict rules

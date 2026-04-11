@@ -9,7 +9,12 @@ crate-type = ["rlib", "cdylib"]
 
 [features]
 default = []
-python = ["dep:pyo3", "pyo3/extension-module", "dep:numpy"]
+python = [
+    "dep:pyo3",
+    "pyo3/extension-module",
+    "pyo3/generate-import-lib",
+    "dep:numpy",
+]
 
 [dependencies]
 rustfft = "6.4"

@@ -47,6 +47,16 @@ def _load_module():
     module_path = _module_path()
     spec = importlib.util.spec_from_file_location("native_helper", module_path)
     if spec is None or spec.loader is None:
+        if module_path.suffix in {".dylib", ".dll"}:
+            spec = importlib.util.spec_from_file_location(
+                "native_helper",
+                module_path,
+                loader=importlib.machinery.ExtensionFileLoader(
+                    "native_helper", str(module_path)
+                ),
+            )
+
+    if spec is None or spec.loader is None:
         raise ImportError(f"Could not load module spec from {module_path}")
 
     module = importlib.util.module_from_spec(spec)
