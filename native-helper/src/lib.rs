@@ -255,7 +255,7 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
     //   Y[0:(N+1)//2]    = X[0:(N+1)//2]     (positive frequencies)
     //   Y[-(N-1)//2:]    = X[-(N-1)//2:]      (negative frequencies)
     let n_common = n.min(m);
-    let pos = (n_common + 1) / 2; // number of positive-frequency bins to copy
+    let pos = n_common.div_ceil(2); // number of positive-frequency bins to copy
     let neg = (n_common - 1) / 2; // number of negative-frequency bins to copy
 
     let mut new_spectrum = vec![Complex::new(0.0, 0.0); m];
@@ -510,11 +510,11 @@ fn compute_prominence(data: &[f32], peak_idx: usize) -> f32 {
 
     // Scan right.
     let mut right_min = peak_val;
-    for j in (peak_idx + 1)..data.len() {
-        if data[j] < right_min {
-            right_min = data[j];
+    for &val in &data[(peak_idx + 1)..] {
+        if val < right_min {
+            right_min = val;
         }
-        if data[j] > peak_val {
+        if val > peak_val {
             break;
         }
     }

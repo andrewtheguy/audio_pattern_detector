@@ -30,4 +30,4 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Version bumping
 
-- Bump patch version in both `pyproject.toml` and `native-helper/Cargo.toml` together, then run `cargo check --manifest-path native-helper/Cargo.toml` and `uv lock` to update the lockfile.
+- Bump patch version in `pyproject.toml` only, then run `uv lock` to update the lockfile. The `native-helper/Cargo.toml` version is permanently "0.0.0" (internal-only crate, never published).
