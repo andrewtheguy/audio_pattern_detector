@@ -80,6 +80,7 @@ audio-pattern-detector show-config --pattern-folder ./clips
 | `--pattern-folder`     | Folder of pattern clips (WAV)                                            |
 | `--chunk-seconds`      | Seconds per chunk (default: 60, or "auto")                               |
 | `--jsonl`              | Output JSONL events for file inputs                                      |
+| `--timestamp-format`   | JSONL timestamp fields: `both` (default), `ms`, or `formatted`           |
 | `--debug`              | Enable debug mode                                                        |
 | `--debug-dir`          | Base directory for debug output (default: ./tmp)                         |
 
@@ -87,10 +88,14 @@ audio-pattern-detector show-config --pattern-folder ./clips
 
 When using `--stdin`, `--multiplexed-stdin`, or `--jsonl`:
 
+By default, JSONL timestamp events include both millisecond and formatted
+fields. Use `--timestamp-format ms` or `--timestamp-format formatted` to emit
+just one representation.
+
 ```jsonl
 {"type": "start", "source": "audio.wav"}
-{"type": "pattern_detected", "clip_name": "pattern", "timestamp": 5.5, "timestamp_formatted": "00:00:05.500"}
-{"type": "end", "total_time": 60.0, "total_time_formatted": "00:01:00.000"}
+{"type": "pattern_detected", "clip_name": "pattern", "timestamp_ms": 5500, "timestamp_formatted": "00:00:05.500"}
+{"type": "end", "total_time_ms": 60000, "total_time_formatted": "00:01:00.000"}
 ```
 
 ## Documentation

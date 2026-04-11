@@ -196,6 +196,14 @@ def test_match_stdin_reads_wav():
     pattern_events = [e for e in events if e["type"] == "pattern_detected"]
     assert len(pattern_events) > 0
     assert pattern_events[0]["clip_name"] == "rthk_beep"
+    assert "timestamp_ms" in pattern_events[0]
+    assert isinstance(pattern_events[0]["timestamp_ms"], int)
+    assert "timestamp_formatted" in pattern_events[0]
+    assert isinstance(pattern_events[0]["timestamp_formatted"], str)
+    assert "total_time_ms" in events[-1]
+    assert isinstance(events[-1]["total_time_ms"], int)
+    assert "total_time_formatted" in events[-1]
+    assert isinstance(events[-1]["total_time_formatted"], str)
 
 
 def test_match_stdin_with_pattern_folder():
@@ -225,7 +233,7 @@ def test_match_stdin_with_pattern_folder():
 
 
 def test_match_jsonl_output_format():
-    """Test --jsonl produces correct JSONL output format."""
+    """Test --jsonl includes both timestamp formats by default."""
     result = run_cli(
         "match",
         "--audio-file", "sample_audios/rthk_section_with_beep.wav",
@@ -242,16 +250,43 @@ def test_match_jsonl_output_format():
     assert events[0]["type"] == "start"
     assert "source" in events[0]
 
-    # Last event should be "end" with ms format by default
+    # Last event should be "end" with both timestamp formats by default
     assert events[-1]["type"] == "end"
+    assert "total_time_ms" in events[-1]
+    assert isinstance(events[-1]["total_time_ms"], int)
+    assert "total_time_formatted" in events[-1]
+    assert isinstance(events[-1]["total_time_formatted"], str)
+
+    # Middle events should be "pattern_detected" with both timestamp formats by default
+    for event in events[1:-1]:
+        assert event["type"] == "pattern_detected"
+        assert "clip_name" in event
+        assert "timestamp_ms" in event
+        assert isinstance(event["timestamp_ms"], int)
+        assert "timestamp_formatted" in event
+        assert isinstance(event["timestamp_formatted"], str)
+
+
+def test_match_jsonl_timestamp_format_ms():
+    """Test --timestamp-format ms produces integer milliseconds only."""
+    result = run_cli(
+        "match",
+        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--jsonl",
+        "--timestamp-format", "ms",
+    )
+    assert result.returncode == 0
+
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
     assert "total_time_ms" in events[-1]
     assert isinstance(events[-1]["total_time_ms"], int)
     assert "total_time_formatted" not in events[-1]
 
-    # Middle events should be "pattern_detected" with ms format by default
     for event in events[1:-1]:
         assert event["type"] == "pattern_detected"
-        assert "clip_name" in event
         assert "timestamp_ms" in event
         assert isinstance(event["timestamp_ms"], int)
         assert "timestamp_formatted" not in event
@@ -633,5 +668,4 @@ def test_multiplexed_stdin_requires_no_pattern_file():
         stdin_data=payload,
     )
     assert result.returncode == 0
-
 
