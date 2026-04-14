@@ -67,11 +67,8 @@ def test_cli_match_help():
     assert result.returncode == 0
     assert "--pattern-file" in result.stdout
     assert "--pattern-folder" in result.stdout
-    assert "--audio-file" in result.stdout
-    assert "--audio-folder" in result.stdout
     assert "--stdin" in result.stdout
     assert "--target-sample-rate" in result.stdout
-    assert "--jsonl" in result.stdout
     assert "--chunk-seconds" in result.stdout
 
 
@@ -92,36 +89,42 @@ def test_cli_no_command():
 # --- Match Command: Argument Passing Tests ---
 
 
-def test_match_audio_file_returns_json():
-    """Test match with --audio-file returns valid JSON output."""
+def test_match_audio_file_returns_jsonl():
+    """Test match with positional audio file returns JSONL output."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
     )
     assert result.returncode == 0
 
-    # Verify output is valid JSON with expected structure
-    output = json.loads(result.stdout)
-    assert isinstance(output, dict)
-    assert "rthk_beep" in output
-    assert isinstance(output["rthk_beep"], list)
+    # Verify output is valid JSONL with expected events
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "end"
+
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0
+    assert pattern_events[0]["clip_name"] == "rthk_beep"
 
 
 def test_match_pattern_folder_passes_multiple_patterns():
     """Test --pattern-folder passes all patterns to detector."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/cbs_news_audio_section.wav",
+        "sample_audios/cbs_news_audio_section.wav",
         "--pattern-folder", "sample_audios/clips",
     )
     assert result.returncode == 0
 
-    output = json.loads(result.stdout)
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
 
-    # All patterns from folder should be in output
-    assert "cbs_news" in output
-    assert "rthk_beep" in output
+    # All patterns from folder should appear in pattern_detected events
+    clip_names = {e["clip_name"] for e in events if e["type"] == "pattern_detected"}
+    assert "cbs_news" in clip_names
 
 
 def test_match_chunk_seconds_argument_passed():
@@ -129,7 +132,7 @@ def test_match_chunk_seconds_argument_passed():
     # Using auto mode - should work without error
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
         "--chunk-seconds", "auto",
     )
@@ -138,7 +141,7 @@ def test_match_chunk_seconds_argument_passed():
     # Using explicit value
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
         "--chunk-seconds", "10",
     )
@@ -149,7 +152,7 @@ def test_match_chunk_seconds_invalid_value():
     """Test --chunk-seconds rejects invalid values."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
         "--chunk-seconds", "invalid",
         check=False,
@@ -229,16 +232,15 @@ def test_match_stdin_with_pattern_folder():
     assert "cbs_news" in pattern_names
 
 
-# --- Match Command: --jsonl Output Format Tests ---
+# --- Match Command: JSONL Output Format Tests ---
 
 
 def test_match_jsonl_output_format():
-    """Test --jsonl includes both timestamp formats by default."""
+    """Test JSONL output includes both timestamp formats by default."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
-        "--jsonl",
     )
     assert result.returncode == 0
 
@@ -271,9 +273,8 @@ def test_match_jsonl_timestamp_format_ms():
     """Test --timestamp-format ms produces integer milliseconds only."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
-        "--jsonl",
         "--timestamp-format", "ms",
     )
     assert result.returncode == 0
@@ -296,9 +297,8 @@ def test_match_jsonl_timestamp_format_formatted():
     """Test --timestamp-format formatted produces HH:MM:SS.mmm strings."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
-        "--jsonl",
         "--timestamp-format", "formatted",
     )
     assert result.returncode == 0
@@ -320,13 +320,12 @@ def test_match_jsonl_timestamp_format_formatted():
 
 
 def test_match_jsonl_start_event_source():
-    """Test --jsonl start event contains correct source."""
+    """Test start event contains correct source."""
     # Test with audio file
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
-        "--jsonl",
     )
     start_event = json.loads(result.stdout.strip().split("\n")[0])
     assert "rthk_section_with_beep.wav" in start_event["source"]
@@ -345,12 +344,11 @@ def test_match_jsonl_start_event_source():
 
 
 def test_match_jsonl_no_match_only_start_end():
-    """Test --jsonl output when no patterns match."""
+    """Test JSONL output when no patterns match."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "sample_audios/clips/cbs_news.wav",
-        "--jsonl",
     )
     assert result.returncode == 0
 
@@ -418,7 +416,7 @@ def test_match_nonexistent_audio_file():
     """Test match with nonexistent audio file."""
     result = run_cli(
         "match",
-        "--audio-file", "nonexistent.wav",
+        "nonexistent.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
         check=False,
     )
@@ -429,7 +427,7 @@ def test_match_nonexistent_pattern_file():
     """Test match with nonexistent pattern file."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         "--pattern-file", "nonexistent.wav",
         check=False,
     )
@@ -451,7 +449,7 @@ def test_match_no_pattern():
     """Test match without any pattern."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/rthk_section_with_beep.wav",
+        "sample_audios/rthk_section_with_beep.wav",
         check=False,
     )
     assert result.returncode != 0
@@ -503,15 +501,18 @@ def test_match_16khz_audio_auto_converts():
     """Test match with 16kHz audio file (auto-converted to 8kHz)."""
     result = run_cli(
         "match",
-        "--audio-file", "sample_audios/test_16khz/rthk_section_with_beep_16k.wav",
+        "sample_audios/test_16khz/rthk_section_with_beep_16k.wav",
         "--pattern-file", "sample_audios/clips/rthk_beep.wav",
     )
     assert result.returncode == 0
 
-    output = json.loads(result.stdout)
-    assert "rthk_beep" in output
-    # Should find matches despite sample rate difference
-    assert len(output["rthk_beep"]) > 0
+    lines = result.stdout.strip().split("\n")
+    events = [json.loads(line) for line in lines]
+
+    # Should have pattern_detected events despite sample rate difference
+    pattern_events = [e for e in events if e["type"] == "pattern_detected"]
+    assert len(pattern_events) > 0
+    assert pattern_events[0]["clip_name"] == "rthk_beep"
 
 
 # --- Stdin with Sample Rate Tests ---
