@@ -41,12 +41,12 @@ uv run audio-pattern-detector [command] [options]
 
 ```shell
 # Basic usage
-audio-pattern-detector match --audio-file audio.wav --pattern-file pattern.wav
+audio-pattern-detector match audio.wav --pattern-file pattern.wav
 
 # With multiple patterns
-audio-pattern-detector match --audio-file audio.wav --pattern-folder ./patterns/
+audio-pattern-detector match audio.wav --pattern-folder ./patterns/
 
-# Streaming from stdin (outputs JSONL)
+# Streaming from stdin
 ffmpeg -i input.mp3 -f wav -ac 1 -ar 8000 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
 ```
@@ -61,22 +61,20 @@ audio-pattern-detector show-config --pattern-folder ./clips
 
 | Option                 | Description                                                              |
 |------------------------|--------------------------------------------------------------------------|
-| `--audio-file`         | Audio file to search for patterns                                        |
-| `--audio-folder`       | Folder of audio files to process                                         |
-| `--stdin`              | Read WAV audio from stdin (outputs JSONL)                                |
+| `audio_file`           | Audio file to search for patterns (positional argument)                  |
+| `--stdin`              | Read WAV audio from stdin                                                |
 | `--multiplexed-stdin`  | Read patterns and audio from stdin via binary protocol (for IPC)         |
 | `--target-sample-rate` | Target sample rate for processing (default: 8000)                        |
 | `--pattern-file`       | Single pattern file (WAV)                                                |
 | `--pattern-folder`     | Folder of pattern clips (WAV)                                            |
 | `--chunk-seconds`      | Seconds per chunk (default: 60, or "auto")                               |
-| `--jsonl`              | Output JSONL events for file inputs                                      |
 | `--timestamp-format`   | JSONL timestamp fields: `both` (default), `ms`, or `formatted`           |
 | `--debug`              | Enable debug mode                                                        |
 | `--debug-dir`          | Base directory for debug output (default: ./tmp)                         |
 
 ## JSONL Output Format
 
-When using `--stdin`, `--multiplexed-stdin`, or `--jsonl`:
+Output is always streaming JSONL:
 
 By default, JSONL timestamp events include both millisecond and formatted
 fields. Use `--timestamp-format ms` or `--timestamp-format formatted` to emit
