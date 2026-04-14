@@ -13,7 +13,7 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 Automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
 
 ```shell
-uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ 'audio-pattern-detector==x.x.v'
+uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ 'audio-pattern-detector==x.x.x'
 ```
 
 ### Install from source (requires Rust toolchain)
@@ -21,21 +21,11 @@ uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_d
 uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@(tag or branch)
 ```
 
-### Install locally for development
-```shell
-uv pip install -e .
-```
-
-### Install with optional debug dependencies
-```shell
-uv pip install -e ".[debug]"
-```
-
-This installs matplotlib for debug visualizations.
-
 ### Run without installing
 ```shell
-# Using uv (from local directory)
+uv tool run --from git+https://github.com/andrewtheguy/audio_pattern_detector.git@vx.x.x audio-pattern-detector [command] [options]
+
+# Or from local directory
 uv run audio-pattern-detector [command] [options]
 ```
 
