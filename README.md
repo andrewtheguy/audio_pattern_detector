@@ -13,7 +13,7 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 Automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
 
 ```shell
-uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ 'audio-pattern-detector==0.2.23'
+uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ 'audio-pattern-detector==x.x.v'
 ```
 
 ### Install from source (requires Rust toolchain)
