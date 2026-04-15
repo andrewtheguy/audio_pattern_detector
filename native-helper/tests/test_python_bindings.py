@@ -45,14 +45,14 @@ def _module_path() -> pathlib.Path:
 
 def _load_module():
     module_path = _module_path()
-    spec = importlib.util.spec_from_file_location("native_helper", module_path)
+    spec = importlib.util.spec_from_file_location("_native", module_path)
     if spec is None or spec.loader is None:
         if module_path.suffix in {".dylib", ".dll"}:
             spec = importlib.util.spec_from_file_location(
-                "native_helper",
+                "_native",
                 module_path,
                 loader=importlib.machinery.ExtensionFileLoader(
-                    "native_helper", str(module_path)
+                    "_native", str(module_path)
                 ),
             )
 
