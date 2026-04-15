@@ -5,7 +5,7 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Native helper (Rust)
 
-- Rust code lives in `native-helper/`. After changing Rust source, rebuild with `uv run maturin develop --manifest-path native-helper/Cargo.toml`.
+- Rust code lives in `native-helper/`. After changing Rust source, rebuild with `uv run maturin develop --skip-install --manifest-path native-helper/Cargo.toml`.
 - Run Rust tests with `cargo test --manifest-path native-helper/Cargo.toml`.
 - Run Python binding tests with `uv run pytest native-helper/tests/`.
 - Follow the existing PyO3 binding pattern in `src/python.rs`: use `extract_f32_data`/`extract_f64_data` helpers, register in `__all__` and `add_function`.

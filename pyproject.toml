@@ -63,4 +63,5 @@ build-backend = "maturin"
 [tool.maturin]
 manifest-path = "native-helper/Cargo.toml"
 features = ["python"]
+module-name = "audio_pattern_detector._native"
 python-packages = ["audio_pattern_detector"]

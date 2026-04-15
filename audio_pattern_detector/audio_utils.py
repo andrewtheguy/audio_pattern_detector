@@ -165,7 +165,7 @@ def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> 
     if orig_sr == target_sr:
         return audio
 
-    from native_helper import resample
+    from audio_pattern_detector._native import resample
 
     num_samples = int(len(audio) * target_sr / orig_sr)
     return resample(audio, num_samples)
@@ -227,11 +227,18 @@ def _load_wave_file_ffmpeg_convert(file_path: str, target_sample_rate: int) -> N
 
 def resample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
     """Resample a curve to num_samples while preserving local maxima."""
-    from native_helper import resample_preserve_maxima as native_resample_preserve_maxima
+    from audio_pattern_detector._native import resample_preserve_maxima as native_resample_preserve_maxima
 
     curve_f32 = np.ascontiguousarray(curve, dtype=np.float32)
     return native_resample_preserve_maxima(curve_f32, num_samples)
 
+
+def resample_lttb(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
+    """Resample a curve using Largest Triangle Three Buckets (LTTB)."""
+    from audio_pattern_detector._native import resample_lttb as native_resample_lttb
+
+    curve_f32 = np.ascontiguousarray(curve, dtype=np.float32)
+    return native_resample_lttb(curve_f32, num_samples)
 
 
 @contextmanager

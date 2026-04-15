@@ -162,7 +162,7 @@ class AudioPatternDetector:
 
             # Normalize clip if enabled
             if self.normalize:
-                from native_helper import integrated_loudness, loudness_normalize
+                from audio_pattern_detector._native import integrated_loudness, loudness_normalize
                 sr = self.target_sample_rate
                 block = clip_seconds if clip_seconds < 0.5 else 0.4
                 loudness = integrated_loudness(clip, sr, block_size=block)
@@ -405,7 +405,7 @@ class AudioPatternDetector:
             audio_section = chunk
 
         if self.normalize:
-            from native_helper import integrated_loudness, loudness_normalize
+            from audio_pattern_detector._native import integrated_loudness, loudness_normalize
             audio_section_seconds = len(audio_section) / sr
             block = audio_section_seconds if audio_section_seconds < 0.5 else 0.4
             loudness = integrated_loudness(audio_section, sr, block_size=block)
@@ -511,7 +511,7 @@ class AudioPatternDetector:
         # the selected ones are going to be checked for similarity
         # before adding to final peaks
         height_min = self.height_min if self.height_min is not None else 0.25
-        from native_helper import find_peaks
+        from audio_pattern_detector._native import find_peaks
         peaks, _ = find_peaks(correlation, height=height_min, distance=distance)
 
         peaks_final = []
@@ -768,7 +768,7 @@ class AudioPatternDetector:
         is_short_clip: bool = False,
     ) -> None:
 
-        from native_helper import pearson_correlation
+        from audio_pattern_detector._native import pearson_correlation
 
         debug_mode = self.debug_mode
         sr = self.target_sample_rate
