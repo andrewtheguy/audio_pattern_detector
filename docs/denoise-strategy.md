@@ -1,16 +1,26 @@
-# Denoise Strategy for Pattern Clips
+# Pattern Clip Strategy
 
-When matching pattern clips against lossy-encoded audio (e.g. Opus HLS streams), background noise in the pattern clip degrades cross-correlation accuracy. Denoising the pattern clip before matching improves results.
+## Preferred: extract clips from the source encoding
 
-## Why denoise?
+The best pattern clips are extracted directly from the same encoding as the audio being searched. For example, if the target audio is an Opus HLS stream, extract the clip from an Opus recording rather than from a lossless or differently-encoded source.
 
-Denoising the pattern clip improves match accuracy in two scenarios:
+Lossy codecs (Opus, AAC) alter the cross-correlation shape. A clip extracted from the same codec shares the same artifacts, so the correlation envelope stays tight and the Pearson r stays high. A clip from a different encoding (e.g. a clean WAV clip matched against Opus audio) produces an inflated noise floor in the cross-correlation, which deflates the Pearson r and can cause missed detections.
+
+```bash
+# Extract a clip from an Opus source at the detection timestamp
+ffmpeg -i source.ogg -ss <timestamp> -t <duration> -ar 8000 -ac 1 -y clip.wav
+```
+
+Use the old (pre-change) detector or a lower `--height-min` to find the timestamp in the source audio, then extract the clip at that position.
+
+## Fallback: denoise strategy
+
+When a source-matched clip is not available (e.g. the pattern only exists in a clean recording), denoising the clip can improve results. Background noise in the pattern correlates with unrelated parts of the audio stream, widening the cross-correlation envelope and reducing the Pearson r score.
+
+Denoising helps in these scenarios:
 
 1. **Lossy-encoded streams**: Codecs like Opus and AAC alter the audio signal. Short clips (~1-2s) are especially affected because there is less signal to average out codec artifacts.
 2. **Normal broadcast variation**: Even with lossless audio, radio shows have varying background music, room noise, and compression artifacts between broadcasts. A clean pattern is more robust against these day-to-day discrepancies.
-
-In both cases, background noise in the pattern correlates with unrelated parts of the audio stream, widening the cross-correlation envelope and reducing the Pearson r shape similarity score. Removing noise isolates the distinctive signal, making the pattern more reliably matchable across different recordings.
-
 3. **Repeating background sounds**: If the pattern clip contains repeating elements (e.g. background beeps, music loops, jingle tails) that also appear elsewhere in the audio stream, the detector may produce duplicate detections a few seconds apart from a single real occurrence. Filtering out the repeating frequency range eliminates these ghost matches.
 
 ## FFmpeg filter strategies
