@@ -23,7 +23,7 @@ RTHK_BEEP_EXPECTED_TIMES = [1.407375, 2.419125]
 
 RAINBOW_INTRO_PATTERN = "sample_audios/clips/天空下的彩虹intro.wav"
 RAINBOW_INTRO_AUDIO = "sample_audios/am1430_section_with_rainbow_intro.wav"
-RAINBOW_INTRO_EXPECTED_TIME = 15.5
+RAINBOW_INTRO_EXPECTED_TIME = 13.848
 
 
 

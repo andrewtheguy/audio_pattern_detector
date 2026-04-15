@@ -795,19 +795,21 @@ class AudioPatternDetector:
         else:
             similarity = min(similarity_whole,similarity_middle)
 
-        # Multi-window Pearson r: try different regions and pick best match
-        # Downsample count scales with window width so resolution is consistent
+        # Pearson r on center window (partitions 4-6, i.e. 40-60% around peak)
+        # Additional flanking windows are computed only for debug graphs.
         ds_base = 101  # for 20% window (2 partitions)
         if is_short_clip:
             pearson_windows: list[tuple[int, int, int]] = [
                 (0, 10, round(ds_base * 10 / 2)),    # 0-100% → 505 samples
             ]
+            center_window_idx = 0
         else:
             pearson_windows = [
                 (0, 5, round(ds_base * 5 / 2)),      # 0-50% → 252 samples
-                (4, 6, ds_base),                      # 40-60% → 101 samples
+                (4, 6, ds_base),                      # 40-60% → 101 samples (center)
                 (5, 10, round(ds_base * 5 / 2)),      # 50-100% → 252 samples
             ]
+            center_window_idx = 1
 
         cached_clips = self._clip_cache["downsampled_pearson_windows"].get(clip_name)
         if cached_clips is None:
@@ -833,7 +835,7 @@ class AudioPatternDetector:
                 best_pearson_r = r
                 best_window_idx = wi
 
-        pearson_r = best_pearson_r
+        pearson_r: float = pearson_per_window[f"pearson_w{pearson_windows[center_window_idx][0]}_{pearson_windows[center_window_idx][1]}"]
 
         if debug_mode:
             import matplotlib.pyplot as plt
