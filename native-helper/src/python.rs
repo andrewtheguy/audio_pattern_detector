@@ -181,7 +181,7 @@ fn pearson_correlation_py(x: Bound<'_, PyAny>, y: Bound<'_, PyAny>) -> PyResult<
 }
 
 #[pymodule]
-#[pyo3(name = "native_helper")]
+#[pyo3(name = "_native")]
 fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add(
         "__all__",

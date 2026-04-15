@@ -28,7 +28,7 @@ def get_pure_tone_frequency(audio_data: NDArray[np.float32], sample_rate: int) -
         return None
     magnitude_normalized = magnitude / dominant_magnitude
 
-    from native_helper import find_peaks
+    from audio_pattern_detector._native import find_peaks
     peaks, _ = find_peaks(magnitude_normalized, prominence=0.05)
 
     peak_freqs = freqs[peaks]

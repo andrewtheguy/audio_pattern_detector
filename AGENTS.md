@@ -5,7 +5,7 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 
 ## Native helper (Rust)
 
-- Rust code lives in `native-helper/`. After changing Rust source, rebuild with `uv run maturin develop --manifest-path native-helper/Cargo.toml`.
+- Rust code lives in `native-helper/`. After changing Rust source, rebuild with `uv run maturin develop --skip-install --manifest-path native-helper/Cargo.toml`.
 - Run Rust tests with `cargo test --manifest-path native-helper/Cargo.toml`.
 - Run Python binding tests with `uv run pytest native-helper/tests/`.
 - Follow the existing PyO3 binding pattern in `src/python.rs`: use `extract_f32_data`/`extract_f64_data` helpers, register in `__all__` and `add_function`.
@@ -26,7 +26,7 @@ do `uv run basedpyright` `uv run ruff check` after changes to make sure code sty
 - Use `--debug` and `--debug-dir <dir>` to save graphs per run. Use separate debug dirs for A/B comparisons.
 - The Pearson downsampled graphs in `graph/pearson_downsampled/` show the 101-point curves actually used for verification — check these first when troubleshooting.
 - Debug audio sections in `audio_section/` can be listened to for ground truth verification. Don't assume old detection results are correct.
-- Pattern clips with background noise should be denoised for better matching on lossy streams. See `docs/denoise-strategy.md`.
+- Pattern clips should be extracted from the same encoding as the target audio (e.g. from an Opus stream when matching Opus audio). Denoise as a fallback when source-matched clips aren't available. See `docs/denoise-strategy.md`.
 
 ## Version bumping
 

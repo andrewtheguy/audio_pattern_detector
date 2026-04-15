@@ -39,7 +39,7 @@ def _module_path() -> pathlib.Path:
 
     raise FileNotFoundError(
         "Could not find the built native_helper extension. "
-        "Build it first with `cargo build --features python --lib` or `maturin develop`."
+        "Build it first with `cargo build --features python --lib` or `maturin develop --skip-install`."
     )
 
 

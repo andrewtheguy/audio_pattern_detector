@@ -27,7 +27,7 @@ scipy is included in the root `dev` dependency group solely for QA: the comparis
 ## Building
 
 ```shell
-uv run maturin develop --manifest-path native-helper/Cargo.toml
+uv run maturin develop --manifest-path native-helper/Cargo.toml --skip-install
 ```
 
 ## Testing
