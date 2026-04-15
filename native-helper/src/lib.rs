@@ -318,76 +318,6 @@ pub fn resample_preserve_maxima_1d(data: &[f32], target_len: usize) -> Vec<f32> 
 }
 
 
-/// Downsample using Largest Triangle Three Buckets (LTTB).
-///
-/// LTTB preserves visually significant points (peaks, valleys) while
-/// naturally smoothing flat/noisy regions.  This gives sharper peaks
-/// than mean pooling and a more stable noise floor than max pooling,
-/// producing better Pearson correlation comparisons.
-pub fn resample_lttb_1d(data: &[f32], target_len: usize) -> Vec<f32> {
-    let n = data.len();
-    if target_len == 0 || n == 0 {
-        return Vec::new();
-    }
-    if target_len >= n {
-        return data.to_vec();
-    }
-    if target_len <= 2 {
-        let mut out = Vec::with_capacity(target_len);
-        out.push(data[0]);
-        if target_len == 2 {
-            out.push(data[n - 1]);
-        }
-        return out;
-    }
-
-    let mut out = Vec::with_capacity(target_len);
-    out.push(data[0]); // always keep first
-
-    let bucket_size = (n - 2) as f64 / (target_len - 2) as f64;
-    let mut prev_selected: usize = 0;
-
-    for bucket_idx in 0..(target_len - 2) {
-        // Current bucket range
-        let bucket_start = ((bucket_idx as f64 * bucket_size) as usize) + 1;
-        let bucket_end = (((bucket_idx + 1) as f64 * bucket_size) as usize + 1).min(n);
-
-        // Next bucket average (the "third point" of the triangle)
-        let next_start = (((bucket_idx + 1) as f64 * bucket_size) as usize) + 1;
-        let next_end = (((bucket_idx + 2) as f64 * bucket_size) as usize + 1).min(n);
-        let next_count = next_end - next_start;
-        let avg_x = (next_start + next_end - 1) as f64 / 2.0;
-        let avg_y: f64 = if next_count > 0 {
-            data[next_start..next_end].iter().map(|&v| v as f64).sum::<f64>() / next_count as f64
-        } else {
-            data[n - 1] as f64
-        };
-
-        // Select point in current bucket that forms largest triangle
-        let mut max_area: f64 = -1.0;
-        let mut selected = bucket_start;
-        let prev_x = prev_selected as f64;
-        let prev_y = data[prev_selected] as f64;
-
-        for j in bucket_start..bucket_end {
-            let area = ((prev_x - avg_x) * (data[j] as f64 - prev_y)
-                - (prev_x - j as f64) * (avg_y - prev_y))
-                .abs();
-            if area > max_area {
-                max_area = area;
-                selected = j;
-            }
-        }
-
-        out.push(data[selected]);
-        prev_selected = selected;
-    }
-
-    out.push(data[n - 1]); // always keep last
-    out
-}
-
-
 // ── Simpson's rule ───────────────────────────────────────────────────
 
 /// Composite Simpson's rule for uniformly spaced data with unit spacing (dx=1).
@@ -1034,8 +964,6 @@ mod tests {
             Vec::<f32>::new()
         );
     }
-
-    // ── lttb_1d ─────────────────────────────────────────────────────
 
     // ── simpson ──────────────────────────────────────────────────────
 
