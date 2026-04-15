@@ -1,6 +1,6 @@
 use crate::{
     resample_preserve_maxima_1d as rust_resample_preserve_maxima_1d,
-    resample_lttb_1d as rust_resample_lttb_1d,
+    resample_envelope_1d as rust_resample_envelope_1d,
     find_peaks_1d as rust_find_peaks_1d, integrated_loudness as rust_integrated_loudness,
     loudness_normalize as rust_loudness_normalize,
     pearson_correlation_1d as rust_pearson_correlation_1d, resample_1d as rust_resample_1d,
@@ -139,8 +139,8 @@ fn resample_preserve_maxima_py<'py>(
     })
 }
 
-#[pyfunction(name = "resample_lttb")]
-fn resample_lttb_py<'py>(
+#[pyfunction(name = "resample_envelope")]
+fn resample_envelope_py<'py>(
     py: Python<'py>,
     data: Bound<'py, PyAny>,
     num_samples: usize,
@@ -150,7 +150,7 @@ fn resample_lttb_py<'py>(
     }
 
     with_f32_slice(&data, |data_f32| {
-        let result = rust_resample_lttb_1d(data_f32, num_samples);
+        let result = rust_resample_envelope_1d(data_f32, num_samples);
         Ok(result.into_pyarray(py))
     })
 }
@@ -206,7 +206,7 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
             "find_peaks",
             "resample",
             "resample_preserve_maxima",
-            "resample_lttb",
+            "resample_envelope",
             "simpson",
             "integrated_loudness",
             "loudness_normalize",
@@ -216,7 +216,7 @@ fn native_helper(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(find_peaks_py, module)?)?;
     module.add_function(wrap_pyfunction!(resample_py, module)?)?;
     module.add_function(wrap_pyfunction!(resample_preserve_maxima_py, module)?)?;
-    module.add_function(wrap_pyfunction!(resample_lttb_py, module)?)?;
+    module.add_function(wrap_pyfunction!(resample_envelope_py, module)?)?;
     module.add_function(wrap_pyfunction!(simpson_py, module)?)?;
     module.add_function(wrap_pyfunction!(integrated_loudness_py, module)?)?;
     module.add_function(wrap_pyfunction!(loudness_normalize_py, module)?)?;

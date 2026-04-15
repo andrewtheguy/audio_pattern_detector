@@ -21,7 +21,7 @@ def resample_preserve_maxima(
     num_samples: int,
 ) -> npt.NDArray[np.float32]: ...
 
-def resample_lttb(
+def resample_envelope(
     data: npt.NDArray[np.floating[Any]],
     num_samples: int,
 ) -> npt.NDArray[np.float32]: ...

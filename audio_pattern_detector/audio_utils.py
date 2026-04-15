@@ -233,12 +233,12 @@ def resample_preserve_maxima(curve: NDArray[np.floating[Any]], num_samples: int)
     return native_resample_preserve_maxima(curve_f32, num_samples)
 
 
-def resample_lttb(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
-    """Resample a curve using Largest Triangle Three Buckets (LTTB)."""
-    from audio_pattern_detector._native import resample_lttb as native_resample_lttb
+def resample_envelope(curve: NDArray[np.floating[Any]], num_samples: int) -> NDArray[np.float32]:
+    """Resample via two-stage envelope: max pool (5:1) then mean pool to target."""
+    from audio_pattern_detector._native import resample_envelope as native_resample_envelope
 
     curve_f32 = np.ascontiguousarray(curve, dtype=np.float32)
-    return native_resample_lttb(curve_f32, num_samples)
+    return native_resample_envelope(curve_f32, num_samples)
 
 
 @contextmanager

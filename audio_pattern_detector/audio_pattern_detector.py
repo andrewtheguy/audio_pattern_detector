@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
-    resample_preserve_maxima,
+    resample_envelope,
     seconds_to_time,
     slicing_with_zero_padding,
     write_wav_file,
@@ -817,7 +817,7 @@ class AudioPatternDetector:
             for wl, wr, ds_n in pearson_windows:
                 lo = round(len(correlation_clip) * wl / partition_count)
                 hi = round(len(correlation_clip) * wr / partition_count)
-                cached_clips.append(resample_preserve_maxima(correlation_clip[lo:hi], ds_n))
+                cached_clips.append(resample_envelope(correlation_clip[lo:hi], ds_n))
             self._clip_cache["downsampled_pearson_windows"][clip_name] = cached_clips
 
         best_pearson_r = -1.0
@@ -827,7 +827,7 @@ class AudioPatternDetector:
         for wi, (wl, wr, ds_n) in enumerate(pearson_windows):
             lo = round(len(correlation_slice) * wl / partition_count)
             hi = round(len(correlation_slice) * wr / partition_count)
-            ds_s = resample_preserve_maxima(correlation_slice[lo:hi], ds_n)
+            ds_s = resample_envelope(correlation_slice[lo:hi], ds_n)
             ds_slices.append(ds_s)
             r: float = pearson_correlation(cached_clips[wi], ds_s)
             pearson_per_window[f"pearson_w{wl}_{wr}"] = r
