@@ -99,6 +99,9 @@ just one representation.
 uv run basedpyright  # Type checking
 uv run ruff check    # Linting
 uv run pytest        # Testing
+
+# Rebuild native-helper after changing Rust files in native-helper/src/
+uv run maturin develop --skip-install --manifest-path native-helper/Cargo.toml
 ```
 
 See [docs/development.md](docs/development.md) for more details.

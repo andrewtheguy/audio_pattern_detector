@@ -22,6 +22,14 @@ Use pytest to test because not all of them are written using default python unit
 uv run pytest
 ```
 
+## Native Helper Rebuild
+
+After changing Rust code in `native-helper/src/`, rebuild the Python extension:
+
+```shell
+uv run maturin develop --skip-install --manifest-path native-helper/Cargo.toml
+```
+
 ## Debug graphs
 
 matplotlib is required for `--debug` graph output but is not installed by default. Enable it with:
