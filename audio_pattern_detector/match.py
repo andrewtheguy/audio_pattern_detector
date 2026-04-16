@@ -523,7 +523,12 @@ def _match_pattern_multiplexed_stdin(
 
 def _make_jsonl_callback(timestamp_format: str = "both") -> PatternDetectedCallback:
     """Create a callback that emits pattern_detected JSONL events."""
+    last_ms: dict[str, int] = {}
     def callback(clip_name: str, timestamp: float) -> None:
+        ts_ms = round(timestamp * 1000)
+        if last_ms.get(clip_name) == ts_ms:
+            return
+        last_ms[clip_name] = ts_ms
         if timestamp_format == "formatted":
             _emit_jsonl(
                 "pattern_detected",
@@ -534,13 +539,13 @@ def _make_jsonl_callback(timestamp_format: str = "both") -> PatternDetectedCallb
             _emit_jsonl(
                 "pattern_detected",
                 clip_name=clip_name,
-                timestamp_ms=round(timestamp * 1000),
+                timestamp_ms=ts_ms,
             )
         else:
             _emit_jsonl(
                 "pattern_detected",
                 clip_name=clip_name,
-                timestamp_ms=round(timestamp * 1000),
+                timestamp_ms=ts_ms,
                 timestamp_formatted=seconds_to_time(timestamp),
             )
     return callback
