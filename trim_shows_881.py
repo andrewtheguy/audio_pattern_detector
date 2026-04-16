@@ -41,33 +41,49 @@ class Segments:
     show2: tuple[int, int]
 
 
-def parse_jsonl(path: Path) -> tuple[list[Detection], int] | None:
-    """Return (detections, total_time_ms) or None if malformed/missing."""
+class JsonlError(Exception):
+    """Raised for any problem reading/parsing a detection JSONL."""
+
+
+def parse_jsonl(path: Path) -> tuple[list[Detection], int]:
+    """Return (detections, total_time_ms). Raises JsonlError on failure."""
     if not path.is_file():
-        return None
+        raise JsonlError(f"missing JSONL at {path}")
     detections: list[Detection] = []
     total_time_ms: int | None = None
     with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for lineno, raw in enumerate(f, start=1):
+            line = raw.strip()
             if not line:
                 continue
             try:
                 obj = json.loads(line)
-            except json.JSONDecodeError:
-                return None
+            except json.JSONDecodeError as e:
+                raise JsonlError(
+                    f"malformed JSON at {path}:{lineno}: {e.msg}"
+                ) from e
             t = obj.get("type")
             if t == "pattern_detected":
-                detections.append(
-                    Detection(
-                        clip_name=str(obj["clip_name"]),
-                        timestamp_ms=int(obj["timestamp_ms"]),
+                try:
+                    detections.append(
+                        Detection(
+                            clip_name=str(obj["clip_name"]),
+                            timestamp_ms=int(obj["timestamp_ms"]),
+                        )
                     )
-                )
+                except (KeyError, TypeError, ValueError) as e:
+                    raise JsonlError(
+                        f"malformed pattern_detected at {path}:{lineno}: {e}"
+                    ) from e
             elif t == "end":
-                total_time_ms = int(obj["total_time_ms"])
+                try:
+                    total_time_ms = int(obj["total_time_ms"])
+                except (KeyError, TypeError, ValueError) as e:
+                    raise JsonlError(
+                        f"malformed end event at {path}:{lineno}: {e}"
+                    ) from e
     if total_time_ms is None:
-        return None
+        raise JsonlError(f"no end event in {path}")
     return detections, total_time_ms
 
 
@@ -160,12 +176,11 @@ def show_output_name(base_dt: datetime, start_ms: int, end_ms: int) -> str:
 def process_hour(m4a: Path, dry_run: bool) -> None:
     rel = m4a.relative_to(HOURLY_DIR)
     jsonl_path = RESULTS_DIR / rel.with_suffix(".jsonl")
-    parsed = parse_jsonl(jsonl_path)
-    if parsed is None:
-        print(f"SKIP {rel}: missing or malformed JSONL at {jsonl_path}", file=sys.stderr)
+    try:
+        detections, total_time_ms = parse_jsonl(jsonl_path)
+    except JsonlError as e:
+        print(f"SKIP {rel}: {e}", file=sys.stderr)
         return
-
-    detections, total_time_ms = parsed
     segments = compute_segments(detections, total_time_ms)
 
     base_dt = parse_hourly_base_dt(rel.stem)
