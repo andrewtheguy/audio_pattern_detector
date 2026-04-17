@@ -2,8 +2,8 @@
 """Trim 881 hourly captures into two ~30-min show segments via ffmpeg.
 
 Consumes JSONL detection results produced by `run_all.py` and writes two
-Opus-encoded (8 kbps, voip profile) .opus files per hour under
-./tmp/trimmed/881/<date>/...
+stream-copied .m4a files per hour under ./tmp/trimmed/881/<date>/...
+Pass --opus to instead re-encode as Opus (8 kbps, voip profile) .opus files.
 """
 
 from __future__ import annotations
@@ -133,6 +133,24 @@ def format_ms(ms: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
 
 
+def ffmpeg_trim_copy(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-ss",
+        f"{start_ms / 1000:.3f}",
+        "-to",
+        f"{end_ms / 1000:.3f}",
+        "-i",
+        str(src),
+        "-c",
+        "copy",
+        str(dst),
+    ]
+    subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL)
+
+
 def ffmpeg_trim_opus(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -173,15 +191,17 @@ def parse_hourly_base_dt(stem: str) -> datetime | None:
     return datetime.strptime(m.group(1), "%Y%m%d%H%M%S")
 
 
-def show_output_name(base_dt: datetime, start_ms: int, end_ms: int) -> str:
+def show_output_name(
+    base_dt: datetime, start_ms: int, end_ms: int, ext: str
+) -> str:
     begin = base_dt + timedelta(milliseconds=start_ms)
     end = base_dt + timedelta(milliseconds=end_ms)
     return (
-        f"segments_881_{begin:%Y%m%d}_{begin:%H%M%S}_{end:%H%M%S}.opus"
+        f"segments_881_{begin:%Y%m%d}_{begin:%H%M%S}_{end:%H%M%S}.{ext}"
     )
 
 
-def process_hour(m4a: Path, dry_run: bool) -> None:
+def process_hour(m4a: Path, dry_run: bool, opus: bool) -> None:
     rel = m4a.relative_to(HOURLY_DIR)
     jsonl_path = RESULTS_DIR / rel.with_suffix(".jsonl")
     try:
@@ -199,8 +219,10 @@ def process_hour(m4a: Path, dry_run: bool) -> None:
     s1_start, s1_end = segments.show1
     s2_start, s2_end = segments.show2
 
-    show1_out = OUTPUT_DIR / rel.parent / show_output_name(base_dt, s1_start, s1_end)
-    show2_out = OUTPUT_DIR / rel.parent / show_output_name(base_dt, s2_start, s2_end)
+    ext = "opus" if opus else "m4a"
+    trim = ffmpeg_trim_opus if opus else ffmpeg_trim_copy
+    show1_out = OUTPUT_DIR / rel.parent / show_output_name(base_dt, s1_start, s1_end, ext)
+    show2_out = OUTPUT_DIR / rel.parent / show_output_name(base_dt, s2_start, s2_end, ext)
 
     print(
         f"{rel}\n"
@@ -216,12 +238,12 @@ def process_hour(m4a: Path, dry_run: bool) -> None:
         return
 
     if s1_end > s1_start:
-        ffmpeg_trim_opus(m4a, show1_out, s1_start, s1_end)
+        trim(m4a, show1_out, s1_start, s1_end)
     else:
         print(f"SKIP show1 for {rel}: non-positive duration", file=sys.stderr)
 
     if s2_end > s2_start:
-        ffmpeg_trim_opus(m4a, show2_out, s2_start, s2_end)
+        trim(m4a, show2_out, s2_start, s2_end)
     else:
         print(f"SKIP show2 for {rel}: non-positive duration", file=sys.stderr)
 
@@ -233,11 +255,17 @@ def main() -> int:
         action="store_true",
         help="Print computed segments without invoking ffmpeg.",
     )
+    _ = ap.add_argument(
+        "--opus",
+        action="store_true",
+        help="Re-encode as Opus (8 kbps, voip profile) instead of stream-copying to .m4a.",
+    )
     args = ap.parse_args()
     dry_run: bool = bool(args.dry_run)
+    opus: bool = bool(args.opus)
 
     for m4a in iter_hourly_m4as():
-        process_hour(m4a, dry_run)
+        process_hour(m4a, dry_run, opus)
     return 0
 
 
