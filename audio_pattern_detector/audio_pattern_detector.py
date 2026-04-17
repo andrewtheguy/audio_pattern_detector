@@ -35,7 +35,7 @@ DEFAULT_SECONDS_PER_CHUNK = 60
 SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
 
 # Strategy name that triggers the pure tone verification path.
-# Set on an AudioClip by the `.apd` pattern loader.
+# Set on an AudioClip by the `.apd.toml` pattern loader.
 PURE_TONE_STRATEGY = "pure_tone"
 
 
@@ -209,7 +209,7 @@ class AudioPatternDetector:
             }
 
             if audio_clip.strategy == PURE_TONE_STRATEGY:
-                # The .apd loader stores the declared frequency directly so
+                # The .apd.toml loader stores the declared frequency directly so
                 # we don't need to re-derive it from the synthesised clip.
                 freq = audio_clip.strategy_params.get("dominant_frequency_hz")
                 if freq is None:
@@ -653,7 +653,7 @@ class AudioPatternDetector:
         """Verify a candidate peak is a pure tone with the expected frequency and duration.
 
         This is the pure-tone special-case path, triggered when a clip's
-        strategy is PURE_TONE_STRATEGY (declared in its `.apd` config). It
+        strategy is PURE_TONE_STRATEGY (declared in its `.apd.toml` config). It
         exists because pure-tone beeps (e.g. the RTHK hourly beep) do not
         cross-correlate well enough for the normal MSE+Pearson verification.
 

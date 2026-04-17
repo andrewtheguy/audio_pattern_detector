@@ -1,0 +1,17 @@
+# rthk_beep: RTHK hourly station beep.
+# Uses the pure_tone verification strategy (short-time spectral analysis)
+# instead of the normal MSE + Pearson envelope check, because a clean
+# sine does not cross-correlate distinctively against real airtime audio.
+#
+# The clip is synthesised from frequency + duration at the target sample
+# rate, so a single .apd.toml works at 8 kHz, 16 kHz, or any other rate.
+
+strategy = "pure_tone"
+description = "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s"
+
+[generator]
+type = "sine"
+# Measured from the original rthk_beep.wav capture (parabolic-interp FFT peak).
+frequency_hz = 1040.19
+duration_seconds = 0.228375
+amplitude = 1.0

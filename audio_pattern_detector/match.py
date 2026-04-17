@@ -650,7 +650,7 @@ def cmd_match(args: argparse.Namespace) -> None:
 
     if args.pattern_folder:
         pattern_files = []
-        for ext in ("wav", "apd"):
+        for ext in ("wav", "apd.toml"):
             for pattern_file in glob.glob(f'{args.pattern_folder}/*.{ext}'):
                 print(f"adding pattern file {pattern_file}...", file=sys.stderr)
                 pattern_files.append(pattern_file)
@@ -693,7 +693,7 @@ def cmd_show_config(args: argparse.Namespace) -> None:
 
     if args.pattern_folder:
         pattern_files = []
-        for ext in ("wav", "apd"):
+        for ext in ("wav", "apd.toml"):
             for pattern_file in glob.glob(f'{args.pattern_folder}/*.{ext}'):
                 pattern_files.append(pattern_file)
     elif args.pattern_file:

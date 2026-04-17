@@ -94,7 +94,7 @@ def test_match_audio_file_returns_jsonl():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
     )
     assert result.returncode == 0
 
@@ -133,7 +133,7 @@ def test_match_chunk_seconds_argument_passed():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         "--chunk-seconds", "auto",
     )
     assert result.returncode == 0
@@ -142,7 +142,7 @@ def test_match_chunk_seconds_argument_passed():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         "--chunk-seconds", "10",
     )
     assert result.returncode == 0
@@ -153,7 +153,7 @@ def test_match_chunk_seconds_invalid_value():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         "--chunk-seconds", "invalid",
         check=False,
     )
@@ -182,7 +182,7 @@ def test_match_stdin_reads_wav():
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         stdin_data=wav_data,
     )
     assert result.returncode == 0
@@ -240,7 +240,7 @@ def test_match_jsonl_output_format():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
     )
     assert result.returncode == 0
 
@@ -274,7 +274,7 @@ def test_match_jsonl_timestamp_format_ms():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         "--timestamp-format", "ms",
     )
     assert result.returncode == 0
@@ -298,7 +298,7 @@ def test_match_jsonl_timestamp_format_formatted():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         "--timestamp-format", "formatted",
     )
     assert result.returncode == 0
@@ -325,7 +325,7 @@ def test_match_jsonl_start_event_source():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
     )
     start_event = json.loads(result.stdout.strip().split("\n")[0])
     assert "rthk_section_with_beep.wav" in start_event["source"]
@@ -336,7 +336,7 @@ def test_match_jsonl_start_event_source():
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         stdin_data=wav_data,
     )
     start_event = json.loads(result.stdout.decode().strip().split("\n")[0])
@@ -368,7 +368,7 @@ def test_show_config_returns_json():
     """Test show-config returns valid JSON with expected structure."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
     )
     assert result.returncode == 0
 
@@ -397,7 +397,7 @@ def test_show_config_clip_info():
     """Test show-config returns per-clip configuration."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
     )
     config = json.loads(result.stdout)
 
@@ -417,7 +417,7 @@ def test_match_nonexistent_audio_file():
     result = run_cli(
         "match",
         "nonexistent.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         check=False,
     )
     assert result.returncode != 0
@@ -438,7 +438,7 @@ def test_match_no_audio_source():
     """Test match without any audio source."""
     result = run_cli(
         "match",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         check=False,
     )
     assert result.returncode != 0
@@ -502,7 +502,7 @@ def test_match_16khz_audio_auto_converts():
     result = run_cli(
         "match",
         "sample_audios/test_16khz/rthk_section_with_beep_16k.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
     )
     assert result.returncode == 0
 
@@ -526,7 +526,7 @@ def test_stdin_wav_with_wrong_sample_rate_rejected():
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
         stdin_data=wav_data,
         check=False,
     )
@@ -577,7 +577,7 @@ def test_multiplexed_stdin_help():
 def test_multiplexed_stdin_single_pattern_wav_audio():
     """Test --multiplexed-stdin with single pattern and WAV audio."""
     # The multiplexed-stdin protocol is WAV-only, so this uses the cbs_news
-    # .wav pattern (not the .apd pure-tone pattern).
+    # .wav pattern (not the .apd.toml pure-tone pattern).
     with open("sample_audios/clips/cbs_news.wav", "rb") as f:
         pattern_data = f.read()
 

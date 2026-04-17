@@ -8,7 +8,7 @@ from audio_pattern_detector.audio_utils import DEFAULT_TARGET_SAMPLE_RATE
 from audio_pattern_detector.detection_utils import get_pure_tone_frequency
 
 
-RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd"
+RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd.toml"
 HARMONIC_STACK_FUNDAMENTAL = 260.0
 SWEEP_START_FREQUENCY = 920.0
 SWEEP_END_FREQUENCY = 1160.0

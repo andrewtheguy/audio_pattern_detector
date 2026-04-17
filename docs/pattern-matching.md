@@ -111,25 +111,23 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 3. **Same thresholds** — `similarity > 0.03` rejects, `pearson_r >= 0.90` accepts.
 
-**Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. clean pure tones like the RTHK hourly beep) need their own special-case path instead — see `.apd` pattern configs below.
+**Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. clean pure tones like the RTHK hourly beep) need their own special-case path instead — see `.apd.toml` pattern configs below.
 
-### `.apd` Pattern Configs and Pure Tone Verification
+### `.apd.toml` Pattern Configs and Pure Tone Verification
 
-Patterns that need a special detection strategy use a `.apd` file instead of `.wav`. The `.apd` format is JSON-with-comments (JSONC) and declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
+Patterns that need a special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) that declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
 
-Example (`sample_audios/clips/rthk_beep.apd`):
+Example (`sample_audios/clips/rthk_beep.apd.toml`):
 
-```jsonc
-{
-  "strategy": "pure_tone",
-  "description": "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s",
-  "generator": {
-    "type": "sine",
-    "frequency_hz": 1040.19,
-    "duration_seconds": 0.228375,
-    "amplitude": 1.0
-  }
-}
+```toml
+strategy = "pure_tone"
+description = "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s"
+
+[generator]
+type = "sine"
+frequency_hz = 1040.19
+duration_seconds = 0.228375
+amplitude = 1.0
 ```
 
 The only strategy currently implemented is `pure_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
@@ -140,11 +138,11 @@ When a clip's `strategy == "pure_tone"`:
 3. Flanks (adjacent segments) must have low purity to reject neighboring tones.
 4. Multiple acceptance criteria with varying strictness levels handle different signal conditions.
 
-Because the clip is synthesised at the target sample rate, a single `.apd` file works at 8 kHz, 16 kHz, or any other supported rate without needing a per-rate variant.
+Because the clip is synthesised at the target sample rate, a single `.apd.toml` file works at 8 kHz, 16 kHz, or any other supported rate without needing a per-rate variant.
 
 ## Pure Tone Classification
 
-A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification backs the `pure_tone` strategy declared via `.apd`.
+A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification backs the `pure_tone` strategy declared via `.apd.toml`.
 
 ## Timestamp Conversion
 

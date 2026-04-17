@@ -17,7 +17,7 @@ CBS_NEWS_PATTERN = "sample_audios/clips/cbs_news.wav"
 CBS_NEWS_AUDIO = "sample_audios/cbs_news_audio_section.wav"
 CBS_NEWS_EXPECTED_TIME = 25.89875
 
-RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd"
+RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd.toml"
 RTHK_BEEP_AUDIO = "sample_audios/rthk_section_with_beep.wav"
 RTHK_BEEP_EXPECTED_TIMES = [1.407375, 2.419125]
 
@@ -546,9 +546,9 @@ def test_match_16khz_cbs_news():
 
 
 def test_match_16khz_with_apd_pattern():
-    """Test matching 16kHz audio using an `.apd` pure-tone pattern.
+    """Test matching 16kHz audio using an `.apd.toml` pure-tone pattern.
 
-    `.apd` patterns synthesise the clip at the target sample rate, so the
+    `.apd.toml` patterns synthesise the clip at the target sample rate, so the
     same pattern file works for 8kHz and 16kHz audio without any pre-conversion.
     """
     audio_file = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav"
@@ -563,10 +563,10 @@ def test_match_16khz_with_apd_pattern():
 
 
 def test_multiple_patterns_mixed_formats():
-    """Test matching with a `.wav` pattern and a `.apd` pattern simultaneously.
+    """Test matching with a `.wav` pattern and a `.apd.toml` pattern simultaneously.
 
     Confirms the detector handles mixed-format pattern lists: a normal `.wav`
-    pattern (cbs_news) that matches, and an `.apd` pure-tone pattern
+    pattern (cbs_news) that matches, and an `.apd.toml` pure-tone pattern
     (rthk_beep) that should not match CBS news audio.
     """
     input_patterns = [
@@ -578,10 +578,10 @@ def test_multiple_patterns_mixed_formats():
     temp_files: list[str] = []
 
     try:
-        # Convert the .wav pattern to 8kHz; the .apd pattern generates natively.
+        # Convert the .wav pattern to 8kHz; the .apd.toml pattern generates natively.
         for input_file in input_patterns:
             assert Path(input_file).exists(), f"Input pattern {input_file} not found"
-            if input_file.endswith(".apd"):
+            if input_file.endswith(".apd.toml"):
                 converted_patterns.append(input_file)
                 continue
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
