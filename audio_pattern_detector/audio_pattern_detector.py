@@ -390,17 +390,25 @@ class AudioPatternDetector:
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
         chunk_seconds = len(chunk) / sr
-        # Concatenate previous chunk for continuity in processing
+        # Build audio_section with enough tail from previous_chunk to catch
+        # patterns that straddle chunk boundaries. Shape depends on branch.
         if previous_chunk is not None:
-            if chunk_seconds < seconds_per_chunk:  # too small
-                # no need for sliding window since it is the last piece
+            if chunk_seconds < seconds_per_chunk:  # final short chunk
+                # Take the last seconds_per_chunk seconds of (previous ++ chunk):
+                # previous_chunk participates in full, but only its tail survives
+                # the slice. No sliding_window overlap is added — the surviving
+                # window already extends further back than any pattern length.
                 subtract_seconds = -(chunk_seconds - seconds_per_chunk)
                 audio_section_temp = np.concatenate((previous_chunk, chunk))[(-seconds_per_chunk * sr):]
                 audio_section = audio_section_temp
             else:
+                # Prepend only the last sliding_window seconds (= ceil(clip_seconds))
+                # of previous_chunk — just enough to cover a pattern that crosses
+                # the boundary. Length: sliding_window + seconds_per_chunk.
                 subtract_seconds = sliding_window
                 audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk))
         else:
+            # First chunk: no previous audio available. Length: seconds_per_chunk.
             subtract_seconds = 0
             audio_section = chunk
 
