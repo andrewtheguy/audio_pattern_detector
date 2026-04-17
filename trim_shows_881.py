@@ -2,7 +2,8 @@
 """Trim 881 hourly captures into two ~30-min show segments via ffmpeg.
 
 Consumes JSONL detection results produced by `run_all.py` and writes two
-stream-copied .m4a files per hour under ./tmp/trimmed/881/<date>/...
+Opus-encoded (8 kbps, voip profile) .opus files per hour under
+./tmp/trimmed/881/<date>/...
 """
 
 from __future__ import annotations
@@ -132,7 +133,7 @@ def format_ms(ms: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
 
 
-def ffmpeg_copy(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
+def ffmpeg_trim_opus(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "ffmpeg",
@@ -143,8 +144,15 @@ def ffmpeg_copy(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
         f"{end_ms / 1000:.3f}",
         "-i",
         str(src),
-        "-c",
-        "copy",
+        "-vn",
+        "-c:a",
+        "libopus",
+        "-application",
+        "voip",
+        "-b:a",
+        "8k",
+        "-ac",
+        "1",
         str(dst),
     ]
     subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL)
@@ -169,7 +177,7 @@ def show_output_name(base_dt: datetime, start_ms: int, end_ms: int) -> str:
     begin = base_dt + timedelta(milliseconds=start_ms)
     end = base_dt + timedelta(milliseconds=end_ms)
     return (
-        f"segments_881_{begin:%Y%m%d}_{begin:%H%M%S}_{end:%H%M%S}.m4a"
+        f"segments_881_{begin:%Y%m%d}_{begin:%H%M%S}_{end:%H%M%S}.opus"
     )
 
 
@@ -208,12 +216,12 @@ def process_hour(m4a: Path, dry_run: bool) -> None:
         return
 
     if s1_end > s1_start:
-        ffmpeg_copy(m4a, show1_out, s1_start, s1_end)
+        ffmpeg_trim_opus(m4a, show1_out, s1_start, s1_end)
     else:
         print(f"SKIP show1 for {rel}: non-positive duration", file=sys.stderr)
 
     if s2_end > s2_start:
-        ffmpeg_copy(m4a, show2_out, s2_start, s2_end)
+        ffmpeg_trim_opus(m4a, show2_out, s2_start, s2_end)
     else:
         print(f"SKIP show2 for {rel}: non-positive duration", file=sys.stderr)
 
