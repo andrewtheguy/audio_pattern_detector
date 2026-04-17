@@ -34,8 +34,9 @@ DEFAULT_SECONDS_PER_CHUNK = 60
 # Clips shorter than this go through the normal path with 0-100% window
 SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
 
-# Clip name that triggers the pure tone verification path
-PURE_TONE_CLIP_NAME = "rthk_beep"
+# Strategy name that triggers the pure tone verification path.
+# Set on an AudioClip by the `.apd.toml` pattern loader.
+PURE_TONE_STRATEGY = "pure_tone"
 
 
 # Type definitions
@@ -207,10 +208,14 @@ class AudioPatternDetector:
                 "correlation_clip_absolute_max": absolute_max,
             }
 
-            if clip_name == PURE_TONE_CLIP_NAME:
-                freq = get_pure_tone_frequency(clip, self.target_sample_rate)
+            if audio_clip.strategy == PURE_TONE_STRATEGY:
+                # The .apd.toml loader stores the declared frequency directly so
+                # we don't need to re-derive it from the synthesised clip.
+                freq = audio_clip.strategy_params.get("dominant_frequency_hz")
+                if freq is None:
+                    freq = get_pure_tone_frequency(clip, self.target_sample_rate)
                 if freq is not None:
-                    self._pure_tone_frequencies[clip_name] = freq
+                    self._pure_tone_frequencies[clip_name] = float(freq)
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
         self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
@@ -647,8 +652,9 @@ class AudioPatternDetector:
     ) -> bool:
         """Verify a candidate peak is a pure tone with the expected frequency and duration.
 
-        This is the RTHK beep special-case path, triggered by clip name (see
-        PURE_TONE_CLIP_NAME). It exists because rthk_beep.wav does not
+        This is the pure-tone special-case path, triggered when a clip's
+        strategy is PURE_TONE_STRATEGY (declared in its `.apd.toml` config). It
+        exists because pure-tone beeps (e.g. the RTHK hourly beep) do not
         cross-correlate well enough for the normal MSE+Pearson verification.
 
         Uses short-time spectral analysis to require a contiguous run of

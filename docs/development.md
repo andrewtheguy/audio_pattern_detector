@@ -91,7 +91,7 @@ Works well with repeating or non-repeating patterns that are loud enough within 
 
 Short clips (< 0.5s) use the same verification but with a single 0-100% Pearson window and whole-only MSE (no middle partition emphasis), since the correlation envelope is too short for sub-region analysis. Short clips must cross-correlate well — this is the user's responsibility when providing the clip.
 
-The `rthk_beep` clip is a special case: it uses a dedicated pure tone verification path (triggered by clip name, not FFT analysis) because `rthk_beep.wav` does not cross-correlate well enough for the normal path. This is independent of the short clip path.
+The RTHK hourly beep is a special case: it uses a dedicated pure tone verification path (triggered by the clip's `strategy` field, declared in a `.apd.toml` pattern config) because a clean pure tone does not cross-correlate well enough for the normal path. This is independent of the short clip path. See [docs/pattern-matching.md](pattern-matching.md) for the `.apd.toml` format.
 
 It will miss distorted patterns like this because error score is too high and Pearson r is too low:
 

@@ -63,7 +63,7 @@ def run_detector_without_callback(audio_file, pattern_files, accumulate_results=
 
 def test_callback_basic():
     """Test on_pattern_detected callback is called correctly."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     assert Path(pattern_file).exists()
@@ -91,7 +91,7 @@ def test_callback_basic():
 
 def test_callback_timestamps_monotonic():
     """Test callback events are emitted in timestamp order."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     events, _, _ = run_detector_with_callback(audio_file, [pattern_file])
@@ -108,7 +108,7 @@ def test_callback_timestamps_monotonic():
 def test_callback_multiple_patterns_monotonic():
     """Test multiple patterns emit in timestamp order with single matching pattern."""
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",  # Found at ~1.4s and ~2.4s
+        "sample_audios/clips/rthk_beep.apd.toml",  # Found at ~1.4s and ~2.4s
         "sample_audios/clips/cbs_news.wav",    # Not found in RTHK audio
     ]
     audio_file = "sample_audios/rthk_section_with_beep.wav"
@@ -148,7 +148,7 @@ def test_callback_no_matches():
 def test_callback_multiple_patterns_non_matching_ignored():
     """Test callback with two patterns where only one matches the audio."""
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",  # Not found in CBS audio
+        "sample_audios/clips/rthk_beep.apd.toml",  # Not found in CBS audio
         "sample_audios/clips/cbs_news.wav",    # Found at ~25.9s
     ]
     audio_file = "sample_audios/cbs_news_audio_section.wav"
@@ -165,7 +165,7 @@ def test_callback_multiple_patterns_non_matching_ignored():
 
 def test_accumulate_results_true():
     """Test accumulate_results=True returns peak_times dict."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     peak_times, total_time = run_detector_without_callback(
@@ -188,7 +188,7 @@ def test_accumulate_results_true():
 
 def test_accumulate_results_false_returns_none():
     """Test accumulate_results=False returns None for peak_times."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     peak_times, total_time = run_detector_without_callback(
@@ -204,7 +204,7 @@ def test_accumulate_results_false_returns_none():
 
 def test_accumulate_results_false_with_callback():
     """Test callback works when accumulate_results=False."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     events, peak_times, total_time = run_detector_with_callback(
@@ -226,7 +226,7 @@ def test_accumulate_results_false_with_callback():
 
 def test_accumulate_results_false_no_callback():
     """Test accumulate_results=False without callback (no-op mode)."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     # This is essentially a no-op mode - detection runs but results aren't saved
@@ -247,7 +247,7 @@ def test_accumulate_results_false_no_callback():
 
 def test_callback_with_accumulate_true():
     """Test callback and accumulation both capture same matches."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     events, peak_times, total_time = run_detector_with_callback(
@@ -295,7 +295,7 @@ def test_callback_with_accumulate_false():
 def test_callback_multiple_patterns_with_accumulate():
     """Test multiple patterns with both callback and accumulation."""
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",
+        "sample_audios/clips/rthk_beep.apd.toml",
         "sample_audios/clips/cbs_news.wav",
         "sample_audios/clips/天空下的彩虹intro.wav",  # Does not match CBS audio
     ]
@@ -362,7 +362,7 @@ def test_callback_with_no_match_accumulate_false():
 
 def test_callback_called_immediately():
     """Test that callback is called as patterns are detected, not at the end."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     # Track when events were added relative to each other
@@ -395,7 +395,7 @@ def test_callback_called_immediately():
 
 def test_callback_receives_correct_types():
     """Test callback receives correct argument types."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     audio_file = "sample_audios/rthk_section_with_beep.wav"
 
     received_types = []
@@ -430,7 +430,7 @@ def test_callback_receives_correct_types():
 
 def test_get_config_returns_correct_structure():
     """Test get_config returns dict with expected keys."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     pattern_clip = AudioClip.from_audio_file(pattern_file)
     detector = AudioPatternDetector(audio_clips=[pattern_clip])
 
@@ -446,7 +446,7 @@ def test_get_config_returns_correct_structure():
 
 def test_get_config_default_seconds_per_chunk():
     """Test default_seconds_per_chunk always returns the constant value."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     pattern_clip = AudioClip.from_audio_file(pattern_file)
 
     # Test with default seconds_per_chunk
@@ -467,7 +467,7 @@ def test_get_config_default_seconds_per_chunk():
 
 def test_get_config_sample_rate():
     """Test sample_rate is correct."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     pattern_clip = AudioClip.from_audio_file(pattern_file)
     detector = AudioPatternDetector(audio_clips=[pattern_clip])
 
@@ -478,7 +478,7 @@ def test_get_config_sample_rate():
 
 def test_get_config_min_chunk_size_single_pattern():
     """Test min_chunk_size_seconds for single pattern."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     pattern_clip = AudioClip.from_audio_file(pattern_file)
     detector = AudioPatternDetector(audio_clips=[pattern_clip])
 
@@ -493,7 +493,7 @@ def test_get_config_min_chunk_size_single_pattern():
 def test_get_config_min_chunk_size_multiple_patterns():
     """Test min_chunk_size_seconds is max of all patterns' minimums."""
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",            # Short beep
+        "sample_audios/clips/rthk_beep.apd.toml",            # Short beep
         "sample_audios/clips/cbs_news.wav",             # Longer pattern
         "sample_audios/clips/天空下的彩虹intro.wav",  # Another pattern
     ]
@@ -516,7 +516,7 @@ def test_get_config_min_chunk_size_multiple_patterns():
 
 def test_get_config_clips_info():
     """Test clips dict contains correct per-clip info."""
-    pattern_file = "sample_audios/clips/rthk_beep.wav"
+    pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
     pattern_clip = AudioClip.from_audio_file(pattern_file)
     detector = AudioPatternDetector(audio_clips=[pattern_clip])
 
@@ -542,7 +542,7 @@ def test_get_config_clips_info():
 def test_get_config_clips_multiple_patterns():
     """Test clips dict includes all patterns."""
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",
+        "sample_audios/clips/rthk_beep.apd.toml",
         "sample_audios/clips/cbs_news.wav",
         "sample_audios/clips/天空下的彩虹intro.wav",
     ]
@@ -560,7 +560,7 @@ def test_get_config_clips_multiple_patterns():
 
 def test_get_config_clip_duration():
     """Test clip duration is correctly computed."""
-    beep_clip = AudioClip.from_audio_file("sample_audios/clips/rthk_beep.wav")
+    beep_clip = AudioClip.from_audio_file("sample_audios/clips/rthk_beep.apd.toml")
     detector1 = AudioPatternDetector(audio_clips=[beep_clip])
     config1 = detector1.get_config()
     assert config1["clips"]["rthk_beep"]["duration_seconds"] < 0.5
@@ -576,7 +576,7 @@ def test_get_config_sliding_window_computed_correctly():
     import math
 
     pattern_files = [
-        "sample_audios/clips/rthk_beep.wav",
+        "sample_audios/clips/rthk_beep.apd.toml",
         "sample_audios/clips/cbs_news.wav",
     ]
 
@@ -585,7 +585,7 @@ def test_get_config_sliding_window_computed_correctly():
         detector = AudioPatternDetector(audio_clips=[pattern_clip])
         config = detector.get_config()
 
-        clip_name = Path(pattern_file).stem
+        clip_name = pattern_clip.name
         clip_config = config["clips"][clip_name]
 
         # sliding_window should be ceil of duration

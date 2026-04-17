@@ -58,7 +58,7 @@ class TestLoadWaveFile:
     def test_load_existing_wav_file(self):
         """Test loading an existing wav file."""
         # Use one of the sample files
-        sample_file = "sample_audios/clips/rthk_beep.wav"
+        sample_file = "sample_audios/clips/cbs_news.wav"
         if os.path.exists(sample_file):
             audio = load_wave_file(sample_file, 8000)
             assert isinstance(audio, np.ndarray)
@@ -69,7 +69,7 @@ class TestLoadWaveFile:
 
     def test_load_with_different_sample_rate_resamples(self):
         """Test that loading with different sample rate resamples the audio."""
-        sample_file = "sample_audios/clips/rthk_beep.wav"
+        sample_file = "sample_audios/clips/cbs_news.wav"
         if os.path.exists(sample_file):
             # Load at 8kHz (original rate)
             audio_8k = load_wave_file(sample_file, 8000)
@@ -146,7 +146,7 @@ class TestRoundTrip:
 
     def test_load_sample_file_and_rewrite(self):
         """Test loading a sample file and writing it back."""
-        sample_file = "sample_audios/clips/rthk_beep.wav"
+        sample_file = "sample_audios/clips/cbs_news.wav"
         if not os.path.exists(sample_file):
             pytest.skip("Sample file not found")
 
@@ -189,7 +189,7 @@ class TestAudioUtilities:
     def test_load_wav_file_basic(self):
         """Test loading WAV file."""
         from audio_pattern_detector.audio_utils import load_wav_file
-        sample_file = "sample_audios/clips/rthk_beep.wav"
+        sample_file = "sample_audios/clips/cbs_news.wav"
         if not os.path.exists(sample_file):
             pytest.skip("Sample file not found")
 
@@ -280,7 +280,7 @@ class TestAudioUtilities:
         audio_utils._ffmpeg_available = False
 
         try:
-            sample_file = "sample_audios/clips/rthk_beep.wav"
+            sample_file = "sample_audios/clips/cbs_news.wav"
             if not os.path.exists(sample_file):
                 pytest.skip("Sample file not found")
 

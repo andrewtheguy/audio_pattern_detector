@@ -369,7 +369,7 @@ class TestSlidingWindowWithRealPatterns:
 
         Verifies that using small chunks doesn't affect timestamp accuracy.
         """
-        pattern_file = "sample_audios/clips/rthk_beep.wav"
+        pattern_file = "sample_audios/clips/rthk_beep.apd.toml"
         audio_file = "sample_audios/rthk_section_with_beep.wav"
 
         if not Path(pattern_file).exists() or not Path(audio_file).exists():
