@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Trim 881 hourly captures into two ~30-min show segments via ffmpeg.
+"""Trim RTHK radio1/radio2 hourly captures into two ~30-min show segments.
 
-Consumes JSONL detection results produced by `run_all.py` and writes two
+Consumes JSONL detection results produced by `match_all.py` and writes two
 stream-copied .m4a files per hour under
-/mnt/dasdata/andrewdata/radio_shows/trimmed/m4a/881/<date>/...
+/mnt/dasdata/andrewdata/radio_shows/trimmed/m4a/rthk/<station>/<date>/...
 Pass --opus to instead re-encode as Opus (8 kbps, voip profile) .opus files
-under /mnt/dasdata/andrewdata/radio_shows/trimmed/opus/881/<date>/...
+under /mnt/dasdata/andrewdata/radio_shows/trimmed/opus/rthk/<station>/<date>/...
 """
 
 from __future__ import annotations
@@ -20,14 +20,19 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-HOURLY_DIR = Path("/mnt/dasdata/capture881903/output/hourly/881")
-RESULTS_DIR = Path("./tmp/results/881")
+HOURLY_ROOT = Path("/mnt/dasdata/andrewdata/ftp/rthk/hourly")
+RESULTS_ROOT = Path("./tmp/results/rthk")
 OUTPUT_ROOT = Path("/mnt/dasdata/andrewdata/radio_shows/trimmed")
-OUTPUT_SUBDIR = "881"
+OUTPUT_SUBDIR = "rthk"
+STATIONS = ("radio1", "radio2")
 
-SHOW_END_ANCHORS = {"newsreport", "881903nationalhymnintro"}
-RESIDUAL_THRESHOLD_MS = 5 * 60 * 1000
-MIDPOINT_FALLBACK_MS = 30 * 60 * 1000
+SHOW_END_ANCHORS = {"rthknewsreportcan", "rthknationalhymnintro"}
+
+HALF_HOUR_MS = 30 * 60 * 1000
+ONE_HOUR_MS = 60 * 60 * 1000
+# RTHK shows align to the half-hour / hour marks; accept end-anchors within
+# this window around each boundary, otherwise fall back to the mark itself.
+END_ANCHOR_TOLERANCE_MS = 5 * 60 * 1000
 # Non-end anchors within this window of a show end are spurious (they fall
 # inside the show-end transition) and must not be picked as the show start.
 MIN_SHOW_LENGTH_MS = 15 * 60 * 1000
@@ -92,21 +97,29 @@ def parse_jsonl(path: Path) -> tuple[list[Detection], int]:
 
 
 def compute_segments(detections: list[Detection], total_time_ms: int) -> Segments:
-    """Apply the show-segmentation rules from the plan."""
+    """Apply RTHK's half-hour/hour-anchored segmentation rules."""
     end_anchors = [d for d in detections if d.clip_name in SHOW_END_ANCHORS]
     non_end_anchors = [d for d in detections if d.clip_name not in SHOW_END_ANCHORS]
 
-    # show1_end: first show-end anchor past the residual threshold; else 30:00.
-    show1_end = MIDPOINT_FALLBACK_MS
+    # show1_end: earliest end-anchor within ±TOLERANCE of the 30-min mark;
+    # else fall back to exactly 30:00. Detections are already in timestamp
+    # order, so the first match is the earliest — which naturally picks
+    # whichever of rthknewsreportcan / rthknationalhymnintro comes first.
+    show1_end = HALF_HOUR_MS
+    w1_lo = HALF_HOUR_MS - END_ANCHOR_TOLERANCE_MS
+    w1_hi = HALF_HOUR_MS + END_ANCHOR_TOLERANCE_MS
     for d in end_anchors:
-        if d.timestamp_ms >= RESIDUAL_THRESHOLD_MS:
+        if w1_lo <= d.timestamp_ms <= w1_hi:
             show1_end = d.timestamp_ms
             break
 
-    # show2_end: first show-end anchor strictly after show1_end; else file end.
-    show2_end = total_time_ms
+    # show2_end: earliest end-anchor within ±TOLERANCE of the 60-min mark
+    # and strictly after show1_end; else fall back to min(total, 60:00).
+    show2_end = min(total_time_ms, ONE_HOUR_MS)
+    w2_lo = ONE_HOUR_MS - END_ANCHOR_TOLERANCE_MS
+    w2_hi = ONE_HOUR_MS + END_ANCHOR_TOLERANCE_MS
     for d in end_anchors:
-        if d.timestamp_ms > show1_end:
+        if d.timestamp_ms > show1_end and w2_lo <= d.timestamp_ms <= w2_hi:
             show2_end = d.timestamp_ms
             break
 
@@ -116,7 +129,7 @@ def compute_segments(detections: list[Detection], total_time_ms: int) -> Segment
     show1_start = 0
     for d in non_end_anchors:
         if d.timestamp_ms < show1_cutoff:
-            show1_start = d.timestamp_ms  # keep overwriting to get the latest
+            show1_start = d.timestamp_ms
 
     # show2_start: latest non-end anchor in (show1_end, show2_end - 15min];
     # else show1_end.
@@ -179,44 +192,51 @@ def ffmpeg_trim_opus(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
     subprocess.run(cmd, check=True, stdin=subprocess.DEVNULL)
 
 
-def iter_hourly_m4as() -> Iterator[Path]:
-    yield from sorted(HOURLY_DIR.rglob("*.m4a"))
+def iter_rthk_m4as(station: str) -> Iterator[Path]:
+    yield from sorted((HOURLY_ROOT / station).rglob("*.m4a"))
 
 
-_HOURLY_TS_RE = re.compile(r"_(\d{14})$")
+_RTHK_TS_RE = re.compile(r"_(\d{4})-(\d{2})-(\d{2})_(\d{2})_to_\d{2}$")
 
 
-def parse_hourly_base_dt(stem: str) -> datetime | None:
-    """Extract the YYYYMMDDHHMMSS suffix from the hourly filename stem."""
-    m = _HOURLY_TS_RE.search(stem)
+def parse_rthk_base_dt(stem: str) -> datetime | None:
+    """Extract the capture-hour start datetime from an RTHK filename stem."""
+    m = _RTHK_TS_RE.search(stem)
     if not m:
         return None
-    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S")
+    y, mo, d, h = (int(g) for g in m.groups())
+    return datetime(y, mo, d, h, 0, 0)
 
 
 def show_output_name(
-    base_dt: datetime, start_ms: int, end_ms: int, ext: str
+    station: str, base_dt: datetime, start_ms: int, end_ms: int, ext: str
 ) -> str:
     begin = base_dt + timedelta(milliseconds=start_ms)
     end = base_dt + timedelta(milliseconds=end_ms)
     return (
-        f"segments_881_{begin:%Y%m%d}_{begin:%H%M%S}_{end:%H%M%S}.{ext}"
+        f"segments_{station}_{begin:%Y%m%d}_{begin:%H%M%S}_{end:%H%M%S}.{ext}"
     )
 
 
-def process_hour(m4a: Path, dry_run: bool, opus: bool) -> None:
-    rel = m4a.relative_to(HOURLY_DIR)
-    jsonl_path = RESULTS_DIR / rel.with_suffix(".jsonl")
+def process_hour(station: str, m4a: Path, dry_run: bool, opus: bool) -> None:
+    station_hourly = HOURLY_ROOT / station
+    station_results = RESULTS_ROOT / station
+
+    rel = m4a.relative_to(station_hourly)
+    jsonl_path = station_results / rel.with_suffix(".jsonl")
     try:
         detections, total_time_ms = parse_jsonl(jsonl_path)
     except JsonlError as e:
-        print(f"SKIP {rel}: {e}", file=sys.stderr)
+        print(f"SKIP {station}/{rel}: {e}", file=sys.stderr)
         return
     segments = compute_segments(detections, total_time_ms)
 
-    base_dt = parse_hourly_base_dt(rel.stem)
+    base_dt = parse_rthk_base_dt(rel.stem)
     if base_dt is None:
-        print(f"SKIP {rel}: cannot parse YYYYMMDDHHMMSS from filename", file=sys.stderr)
+        print(
+            f"SKIP {station}/{rel}: cannot parse YYYY-MM-DD_HH_to_HH from filename",
+            file=sys.stderr,
+        )
         return
 
     s1_start, s1_end = segments.show1
@@ -224,12 +244,16 @@ def process_hour(m4a: Path, dry_run: bool, opus: bool) -> None:
 
     ext = "opus" if opus else "m4a"
     trim = ffmpeg_trim_opus if opus else ffmpeg_trim_copy
-    output_dir = OUTPUT_ROOT / ext / OUTPUT_SUBDIR / rel.parent
-    show1_out = output_dir / show_output_name(base_dt, s1_start, s1_end, ext)
-    show2_out = output_dir / show_output_name(base_dt, s2_start, s2_end, ext)
+    output_dir = OUTPUT_ROOT / ext / OUTPUT_SUBDIR / station / rel.parent
+    show1_out = output_dir / show_output_name(
+        station, base_dt, s1_start, s1_end, ext
+    )
+    show2_out = output_dir / show_output_name(
+        station, base_dt, s2_start, s2_end, ext
+    )
 
     print(
-        f"{rel}\n"
+        f"{station}/{rel}\n"
         f"  show1: {format_ms(s1_start)} - {format_ms(s1_end)}  -> {show1_out}\n"
         f"  show2: {format_ms(s2_start)} - {format_ms(s2_end)}  -> {show2_out}"
     )
@@ -238,22 +262,34 @@ def process_hour(m4a: Path, dry_run: bool, opus: bool) -> None:
         return
 
     if not m4a.is_file():
-        print(f"SKIP {rel}: source audio missing", file=sys.stderr)
+        print(f"SKIP {station}/{rel}: source audio missing", file=sys.stderr)
         return
 
     if s1_end > s1_start:
         trim(m4a, show1_out, s1_start, s1_end)
     else:
-        print(f"SKIP show1 for {rel}: non-positive duration", file=sys.stderr)
+        print(
+            f"SKIP show1 for {station}/{rel}: non-positive duration",
+            file=sys.stderr,
+        )
 
     if s2_end > s2_start:
         trim(m4a, show2_out, s2_start, s2_end)
     else:
-        print(f"SKIP show2 for {rel}: non-positive duration", file=sys.stderr)
+        print(
+            f"SKIP show2 for {station}/{rel}: non-positive duration",
+            file=sys.stderr,
+        )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
+    _ = ap.add_argument(
+        "--station",
+        required=True,
+        choices=STATIONS,
+        help="Which RTHK station to process.",
+    )
     _ = ap.add_argument(
         "--dry-run",
         action="store_true",
@@ -265,11 +301,12 @@ def main() -> int:
         help="Re-encode as Opus (8 kbps, voip profile) instead of stream-copying to .m4a.",
     )
     args = ap.parse_args()
+    station: str = str(args.station)
     dry_run: bool = bool(args.dry_run)
     opus: bool = bool(args.opus)
 
-    for m4a in iter_hourly_m4as():
-        process_hour(m4a, dry_run, opus)
+    for m4a in iter_rthk_m4as(station):
+        process_hour(station, m4a, dry_run, opus)
     return 0
 
 
