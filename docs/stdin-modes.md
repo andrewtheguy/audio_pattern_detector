@@ -62,152 +62,71 @@ audio-pattern-detector match --multiplexed-stdin < payload.bin
 
 ### Node.js Example
 
+Patterns are written synchronously (they are small), then the audio file is
+piped in from a read stream so the full payload is never held in memory.
+Output is parsed line-by-line with `readline` so JSONL events are handled as
+soon as they arrive.
+
 ```javascript
-const { spawn } = require('child_process');
-const fs = require('fs');
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const readline = require('node:readline');
 
-function buildMultiplexedPayload(patterns, audioData) {
-  const chunks = [];
-
-  // Number of patterns (uint32 LE)
-  const countBuf = Buffer.alloc(4);
-  countBuf.writeUInt32LE(patterns.length);
-  chunks.push(countBuf);
-
-  // Each pattern: name_len + name + data_len + wav_data
-  for (const { name, wavData } of patterns) {
-    const nameBuf = Buffer.from(name, 'utf8');
-    const nameLenBuf = Buffer.alloc(4);
-    nameLenBuf.writeUInt32LE(nameBuf.length);
-    const dataLenBuf = Buffer.alloc(4);
-    dataLenBuf.writeUInt32LE(wavData.length);
-
-    chunks.push(nameLenBuf, nameBuf, dataLenBuf, wavData);
-  }
-
-  // Audio stream
-  chunks.push(audioData);
-  return Buffer.concat(chunks);
+function writeUInt32LE(stream, value) {
+  const buf = Buffer.alloc(4);
+  buf.writeUInt32LE(value);
+  stream.write(buf);
 }
 
-// Build payload with multiple patterns
+function writePatternHeader(stream, patterns) {
+  writeUInt32LE(stream, patterns.length);
+  for (const { name, wavPath } of patterns) {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const { size: wavSize } = fs.statSync(wavPath);
+    writeUInt32LE(stream, nameBuf.length);
+    stream.write(nameBuf);
+    writeUInt32LE(stream, wavSize);
+    // Patterns are small — read once and write in one go.
+    stream.write(fs.readFileSync(wavPath));
+  }
+}
+
 const patterns = [
-  { name: 'beep', wavData: fs.readFileSync('patterns/beep.wav') },
-  { name: 'tone', wavData: fs.readFileSync('patterns/tone.wav') },
+  { name: 'beep', wavPath: 'patterns/beep.wav' },
+  { name: 'tone', wavPath: 'patterns/tone.wav' },
 ];
-const audioData = fs.readFileSync('input.wav');
-const payload = buildMultiplexedPayload(patterns, audioData);
 
-// Spawn detector
 const detector = spawn('audio-pattern-detector', ['match', '--multiplexed-stdin']);
-detector.stdin.end(payload);
 
-// Parse JSONL output
-detector.stdout.on('data', (data) => {
-  data.toString().trim().split('\n').forEach(line => {
-    const event = JSON.parse(line);
-    if (event.type === 'pattern_detected') {
-      console.log(`Detected ${event.clip_name} at ${event.timestamp_formatted}`);
-    }
-  });
+writePatternHeader(detector.stdin, patterns);
+
+// Stream the audio file so it never sits fully in memory. `end: true`
+// closes stdin when the file ends, signalling EOF to the detector.
+fs.createReadStream('input.wav').pipe(detector.stdin);
+
+readline.createInterface({ input: detector.stdout }).on('line', (line) => {
+  if (!line) return;
+  const event = JSON.parse(line);
+  if (event.type === 'pattern_detected') {
+    console.log(`Detected ${event.clip_name} at ${event.timestamp_formatted}`);
+  }
+});
+
+detector.on('exit', (code) => {
+  if (code !== 0) process.exit(code ?? 1);
 });
 ```
 
-### Python Example
+For a live capture (e.g. ffmpeg transcoding a radio stream to WAV), replace
+`fs.createReadStream('input.wav')` with the ffmpeg child process's stdout:
 
-```python
-import subprocess
-import struct
-import json
-
-def build_multiplexed_payload(patterns: list[tuple[str, bytes]], audio_data: bytes) -> bytes:
-    payload = bytearray()
-
-    # Number of patterns
-    payload.extend(struct.pack('<I', len(patterns)))
-
-    # Each pattern
-    for name, wav_data in patterns:
-        name_bytes = name.encode('utf-8')
-        payload.extend(struct.pack('<I', len(name_bytes)))
-        payload.extend(name_bytes)
-        payload.extend(struct.pack('<I', len(wav_data)))
-        payload.extend(wav_data)
-
-    # Audio stream
-    payload.extend(audio_data)
-    return bytes(payload)
-
-# Build payload
-patterns = [
-    ('beep', open('patterns/beep.wav', 'rb').read()),
-    ('tone', open('patterns/tone.wav', 'rb').read()),
-]
-audio_data = open('input.wav', 'rb').read()
-payload = build_multiplexed_payload(patterns, audio_data)
-
-# Run detector
-proc = subprocess.run(
-    ['audio-pattern-detector', 'match', '--multiplexed-stdin'],
-    input=payload,
-    capture_output=True,
-)
-
-# Parse JSONL output
-for line in proc.stdout.decode().strip().split('\n'):
-    event = json.loads(line)
-    print(event)
-```
-
-### Go Example
-
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/binary"
-    "fmt"
-    "os"
-    "os/exec"
-)
-
-func buildPayload(patterns []struct{ Name string; Data []byte }, audioData []byte) []byte {
-    var buf bytes.Buffer
-
-    // Number of patterns
-    binary.Write(&buf, binary.LittleEndian, uint32(len(patterns)))
-
-    // Each pattern
-    for _, p := range patterns {
-        nameBytes := []byte(p.Name)
-        binary.Write(&buf, binary.LittleEndian, uint32(len(nameBytes)))
-        buf.Write(nameBytes)
-        binary.Write(&buf, binary.LittleEndian, uint32(len(p.Data)))
-        buf.Write(p.Data)
-    }
-
-    // Audio stream
-    buf.Write(audioData)
-    return buf.Bytes()
-}
-
-func main() {
-    beepData, _ := os.ReadFile("patterns/beep.wav")
-    audioData, _ := os.ReadFile("input.wav")
-
-    patterns := []struct{ Name string; Data []byte }{
-        {"beep", beepData},
-    }
-
-    payload := buildPayload(patterns, audioData)
-
-    cmd := exec.Command("audio-pattern-detector", "match", "--multiplexed-stdin")
-    cmd.Stdin = bytes.NewReader(payload)
-    output, _ := cmd.Output()
-
-    fmt.Println(string(output))
-}
+```javascript
+const ffmpeg = spawn('ffmpeg', [
+  '-i', 'https://example.com/stream.m3u8',
+  '-f', 'wav', '-acodec', 'pcm_s16le', '-ac', '1', '-ar', '8000',
+  'pipe:',
+]);
+ffmpeg.stdout.pipe(detector.stdin);
 ```
 
 **Note**: When using `--multiplexed-stdin`:
