@@ -5,7 +5,7 @@ HOURLY_DIR="/mnt/dasdata/capture881903/output/hourly"
 PATTERN_FOLDER="/mnt/dasdata/andrewdata/audio_clips"
 OUTPUT_BASE="./tmp/results"
 
-find "$HOURLY_DIR" -name '*.m4a' -type f | sort | while IFS= read -r m4a; do
+find "$HOURLY_DIR" -name '*.m4a' -type f -path '*/903/*' | sort | while IFS= read -r m4a; do
     rel="${m4a#$HOURLY_DIR/}"
     dir="$(dirname "$rel")"
     base="$(basename "$rel" .m4a)"
