@@ -111,23 +111,40 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 3. **Same thresholds** — `similarity > 0.03` rejects, `pearson_r >= 0.90` accepts.
 
-**Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. `rthk_beep.wav`) need their own special-case path instead.
+**Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. clean pure tones like the RTHK hourly beep) need their own special-case path instead — see `.apd` pattern configs below.
 
-### RTHK Beep (Pure Tone Special Case)
+### `.apd` Pattern Configs and Pure Tone Verification
 
-The `rthk_beep` clip is handled independently from the short clip path. It is triggered by clip name (`rthk_beep`), not by FFT analysis of the clip content. The `rthk_beep.wav` file does not cross-correlate well enough for the normal verification path, so it uses a dedicated pure tone verification instead.
+Patterns that need a special detection strategy use a `.apd` file instead of `.wav`. The `.apd` format is JSON-with-comments (JSONC) and declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
 
-When `clip_name == "rthk_beep"`:
-1. The dominant frequency is computed via `get_pure_tone_frequency()` during initialization.
+Example (`sample_audios/clips/rthk_beep.apd`):
+
+```jsonc
+{
+  "strategy": "pure_tone",
+  "description": "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s",
+  "generator": {
+    "type": "sine",
+    "frequency_hz": 1040.19,
+    "duration_seconds": 0.228375,
+    "amplitude": 1.0
+  }
+}
+```
+
+The only strategy currently implemented is `pure_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
+
+When a clip's `strategy == "pure_tone"`:
+1. The dominant frequency declared in `generator.frequency_hz` is stored as the clip's strategy parameter during initialisation (no FFT re-derivation is needed, though `get_pure_tone_frequency()` is used as a fallback if absent).
 2. At verification time, `_verify_pure_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
 3. Flanks (adjacent segments) must have low purity to reject neighboring tones.
 4. Multiple acceptance criteria with varying strictness levels handle different signal conditions.
 
-This path is completely independent of the short clip path — it could theoretically be used for clips of any length, but currently only `rthk_beep` triggers it.
+Because the clip is synthesised at the target sample rate, a single `.apd` file works at 8 kHz, 16 kHz, or any other supported rate without needing a per-rate variant.
 
 ## Pure Tone Classification
 
-A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification is only used for the `rthk_beep` clip.
+A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification backs the `pure_tone` strategy declared via `.apd`.
 
 ## Timestamp Conversion
 

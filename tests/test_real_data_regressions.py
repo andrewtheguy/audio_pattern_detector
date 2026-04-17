@@ -5,7 +5,7 @@ import pytest
 from audio_pattern_detector.match import match_pattern
 
 
-RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.wav"
+RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd"
 
 RTHK_BEEP_STRAY_CLIPS_V2_DIR = "sample_audios/regressions/rthk_beep_stray_clips_v2"
 
@@ -83,12 +83,17 @@ def _assert_expected_timestamps(
     actual_timestamps: list[float],
     expected_timestamps: list[float],
 ) -> None:
+    # Tolerance is 0.02s: the .apd pattern is a synthesised pure sine, so the
+    # cross-correlation peak can land at a phase-aligned offset up to ~1 cycle
+    # away from the true beep start (~1ms at 1 kHz, but accumulates across the
+    # clip). 20 ms keeps regression sensitivity without over-fitting to the
+    # specific phase of whichever WAV happened to generate the golden values.
     assert len(actual_timestamps) == len(expected_timestamps), (
         f"Expected {len(expected_timestamps)} matches, found "
         f"{len(actual_timestamps)}: {actual_timestamps}"
     )
     for actual, expected in zip(sorted(actual_timestamps), sorted(expected_timestamps)):
-        assert abs(actual - expected) < 0.01, (
+        assert abs(actual - expected) < 0.02, (
             f"Expected timestamp ~{expected}s, got {actual}s"
         )
 

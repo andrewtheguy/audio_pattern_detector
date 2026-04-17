@@ -94,7 +94,7 @@ def test_match_audio_file_returns_jsonl():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
     )
     assert result.returncode == 0
 
@@ -133,7 +133,7 @@ def test_match_chunk_seconds_argument_passed():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         "--chunk-seconds", "auto",
     )
     assert result.returncode == 0
@@ -142,7 +142,7 @@ def test_match_chunk_seconds_argument_passed():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         "--chunk-seconds", "10",
     )
     assert result.returncode == 0
@@ -153,7 +153,7 @@ def test_match_chunk_seconds_invalid_value():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         "--chunk-seconds", "invalid",
         check=False,
     )
@@ -182,7 +182,7 @@ def test_match_stdin_reads_wav():
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         stdin_data=wav_data,
     )
     assert result.returncode == 0
@@ -240,7 +240,7 @@ def test_match_jsonl_output_format():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
     )
     assert result.returncode == 0
 
@@ -274,7 +274,7 @@ def test_match_jsonl_timestamp_format_ms():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         "--timestamp-format", "ms",
     )
     assert result.returncode == 0
@@ -298,7 +298,7 @@ def test_match_jsonl_timestamp_format_formatted():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         "--timestamp-format", "formatted",
     )
     assert result.returncode == 0
@@ -325,7 +325,7 @@ def test_match_jsonl_start_event_source():
     result = run_cli(
         "match",
         "sample_audios/rthk_section_with_beep.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
     )
     start_event = json.loads(result.stdout.strip().split("\n")[0])
     assert "rthk_section_with_beep.wav" in start_event["source"]
@@ -336,7 +336,7 @@ def test_match_jsonl_start_event_source():
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         stdin_data=wav_data,
     )
     start_event = json.loads(result.stdout.decode().strip().split("\n")[0])
@@ -368,7 +368,7 @@ def test_show_config_returns_json():
     """Test show-config returns valid JSON with expected structure."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
     )
     assert result.returncode == 0
 
@@ -397,7 +397,7 @@ def test_show_config_clip_info():
     """Test show-config returns per-clip configuration."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
     )
     config = json.loads(result.stdout)
 
@@ -417,7 +417,7 @@ def test_match_nonexistent_audio_file():
     result = run_cli(
         "match",
         "nonexistent.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         check=False,
     )
     assert result.returncode != 0
@@ -438,7 +438,7 @@ def test_match_no_audio_source():
     """Test match without any audio source."""
     result = run_cli(
         "match",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         check=False,
     )
     assert result.returncode != 0
@@ -502,7 +502,7 @@ def test_match_16khz_audio_auto_converts():
     result = run_cli(
         "match",
         "sample_audios/test_16khz/rthk_section_with_beep_16k.wav",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
     )
     assert result.returncode == 0
 
@@ -526,7 +526,7 @@ def test_stdin_wav_with_wrong_sample_rate_rejected():
     result = run_cli_binary(
         "match",
         "--stdin",
-        "--pattern-file", "sample_audios/clips/rthk_beep.wav",
+        "--pattern-file", "sample_audios/clips/rthk_beep.apd",
         stdin_data=wav_data,
         check=False,
     )
@@ -576,16 +576,17 @@ def test_multiplexed_stdin_help():
 
 def test_multiplexed_stdin_single_pattern_wav_audio():
     """Test --multiplexed-stdin with single pattern and WAV audio."""
-    # Load pattern WAV
-    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+    # The multiplexed-stdin protocol is WAV-only, so this uses the cbs_news
+    # .wav pattern (not the .apd pure-tone pattern).
+    with open("sample_audios/clips/cbs_news.wav", "rb") as f:
         pattern_data = f.read()
 
     # Convert audio to WAV
-    audio_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+    audio_data = _convert_file_to_wav_stdout("sample_audios/cbs_news_audio_section.wav")
 
     # Build multiplexed payload
     payload = _build_multiplexed_payload(
-        patterns=[("rthk_beep", pattern_data)],
+        patterns=[("cbs_news", pattern_data)],
         audio_data=audio_data,
     )
 
@@ -608,25 +609,24 @@ def test_multiplexed_stdin_single_pattern_wav_audio():
     # Should have pattern_detected events
     pattern_events = [e for e in events if e["type"] == "pattern_detected"]
     assert len(pattern_events) > 0
-    assert pattern_events[0]["clip_name"] == "rthk_beep"
+    assert pattern_events[0]["clip_name"] == "cbs_news"
 
 
 def test_multiplexed_stdin_multiple_patterns():
     """Test --multiplexed-stdin with multiple patterns."""
-    # Load pattern WAVs
-    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
-        pattern1_data = f.read()
+    # The multiplexed-stdin protocol is WAV-only, so both patterns are .wav.
     with open("sample_audios/clips/cbs_news.wav", "rb") as f:
+        pattern1_data = f.read()
+    with open("sample_audios/clips/天空下的彩虹intro.wav", "rb") as f:
         pattern2_data = f.read()
 
-    # Convert audio to WAV (this audio has RTHK beep but not CBS)
-    audio_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+    # Match against CBS audio: should detect cbs_news, not the rainbow intro.
+    audio_data = _convert_file_to_wav_stdout("sample_audios/cbs_news_audio_section.wav")
 
-    # Build multiplexed payload with two patterns
     payload = _build_multiplexed_payload(
         patterns=[
-            ("rthk_beep", pattern1_data),
-            ("cbs_news", pattern2_data),
+            ("cbs_news", pattern1_data),
+            ("rainbow_intro", pattern2_data),
         ],
         audio_data=audio_data,
     )
@@ -641,20 +641,20 @@ def test_multiplexed_stdin_multiple_patterns():
     lines = result.stdout.decode().strip().split("\n")
     events = [json.loads(line) for line in lines]
 
-    # Should detect rthk_beep but not cbs_news
+    # Should detect cbs_news but not rainbow_intro
     pattern_events = [e for e in events if e["type"] == "pattern_detected"]
     clip_names = {e["clip_name"] for e in pattern_events}
-    assert "rthk_beep" in clip_names
+    assert "cbs_news" in clip_names
 
 
 def test_multiplexed_stdin_requires_no_pattern_file():
     """Test --multiplexed-stdin does not require --pattern-file."""
-    # Load pattern WAV
-    with open("sample_audios/clips/rthk_beep.wav", "rb") as f:
+    # Load pattern WAV (multiplexed-stdin protocol is WAV-only).
+    with open("sample_audios/clips/cbs_news.wav", "rb") as f:
         pattern_data = f.read()
 
     # Convert audio to WAV
-    audio_data = _convert_file_to_wav_stdout("sample_audios/rthk_section_with_beep.wav")
+    audio_data = _convert_file_to_wav_stdout("sample_audios/cbs_news_audio_section.wav")
 
     # Build multiplexed payload
     payload = _build_multiplexed_payload(

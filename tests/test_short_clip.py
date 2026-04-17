@@ -101,36 +101,41 @@ def test_short_chirp_no_false_positives_in_noise():
     assert peak_times.get("test_chirp", []) == []
 
 
-def test_rthk_beep_still_uses_pure_tone_path():
-    """Verify that a clip named 'rthk_beep' triggers pure tone detection by name."""
-    # Create a pure tone clip named 'rthk_beep'
+def test_pure_tone_strategy_triggers_pure_tone_path():
+    """A clip with strategy='pure_tone' routes to pure tone detection."""
     duration = 0.125
     freq = 1000.0
     n = int(duration * SR)
     t = np.arange(n, dtype=np.float32) / SR
     tone = (0.9 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
 
-    clip = _audio_clip_from_array("rthk_beep", tone)
+    clip = AudioClip(
+        name="my_beep",
+        audio=np.asarray(tone, dtype=np.float32),
+        sample_rate=SR,
+        strategy="pure_tone",
+        strategy_params={"dominant_frequency_hz": freq},
+    )
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
 
-    assert "rthk_beep" in detector._pure_tone_frequencies, \
-        "rthk_beep should have a pure tone frequency set"
+    assert "my_beep" in detector._pure_tone_frequencies, \
+        "strategy='pure_tone' should register a dominant frequency"
 
 
-def test_non_rthk_pure_tone_uses_normal_path():
-    """A pure tone clip NOT named 'rthk_beep' should go through normal path."""
+def test_pure_tone_clip_without_strategy_uses_normal_path():
+    """A pure-tone clip without strategy='pure_tone' must NOT trigger the pure tone path."""
     duration = 0.125
     freq = 1000.0
     n = int(duration * SR)
     t = np.arange(n, dtype=np.float32) / SR
     tone = (0.9 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
 
-    # Verify it IS a pure tone
+    # Verify it IS a pure tone (audio content).
     assert get_pure_tone_frequency(tone, SR) is not None
 
-    # But when named something else, it should NOT trigger pure tone path
+    # Without strategy metadata, dispatch defaults to the normal path.
     clip = _audio_clip_from_array("other_tone", tone)
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
 
     assert "other_tone" not in detector._pure_tone_frequencies, \
-        "Non-rthk_beep clips should not have a pure tone frequency"
+        "Clips without strategy='pure_tone' should not route to the pure tone path"
