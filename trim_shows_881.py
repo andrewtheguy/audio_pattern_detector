@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Trim 881 hourly captures into two ~30-min show segments via ffmpeg.
 
-Consumes JSONL detection results produced by `run_all.sh` and writes two
+Consumes JSONL detection results produced by `run_all.py` and writes two
 stream-copied .m4a files per hour under ./tmp/trimmed/881/<date>/...
 """
 
