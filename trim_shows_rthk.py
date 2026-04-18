@@ -6,6 +6,13 @@ stream-copied .m4a files per hour under
 /mnt/dasdata/andrewdata/radio_shows/trimmed/m4a/rthk/<station>/<date>/...
 Pass --opus to instead re-encode as Opus (8 kbps, voip profile) .opus files
 under /mnt/dasdata/andrewdata/radio_shows/trimmed/opus/rthk/<station>/<date>/...
+
+Show-end selection:
+- Daytime hours (06:00–23:59 capture start): earliest of rthknewsreportcan /
+  rthknationalhymnintro within ±5 min of the 30-min and 60-min marks.
+- Overnight hours (00:00–05:59 capture start): last rthk_beep within ±5 min
+  of those marks. Requires rthk_beep.apd.toml to be present in the station's
+  pattern folder so the detector produces `rthk_beep` entries in the JSONL.
 """
 
 from __future__ import annotations
@@ -26,7 +33,11 @@ OUTPUT_ROOT = Path("/mnt/dasdata/andrewdata/radio_shows/trimmed")
 OUTPUT_SUBDIR = "rthk"
 STATIONS = ("radio1", "radio2")
 
-SHOW_END_ANCHORS = {"rthknewsreportcan", "rthknationalhymnintro"}
+DAYTIME_END_ANCHORS = {"rthknewsreportcan", "rthknationalhymnintro"}
+# Overnight (00:00–05:59) the news-report jingle is absent; the only reliable
+# show-end marker is the hourly/half-hourly station beep.
+OVERNIGHT_END_ANCHORS = {"rthk_beep"}
+OVERNIGHT_HOURS = range(0, 6)
 
 HALF_HOUR_MS = 30 * 60 * 1000
 ONE_HOUR_MS = 60 * 60 * 1000
@@ -96,32 +107,43 @@ def parse_jsonl(path: Path) -> tuple[list[Detection], int]:
     return detections, total_time_ms
 
 
-def compute_segments(detections: list[Detection], total_time_ms: int) -> Segments:
-    """Apply RTHK's half-hour/hour-anchored segmentation rules."""
-    end_anchors = [d for d in detections if d.clip_name in SHOW_END_ANCHORS]
-    non_end_anchors = [d for d in detections if d.clip_name not in SHOW_END_ANCHORS]
+def compute_segments(
+    detections: list[Detection],
+    total_time_ms: int,
+    end_anchor_names: set[str],
+    pick_last: bool,
+) -> Segments:
+    """Apply RTHK's half-hour/hour-anchored segmentation rules.
 
-    # show1_end: earliest end-anchor within ±TOLERANCE of the 30-min mark;
-    # else fall back to exactly 30:00. Detections are already in timestamp
-    # order, so the first match is the earliest — which naturally picks
-    # whichever of rthknewsreportcan / rthknationalhymnintro comes first.
+    `pick_last=False` picks the earliest anchor in each boundary window
+    (daytime: whichever of rthknewsreportcan / rthknationalhymnintro comes
+    first). `pick_last=True` picks the latest (overnight: the last beep
+    inside the window, since beeps cluster around the exact boundary).
+    """
+    end_anchors = [d for d in detections if d.clip_name in end_anchor_names]
+    non_end_anchors = [d for d in detections if d.clip_name not in end_anchor_names]
+
+    # show1_end: end-anchor within ±TOLERANCE of the 30-min mark;
+    # else fall back to exactly 30:00.
     show1_end = HALF_HOUR_MS
     w1_lo = HALF_HOUR_MS - END_ANCHOR_TOLERANCE_MS
     w1_hi = HALF_HOUR_MS + END_ANCHOR_TOLERANCE_MS
     for d in end_anchors:
         if w1_lo <= d.timestamp_ms <= w1_hi:
             show1_end = d.timestamp_ms
-            break
+            if not pick_last:
+                break
 
-    # show2_end: earliest end-anchor within ±TOLERANCE of the 60-min mark
-    # and strictly after show1_end; else fall back to min(total, 60:00).
+    # show2_end: end-anchor within ±TOLERANCE of the 60-min mark and strictly
+    # after show1_end; else fall back to min(total, 60:00).
     show2_end = min(total_time_ms, ONE_HOUR_MS)
     w2_lo = ONE_HOUR_MS - END_ANCHOR_TOLERANCE_MS
     w2_hi = ONE_HOUR_MS + END_ANCHOR_TOLERANCE_MS
     for d in end_anchors:
         if d.timestamp_ms > show1_end and w2_lo <= d.timestamp_ms <= w2_hi:
             show2_end = d.timestamp_ms
-            break
+            if not pick_last:
+                break
 
     # show1_start: latest non-end anchor strictly before show1_end and at
     # least MIN_SHOW_LENGTH_MS before it; else 0.
@@ -229,7 +251,6 @@ def process_hour(station: str, m4a: Path, dry_run: bool, opus: bool) -> None:
     except JsonlError as e:
         print(f"SKIP {station}/{rel}: {e}", file=sys.stderr)
         return
-    segments = compute_segments(detections, total_time_ms)
 
     base_dt = parse_rthk_base_dt(rel.stem)
     if base_dt is None:
@@ -238,6 +259,12 @@ def process_hour(station: str, m4a: Path, dry_run: bool, opus: bool) -> None:
             file=sys.stderr,
         )
         return
+
+    overnight = base_dt.hour in OVERNIGHT_HOURS
+    end_anchor_names = OVERNIGHT_END_ANCHORS if overnight else DAYTIME_END_ANCHORS
+    segments = compute_segments(
+        detections, total_time_ms, end_anchor_names, pick_last=overnight
+    )
 
     s1_start, s1_end = segments.show1
     s2_start, s2_end = segments.show2
