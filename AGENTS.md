@@ -2,6 +2,7 @@ no backward compatibility, so feel free to make breaking changes as needed. Just
 do `uv run basedpyright` `uv run ruff check` after changes to make sure code style is correct and then `uv run pytest` as needed.
 
 - Use `./tmp` as the temporary working directory for debug output, scratch files, etc. It is gitignored.
+- Always use uv for python commands to avoid trampling or breaking the system python environment.
 
 ## Native helper (Rust)
 
