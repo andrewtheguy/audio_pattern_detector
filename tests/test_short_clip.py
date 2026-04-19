@@ -122,6 +122,27 @@ def test_pure_tone_strategy_triggers_pure_tone_path():
         "strategy='pure_tone' should register a dominant frequency"
 
 
+def test_marker_tone_strategy_triggers_tone_path():
+    """A clip with strategy='marker_tone' routes to the tone verifier path."""
+    duration = 0.125
+    freq = 1000.0
+    n = int(duration * SR)
+    t = np.arange(n, dtype=np.float32) / SR
+    tone = (0.9 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
+
+    clip = AudioClip(
+        name="my_marker",
+        audio=np.asarray(tone, dtype=np.float32),
+        sample_rate=SR,
+        strategy="marker_tone",
+        strategy_params={"dominant_frequency_hz": freq},
+    )
+    detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
+
+    assert "my_marker" in detector._pure_tone_frequencies, \
+        "strategy='marker_tone' should register a dominant frequency"
+
+
 def test_pure_tone_clip_without_strategy_uses_normal_path():
     """A pure-tone clip without strategy='pure_tone' must NOT trigger the pure tone path."""
     duration = 0.125
