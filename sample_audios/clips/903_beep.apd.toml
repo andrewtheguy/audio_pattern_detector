@@ -1,0 +1,16 @@
+# 903_beep: half-hour marker tone seen in capture 903 AAC hour files.
+# Uses the marker_tone verification strategy because a short clean sine does
+# not cross-correlate reliably enough against lossy airtime audio.
+#
+# The clip is synthesised from frequency + duration at the target sample
+# rate, so a single .apd.toml works at 8 kHz, 16 kHz, or any other rate.
+
+strategy = "marker_tone"
+description = "Capture 903 marker beep - ~1062 Hz pure tone, ~0.153s"
+
+[generator]
+type = "sine"
+# Measured from /mnt/dasdata/andrewdata/audio_clips/short/881903beep.wav.
+frequency_hz = 1061.98
+duration_seconds = 0.152875
+amplitude = 1.0

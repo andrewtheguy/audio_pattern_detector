@@ -4,7 +4,7 @@ This document describes how audio pattern detection works, from raw audio data t
 
 ## Overview
 
-The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths: a normal correlation-envelope path (for all clips including short ones) and a special pure-tone path (triggered by clip name `rthk_beep`).
+The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths: a normal correlation-envelope path (for all clips including short ones) and strategy-specific tone verification paths for `.apd.toml` marker clips.
 
 ## Pipeline
 
@@ -23,8 +23,8 @@ Raw audio stream (float32 PCM)
         |
    For each candidate peak:
         |
-   ┌─ clip name == "rthk_beep"? ──────────────────────┐
-   │  YES: Pure tone verification                      │
+   ┌─ clip strategy in {"pure_tone", "marker_tone"}? ─┐
+   │  YES: Tone verification path                      │
    │  NO:  Partitioned MSE + Pearson r check           │
    │       (short clips < 0.5s use 0-100% window only) │
    └───────────────────────────────────────────────────┘
@@ -38,9 +38,9 @@ Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
 2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, mode='full')`), producing a reference correlation curve. The absolute max is stored for normalization later.
-3. **Pure tone detection** - for the `rthk_beep` clip only, the dominant frequency is computed via FFT (`get_pure_tone_frequency`). All other clips set `dominant_frequency = None`.
+3. **Tone-strategy setup** - for clips whose strategy is `pure_tone` or `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips set `dominant_frequency = None`.
 
-This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, and the dominant frequency (non-None only for `rthk_beep`).
+This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, and the dominant frequency (non-None only for tone-strategy clips).
 
 ## Chunked Processing
 
@@ -130,19 +130,19 @@ duration_seconds = 0.228375
 amplitude = 1.0
 ```
 
-The only strategy currently implemented is `pure_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
+The currently implemented tone strategies are `pure_tone` and `marker_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
 
-When a clip's `strategy == "pure_tone"`:
+When a clip's strategy is tone-based:
 1. The dominant frequency declared in `generator.frequency_hz` is stored as the clip's strategy parameter during initialisation (no FFT re-derivation is needed, though `get_pure_tone_frequency()` is used as a fallback if absent).
-2. At verification time, `_verify_pure_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
-3. Flanks (adjacent segments) must have low purity to reject neighboring tones.
-4. Multiple acceptance criteria with varying strictness levels handle different signal conditions.
+2. At verification time, `_verify_pure_tone` or `_verify_marker_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
+3. `pure_tone` keeps the stricter RTHK-style isolated-flank rules.
+4. `marker_tone` is a separate verifier for short station markers that can bleed slightly into one adjacent flank because of AAC smearing or a tonal program bed.
 
 Because the clip is synthesised at the target sample rate, a single `.apd.toml` file works at 8 kHz, 16 kHz, or any other supported rate without needing a per-rate variant.
 
 ## Pure Tone Classification
 
-A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification backs the `pure_tone` strategy declared via `.apd.toml`.
+A clip is classified as a pure tone if its frequency spectrum (via FFT) has exactly one prominent peak (prominence > 0.05 in the normalized magnitude spectrum) matching the dominant frequency within 1% relative tolerance. This classification backs the tone-based `.apd.toml` strategies.
 
 ## Timestamp Conversion
 

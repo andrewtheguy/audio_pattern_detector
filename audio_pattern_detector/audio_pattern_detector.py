@@ -20,6 +20,7 @@ from audio_pattern_detector.audio_utils import (
     write_wav_file,
 )
 from audio_pattern_detector.detection_utils import (
+    PureToneMetrics,
     analyze_pure_tone_candidate,
     extract_padded_segment,
     get_pure_tone_frequency,
@@ -37,6 +38,8 @@ SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
 # Strategy name that triggers the pure tone verification path.
 # Set on an AudioClip by the `.apd.toml` pattern loader.
 PURE_TONE_STRATEGY = "pure_tone"
+MARKER_TONE_STRATEGY = "marker_tone"
+TONE_STRATEGIES: frozenset[str] = frozenset({PURE_TONE_STRATEGY, MARKER_TONE_STRATEGY})
 
 
 # Type definitions
@@ -145,6 +148,7 @@ class AudioPatternDetector:
 
         # Pre-compute clip data that doesn't depend on audio_stream
         self._clip_datas: dict[str, ClipData] = {}
+        self._clip_strategies: dict[str, str | None] = {}
         self._pure_tone_frequencies: dict[str, float] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
@@ -207,8 +211,9 @@ class AudioPatternDetector:
                 "correlation_clip": correlation_clip,
                 "correlation_clip_absolute_max": absolute_max,
             }
+            self._clip_strategies[clip_name] = audio_clip.strategy
 
-            if audio_clip.strategy == PURE_TONE_STRATEGY:
+            if audio_clip.strategy in TONE_STRATEGIES:
                 # The .apd.toml loader stores the declared frequency directly so
                 # we don't need to re-derive it from the synthesised clip.
                 freq = audio_clip.strategy_params.get("dominant_frequency_hz")
@@ -610,14 +615,27 @@ class AudioPatternDetector:
         """Route a candidate peak to the appropriate verification method."""
         dominant_frequency = self._pure_tone_frequencies.get(clip_name)
         if dominant_frequency is not None:
-            accepted = self._verify_pure_tone(
-                audio_section=audio_section,
-                peak=peak,
-                clip_length=clip_length,
-                dominant_frequency=dominant_frequency,
-                sr=sr,
-                section_ts=section_ts,
-            )
+            strategy = self._clip_strategies.get(clip_name)
+            if strategy == PURE_TONE_STRATEGY:
+                accepted = self._verify_pure_tone(
+                    audio_section=audio_section,
+                    peak=peak,
+                    clip_length=clip_length,
+                    dominant_frequency=dominant_frequency,
+                    sr=sr,
+                    section_ts=section_ts,
+                )
+            elif strategy == MARKER_TONE_STRATEGY:
+                accepted = self._verify_marker_tone(
+                    audio_section=audio_section,
+                    peak=peak,
+                    clip_length=clip_length,
+                    dominant_frequency=dominant_frequency,
+                    sr=sr,
+                    section_ts=section_ts,
+                )
+            else:
+                raise AssertionError(f"unhandled tone strategy {strategy!r} for {clip_name}")
             if accepted:
                 peaks_final.append(peak)
         else:
@@ -667,14 +685,13 @@ class AudioPatternDetector:
         there first, then re-run those tests to validate.
         """
         debug_mode = self.debug_mode
-        match_start = peak - clip_length + 1
-        matched_segment = extract_padded_segment(audio_section, match_start, clip_length)
-        left_flank = extract_padded_segment(audio_section, match_start - clip_length, clip_length)
-        right_flank = extract_padded_segment(audio_section, match_start + clip_length, clip_length)
-
-        metrics = analyze_pure_tone_candidate(matched_segment, sr, dominant_frequency)
-        left_metrics = analyze_pure_tone_candidate(left_flank, sr, dominant_frequency)
-        right_metrics = analyze_pure_tone_candidate(right_flank, sr, dominant_frequency)
+        metrics, left_metrics, right_metrics = self._analyze_tone_candidate_context(
+            audio_section=audio_section,
+            peak=peak,
+            clip_length=clip_length,
+            dominant_frequency=dominant_frequency,
+            sr=sr,
+        )
         max_flank_purity = max(
             left_metrics.overall_band_purity,
             right_metrics.overall_band_purity,
@@ -757,6 +774,103 @@ class AudioPatternDetector:
                 acceptance_mode = "short_isolated"
             print(
                 f"accepted pure tone {section_ts} ({acceptance_mode}): band_purity="
+                f"{metrics.overall_band_purity:.3f} active_ratio="
+                f"{metrics.active_frame_ratio:.3f} run="
+                f"{metrics.longest_active_run} active_purity="
+                f"{metrics.active_frame_mean_purity:.3f} freq="
+                f"{metrics.detected_frequency:.1f}Hz flank_purity="
+                f"({left_metrics.overall_band_purity:.3f}, "
+                f"{right_metrics.overall_band_purity:.3f})",
+                file=sys.stderr,
+            )
+        return True
+
+    def _analyze_tone_candidate_context(
+        self,
+        audio_section: NDArray[np.float32],
+        peak: int,
+        clip_length: int,
+        dominant_frequency: float,
+        sr: int,
+    ) -> tuple[PureToneMetrics, PureToneMetrics, PureToneMetrics]:
+        match_start = peak - clip_length + 1
+        matched_segment = extract_padded_segment(audio_section, match_start, clip_length)
+        left_flank = extract_padded_segment(audio_section, match_start - clip_length, clip_length)
+        right_flank = extract_padded_segment(audio_section, match_start + clip_length, clip_length)
+        return (
+            analyze_pure_tone_candidate(matched_segment, sr, dominant_frequency),
+            analyze_pure_tone_candidate(left_flank, sr, dominant_frequency),
+            analyze_pure_tone_candidate(right_flank, sr, dominant_frequency),
+        )
+
+    def _verify_marker_tone(
+        self,
+        audio_section: NDArray[np.float32],
+        peak: int,
+        clip_length: int,
+        dominant_frequency: float,
+        sr: int,
+        section_ts: str,
+    ) -> bool:
+        """Verify a short program marker tone that may bleed slightly into nearby frames.
+
+        This path is intentionally separate from PURE_TONE_STRATEGY so station-specific
+        tuning does not affect the existing RTHK beep verifier. It targets short
+        marker beeps that stay strongly single-frequency in the candidate window
+        but can leak a little narrowband energy into one adjacent flank because of
+        AAC smearing or the surrounding program bed.
+        """
+        debug_mode = self.debug_mode
+        metrics, left_metrics, right_metrics = self._analyze_tone_candidate_context(
+            audio_section=audio_section,
+            peak=peak,
+            clip_length=clip_length,
+            dominant_frequency=dominant_frequency,
+            sr=sr,
+        )
+        min_flank_purity = min(
+            left_metrics.overall_band_purity,
+            right_metrics.overall_band_purity,
+        )
+        max_flank_purity = max(
+            left_metrics.overall_band_purity,
+            right_metrics.overall_band_purity,
+        )
+
+        if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
+            if debug_mode:
+                print(
+                    f"failed marker tone check for {section_ts}: dominant "
+                    f"{metrics.detected_frequency:.1f}Hz != expected "
+                    f"{dominant_frequency:.1f}Hz",
+                    file=sys.stderr,
+                )
+            return False
+
+        embedded_marker_accept = (
+            metrics.overall_band_purity >= 0.95
+            and metrics.active_frame_ratio >= 0.80
+            and metrics.longest_active_run >= 9
+            and metrics.active_frame_mean_purity >= 0.92
+            and min_flank_purity <= 0.25
+            and max_flank_purity <= 0.45
+        )
+
+        if not embedded_marker_accept:
+            if debug_mode:
+                print(
+                    f"failed marker tone check for {section_ts}: band={metrics.overall_band_purity:.3f} "
+                    f"active_ratio={metrics.active_frame_ratio:.3f} run={metrics.longest_active_run} "
+                    f"active_mean={metrics.active_frame_mean_purity:.3f} "
+                    f"flanks=({left_metrics.overall_band_purity:.3f}, "
+                    f"{right_metrics.overall_band_purity:.3f})",
+                    file=sys.stderr,
+                )
+            return False
+
+        if debug_mode:
+            print(
+                f"accepted marker tone {section_ts}: band_purity="
                 f"{metrics.overall_band_purity:.3f} active_ratio="
                 f"{metrics.active_frame_ratio:.3f} run="
                 f"{metrics.longest_active_run} active_purity="

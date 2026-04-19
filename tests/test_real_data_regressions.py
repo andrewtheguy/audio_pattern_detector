@@ -6,6 +6,7 @@ from audio_pattern_detector.match import match_pattern
 
 
 RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd.toml"
+RADIO903_BEEP_PATTERN = "sample_audios/clips/903_beep.apd.toml"
 
 RTHK_BEEP_STRAY_CLIPS_V2_DIR = "sample_audios/regressions/rthk_beep_stray_clips_v2"
 
@@ -76,6 +77,23 @@ RTHK_BEEP_HOURLY_OPENING_CASES = [
         RTHK_BEEP_HOURLY_OPENING_17_TO_18,
         [1.06975, 2.068875, 3.090625, 4.074375, 5.07975, 6.08225],
     ),
+]
+
+RADIO903_BEEP_OPENINGS_DIR = "sample_audios/regressions/903_beep_openings"
+
+RADIO903_BEEP_OPENING_RECOVERY = (
+    f"{RADIO903_BEEP_OPENINGS_DIR}/radio903_2026-04-17_09_to_10_12s_opening.wav"
+)
+RADIO903_BEEP_OPENING_NEGATIVE = (
+    f"{RADIO903_BEEP_OPENINGS_DIR}/radio903_2026-04-17_06_to_07_no_opening_beep.wav"
+)
+
+RADIO903_BEEP_OPENING_CASES = [
+    (RADIO903_BEEP_OPENING_RECOVERY, [12.163125]),
+]
+
+RADIO903_BEEP_FALSE_POSITIVE_CASES = [
+    (RADIO903_BEEP_OPENING_NEGATIVE, []),
 ]
 
 
@@ -184,3 +202,47 @@ def test_rthk_beep_hourly_openings_recover_first_cluster_beeps(
     assert peak_times is not None
     assert "rthk_beep" in peak_times
     _assert_expected_timestamps(peak_times["rthk_beep"], expected_timestamps)
+
+
+@pytest.mark.parametrize(
+    ("audio_file", "expected_timestamps"),
+    RADIO903_BEEP_OPENING_CASES,
+    ids=[
+        Path(audio_file).stem
+        for audio_file, _expected_timestamps in RADIO903_BEEP_OPENING_CASES
+    ],
+)
+def test_radio903_marker_tone_recover_opening_beep(
+    audio_file: str,
+    expected_timestamps: list[float],
+) -> None:
+    assert Path(RADIO903_BEEP_PATTERN).exists(), f"Pattern file {RADIO903_BEEP_PATTERN} not found"
+    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+    peak_times, _ = match_pattern(audio_file, [RADIO903_BEEP_PATTERN], debug_mode=False)
+
+    assert peak_times is not None
+    assert "903_beep" in peak_times
+    _assert_expected_timestamps(peak_times["903_beep"], expected_timestamps)
+
+
+@pytest.mark.parametrize(
+    ("audio_file", "expected_timestamps"),
+    RADIO903_BEEP_FALSE_POSITIVE_CASES,
+    ids=[
+        Path(audio_file).stem
+        for audio_file, _expected_timestamps in RADIO903_BEEP_FALSE_POSITIVE_CASES
+    ],
+)
+def test_radio903_marker_tone_avoids_false_positive_openings(
+    audio_file: str,
+    expected_timestamps: list[float],
+) -> None:
+    assert Path(RADIO903_BEEP_PATTERN).exists(), f"Pattern file {RADIO903_BEEP_PATTERN} not found"
+    assert Path(audio_file).exists(), f"Audio file {audio_file} not found"
+
+    peak_times, _ = match_pattern(audio_file, [RADIO903_BEEP_PATTERN], debug_mode=False)
+
+    assert peak_times is not None
+    assert "903_beep" in peak_times
+    assert peak_times["903_beep"] == expected_timestamps
