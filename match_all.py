@@ -20,10 +20,16 @@ class Source:
 
 
 SOURCES: dict[str, Source] = {
-    "881903": Source(
-        hourly_dir=Path("/mnt/dasdata/capture881903/output/hourly"),
+    "881": Source(
+        hourly_dir=Path("/mnt/dasdata/capture881903/output/hourly/881"),
         pattern_folder=Path("/mnt/dasdata/andrewdata/audio_clips/881903"),
-        output_base=Path("./tmp/results/881903"),
+        output_base=Path("./tmp/results/881"),
+        #path_filter="/903/",
+    ),
+    "903": Source(
+        hourly_dir=Path("/mnt/dasdata/capture881903/output/hourly/903"),
+        pattern_folder=Path("/mnt/dasdata/andrewdata/audio_clips/881903"),
+        output_base=Path("./tmp/results/903"),
         #path_filter="/903/",
     ),
     "rthk-radio1": Source(

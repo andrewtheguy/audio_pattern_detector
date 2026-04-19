@@ -40,7 +40,20 @@ def _parse_file_start_utc(audio_file: Path) -> datetime:
         raise ValueError(
             f"Audio filename must end with _YYYYMMDDHHMMSS before the extension: {audio_file.name}"
         )
-    return datetime.strptime(match.group(1), "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+    timestamp_text = match.group(1)
+    try:
+        parsed_dt = datetime.strptime(timestamp_text, "%Y%m%d%H%M%S")
+    except ValueError as exc:
+        raise ValueError(
+            f"Audio filename {audio_file.name} has invalid timestamp "
+            f"{timestamp_text!r}: {exc}"
+        ) from exc
+    if not (2000 <= parsed_dt.year <= 2100):
+        raise ValueError(
+            f"Audio filename {audio_file.name} has out-of-range timestamp year "
+            f"{parsed_dt.year}; expected a year between 2000 and 2100"
+        )
+    return parsed_dt.replace(tzinfo=UTC)
 
 
 def _format_utc(dt: datetime, *, include_microseconds: bool) -> str:
@@ -56,7 +69,14 @@ def _round_millis(value: float) -> float:
 def _default_output_path(pattern_file: Path, audio_files: list[Path]) -> Path:
     if not audio_files:
         raise ValueError("Cannot derive output path with no audio files")
-    first_file_start = _parse_file_start_utc(audio_files[0])
+    first_audio_file = audio_files[0]
+    try:
+        first_file_start = _parse_file_start_utc(first_audio_file)
+    except ValueError as exc:
+        raise ValueError(
+            "Cannot derive default output path from "
+            f"{first_audio_file.name} while deriving the output filename: {exc}"
+        ) from exc
     date_str = first_file_start.strftime("%Y-%m-%d")
     return Path("./tmp") / f"{_pattern_name_from_path(pattern_file)}_{date_str}_detection_results.json"
 
@@ -214,13 +234,13 @@ def main() -> int:
     source_dir = args.source_dir
     pattern_file = args.pattern_file
     if not source_dir.is_dir():
-        raise ValueError(f"Source directory not found: {source_dir}")
+        parser.error(f"Source directory not found: {source_dir}")
     if not pattern_file.is_file():
-        raise ValueError(f"Pattern file not found: {pattern_file}")
+        parser.error(f"Pattern file not found: {pattern_file}")
 
     audio_files = _collect_audio_files(source_dir, args.pattern, args.recursive)
     if not audio_files:
-        raise ValueError(
+        parser.error(
             f"No files matched pattern {args.pattern!r} in {source_dir}"
         )
 
