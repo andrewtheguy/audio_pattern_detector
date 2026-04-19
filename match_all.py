@@ -22,7 +22,7 @@ class Source:
 SOURCES: dict[str, Source] = {
     "881903": Source(
         hourly_dir=Path("/mnt/dasdata/capture881903/output/hourly"),
-        pattern_folder=Path("/mnt/dasdata/andrewdata/audio_clips"),
+        pattern_folder=Path("/mnt/dasdata/andrewdata/audio_clips/881903"),
         output_base=Path("./tmp/results/881903"),
         #path_filter="/903/",
     ),
