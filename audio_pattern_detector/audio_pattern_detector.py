@@ -853,7 +853,7 @@ class AudioPatternDetector:
             and metrics.longest_active_run >= 9
             and metrics.active_frame_mean_purity >= 0.92
             and min_flank_purity <= 0.25
-            and max_flank_purity <= 0.45
+            and max_flank_purity <= 0.65
         )
 
         if not embedded_marker_accept:
