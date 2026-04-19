@@ -149,6 +149,7 @@ class AudioPatternDetector:
         # Pre-compute clip data that doesn't depend on audio_stream
         self._clip_datas: dict[str, ClipData] = {}
         self._clip_strategies: dict[str, str | None] = {}
+        self._clip_strategy_params: dict[str, dict[str, Any]] = {}
         self._pure_tone_frequencies: dict[str, float] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
@@ -212,6 +213,7 @@ class AudioPatternDetector:
                 "correlation_clip_absolute_max": absolute_max,
             }
             self._clip_strategies[clip_name] = audio_clip.strategy
+            self._clip_strategy_params[clip_name] = dict(audio_clip.strategy_params)
 
             if audio_clip.strategy in TONE_STRATEGIES:
                 # The .apd.toml loader stores the declared frequency directly so
@@ -627,6 +629,7 @@ class AudioPatternDetector:
                 )
             elif strategy == MARKER_TONE_STRATEGY:
                 accepted = self._verify_marker_tone(
+                    clip_name=clip_name,
                     audio_section=audio_section,
                     peak=peak,
                     clip_length=clip_length,
@@ -805,6 +808,7 @@ class AudioPatternDetector:
 
     def _verify_marker_tone(
         self,
+        clip_name: str,
         audio_section: NDArray[np.float32],
         peak: int,
         clip_length: int,
@@ -836,6 +840,18 @@ class AudioPatternDetector:
             left_metrics.overall_band_purity,
             right_metrics.overall_band_purity,
         )
+        verification = self._clip_strategy_params.get(clip_name, {}).get("verification", {})
+        if not isinstance(verification, dict):
+            verification = {}
+
+        minimum_band_purity = float(verification.get("minimum_band_purity", 0.95))
+        minimum_active_frame_ratio = float(verification.get("minimum_active_frame_ratio", 0.80))
+        minimum_longest_active_run = int(verification.get("minimum_longest_active_run", 9))
+        minimum_active_frame_mean_purity = float(
+            verification.get("minimum_active_frame_mean_purity", 0.92)
+        )
+        maximum_min_flank_purity = float(verification.get("maximum_min_flank_purity", 0.25))
+        maximum_max_flank_purity = float(verification.get("maximum_max_flank_purity", 0.65))
 
         if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
             if debug_mode:
@@ -848,12 +864,12 @@ class AudioPatternDetector:
             return False
 
         embedded_marker_accept = (
-            metrics.overall_band_purity >= 0.95
-            and metrics.active_frame_ratio >= 0.80
-            and metrics.longest_active_run >= 9
-            and metrics.active_frame_mean_purity >= 0.92
-            and min_flank_purity <= 0.25
-            and max_flank_purity <= 0.65
+            metrics.overall_band_purity >= minimum_band_purity
+            and metrics.active_frame_ratio >= minimum_active_frame_ratio
+            and metrics.longest_active_run >= minimum_longest_active_run
+            and metrics.active_frame_mean_purity >= minimum_active_frame_mean_purity
+            and min_flank_purity <= maximum_min_flank_purity
+            and max_flank_purity <= maximum_max_flank_purity
         )
 
         if not embedded_marker_accept:

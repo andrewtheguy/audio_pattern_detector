@@ -28,6 +28,14 @@ VALID_STRATEGIES: frozenset[str] = frozenset({"pure_tone", "marker_tone"})
 
 # Generator types understood by the loader.
 VALID_GENERATOR_TYPES: frozenset[str] = frozenset({"sine"})
+VALID_VERIFICATION_FIELDS: frozenset[str] = frozenset({
+    "minimum_band_purity",
+    "minimum_active_frame_ratio",
+    "minimum_longest_active_run",
+    "minimum_active_frame_mean_purity",
+    "maximum_min_flank_purity",
+    "maximum_max_flank_purity",
+})
 
 
 @dataclass(frozen=True)
@@ -107,6 +115,28 @@ def load_apd_file(path: str | Path, sample_rate: int) -> PatternConfig:
     if strategy in {"pure_tone", "marker_tone"}:
         # Tone-based strategies use the declared generator frequency directly.
         strategy_params["dominant_frequency_hz"] = float(generator["frequency_hz"])
+
+    verification_raw = obj.get("verification")
+    if verification_raw is not None:
+        if not isinstance(verification_raw, dict):
+            raise ValueError(f"{path}: field 'verification' must be table/object")
+        verification = cast(dict[str, Any], verification_raw)
+        unknown_fields = sorted(set(verification) - VALID_VERIFICATION_FIELDS)
+        if unknown_fields:
+            raise ValueError(
+                f"{path}: unknown verification field(s): {unknown_fields}. "
+                f"Valid fields: {sorted(VALID_VERIFICATION_FIELDS)}"
+            )
+
+        parsed_verification: dict[str, float | int] = {}
+        for key in sorted(verification):
+            if key == "minimum_longest_active_run":
+                parsed_verification[key] = int(_get_required(verification, key, int, str(path)))
+            else:
+                parsed_verification[key] = float(
+                    _get_required(verification, key, (int, float), str(path))
+                )
+        strategy_params["verification"] = parsed_verification
 
     return PatternConfig(
         strategy=strategy,
