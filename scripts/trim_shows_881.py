@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-HOURLY_DIR = Path("/mnt/dasdata/capture881903/output/hourly/881")
+HOURLY_DIR = Path("/mnt/dasdata/andrewdata/ftp/881903/hourly/881")
 RESULTS_DIR = Path("./tmp/results/881")
 OUTPUT_ROOT = Path("/mnt/dasdata/andrewdata/radio_shows/trimmed")
 OUTPUT_SUBDIR = "881"
