@@ -12,10 +12,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
+from andrew_utils import seconds_to_time
 from audio_pattern_detector.audio_utils import (
     DEFAULT_TARGET_SAMPLE_RATE,
     resample_preserve_maxima,
-    seconds_to_time,
     slicing_with_zero_padding,
     write_wav_file,
 )

@@ -14,10 +14,10 @@ from numpy.typing import NDArray
 from audio_pattern_detector.audio_clip import AudioClip, AudioStream
 from audio_pattern_detector.audio_pattern_detector import PatternDetectedCallback
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
+from andrew_utils import seconds_to_time
 from audio_pattern_detector.audio_utils import (
     ffmpeg_get_float32_pcm,
     resample_audio,
-    seconds_to_time,
     DEFAULT_TARGET_SAMPLE_RATE,
 )
 

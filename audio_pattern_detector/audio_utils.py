@@ -349,17 +349,3 @@ def get_audio_duration(audio_path: str) -> float | None:
     return float(duration_str)
 
 
-def seconds_to_time(seconds: float, include_decimals: bool = True) -> str:
-    """Convert seconds to time string format HH:MM:SS.mmm or HH:MM:SS."""
-    if include_decimals:
-        milliseconds = round(seconds * 1000)
-        minutes_remaining, remaining_milliseconds = divmod(milliseconds, 60000)
-        hours, minutes = divmod(minutes_remaining, 60)
-        remaining_seconds = f"{remaining_milliseconds:05d}"
-        remaining_seconds = remaining_seconds[:-3] + '.' + remaining_seconds[-3:]
-        return f"{hours:02d}:{minutes:02d}:{remaining_seconds}"
-    else:
-        seconds = round(seconds)
-        minutes_remaining, remaining_seconds = divmod(seconds, 60)
-        hours, minutes = divmod(minutes_remaining, 60)
-        return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}"
