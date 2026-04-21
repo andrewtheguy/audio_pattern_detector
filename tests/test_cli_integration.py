@@ -76,8 +76,7 @@ def test_cli_show_config_help():
     """Test that show-config --help shows options."""
     result = run_cli("show-config", "--help")
     assert result.returncode == 0
-    assert "--pattern-file" in result.stdout
-    assert "--pattern-folder" in result.stdout
+    assert "pattern file" in result.stdout
 
 
 def test_cli_no_command():
@@ -368,7 +367,7 @@ def test_show_config_returns_json():
     """Test show-config returns valid JSON with expected structure."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
+        "sample_audios/clips/rthk_beep.apd.toml",
     )
     assert result.returncode == 0
 
@@ -380,24 +379,11 @@ def test_show_config_returns_json():
     assert "rthk_beep" in config["clips"]
 
 
-def test_show_config_with_pattern_folder():
-    """Test show-config with --pattern-folder includes all patterns."""
-    result = run_cli(
-        "show-config",
-        "--pattern-folder", "sample_audios/clips",
-    )
-    assert result.returncode == 0
-
-    config = json.loads(result.stdout)
-    assert "cbs_news" in config["clips"]
-    assert "rthk_beep" in config["clips"]
-
-
 def test_show_config_clip_info():
     """Test show-config returns per-clip configuration."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "sample_audios/clips/rthk_beep.apd.toml",
+        "sample_audios/clips/rthk_beep.apd.toml",
     )
     config = json.loads(result.stdout)
 
@@ -481,14 +467,13 @@ def test_show_config_no_pattern():
         check=False,
     )
     assert result.returncode != 0
-    assert "Please provide" in result.stderr
 
 
 def test_show_config_nonexistent_pattern():
     """Test show-config with nonexistent pattern file."""
     result = run_cli(
         "show-config",
-        "--pattern-file", "nonexistent.wav",
+        "nonexistent.wav",
         check=False,
     )
     assert result.returncode != 0

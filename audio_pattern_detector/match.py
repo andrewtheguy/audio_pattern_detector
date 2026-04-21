@@ -644,19 +644,17 @@ def cmd_match(args: argparse.Namespace) -> None:
         return
 
     # Non-multiplexed modes: require pattern file(s)
-    if args.pattern_folder and args.pattern_file:
-        print("Error: --pattern-file and --pattern-folder are mutually exclusive", file=sys.stderr)
-        sys.exit(1)
-
+    pattern_files: list[str] = []
     if args.pattern_folder:
-        pattern_files = []
-        for ext in ("wav", "apd.toml"):
-            for pattern_file in glob.glob(f'{args.pattern_folder}/*.{ext}'):
-                print(f"adding pattern file {pattern_file}...", file=sys.stderr)
-                pattern_files.append(pattern_file)
-    elif args.pattern_file:
-        pattern_files = args.pattern_file  # already a list from action='append'
-    else:
+        for folder in args.pattern_folder:
+            for ext in ("wav", "apd.toml"):
+                for pattern_file in glob.glob(f'{folder}/*.{ext}'):
+                    print(f"adding pattern file {pattern_file}...", file=sys.stderr)
+                    pattern_files.append(pattern_file)
+    if args.pattern_file:
+        pattern_files.extend(args.pattern_file)
+
+    if not pattern_files:
         print("Please provide either --pattern-file, --pattern-folder, or --multiplexed-stdin", file=sys.stderr)
         sys.exit(1)
 
@@ -687,27 +685,11 @@ def cmd_show_config(args: argparse.Namespace) -> None:
     # Get target sample rate (None means use default 8000)
     target_sample_rate = getattr(args, 'target_sample_rate', None)
 
-    if args.pattern_folder and args.pattern_file:
-        print("Error: --pattern-file and --pattern-folder are mutually exclusive", file=sys.stderr)
+    pattern_file = args.pattern_file
+    if not os.path.exists(pattern_file):
+        print(f"Error: Pattern {pattern_file} does not exist", file=sys.stderr)
         sys.exit(1)
-
-    if args.pattern_folder:
-        pattern_files = []
-        for ext in ("wav", "apd.toml"):
-            for pattern_file in glob.glob(f'{args.pattern_folder}/*.{ext}'):
-                pattern_files.append(pattern_file)
-    elif args.pattern_file:
-        pattern_files = args.pattern_file  # already a list from action='append'
-    else:
-        print("Please provide either --pattern-file or --pattern-folder", file=sys.stderr)
-        sys.exit(1)
-
-    pattern_clips = []
-    for pattern_file in pattern_files:
-        if not os.path.exists(pattern_file):
-            print(f"Error: Pattern {pattern_file} does not exist", file=sys.stderr)
-            sys.exit(1)
-        pattern_clips.append(AudioClip.from_audio_file(pattern_file, sample_rate=target_sample_rate))
+    pattern_clips = [AudioClip.from_audio_file(pattern_file, sample_rate=target_sample_rate)]
 
     # Use auto mode (None) to show minimum computed values
     detector = AudioPatternDetector(

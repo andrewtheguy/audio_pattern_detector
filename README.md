@@ -54,7 +54,7 @@ ffmpeg -i input.mp3 -f wav -ac 1 -ar 8000 pipe: | \
 ### Show-config - Show computed configuration
 
 ```shell
-audio-pattern-detector show-config --pattern-folder ./clips
+audio-pattern-detector show-config ./clips/rthk_beep.apd.toml
 ```
 
 ## CLI Options (match)
