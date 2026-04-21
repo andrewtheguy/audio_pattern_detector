@@ -29,8 +29,10 @@ def main():
     match_parser = subparsers.add_parser('match', help='Find pattern matches in audio files')
     match_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, action='append',
                               help='pattern file (can be specified multiple times)')
-    match_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
-    match_parser.add_argument('audio_file', nargs='?', default=None, type=str, help='audio file to find pattern')
+    match_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, action='append',
+                              help='folder with pattern audio clips (can be specified multiple times, can be combined with --pattern-file)')
+    match_parser.add_argument('audio_file', nargs='?', default=None, type=str,
+                              help='single audio file to find pattern in (omit when using --stdin or --multiplexed-stdin)')
     match_parser.add_argument('--stdin', action='store_true', help='read audio from stdin in WAV format')
     match_parser.add_argument('--multiplexed-stdin', action='store_true',
                               help='read patterns and audio from stdin using multiplexed protocol (always outputs JSONL). '
@@ -50,10 +52,8 @@ def main():
     match_parser.set_defaults(func=_lazy_cmd_match)
 
     # Add show-config subcommand
-    show_config_parser = subparsers.add_parser('show-config', help='Show computed configuration for pattern files')
-    show_config_parser.add_argument('--pattern-file', metavar='pattern file', required=False, type=str, action='append',
-                                    help='pattern file (can be specified multiple times)')
-    show_config_parser.add_argument('--pattern-folder', metavar='pattern folder', required=False, type=str, help='folder with pattern audio clips')
+    show_config_parser = subparsers.add_parser('show-config', help='Show computed configuration for a pattern file')
+    show_config_parser.add_argument('pattern_file', metavar='pattern file', type=str, help='pattern file')
     show_config_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     show_config_parser.set_defaults(func=_lazy_cmd_show_config)
 
