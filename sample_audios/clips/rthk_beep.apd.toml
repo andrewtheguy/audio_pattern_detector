@@ -1,12 +1,12 @@
 # rthk_beep: RTHK hourly station beep.
-# Uses the pure_tone verification strategy (short-time spectral analysis)
-# instead of the normal MSE + Pearson envelope check, because a clean
-# sine does not cross-correlate distinctively against real airtime audio.
+# Uses the marker_tone verification strategy instead of the normal
+# MSE + Pearson envelope check, because a clean sine does not
+# cross-correlate distinctively against real airtime audio.
 #
 # The clip is synthesised from frequency + duration at the target sample
 # rate, so a single .apd.toml works at 8 kHz, 16 kHz, or any other rate.
 
-strategy = "pure_tone"
+strategy = "marker_tone"
 description = "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s"
 
 [generator]
@@ -15,3 +15,14 @@ type = "sine"
 frequency_hz = 1040.19
 duration_seconds = 0.228375
 amplitude = 1.0
+
+[verification]
+# Tuned against the RTHK regression fixtures. The first few beeps in an
+# opening cluster can be dirtier than the later ones, but both neighbouring
+# flanks still stay quiet compared with the matched window.
+minimum_band_purity = 0.72
+minimum_active_frame_ratio = 0.70
+minimum_longest_active_run = 7
+minimum_active_frame_mean_purity = 0.77
+maximum_min_flank_purity = 0.02
+maximum_max_flank_purity = 0.14

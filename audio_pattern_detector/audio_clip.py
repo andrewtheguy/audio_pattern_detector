@@ -25,7 +25,7 @@ class AudioClip:
     audio: NDArray[np.float32]
     sample_rate: int
     # Non-None when the clip was loaded from an `.apd.toml` pattern config. Drives
-    # strategy-based dispatch in AudioPatternDetector (e.g. "pure_tone").
+    # strategy-based dispatch in AudioPatternDetector (e.g. "marker_tone").
     strategy: str | None = None
     strategy_params: dict[str, Any] = field(default_factory=dict)
 
