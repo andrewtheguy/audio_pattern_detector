@@ -35,11 +35,7 @@ DEFAULT_SECONDS_PER_CHUNK = 60
 # Clips shorter than this go through the normal path with 0-100% window
 SHORT_CLIP_DURATION_THRESHOLD = 0.5  # seconds
 
-# Strategy name that triggers the pure tone verification path.
-# Set on an AudioClip by the `.apd.toml` pattern loader.
-PURE_TONE_STRATEGY = "pure_tone"
 MARKER_TONE_STRATEGY = "marker_tone"
-TONE_STRATEGIES: frozenset[str] = frozenset({PURE_TONE_STRATEGY, MARKER_TONE_STRATEGY})
 
 
 # Type definitions
@@ -150,7 +146,7 @@ class AudioPatternDetector:
         self._clip_datas: dict[str, ClipData] = {}
         self._clip_strategies: dict[str, str | None] = {}
         self._clip_strategy_params: dict[str, dict[str, Any]] = {}
-        self._pure_tone_frequencies: dict[str, float] = {}
+        self._tone_frequencies: dict[str, float] = {}
         self._clip_cache: ClipCache = {
             "downsampled_correlation_clips": {},
             "downsampled_pearson_windows": {},
@@ -215,14 +211,14 @@ class AudioPatternDetector:
             self._clip_strategies[clip_name] = audio_clip.strategy
             self._clip_strategy_params[clip_name] = dict(audio_clip.strategy_params)
 
-            if audio_clip.strategy in TONE_STRATEGIES:
+            if audio_clip.strategy == MARKER_TONE_STRATEGY:
                 # The .apd.toml loader stores the declared frequency directly so
                 # we don't need to re-derive it from the synthesised clip.
                 freq = audio_clip.strategy_params.get("dominant_frequency_hz")
                 if freq is None:
                     freq = get_pure_tone_frequency(clip, self.target_sample_rate)
                 if freq is not None:
-                    self._pure_tone_frequencies[clip_name] = float(freq)
+                    self._tone_frequencies[clip_name] = float(freq)
 
         # Pre-compute chunk_size (4 bytes per sample for float32, mono)
         self._chunk_size = int(self.seconds_per_chunk * self.target_sample_rate) * 4
@@ -615,30 +611,20 @@ class AudioPatternDetector:
         peaks_final: list[int],
     ) -> None:
         """Route a candidate peak to the appropriate verification method."""
-        dominant_frequency = self._pure_tone_frequencies.get(clip_name)
+        dominant_frequency = self._tone_frequencies.get(clip_name)
         if dominant_frequency is not None:
             strategy = self._clip_strategies.get(clip_name)
-            if strategy == PURE_TONE_STRATEGY:
-                accepted = self._verify_pure_tone(
-                    audio_section=audio_section,
-                    peak=peak,
-                    clip_length=clip_length,
-                    dominant_frequency=dominant_frequency,
-                    sr=sr,
-                    section_ts=section_ts,
-                )
-            elif strategy == MARKER_TONE_STRATEGY:
-                accepted = self._verify_marker_tone(
-                    clip_name=clip_name,
-                    audio_section=audio_section,
-                    peak=peak,
-                    clip_length=clip_length,
-                    dominant_frequency=dominant_frequency,
-                    sr=sr,
-                    section_ts=section_ts,
-                )
-            else:
+            if strategy != MARKER_TONE_STRATEGY:
                 raise AssertionError(f"unhandled tone strategy {strategy!r} for {clip_name}")
+            accepted = self._verify_marker_tone(
+                clip_name=clip_name,
+                audio_section=audio_section,
+                peak=peak,
+                clip_length=clip_length,
+                dominant_frequency=dominant_frequency,
+                sr=sr,
+                section_ts=section_ts,
+            )
             if accepted:
                 peaks_final.append(peak)
         else:
@@ -661,132 +647,6 @@ class AudioPatternDetector:
                 peaks_final=peaks_final,
                 is_short_clip=is_short_clip,
             )
-
-    def _verify_pure_tone(
-        self,
-        audio_section: NDArray[np.float32],
-        peak: int,
-        clip_length: int,
-        dominant_frequency: float,
-        sr: int,
-        section_ts: str,
-    ) -> bool:
-        """Verify a candidate peak is a pure tone with the expected frequency and duration.
-
-        This is the pure-tone special-case path, triggered when a clip's
-        strategy is PURE_TONE_STRATEGY (declared in its `.apd.toml` config). It
-        exists because pure-tone beeps (e.g. the RTHK hourly beep) do not
-        cross-correlate well enough for the normal MSE+Pearson verification.
-
-        Uses short-time spectral analysis to require a contiguous run of
-        narrowband energy at the expected frequency. This rejects voiced or
-        harmonic speech segments that still produce a strong correlation peak.
-
-        Four acceptance criteria handle different signal conditions. All were
-        tuned against the regression test suite in tests/test_real_data_regressions.py
-        (stray clips, hourly lead-ins, hourly openings). Adjust thresholds
-        there first, then re-run those tests to validate.
-        """
-        debug_mode = self.debug_mode
-        metrics, left_metrics, right_metrics = self._analyze_tone_candidate_context(
-            audio_section=audio_section,
-            peak=peak,
-            clip_length=clip_length,
-            dominant_frequency=dominant_frequency,
-            sr=sr,
-        )
-        max_flank_purity = max(
-            left_metrics.overall_band_purity,
-            right_metrics.overall_band_purity,
-        )
-
-        if not math.isclose(metrics.detected_frequency, dominant_frequency, rel_tol=0.05):
-            if debug_mode:
-                print(
-                    f"failed pure tone check for {section_ts}: dominant "
-                    f"{metrics.detected_frequency:.1f}Hz != expected "
-                    f"{dominant_frequency:.1f}Hz",
-                    file=sys.stderr,
-                )
-            return False
-
-        # Strong, clean beep with high purity throughout. Allows slightly
-        # noisy flanks since the signal itself is unambiguous.
-        strict_accept = (
-            metrics.overall_band_purity >= 0.80
-            and metrics.longest_active_run >= 15
-            and metrics.active_frame_mean_purity >= 0.84
-            and max_flank_purity <= 0.15
-        )
-
-        # Weaker beep (e.g. lossy codec, lower SNR) but still clearly
-        # isolated from surrounding content. Requires quieter flanks.
-        isolated_accept = (
-            metrics.overall_band_purity >= 0.65
-            and metrics.longest_active_run >= 10
-            and metrics.active_frame_mean_purity >= 0.77
-            and max_flank_purity <= 0.12
-        )
-
-        # Beep with consistent frame-level activity (high active_frame_ratio)
-        # but slightly lower per-frame purity — typical of beeps embedded in
-        # background hiss or low-level music.
-        stable_isolated_accept = (
-            metrics.overall_band_purity >= 0.72
-            and metrics.active_frame_ratio >= 0.85
-            and metrics.longest_active_run >= 14
-            and metrics.active_frame_mean_purity >= 0.76
-            and max_flank_purity <= 0.12
-        )
-
-        # Very short beep (few active frames) that is highly pure where it
-        # does appear. Strictest flank requirement to avoid false positives
-        # from brief tonal artifacts in speech.
-        short_isolated_accept = (
-            metrics.overall_band_purity >= 0.72
-            and metrics.active_frame_ratio >= 0.65
-            and metrics.longest_active_run >= 7
-            and metrics.active_frame_mean_purity >= 0.84
-            and max_flank_purity <= 0.06
-        )
-
-        if not (
-            strict_accept
-            or isolated_accept
-            or stable_isolated_accept
-            or short_isolated_accept
-        ):
-            if debug_mode:
-                print(
-                    f"failed pure tone check for {section_ts}: band={metrics.overall_band_purity:.3f} "
-                    f"run={metrics.longest_active_run} active={metrics.active_frame_mean_purity:.3f} "
-                    f"flank=({left_metrics.overall_band_purity:.3f}, "
-                    f"{right_metrics.overall_band_purity:.3f})",
-                    file=sys.stderr,
-                )
-            return False
-
-        if debug_mode:
-            if strict_accept:
-                acceptance_mode = "strict"
-            elif isolated_accept:
-                acceptance_mode = "isolated"
-            elif stable_isolated_accept:
-                acceptance_mode = "stable_isolated"
-            else:
-                acceptance_mode = "short_isolated"
-            print(
-                f"accepted pure tone {section_ts} ({acceptance_mode}): band_purity="
-                f"{metrics.overall_band_purity:.3f} active_ratio="
-                f"{metrics.active_frame_ratio:.3f} run="
-                f"{metrics.longest_active_run} active_purity="
-                f"{metrics.active_frame_mean_purity:.3f} freq="
-                f"{metrics.detected_frequency:.1f}Hz flank_purity="
-                f"({left_metrics.overall_band_purity:.3f}, "
-                f"{right_metrics.overall_band_purity:.3f})",
-                file=sys.stderr,
-            )
-        return True
 
     def _analyze_tone_candidate_context(
         self,
@@ -816,13 +676,13 @@ class AudioPatternDetector:
         sr: int,
         section_ts: str,
     ) -> bool:
-        """Verify a short program marker tone that may bleed slightly into nearby frames.
+        """Verify a synthesized marker tone via short-time spectral analysis.
 
-        This path is intentionally separate from PURE_TONE_STRATEGY so station-specific
-        tuning does not affect the existing RTHK beep verifier. It targets short
-        marker beeps that stay strongly single-frequency in the candidate window
-        but can leak a little narrowband energy into one adjacent flank because of
-        AAC smearing or the surrounding program bed.
+        The clip strategy provides a dominant frequency and optional
+        per-station thresholds. This path targets short beeps that stay
+        strongly single-frequency in the candidate window but can leak a
+        little narrowband energy into one adjacent flank because of AAC
+        smearing or the surrounding program bed.
         """
         debug_mode = self.debug_mode
         metrics, left_metrics, right_metrics = self._analyze_tone_candidate_context(

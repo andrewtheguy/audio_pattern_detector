@@ -5,7 +5,6 @@ import numpy as np
 from audio_pattern_detector.audio_clip import AudioClip
 from audio_pattern_detector.audio_pattern_detector import AudioPatternDetector
 from audio_pattern_detector.audio_utils import DEFAULT_TARGET_SAMPLE_RATE
-from audio_pattern_detector.detection_utils import get_pure_tone_frequency
 
 
 RTHK_BEEP_PATTERN = "sample_audios/clips/rthk_beep.apd.toml"
@@ -57,10 +56,15 @@ def _build_swept_candidate(length: int, sample_rate: int) -> np.ndarray:
     return signal
 
 
-def _run_verify(detector: AudioPatternDetector, audio_section: np.ndarray, dominant_frequency: float) -> bool:
+def _run_verify_marker_tone(
+    detector: AudioPatternDetector,
+    audio_section: np.ndarray,
+    dominant_frequency: float,
+) -> bool:
     # peak = len-1 and clip_length = len → match_start = 0, so the
     # entire audio_section is used as the matched segment.
-    return detector._verify_pure_tone(
+    return detector._verify_marker_tone(
+        clip_name="rthk_beep",
         audio_section=audio_section.astype(np.float32),
         peak=len(audio_section) - 1,
         clip_length=len(audio_section),
@@ -70,13 +74,12 @@ def _run_verify(detector: AudioPatternDetector, audio_section: np.ndarray, domin
     )
 
 
-def test_pure_tone_verifier_rejects_harmonic_and_swept_false_positives():
+def test_marker_tone_verifier_rejects_harmonic_and_swept_false_positives():
     assert Path(RTHK_BEEP_PATTERN).exists(), f"Pattern file {RTHK_BEEP_PATTERN} not found"
 
     pattern_clip = AudioClip.from_audio_file(RTHK_BEEP_PATTERN)
     detector = AudioPatternDetector(audio_clips=[pattern_clip], debug_mode=False)
-    dominant_frequency = get_pure_tone_frequency(pattern_clip.audio, DEFAULT_TARGET_SAMPLE_RATE)
-    assert dominant_frequency is not None
+    dominant_frequency = float(pattern_clip.strategy_params["dominant_frequency_hz"])
 
     candidate_length = len(pattern_clip.audio)
     clean_candidate = _build_clean_candidate(candidate_length, DEFAULT_TARGET_SAMPLE_RATE, dominant_frequency)
@@ -84,9 +87,9 @@ def test_pure_tone_verifier_rejects_harmonic_and_swept_false_positives():
     swept_candidate = _build_swept_candidate(candidate_length, DEFAULT_TARGET_SAMPLE_RATE)
 
     verification_results = [
-        _run_verify(detector, clean_candidate, dominant_frequency),
-        _run_verify(detector, harmonic_candidate, dominant_frequency),
-        _run_verify(detector, swept_candidate, dominant_frequency),
+        _run_verify_marker_tone(detector, clean_candidate, dominant_frequency),
+        _run_verify_marker_tone(detector, harmonic_candidate, dominant_frequency),
+        _run_verify_marker_tone(detector, swept_candidate, dominant_frequency),
     ]
 
     assert verification_results == [True, False, False]

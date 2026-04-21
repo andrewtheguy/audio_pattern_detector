@@ -23,7 +23,7 @@ Raw audio stream (float32 PCM)
         |
    For each candidate peak:
         |
-   ┌─ clip strategy in {"pure_tone", "marker_tone"}? ─┐
+   ┌─ clip strategy == "marker_tone"? ────────────────┐
    │  YES: Tone verification path                      │
    │  NO:  Partitioned MSE + Pearson r check           │
    │       (short clips < 0.5s use 0-100% window only) │
@@ -38,7 +38,7 @@ Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
 2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, mode='full')`), producing a reference correlation curve. The absolute max is stored for normalization later.
-3. **Tone-strategy setup** - for clips whose strategy is `pure_tone` or `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips set `dominant_frequency = None`.
+3. **Tone-strategy setup** - for clips whose strategy is `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips set `dominant_frequency = None`.
 
 This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, and the dominant frequency (non-None only for tone-strategy clips).
 
@@ -113,14 +113,14 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 **Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. clean pure tones like the RTHK hourly beep) need their own special-case path instead — see `.apd.toml` pattern configs below.
 
-### `.apd.toml` Pattern Configs and Pure Tone Verification
+### `.apd.toml` Pattern Configs and Tone Verification
 
 Patterns that need a special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) that declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
 
 Example (`sample_audios/clips/rthk_beep.apd.toml`):
 
 ```toml
-strategy = "pure_tone"
+strategy = "marker_tone"
 description = "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s"
 
 [generator]
@@ -130,13 +130,12 @@ duration_seconds = 0.228375
 amplitude = 1.0
 ```
 
-The currently implemented tone strategies are `pure_tone` and `marker_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
+The currently implemented tone strategy is `marker_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
 
 When a clip's strategy is tone-based:
 1. The dominant frequency declared in `generator.frequency_hz` is stored as the clip's strategy parameter during initialisation (no FFT re-derivation is needed, though `get_pure_tone_frequency()` is used as a fallback if absent).
-2. At verification time, `_verify_pure_tone` or `_verify_marker_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
-3. `pure_tone` keeps the stricter RTHK-style isolated-flank rules.
-4. `marker_tone` is a separate verifier for short station markers that can bleed slightly into one adjacent flank because of AAC smearing or a tonal program bed.
+2. At verification time, `_verify_marker_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
+3. Per-clip `verification` parameters in the TOML file tune how much in-window purity and adjacent-flank leakage are allowed for that station's marker.
 
 Because the clip is synthesised at the target sample rate, a single `.apd.toml` file works at 8 kHz, 16 kHz, or any other supported rate without needing a per-rate variant.
 

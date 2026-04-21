@@ -6,7 +6,7 @@ optionally, parameters for synthesising the pattern clip. TOML parses via
 stays human-editable without any custom parsing code.
 
 The extension is the extensibility point for special detection paths
-(currently `pure_tone` and `marker_tone`); ordinary patterns continue to use `.wav`.
+(currently `marker_tone`); ordinary patterns continue to use `.wav`.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ APD_EXTENSION = ".apd.toml"
 
 # Strategies understood by the detector. Each strategy reads a different
 # subset of strategy_params and triggers a different verification path.
-VALID_STRATEGIES: frozenset[str] = frozenset({"pure_tone", "marker_tone"})
+VALID_STRATEGIES: frozenset[str] = frozenset({"marker_tone"})
 
 # Generator types understood by the loader.
 VALID_GENERATOR_TYPES: frozenset[str] = frozenset({"sine"})
@@ -112,7 +112,7 @@ def load_apd_file(path: str | Path, sample_rate: int) -> PatternConfig:
         raise AssertionError(f"unhandled generator type {gen_type}")
 
     strategy_params: dict[str, Any] = {}
-    if strategy in {"pure_tone", "marker_tone"}:
+    if strategy == "marker_tone":
         # Tone-based strategies use the declared generator frequency directly.
         strategy_params["dominant_frequency_hz"] = float(generator["frequency_hz"])
 

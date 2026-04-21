@@ -1,7 +1,7 @@
 """Tests for short clip detection through the normal correlation path.
 
 Short clips (< 0.5s) go through the normal path with a 0-100% window,
-not the pure tone verification path.
+not the marker tone verification path.
 """
 
 import io
@@ -41,13 +41,14 @@ def _audio_stream_from_array(name: str, audio: np.ndarray) -> AudioStream:
 # --- Tests ---
 
 
-def test_short_chirp_does_not_trigger_pure_tone_path():
+def test_short_chirp_does_not_trigger_marker_tone_path():
     """A short chirp clip goes through normal path regardless of FFT analysis."""
     chirp = _make_chirp(0.1, 400, 1200)
     clip = _audio_clip_from_array("my_chirp", chirp)
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
-    # Even if FFT might detect a dominant frequency, non-rthk_beep clips use normal path
-    assert "my_chirp" not in detector._pure_tone_frequencies
+    # Even if FFT might detect a dominant frequency, clips without strategy metadata
+    # still use the normal path.
+    assert "my_chirp" not in detector._tone_frequencies
 
 
 def test_make_chirp_produces_sub_threshold_length():
@@ -101,27 +102,6 @@ def test_short_chirp_no_false_positives_in_noise():
     assert peak_times.get("test_chirp", []) == []
 
 
-def test_pure_tone_strategy_triggers_pure_tone_path():
-    """A clip with strategy='pure_tone' routes to pure tone detection."""
-    duration = 0.125
-    freq = 1000.0
-    n = int(duration * SR)
-    t = np.arange(n, dtype=np.float32) / SR
-    tone = (0.9 * np.sin(2 * np.pi * freq * t)).astype(np.float32)
-
-    clip = AudioClip(
-        name="my_beep",
-        audio=np.asarray(tone, dtype=np.float32),
-        sample_rate=SR,
-        strategy="pure_tone",
-        strategy_params={"dominant_frequency_hz": freq},
-    )
-    detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
-
-    assert "my_beep" in detector._pure_tone_frequencies, \
-        "strategy='pure_tone' should register a dominant frequency"
-
-
 def test_marker_tone_strategy_triggers_tone_path():
     """A clip with strategy='marker_tone' routes to the tone verifier path."""
     duration = 0.125
@@ -139,12 +119,12 @@ def test_marker_tone_strategy_triggers_tone_path():
     )
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
 
-    assert "my_marker" in detector._pure_tone_frequencies, \
+    assert "my_marker" in detector._tone_frequencies, \
         "strategy='marker_tone' should register a dominant frequency"
 
 
-def test_pure_tone_clip_without_strategy_uses_normal_path():
-    """A pure-tone clip without strategy='pure_tone' must NOT trigger the pure tone path."""
+def test_tone_clip_without_strategy_uses_normal_path():
+    """A tone clip without strategy='marker_tone' must NOT trigger the tone path."""
     duration = 0.125
     freq = 1000.0
     n = int(duration * SR)
@@ -158,5 +138,5 @@ def test_pure_tone_clip_without_strategy_uses_normal_path():
     clip = _audio_clip_from_array("other_tone", tone)
     detector = AudioPatternDetector(audio_clips=[clip], debug_mode=False)
 
-    assert "other_tone" not in detector._pure_tone_frequencies, \
-        "Clips without strategy='pure_tone' should not route to the pure tone path"
+    assert "other_tone" not in detector._tone_frequencies, \
+        "Clips without strategy='marker_tone' should not route to the tone path"
