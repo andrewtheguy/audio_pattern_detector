@@ -1,6 +1,6 @@
 [project]
 name = "audio-pattern-detector"
-version = "0.3.18"
+version = "0.3.19"
 description = ""
 authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
 requires-python = "~=3.12.0"
@@ -56,7 +56,7 @@ explicit = true
 
 [tool.uv.sources]
 fft-correlation = { index = "fft-correlation" }
-andrew-utils = { git = "https://github.com/andrewtheguy/andrew_utils.git", tag = "0.1.1" }
+andrew-utils = { git = "https://github.com/andrewtheguy/andrew_utils.git", tag = "0.1.2" }
 
 [build-system]
 requires = ["maturin>=1.9.4,<2.0"]
