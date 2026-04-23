@@ -3,7 +3,7 @@ import subprocess
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import IO, Any
+from typing import IO, Any, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -171,7 +171,10 @@ def resample_audio(audio: NDArray[np.float32], orig_sr: int, target_sr: int) -> 
     return resample(audio, num_samples)
 
 
-def slicing_with_zero_padding(array: NDArray[np.floating[Any]], width: int, middle_index: int) -> NDArray[np.floating[Any]]:
+_FloatT = TypeVar("_FloatT", bound=np.floating[Any])
+
+
+def slicing_with_zero_padding(array: NDArray[_FloatT], width: int, middle_index: int) -> NDArray[_FloatT]:
     padding = width / 2
 
     beg = int(middle_index - math.floor(padding))
