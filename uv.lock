@@ -35,7 +35,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "andrew-utils", git = "https://github.com/andrewtheguy/andrew_utils.git?tag=0.1.2" },
-    { name = "fft-correlation", specifier = "==0.0.4", index = "https://andrewtheguy.github.io/fft-correlation/simple/" },
+    { name = "fft-correlation", specifier = "==0.0.5", index = "https://andrewtheguy.github.io/fft-correlation/simple/" },
     { name = "numpy", specifier = ">=2.0,<3" },
 ]
 
@@ -108,16 +108,16 @@ wheels = [
 
 [[package]]
 name = "fft-correlation"
-version = "0.0.4"
+version = "0.0.5"
 source = { registry = "https://andrewtheguy.github.io/fft-correlation/simple/" }
 dependencies = [
     { name = "numpy" },
 ]
 wheels = [
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.4/fft_correlation-0.0.4-cp39-abi3-macosx_11_0_arm64.whl" },
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.4/fft_correlation-0.0.4-cp39-abi3-manylinux_2_34_aarch64.whl" },
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.4/fft_correlation-0.0.4-cp39-abi3-manylinux_2_34_x86_64.whl" },
-    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.4/fft_correlation-0.0.4-cp39-abi3-win_amd64.whl" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.5/fft_correlation-0.0.5-cp39-abi3-macosx_11_0_arm64.whl" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.5/fft_correlation-0.0.5-cp39-abi3-manylinux_2_34_aarch64.whl" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.5/fft_correlation-0.0.5-cp39-abi3-manylinux_2_34_x86_64.whl" },
+    { url = "https://github.com/andrewtheguy/fft-correlation/releases/download/v0.0.5/fft_correlation-0.0.5-cp39-abi3-win_amd64.whl" },
 ]
 
 [[package]]
