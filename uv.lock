@@ -5,11 +5,15 @@ requires-python = "==3.12.*"
 [[package]]
 name = "andrew-utils"
 version = "0.1.2"
-source = { git = "https://github.com/andrewtheguy/andrew_utils.git?tag=0.1.2#1e9e1910fee22aaf91288d9f2d10763b50b5cc86" }
+source = { registry = "https://andrewtheguy.github.io/andrew_utils/simple/" }
+sdist = { url = "https://github.com/andrewtheguy/andrew_utils/releases/download/0.1.2/andrew_utils-0.1.2.tar.gz" }
+wheels = [
+    { url = "https://github.com/andrewtheguy/andrew_utils/releases/download/0.1.2/andrew_utils-0.1.2-py3-none-any.whl" },
+]
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.3.20"
+version = "0.3.21"
 source = { editable = "." }
 dependencies = [
     { name = "andrew-utils" },
@@ -34,7 +38,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "andrew-utils", git = "https://github.com/andrewtheguy/andrew_utils.git?tag=0.1.2" },
+    { name = "andrew-utils", specifier = ">=0.1.2,<0.2.0", index = "https://andrewtheguy.github.io/andrew_utils/simple/" },
     { name = "fft-correlation", specifier = "==0.0.5", index = "https://andrewtheguy.github.io/fft-correlation/simple/" },
     { name = "numpy", specifier = ">=2.0,<3" },
 ]
