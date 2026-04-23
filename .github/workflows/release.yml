@@ -89,7 +89,7 @@ jobs:
           workspaces: native-helper
 
       - name: Install release build dependencies
-        run: python -m pip install --upgrade pip numpy maturin
+        run: python -m pip install --upgrade pip 'numpy>=2,<3' maturin
 
       - name: Build wheel
         env:
