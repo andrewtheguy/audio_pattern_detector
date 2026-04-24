@@ -1,6 +1,6 @@
 [project]
 name = "audio-pattern-detector"
-version = "0.3.21"
+version = "0.3.22"
 description = ""
 authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
 requires-python = "~=3.12.0"
@@ -52,7 +52,6 @@ reportImplicitOverride = false
 [[tool.uv.index]]
 name = "fft-correlation"
 url = "https://andrewtheguy.github.io/fft-correlation/simple/"
-explicit = true
 
 [[tool.uv.index]]
 name = "andrew-utils"

@@ -43,12 +43,10 @@ jobs:
           }
 
           generate_index "${GH_REPO}" "audio-pattern-detector"
-          generate_index "andrewtheguy/fft-correlation" "fft-correlation"
 
           cat > _pages/simple/index.html <<'HTML'
           <!DOCTYPE html><html><body>
           <a href="audio-pattern-detector/">audio-pattern-detector</a>
-          <a href="fft-correlation/">fft-correlation</a>
           </body></html>
           HTML
 
