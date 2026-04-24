@@ -13,8 +13,14 @@ Uses cross-correlation to detect potential matches, then uses mean square error 
 Automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
 
 ```shell
-uv tool install --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ 'audio-pattern-detector==x.x.x'
+uv tool install \
+  --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ \
+  --extra-index-url https://andrewtheguy.github.io/fft-correlation/simple/ \
+  --extra-index-url https://andrewtheguy.github.io/andrew_utils/simple/ \
+  'audio-pattern-detector==x.x.x'
 ```
+
+The extra `fft-correlation` and `andrew-utils` indexes are required because those transitive dependencies are not published to PyPI.
 
 ### Install from source (requires Rust toolchain)
 ```shell
