@@ -360,6 +360,49 @@ class TestSlidingWindowBoundary:
         assert abs(closest_detection - expected_time) < 0.3, \
             f"Expected detection near {expected_time}s, got {closest_detection}s"
 
+    def test_pattern_straddling_final_short_chunk_boundary_is_found(self):
+        """Regression: pattern straddling the boundary into the final short chunk
+        must still be detected.
+
+        Previously, the final-short-chunk branch took the last seconds_per_chunk
+        seconds of (previous + chunk) instead of prepending sliding_window. When
+        the final chunk is only slightly shorter than seconds_per_chunk, the
+        actual lookback shrinks below sliding_window, so a pattern crossing that
+        boundary fell out of bounds in both chunks and was silently dropped.
+        """
+        sr = DEFAULT_TARGET_SAMPLE_RATE
+        pattern_duration = 0.23
+        seconds_per_chunk = 3
+        pattern = create_beep_pattern(duration=pattern_duration)
+
+        # Audio length picked so chunk 1 is a "final short chunk" whose length
+        # (2.95s) is close enough to seconds_per_chunk (3s) that the old branch
+        # had only 0.05s of lookback into chunk 0 — well below the 1s
+        # sliding_window required to capture a pattern crossing the boundary.
+        audio_duration = 5.95
+        pattern_start = 2.9  # straddles the 3.0s boundary into chunk 1
+
+        silence_before = create_silence(pattern_start, sr)
+        silence_after = create_silence(audio_duration - pattern_start - pattern_duration, sr)
+        audio = np.concatenate([silence_before, pattern.audio, silence_after])
+
+        audio_stream = create_audio_stream_from_array(audio, "test_audio")
+
+        detector = AudioPatternDetector(
+            debug_mode=False,
+            audio_clips=[pattern],
+            seconds_per_chunk=seconds_per_chunk
+        )
+        peak_times, _ = detector.find_clip_in_audio(audio_stream)
+
+        assert 'test_beep' in peak_times
+        assert len(peak_times['test_beep']) >= 1, \
+            "Pattern straddling boundary into final short chunk should be detected"
+
+        closest_detection = min(peak_times['test_beep'], key=lambda t: abs(t - pattern_start))
+        assert abs(closest_detection - pattern_start) < 0.1, \
+            f"Expected detection near {pattern_start}s, got {closest_detection}s"
+
 
 class TestSlidingWindowWithRealPatterns:
     """Integration tests using real audio patterns for sliding window behavior."""

@@ -397,26 +397,17 @@ class AudioPatternDetector:
         sr = self.target_sample_rate
         seconds_per_chunk = self.seconds_per_chunk
         clip_seconds = len(clip) / sr
-        chunk_seconds = len(chunk) / sr
-        # Build audio_section with enough tail from previous_chunk to catch
-        # patterns that straddle chunk boundaries. Shape depends on branch.
+        # Prepend the last sliding_window seconds (= ceil(clip_seconds)) of
+        # previous_chunk so a pattern that crosses the boundary is fully
+        # contained in audio_section. Applied uniformly to every non-first
+        # chunk — including the final short chunk, whose own length is not a
+        # reliable lookback (it can be ~seconds_per_chunk, leaving only a few
+        # ms of overlap).
         if previous_chunk is not None:
-            if chunk_seconds < seconds_per_chunk:  # final short chunk
-                # Take the last seconds_per_chunk seconds of (previous ++ chunk):
-                # previous_chunk participates in full, but only its tail survives
-                # the slice. No sliding_window overlap is added — the surviving
-                # window already extends further back than any pattern length.
-                subtract_seconds = -(chunk_seconds - seconds_per_chunk)
-                audio_section_temp = np.concatenate((previous_chunk, chunk))[(-seconds_per_chunk * sr):]
-                audio_section = audio_section_temp
-            else:
-                # Prepend only the last sliding_window seconds (= ceil(clip_seconds))
-                # of previous_chunk — just enough to cover a pattern that crosses
-                # the boundary. Length: sliding_window + seconds_per_chunk.
-                subtract_seconds = sliding_window
-                audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk))
+            subtract_seconds = sliding_window
+            audio_section = np.concatenate((previous_chunk[int(-sliding_window * sr):], chunk))
         else:
-            # First chunk: no previous audio available. Length: seconds_per_chunk.
+            # First chunk: no previous audio available. Length: chunk_seconds.
             subtract_seconds = 0
             audio_section = chunk
 
