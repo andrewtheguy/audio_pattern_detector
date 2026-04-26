@@ -4,7 +4,7 @@ Detects audio patterns specified by audio clips in target audio files. Designed 
 
 Useful for AI workflows to efficiently segment audio files before processing (e.g., OpenAI Whisper transcription preprocessing).
 
-Uses cross-correlation to detect potential matches, then uses mean square error and Pearson correlation to eliminate false positives. Robust against lossy-encoded audio (Opus, AAC).
+Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + multi-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
 
 ## Installation
 

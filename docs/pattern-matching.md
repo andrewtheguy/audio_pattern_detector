@@ -4,7 +4,10 @@ This document describes how audio pattern detection works, from raw audio data t
 
 ## Overview
 
-The detector finds occurrences of short audio patterns (clips) within a longer audio stream using FFT-based cross-correlation, followed by similarity verification to reject false positives. There are two verification paths: a normal correlation-envelope path (for all clips including short ones) and strategy-specific tone verification paths for `.apd.toml` marker clips.
+Detection is a **two-step process**:
+
+- **Step 1 — Candidate detection.** FFT-based cross-correlation against the audio always runs first. Its job is to find and center potential match locations as candidate peaks. Every clip type goes through this step, regardless of length or strategy.
+- **Step 2 — Candidate verification.** Each candidate peak from Step 1 is then verified using one of three paths, chosen by clip type: normal verification (for regular clips ≥ 0.5s), short-clip verification (for clips < 0.5s), or marker-tone verification (for `.apd.toml` patterns with `strategy = "marker_tone"`). The three paths are alternatives at Step 2 — they all share the same Step 1.
 
 ## Pipeline
 
@@ -17,17 +20,26 @@ Raw audio stream (float32 PCM)
         |
    Loudness-normalize the audio section to -16 dB LUFS
         |
+─── Step 1: Candidate detection (always runs) ───────────────────
+        |
    FFT cross-correlation against each clip
         |
    Peak detection (height >= 0.25, min distance = clip length)
         |
-   For each candidate peak:
+─── Step 2: Candidate verification (one path per candidate) ─────
         |
-   ┌─ clip strategy == "marker_tone"? ────────────────┐
-   │  YES: Tone verification path                      │
-   │  NO:  Partitioned MSE + Pearson r check           │
-   │       (short clips < 0.5s use 0-100% window only) │
-   └───────────────────────────────────────────────────┘
+   For each candidate peak, dispatch on clip type:
+        |
+   ┌─ strategy == "marker_tone"? ─────────────────────────────┐
+   │  YES → Marker-tone verification                           │
+   │        (narrowband spectral check at dominant frequency)  │
+   │                                                           │
+   │  NO  → Correlation-envelope verification:                 │
+   │        • clip >= 0.5s  → Normal: partitioned MSE          │
+   │                          + 3-window Pearson r             │
+   │        • clip <  0.5s  → Short clip: whole-only MSE       │
+   │                          + single-window Pearson r        │
+   └───────────────────────────────────────────────────────────┘
         |
    Accepted peaks converted to timestamps
 ```
@@ -52,7 +64,9 @@ For the final chunk, if `len(chunk) / sample_rate < seconds_per_chunk`, the dete
 
 Each per-clip `audio_section` is loudness-normalized independently to -16 dB LUFS before correlation.
 
-## FFT Cross-Correlation
+## Step 1: Candidate Detection (FFT Cross-Correlation)
+
+This step always runs first for every clip type. Its job is to locate and center potential match positions; it does not decide whether a candidate is a true match — that is Step 2.
 
 For each chunk and each clip:
 
@@ -62,11 +76,15 @@ For each chunk and each clip:
 
 Each peak is a candidate match location. Candidates are discarded only if the centered slice would extend more than 5 samples beyond the correlation array; otherwise zero-padding is used to keep the slice length consistent.
 
-## Similarity Verification
+## Step 2: Candidate Verification
 
-For each candidate peak, a slice of the cross-correlation curve centered on the peak is extracted, with the same length as the self-correlation curve. Zero-padding is applied if needed at the ends, and the slice is normalized by its own max.
+Every candidate peak from Step 1 is verified before being accepted as a match. The verifier branch is chosen by clip type, and the three branches below are alternatives — exactly one runs per candidate:
 
-The self-correlation curve acts as the "ideal" shape. The verification asks: does this candidate's correlation slice look like the ideal?
+- **Normal Patterns** (`.wav` clips ≥ 0.5s) — partitioned MSE plus 3-window Pearson r on the centered correlation slice.
+- **Short Clips** (`.wav` clips < 0.5s) — same correlation-envelope approach but with simplified single-window MSE and Pearson.
+- **Marker Tone** (`.apd.toml` clips with `strategy = "marker_tone"`) — narrowband spectral check at the declared dominant frequency, instead of the correlation-envelope shape check.
+
+For the two correlation-envelope paths (Normal and Short Clips), a slice of the cross-correlation curve centered on the peak is extracted, with the same length as the self-correlation curve. Zero-padding is applied if needed at the ends, and the slice is normalized by its own max. The self-correlation curve acts as the "ideal" shape; the verification asks: does this candidate's correlation slice look like the ideal? The marker-tone path skips this shape comparison entirely and works on the candidate's audio segment directly.
 
 ### Normal Patterns
 
@@ -113,9 +131,11 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 **Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. clean pure tones like the RTHK hourly beep) need their own special-case path instead — see `.apd.toml` pattern configs below.
 
-### `.apd.toml` Pattern Configs and Tone Verification
+### Marker Tone (`.apd.toml` clips)
 
-Patterns that need a special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) that declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
+Marker-tone clips still go through Step 1 — FFT cross-correlation against the synthesised clip and peak detection — to find and center candidate locations. Only Step 2 differs: instead of the correlation-envelope shape check used by Normal Patterns and Short Clips, the candidate's audio segment is verified with a narrowband spectral check at the clip's declared dominant frequency. This is needed because clean pure tones (like the RTHK hourly beep) do not produce a distinctive enough correlation envelope for the shape-based path to verify reliably.
+
+Patterns that need this special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) that declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
 
 Example (`sample_audios/clips/rthk_beep.apd.toml`):
 
