@@ -118,8 +118,11 @@ def _clip_from_wav_base64(
             f"Valid fields: {sorted(_WAV_BASE64_FIELDS)}"
         )
     data_str = _get_required(params, "data", str, source_path)
+    # Strip whitespace so callers can use TOML triple-quoted strings
+    # (`data = """..."""`) and break the base64 across multiple lines.
+    cleaned = "".join(data_str.split())
     try:
-        wav_bytes = base64.b64decode(data_str, validate=True)
+        wav_bytes = base64.b64decode(cleaned, validate=True)
     except binascii.Error as e:
         raise ValueError(f"{source_path}: invalid base64 in [clip].data: {e}") from e
 

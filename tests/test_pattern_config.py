@@ -118,6 +118,40 @@ dominant_frequency_hz = {freq}
     assert config.strategy_params["dominant_frequency_hz"] == freq
 
 
+def test_wav_base64_accepts_multiline_string(tmp_path: Path) -> None:
+    """[clip].data may span multiple lines via TOML triple-quoted strings."""
+    sr = DEFAULT_TARGET_SAMPLE_RATE
+    wav_bytes = _sine_wav_bytes(1040.0, 0.05, sr)
+    b64 = base64.b64encode(wav_bytes).decode("ascii")
+    wrapped = "\n".join(b64[i : i + 76] for i in range(0, len(b64), 76))
+    body = f"""\
+[clip]
+source = "wav_base64"
+data = \"\"\"
+{wrapped}
+\"\"\"
+
+[verification]
+strategy = "marker_tone"
+dominant_frequency_hz = 1040.0
+"""
+    path = _write_toml(tmp_path, body)
+    inline_body = f"""\
+[clip]
+source = "wav_base64"
+data = "{b64}"
+
+[verification]
+strategy = "marker_tone"
+dominant_frequency_hz = 1040.0
+"""
+    inline_path = _write_toml(tmp_path, inline_body, name="inline.apd.toml")
+
+    multiline = load_apd_file(path, sample_rate=sr)
+    inline = load_apd_file(inline_path, sample_rate=sr)
+    np.testing.assert_array_equal(multiline.audio, inline.audio)
+
+
 def test_wav_base64_resamples_to_target(tmp_path: Path) -> None:
     # WAV recorded at 16 kHz, loader must resample to the requested 8 kHz target.
     source_sr = 16000
