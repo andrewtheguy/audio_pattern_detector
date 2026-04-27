@@ -135,29 +135,39 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 Marker-tone clips still go through Step 1 — FFT cross-correlation against the synthesised clip and peak detection — to find and center candidate locations. Only Step 2 differs: instead of the correlation-envelope shape check used by Normal Patterns and Short Clips, the candidate's audio segment is verified with a narrowband spectral check at the clip's declared dominant frequency. This is needed because clean pure tones (like the RTHK hourly beep) do not produce a distinctive enough correlation envelope for the shape-based path to verify reliably.
 
-Patterns that need this special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) that declares the strategy plus a generator used to synthesise the pattern clip at the target sample rate. Ordinary patterns continue to use `.wav`.
+Patterns that need this special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) split into two sections that mirror the pipeline: `[clip]` provides the Step 1 audio source, and `[verification]` declares the Step 2 strategy and per-strategy thresholds. Ordinary patterns continue to use `.wav`.
+
+`[clip].source` selects how Step 1's clip audio is produced:
+- `source = "sine"` — synthesise a sine at `frequency_hz` for `duration_seconds` (and optional `amplitude`) at the detector's target sample rate. A single file works at 8 kHz, 16 kHz, or any other rate.
+- `source = "wav_base64"` — carry a recorded WAV inline as base64 in the `data` field. Useful when the marker is not a clean sine and a faithful replay matters more than parametric tunability. The loader resamples to the target rate if needed.
 
 Example (`sample_audios/clips/rthk_beep.apd.toml`):
 
 ```toml
-strategy = "marker_tone"
 description = "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s"
 
-[generator]
-type = "sine"
+[clip]
+source = "sine"
 frequency_hz = 1040.19
 duration_seconds = 0.228375
 amplitude = 1.0
+
+[verification]
+strategy = "marker_tone"
+minimum_band_purity = 0.72
+minimum_active_frame_ratio = 0.70
+minimum_longest_active_run = 7
+minimum_active_frame_mean_purity = 0.77
+maximum_min_flank_purity = 0.02
+maximum_max_flank_purity = 0.14
 ```
 
-The currently implemented tone strategy is `marker_tone`; the only generator is `sine`. The extension point is the `strategy` field — adding a new special handling means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
+The currently implemented tone strategy is `marker_tone`. The extension point is the `[verification].strategy` field — adding a new special handler means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
 
 When a clip's strategy is tone-based:
-1. The dominant frequency declared in `generator.frequency_hz` is stored as the clip's strategy parameter during initialisation (no FFT re-derivation is needed, though `get_pure_tone_frequency()` is used as a fallback if absent).
+1. The dominant frequency is taken from `[verification].dominant_frequency_hz` if declared, else from `[clip].frequency_hz` for sine sources, else fallback-derived via `get_pure_tone_frequency()` from the loaded audio.
 2. At verification time, `_verify_marker_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
-3. Per-clip `verification` parameters in the TOML file tune how much in-window purity and adjacent-flank leakage are allowed for that station's marker.
-
-Because the clip is synthesised at the target sample rate, a single `.apd.toml` file works at 8 kHz, 16 kHz, or any other supported rate without needing a per-rate variant.
+3. Per-clip threshold fields under `[verification]` tune how much in-window purity and adjacent-flank leakage are allowed for that station's marker.
 
 ## Pure Tone Classification
 
