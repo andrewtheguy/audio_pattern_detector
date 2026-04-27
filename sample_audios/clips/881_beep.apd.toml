@@ -3,21 +3,22 @@
 # short sine-like tone that correlates more reliably when we synthesize it at
 # the target sample rate and then verify the candidate as a narrowband tone.
 
-strategy = "marker_tone"
 description = "Commercial Radio 881 opening marker tone - ~1059 Hz pure tone, ~0.153s"
 
-[generator]
-type = "sine"
+[clip]
+# Step 1: synthesised sine used for FFT cross-correlation.
 # Measured from the cleanest pure-tone subwindow inside ./tmp/untitled.wav,
 # which the user provided as a reference snippet for the 881 marker.
+source = "sine"
 frequency_hz = 1058.87
 duration_seconds = 0.153
 amplitude = 1.0
 
 [verification]
-# 881 openings can be much dirtier than the 903 marker, but they remain
-# tightly isolated from surrounding content. Keep the flanks very strict while
-# allowing lower in-window purity.
+# Step 2: narrowband spectral check. 881 openings can be much dirtier than
+# the 903 marker, but they remain tightly isolated from surrounding content.
+# Keep the flanks very strict while allowing lower in-window purity.
+strategy = "marker_tone"
 minimum_band_purity = 0.72
 minimum_active_frame_ratio = 0.80
 minimum_longest_active_run = 9

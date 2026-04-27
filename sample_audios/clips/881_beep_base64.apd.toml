@@ -1,0 +1,75 @@
+# 881_beep_base64: same 881 marker tone as 881_beep.apd.toml, but the Step 1
+# clip is carried inline as a base64-encoded WAV instead of synthesised from
+# a formula. Demonstrates the wav_base64 clip source — useful when the clip
+# was recorded rather than generated and a faithful replay matters more than
+# parametric tunability.
+#
+# The embedded WAV is mono int16 at 8 kHz, 0.153 s of a 1058.87 Hz sine; the
+# loader resamples it to the detector's target sample rate if they differ.
+# The loader strips whitespace from [clip].data, so the base64 may use a
+# TOML triple-quoted multi-line string for readability (76-char lines here,
+# matching the PEM/MIME convention).
+
+description = "Commercial Radio 881 marker (base64-WAV variant) - ~1059 Hz, ~0.153s"
+
+[clip]
+source = "wav_base64"
+data = """
+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
+"""
+
+[verification]
+# Step 2: marker_tone uses the same thresholds as the synthesised 881 clip,
+# plus an explicit dominant_frequency_hz since it cannot be inferred from
+# the [clip] section when the source is a recorded WAV.
+strategy = "marker_tone"
+dominant_frequency_hz = 1058.87
+minimum_band_purity = 0.72
+minimum_active_frame_ratio = 0.80
+minimum_longest_active_run = 9
+minimum_active_frame_mean_purity = 0.74
+maximum_min_flank_purity = 0.02
+maximum_max_flank_purity = 0.02

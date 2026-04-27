@@ -5,12 +5,17 @@
 # The clip is synthesised from frequency + duration at the target sample
 # rate, so a single .apd.toml works at 8 kHz, 16 kHz, or any other rate.
 
-strategy = "marker_tone"
 description = "Capture 903 marker beep - ~1062 Hz pure tone, ~0.153s"
 
-[generator]
-type = "sine"
+[clip]
+# Step 1: synthesised sine used for FFT cross-correlation.
 # Measured from /mnt/dasdata/andrewdata/audio_clips/short/881903beep.wav.
+source = "sine"
 frequency_hz = 1061.98
 duration_seconds = 0.152875
 amplitude = 1.0
+
+[verification]
+# Step 2: narrowband spectral check. Defaults are tuned for the cleaner 903
+# marker; no per-station overrides needed.
+strategy = "marker_tone"

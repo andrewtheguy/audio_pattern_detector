@@ -6,20 +6,22 @@
 # The clip is synthesised from frequency + duration at the target sample
 # rate, so a single .apd.toml works at 8 kHz, 16 kHz, or any other rate.
 
-strategy = "marker_tone"
 description = "RTHK hourly beep — ~1040 Hz pure tone, ~0.23s"
 
-[generator]
-type = "sine"
+[clip]
+# Step 1: synthesised sine used for FFT cross-correlation.
 # Measured from the original rthk_beep.wav capture (parabolic-interp FFT peak).
+source = "sine"
 frequency_hz = 1040.19
 duration_seconds = 0.228375
 amplitude = 1.0
 
 [verification]
-# Tuned against the RTHK regression fixtures. The first few beeps in an
-# opening cluster can be dirtier than the later ones, but both neighbouring
-# flanks still stay quiet compared with the matched window.
+# Step 2: narrowband spectral check. Tuned against the RTHK regression
+# fixtures. The first few beeps in an opening cluster can be dirtier than
+# the later ones, but both neighbouring flanks still stay quiet compared
+# with the matched window.
+strategy = "marker_tone"
 minimum_band_purity = 0.72
 minimum_active_frame_ratio = 0.70
 minimum_longest_active_run = 7
