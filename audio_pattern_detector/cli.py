@@ -37,7 +37,7 @@ def main():
     match_parser.add_argument('--multiplexed-stdin', action='store_true',
                               help='read patterns and audio from stdin using multiplexed protocol (always outputs JSONL). '
                                    'Protocol: [uint32 num_patterns] then for each pattern [uint32 name_len][name][uint32 data_len][wav_data], '
-                                   'followed by audio stream (WAV or raw PCM with --raw-pcm)')
+                                   'followed by audio stream (WAV)')
     match_parser.add_argument('--target-sample-rate', metavar='rate', type=int, required=False, help='target sample rate for processing in Hz (default: 8000)')
     match_parser.add_argument('--timestamp-format', choices=['ms', 'formatted', 'both'], default='both',
                               help='timestamp format in JSONL output: "both" for integer milliseconds and HH:MM:SS.mmm strings (default), '

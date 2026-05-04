@@ -96,7 +96,7 @@ just one representation.
 
 - **[Pattern Matching](docs/pattern-matching.md)** - Detailed description of the detection pipeline, verification logic, and thresholds
 - **[Denoise Strategy](docs/denoise-strategy.md)** - How to denoise pattern clips for better matching with lossy-encoded or noisy audio
-- **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin, raw PCM stdin, and multiplexed stdin (IPC) with code examples for Node.js, Python, Go
+- **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin and multiplexed stdin (IPC) with code examples for Node.js, Python, Go
 - **[Development](docs/development.md)** - Type checking, linting, testing, Docker, detection algorithm details
 
 ## Development

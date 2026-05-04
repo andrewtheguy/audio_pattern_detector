@@ -67,7 +67,7 @@ docker build -t audio-pattern-detector .
 
 **Note**: The production image does not include ffmpeg. It supports:
 - WAV files (processed with scipy, no ffmpeg needed)
-- Stdin modes (WAV, raw PCM, multiplexed)
+- Stdin modes (WAV, multiplexed)
 
 For non-WAV file support (mp3, flac, etc.), pipe through ffmpeg on the host:
 
