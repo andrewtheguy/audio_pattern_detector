@@ -106,8 +106,8 @@ Verification uses partitioned mean squared error (MSE) plus Pearson correlation 
 
    Pearson r is scale-invariant — it measures shape similarity regardless of amplitude differences. This is important for lossy-encoded audio (e.g. Opus HLS streams) where codec artifacts inflate the correlation envelope but preserve the overall shape. The multi-window approach handles cases where the peak shape is slightly asymmetric or off-center.
 
-3. **Decision thresholds**:
-   - `similarity > 0.03` -> reject (hard MSE ceiling)
+3. **Decision thresholds** (evaluated in order — MSE first, short-circuiting Pearson):
+   - `similarity > 0.02` -> reject early (hard MSE ceiling; skip Pearson computation entirely)
    - `pearson_r >= 0.90` -> accept (shape matches well, even if MSE is moderately elevated)
    - Otherwise -> reject (shape doesn't match well enough)
 
@@ -127,7 +127,7 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 2. **Pearson correlation** — a single 0-100% window (505 downsampled points) instead of the three partial windows. The full window captures the overall shape without splitting into regions that would be too small.
 
-3. **Same thresholds** — `similarity > 0.03` rejects, `pearson_r >= 0.90` accepts.
+3. **Same thresholds** — `similarity > 0.02` rejects early (no Pearson computation), `pearson_r >= 0.90` accepts.
 
 **Limitation**: short clips require good cross-correlation characteristics. The clip must produce a distinctive correlation peak that matches its self-correlation envelope. Clips that don't cross-correlate well (e.g. clean pure tones like the RTHK hourly beep) need their own special-case path instead — see `.apd.toml` pattern configs below.
 
