@@ -790,7 +790,7 @@ class AudioPatternDetector:
         else:
             similarity = min(similarity_whole,similarity_middle)
 
-        similarity_hard_limit = 0.005
+        similarity_hard_limit = 0.02
         pearson_r_threshold = 0.90
 
         if similarity > similarity_hard_limit:
