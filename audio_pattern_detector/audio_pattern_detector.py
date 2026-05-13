@@ -790,6 +790,19 @@ class AudioPatternDetector:
         else:
             similarity = min(similarity_whole,similarity_middle)
 
+        similarity_hard_limit = 0.005
+        pearson_r_threshold = 0.90
+
+        if similarity > similarity_hard_limit:
+            if debug_mode:
+                seconds.append(peak / sr)
+                self._similarity_debug[clip_name].append((index, similarity,))
+                similarities.append((similarity, {"whole": float(similarity_whole),
+                                                  "middle": float(similarity_middle)},
+                                     None))
+                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
+            return
+
         # Pearson r on center window (partitions 4-6, i.e. 40-60% around peak)
         # Additional flanking windows are computed only for debug graphs.
         ds_base = 101  # for 20% window (2 partitions)
@@ -881,13 +894,7 @@ class AudioPatternDetector:
                                   "best_window_right": float(best_wr),
                                   **pearson_per_window}))
 
-        similarity_hard_limit = 0.03
-        pearson_r_threshold = 0.90
-
-        if similarity > similarity_hard_limit:
-            if debug_mode:
-                print(f"failed verification for {section_ts} due to similarity {similarity} > {similarity_hard_limit}",file=sys.stderr)
-        elif pearson_r >= pearson_r_threshold:
+        if pearson_r >= pearson_r_threshold:
             peaks_final.append(peak)
         else:
             if debug_mode:
