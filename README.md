@@ -6,39 +6,30 @@ Useful for AI workflows to efficiently segment audio files before processing (e.
 
 Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + multi-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
 
+Written in Rust: a single self-contained binary with no runtime dependencies (ffmpeg is only needed for non-WAV input files).
+
 ## Installation
 
-### Install from GitHub Pages package index (recommended)
+### Prebuilt binaries
 
-Automatically selects the correct wheel for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon).
-
-```shell
-uv tool install \
-  --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/ \
-  --extra-index-url https://andrewtheguy.github.io/fft-correlation/simple/ \
-  --extra-index-url https://andrewtheguy.github.io/andrew_utils/simple/ \
-  'audio-pattern-detector==x.x.x'
-```
-
-The extra `fft-correlation` and `andrew-utils` indexes are required because those transitive dependencies are not published to PyPI.
+Download the archive for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon, Windows x86_64) from the [GitHub releases](https://github.com/andrewtheguy/audio_pattern_detector/releases) page and put `audio-pattern-detector` on your `PATH`.
 
 ### Install from source (requires Rust toolchain)
+
 ```shell
-uv tool install git+https://github.com/andrewtheguy/audio_pattern_detector.git@(tag or branch)
+cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git --tag vx.x.x
 ```
 
-### Run without installing
-```shell
-uv tool run --from git+https://github.com/andrewtheguy/audio_pattern_detector.git@vx.x.x audio-pattern-detector [command] [options]
+### Run from a checkout
 
-# Or from local directory
-uv run audio-pattern-detector [command] [options]
+```shell
+cargo run --release -- [command] [options]
 ```
 
 ## Audio Requirements
 
-- **Mono Only**: Only mono (single channel) audio is supported
-- **Sample Rate**: Default is 8kHz (configurable via `--target-sample-rate`)
+- **Mono**: detection runs on mono audio. WAV files with more channels are mixed down; stdin streams must already be mono.
+- **Sample Rate**: Default is 8kHz (configurable via `--target-sample-rate`). WAV files and pattern clips at other rates are resampled; stdin streams must already be at the target rate.
 - **Format**: WAV files recommended (no ffmpeg required). Non-WAV files need ffmpeg.
 
 ## Quick Start
@@ -71,11 +62,12 @@ audio-pattern-detector show-config ./clips/rthk_beep.apd.toml
 | `--stdin`              | Read WAV audio from stdin                                                |
 | `--multiplexed-stdin`  | Read patterns and audio from stdin via binary protocol (for IPC)         |
 | `--target-sample-rate` | Target sample rate for processing (default: 8000)                        |
-| `--pattern-file`       | Single pattern file (WAV)                                                |
-| `--pattern-folder`     | Folder of pattern clips (WAV)                                            |
+| `--pattern-file`       | Single pattern file (`.wav` or `.apd.toml`), repeatable                  |
+| `--pattern-folder`     | Folder of pattern clips (`*.wav` and `*.apd.toml`), repeatable           |
 | `--chunk-seconds`      | Seconds per chunk (default: 60, or "auto")                               |
 | `--timestamp-format`   | JSONL timestamp fields: `both` (default), `ms`, or `formatted`           |
-| `--debug`              | Enable debug mode                                                        |
+| `--height-min`         | Minimum correlation peak height (default: 0.25; lower to find weak matches) |
+| `--debug`              | Enable debug mode (diagnostics, candidate audio, peak dumps; no charts yet) |
 | `--debug-dir`          | Base directory for debug output (default: ./tmp)                         |
 
 ## JSONL Output Format
@@ -87,27 +79,44 @@ fields. Use `--timestamp-format ms` or `--timestamp-format formatted` to emit
 just one representation.
 
 ```jsonl
-{"type": "start", "source": "audio.wav"}
-{"type": "pattern_detected", "clip_name": "pattern", "timestamp_ms": 5500, "timestamp_formatted": "00:00:05.500"}
-{"type": "end", "total_time_ms": 60000, "total_time_formatted": "00:01:00.000"}
+{"type":"start","source":"audio.wav"}
+{"type":"pattern_detected","clip_name":"pattern","timestamp_ms":5500,"timestamp_formatted":"00:00:05.500"}
+{"type":"end","total_time_ms":60000,"total_time_formatted":"00:01:00.000"}
 ```
+
+Errors are reported on stderr as `Error: <message>` with exit code 1.
+
+## Library
+
+The crate can also be used as a Rust library:
+
+```rust
+use audio_pattern_detector::{match_pattern, MatchOptions};
+
+let (peak_times, total_seconds) = match_pattern(
+    "audio.wav",
+    &["pattern.wav", "station_beep.apd.toml"],
+    &MatchOptions::default(),
+    Some(&mut |clip_name, seconds| println!("{clip_name} at {seconds:.3}s")),
+    true,
+)?;
+```
+
+For custom audio sources, implement `SampleSource` and drive `AudioPatternDetector::find_clip_in_audio` directly.
 
 ## Documentation
 
 - **[Pattern Matching](docs/pattern-matching.md)** - Detailed description of the detection pipeline, verification logic, and thresholds
 - **[Denoise Strategy](docs/denoise-strategy.md)** - How to denoise pattern clips for better matching with lossy-encoded or noisy audio
-- **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin and multiplexed stdin (IPC) with code examples for Node.js, Python, Go
-- **[Development](docs/development.md)** - Type checking, linting, testing, Docker, detection algorithm details
+- **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin and multiplexed stdin (IPC) with a Node.js example
+- **[Development](docs/development.md)** - Building, linting, testing, code layout, debug output
+- **[Roadmap](docs/roadmap.md)** - What v1 covers and the plan for debug charts in v2
 
 ## Development
 
 ```shell
-uv run basedpyright  # Type checking
-uv run ruff check    # Linting
-uv run pytest        # Testing
-
-# Rebuild native-helper after changing Rust files in native-helper/src/
-uv run maturin develop --skip-install --manifest-path native-helper/Cargo.toml
+cargo clippy --all-targets -- -D warnings  # Linting
+cargo test                                 # Testing
 ```
 
 See [docs/development.md](docs/development.md) for more details.

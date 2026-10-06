@@ -15,11 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
       - name: Determine and validate version
         id: version
         shell: bash
@@ -27,49 +22,35 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          python - <<'PY'
-          import os
-          import pathlib
-          import re
-          import subprocess
+          version=$(cargo metadata --no-deps --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "audio-pattern-detector") | .version')
+          if [ -z "$version" ]; then
+            echo "Could not determine version from Cargo.toml" >&2
+            exit 1
+          fi
+          release_tag="v${version}"
 
-          root = pathlib.Path(".")
-          pyproject = (root / "pyproject.toml").read_text()
+          if gh api "repos/${GH_REPO}/git/ref/tags/${release_tag}" >/dev/null 2>&1; then
+            echo "Tag ${release_tag} already exists. Bump the version before releasing." >&2
+            exit 1
+          fi
 
-          pyproject_match = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE)
+          echo "Release tag: ${release_tag}"
+          echo "tag=${release_tag}" >> "$GITHUB_OUTPUT"
 
-          if pyproject_match is None:
-            raise SystemExit("Could not determine version from pyproject.toml")
-
-          pyproject_version = pyproject_match.group(1)
-          release_tag = f"v{pyproject_version}"
-
-          # Check if tag already exists
-          result = subprocess.run(
-              ["gh", "api", f"repos/{os.environ['GH_REPO']}/git/ref/tags/{release_tag}"],
-              capture_output=True,
-          )
-          if result.returncode == 0:
-            raise SystemExit(f"Tag {release_tag} already exists. Bump the version before releasing.")
-
-          print(f"Release tag: {release_tag}")
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"tag={release_tag}\n")
-          PY
-
-  build-wheel:
+  build:
     needs: prepare
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          - target: x86_64-unknown-linux-gnu
             runs-on: ubuntu-latest
-          - arch: arm64
+          - target: aarch64-unknown-linux-gnu
             runs-on: ubuntu-24.04-arm
-          - arch: arm64
+          - target: aarch64-apple-darwin
             runs-on: macos-latest
-          - arch: amd64
+          - target: x86_64-pc-windows-msvc
             runs-on: windows-latest
 
     runs-on: ${{ matrix.runs-on }}
@@ -78,40 +59,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: native-helper
 
-      - name: Install release build dependencies
-        run: python -m pip install --upgrade pip 'numpy>=2.0,<3' maturin
+      - name: Build binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
-      - name: Build wheel
+      - name: Package
+        shell: bash
         env:
-          PYO3_PYTHON: python
-        run: maturin build --release -o dist
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          name="audio-pattern-detector-${RELEASE_TAG}-${TARGET}"
+          mkdir -p "dist/${name}"
+          cp README.md "dist/${name}/"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "target/${TARGET}/release/audio-pattern-detector.exe" "dist/${name}/"
+            (cd dist && 7z a "${name}.zip" "${name}")
+          else
+            cp "target/${TARGET}/release/audio-pattern-detector" "dist/${name}/"
+            tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          fi
 
-      - name: Upload wheel artifact
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: python-wheel-${{ runner.os }}-${{ matrix.arch }}-py313
-          path: dist/*.whl
+          name: binary-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
           if-no-files-found: error
 
   create-release:
-    needs: [prepare, build-wheel]
+    needs: [prepare, build]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download wheel artifacts
+      - name: Download binary artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: python-wheel-*
+          pattern: binary-*
           path: release-assets
 
       - name: Create GitHub release
@@ -120,9 +108,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          mapfile -d '' assets < <(find release-assets -type f -name '*.whl' -print0 | sort -z)
+          mapfile -d '' assets < <(find release-assets -type f \( -name '*.tar.gz' -o -name '*.zip' \) -print0 | sort -z)
           if [ "${#assets[@]}" -eq 0 ]; then
-            echo "No wheel assets found under release-assets" >&2
+            echo "No binary assets found under release-assets" >&2
             exit 1
           fi
 
@@ -137,12 +125,3 @@ jobs:
             --target "${GITHUB_SHA}" \
             $prerelease_flag \
             "${assets[@]}"
-
-  deploy-pages:
-    if: github.ref_name == 'main'
-    needs: create-release
-    uses: ./.github/workflows/deploy-pages.yml
-    permissions:
-      contents: read
-      pages: write
-      id-token: write

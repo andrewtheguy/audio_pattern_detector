@@ -1,81 +1,53 @@
 # Development
 
-## Type Checking
-
-Use basedpyright for static type checking:
+## Building
 
 ```shell
-uv run basedpyright
+cargo build            # debug build
+cargo build --release  # optimized binary at target/release/audio-pattern-detector
 ```
 
 ## Linting
 
 ```shell
-uv run ruff check
+cargo clippy --all-targets -- -D warnings
 ```
 
 ## Testing
 
-Use pytest to test because not all of them are written using default python unittest module, and pytest is more flexible and easier to use.
-
 ```shell
-uv run pytest
+cargo test
 ```
 
-## Native Helper Rebuild
+Unit tests live next to the code in `src/`; integration tests in `tests/` run the detector and the CLI binary against the clips in `sample_audios/`. Run the tests in release mode (`cargo test --release`) if the FFT-heavy integration tests feel slow.
 
-After changing Rust code in `native-helper/src/`, rebuild the Python extension:
+## Code layout
 
-```shell
-uv run maturin develop --skip-install --manifest-path native-helper/Cargo.toml
-```
+| Path | Contents |
+|------|----------|
+| `src/main.rs` | CLI (`match`, `show-config`) and JSONL output |
+| `src/matching.rs` | High-level entry points: file, WAV stream and multiplexed stream matching |
+| `src/detector.rs` | `AudioPatternDetector`: chunking, Step 1 correlation, Step 2 verification |
+| `src/tone.rs` | Pure-tone analysis for the marker-tone strategy |
+| `src/pattern_config.rs` | `.apd.toml` loader |
+| `src/audio_clip.rs` | `AudioClip` and verification strategies |
+| `src/stream.rs` | Audio sources (`SampleSource`): memory, raw float32, WAV file, WAV stream |
+| `src/wav.rs` | WAV reading and writing |
+| `src/ffmpeg.rs` | ffmpeg subprocess for non-WAV files |
+| `src/dsp/` | FFT cross-correlation, BS.1770 loudness, peak finding, resampling, Pearson correlation, spectra |
 
-## Debug graphs
+The numerical routines in `src/dsp/` are implemented in the crate rather than pulled in as dependencies; they follow the semantics of the scipy/numpy/pyloudnorm functions the algorithm was originally tuned against (`scipy.signal.find_peaks`, `scipy.signal.resample`, `scipy.signal.correlate`, `numpy.hanning`, BS.1770 integrated loudness), so thresholds carry over unchanged.
 
-matplotlib is required for `--debug` graph output but is not installed by default. Enable it with:
+## Debug output
 
-```shell
-uv sync --group debug
-```
+`--debug` writes diagnostics to stderr and files under `--debug-dir` (default `./tmp`, which is gitignored):
 
-This installs the `debug` dependency group (which includes `dev` plus matplotlib). Only needed during local development when tuning detection parameters.
+- `audio_section/<clip>/` — the audio around each candidate peak as WAV, for listening.
+- `debug/cross_correlation_<clip>/` — per-section JSON dump of candidate peaks, their times, MSE similarity and Pearson r per window.
 
-## Docker
+Use separate `--debug-dir` values for A/B comparisons. Debug mode is only active with the default 60-second chunks.
 
-### Testing with Docker
-
-Use `Dockerfile.test` which includes ffmpeg and dev dependencies:
-
-```shell
-# Build test image
-docker build -f Dockerfile.test -t audio-pattern-detector-test .
-
-# Run tests (mount tests and sample_audios since they're excluded from image)
-docker run --rm \
-  -v $(pwd)/tests:/usr/src/app/tests:ro \
-  -v $(pwd)/sample_audios:/usr/src/app/sample_audios:ro \
-  audio-pattern-detector-test
-```
-
-### Production Docker build
-
-Use the default `Dockerfile` which is minimal and does not include ffmpeg:
-
-```shell
-docker build -t audio-pattern-detector .
-```
-
-**Note**: The production image does not include ffmpeg. It supports:
-- WAV files (processed with scipy, no ffmpeg needed)
-- Stdin modes (WAV, multiplexed)
-
-For non-WAV file support (mp3, flac, etc.), pipe through ffmpeg on the host:
-
-```shell
-ffmpeg -i input.mp3 -f wav -ac 1 pipe: | \
-  docker run --rm -i -v $(pwd)/pattern.wav:/pattern.wav:ro audio-pattern-detector \
-  audio-pattern-detector match --stdin --pattern-file /pattern.wav
-```
+Graphs are not available yet; see [roadmap.md](roadmap.md) for the planned v2 charts.
 
 ## Detection Algorithm
 
@@ -86,7 +58,7 @@ Detection is a **two-step process**:
 
 ### Step 2 paths
 
-**Normal Patterns (`.wav` clips ≥ 0.5s)** — verification uses partitioned MSE plus multi-window Pearson correlation. The cross-correlation curve is downsampled across 3 overlapping regions (0-50%, 40-60%, 50-100%) and compared against the clip's self-correlation. Pearson r is scale-invariant, making it robust against lossy codec artifacts (Opus, AAC) that inflate the correlation envelope but preserve shape. High Pearson r (≥ 0.90) can override moderate MSE, allowing detection even with degraded audio. See [docs/denoise-strategy.md](denoise-strategy.md) for improving pattern clip quality. Works well with repeating or non-repeating patterns that are loud enough within the audio section because the normalized clip is appended to the end of the audio section, which helps eliminate false positives that are much softer or unrelated.
+**Normal Patterns (`.wav` clips ≥ 0.5s)** — verification uses partitioned MSE plus multi-window Pearson correlation. The cross-correlation curve is downsampled across 3 overlapping regions (0-50%, 40-60%, 50-100%) and compared against the clip's self-correlation. Pearson r is scale-invariant, making it robust against lossy codec artifacts (Opus, AAC) that inflate the correlation envelope but preserve shape. High Pearson r (≥ 0.90) can override moderate MSE, allowing detection even with degraded audio. See [docs/denoise-strategy.md](denoise-strategy.md) for improving pattern clip quality. Works well with repeating or non-repeating patterns that are loud enough within the audio section because the correlation is normalized against the clip's own self-correlation peak, which helps eliminate false positives that are much softer or unrelated.
 
 **Short Clips (`.wav` clips < 0.5s)** — uses the same correlation-envelope approach as Normal Patterns but with simplified windowing: a single 0-100% Pearson window and whole-only MSE (no middle partition emphasis), since the correlation envelope is too short for sub-region analysis. Short clips must cross-correlate well at Step 1 — this is the user's responsibility when providing the clip.
 

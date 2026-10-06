@@ -1,0 +1,29 @@
+[package]
+name = "audio-pattern-detector"
+version = "1.0.0"
+edition = "2021"
+description = "Detects audio patterns (intros, breaks, station beeps) in audio files and streams"
+authors = ["Andrew Chen <hello@andrewtheguy.com>"]
+readme = "README.md"
+
+[lib]
+name = "audio_pattern_detector"
+
+[[bin]]
+name = "audio-pattern-detector"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.23"
+clap = { version = "4.6", features = ["derive"] }
+realfft = "3.5"
+rustfft = "6.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+toml = "1.1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"

@@ -49,10 +49,10 @@ Raw audio stream (float32 PCM)
 Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
-2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, mode='full')`), producing a reference correlation curve. The absolute max is stored for normalization later.
-3. **Tone-strategy setup** - for clips whose strategy is `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips set `dominant_frequency = None`.
+2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_full(clip, clip)`), producing a reference correlation curve. The absolute max is stored for normalization later.
+3. **Tone-strategy setup** - for clips whose strategy is `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips have no tone verifier.
 
-This produces a `ClipData` dict per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, and the dominant frequency (non-None only for tone-strategy clips).
+This produces a `ClipData` struct per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, the downsampled Pearson windows of that curve, and the tone verifier (set only for tone-strategy clips).
 
 ## Chunked Processing
 
@@ -60,7 +60,7 @@ Audio is read as a stream of float32 samples and split into fixed-size chunks (`
 
 The raw chunks themselves are not read with overlap. Instead, for each clip, the detector builds an `audio_section`. In the normal case, it prepends the last `sliding_window` seconds from `previous_chunk` to `chunk`, where `sliding_window = ceil(clip_duration_seconds)`. This ensures patterns near chunk boundaries are not missed.
 
-For the final chunk, if `len(chunk) / sample_rate < seconds_per_chunk`, the detector does not use the usual `sliding_window` prepend. Instead, it first concatenates `previous_chunk` and `chunk`, then extracts the last `seconds_per_chunk` seconds from that combined buffer to form `audio_section`.
+The same prepend is applied to every chunk after the first, including a final short chunk.
 
 Each per-clip `audio_section` is loudness-normalized independently to -16 dB LUFS before correlation.
 
@@ -70,7 +70,7 @@ This step always runs first for every clip type. Its job is to locate and center
 
 For each chunk and each clip:
 
-1. Compute `fft_correlate_1d(audio_section, clip, mode='full')` and take the absolute value.
+1. Compute `fft_correlate_full(audio_section, clip)` and take the absolute value.
 2. Normalize by `max(self_correlation_max, cross_correlation_max)` so the correlation curve is in [0, 1].
 3. Run peak detection with `height >= 0.25` and `distance >= clip_length` (prevents duplicate detections within one clip duration).
 
@@ -135,7 +135,7 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 Marker-tone clips still go through Step 1 — FFT cross-correlation against the synthesised clip and peak detection — to find and center candidate locations. Only Step 2 differs: instead of the correlation-envelope shape check used by Normal Patterns and Short Clips, the candidate's audio segment is verified with a narrowband spectral check at the clip's declared dominant frequency. This is needed because clean pure tones (like the RTHK hourly beep) do not produce a distinctive enough correlation envelope for the shape-based path to verify reliably.
 
-Patterns that need this special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (parsed via `tomllib` in the stdlib, with `#` comments) split into two sections that mirror the pipeline: `[clip]` provides the Step 1 audio source, and `[verification]` declares the Step 2 strategy and per-strategy thresholds. Ordinary patterns continue to use `.wav`.
+Patterns that need this special detection strategy use a `.apd.toml` file instead of `.wav`. The file is a plain TOML document (with `#` comments) split into two sections that mirror the pipeline: `[clip]` provides the Step 1 audio source, and `[verification]` declares the Step 2 strategy and per-strategy thresholds. Ordinary patterns continue to use `.wav`.
 
 `[clip].source` selects how Step 1's clip audio is produced:
 - `source = "sine"` — synthesise a sine at `frequency_hz` for `duration_seconds` (and optional `amplitude`) at the detector's target sample rate. A single file works at 8 kHz, 16 kHz, or any other rate.
@@ -162,11 +162,11 @@ maximum_min_flank_purity = 0.02
 maximum_max_flank_purity = 0.14
 ```
 
-The currently implemented tone strategy is `marker_tone`. The extension point is the `[verification].strategy` field — adding a new special handler means adding a new strategy name and wiring it in `audio_pattern_detector.py` and `pattern_config.py`.
+The currently implemented tone strategy is `marker_tone`. The extension point is the `[verification].strategy` field — adding a new special handler means adding a new strategy name and wiring it in `src/audio_clip.rs` (`Strategy`), `src/pattern_config.rs` and `src/detector.rs`.
 
 When a clip's strategy is tone-based:
 1. The dominant frequency is taken from `[verification].dominant_frequency_hz` if declared, else from `[clip].frequency_hz` for sine sources, else fallback-derived via `get_pure_tone_frequency()` from the loaded audio.
-2. At verification time, `_verify_marker_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
+2. At verification time, `verify_marker_tone` checks the candidate audio segment for narrowband energy at the expected frequency using short-time spectral analysis.
 3. Per-clip threshold fields under `[verification]` tune how much in-window purity and adjacent-flank leakage are allowed for that station's marker.
 
 ## Pure Tone Classification
@@ -175,12 +175,9 @@ A clip is classified as a pure tone if its frequency spectrum (via FFT) has exac
 
 ## Timestamp Conversion
 
-Accepted peaks (in sample indices) are converted to timestamps in fractional seconds (`float`):
+Accepted peaks (in sample indices) are converted to timestamps in fractional seconds (`f64`):
 
-1. Subtract the section offset used to build `audio_section`:
-   - `0` for the first chunk
-   - usually `sliding_window` for later full chunks
-   - the negated "missing time" value for the final short chunk. Here, "missing time" means `actual_chunk_duration - seconds_per_chunk`, so it is negative when the final `chunk` is shorter than expected; for example, if `seconds_per_chunk = 10s` but the final `chunk` is only `6s`, the missing time is `6 - 10 = -4s`, and the code subtracts `-(-4s) = 4s` because it had to borrow `4s` from `previous_chunk` when building the final `audio_section`.
+1. Subtract the section offset used to build `audio_section`: `0` for the first chunk, `sliding_window` seconds for every later chunk.
 2. Add the chunk's offset from the start of the stream (`index * seconds_per_chunk`).
 3. Shift backward by the clip duration so the timestamp marks the start of the pattern rather than the correlation peak.
 4. Clamp negative results to `0`.
@@ -190,5 +187,4 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 | Structure | Description |
 |-----------|-------------|
 | `AudioClip` | Input pattern: name, audio array, sample rate |
-| `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window |
-| `ClipCache` | Runtime cache: downsampled Pearson windows per clip |
+| `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window, downsampled Pearson windows, tone verifier |
