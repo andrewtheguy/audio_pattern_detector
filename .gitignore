@@ -162,4 +162,5 @@ cython_debug/
 #.idea/
 
 .DS_Store
-.claude/
+.claude/settings.local.json
+.idea/
