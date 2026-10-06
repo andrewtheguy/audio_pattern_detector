@@ -7,11 +7,11 @@ mod common;
 
 use std::io::Cursor;
 
-use audio_pattern_detector::detector::SHORT_CLIP_DURATION_THRESHOLD;
-use audio_pattern_detector::dsp::hanning;
-use audio_pattern_detector::stream::F32leSource;
-use audio_pattern_detector::tone::get_pure_tone_frequency;
-use audio_pattern_detector::{
+use audio_pattern_detector_core::detector::SHORT_CLIP_DURATION_THRESHOLD;
+use audio_pattern_detector_core::dsp::hanning;
+use audio_pattern_detector_core::stream::F32leSource;
+use audio_pattern_detector_core::tone::get_pure_tone_frequency;
+use audio_pattern_detector_core::{
     AudioClip, AudioPatternDetector, AudioStream, DetectorOptions, MarkerToneParams, MarkerToneThresholds,
     Strategy,
 };

@@ -7,10 +7,10 @@ use std::io::{BufReader, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use audio_pattern_detector::ffmpeg::FfmpegSource;
-use audio_pattern_detector::stream::{resample_audio, WavFileSource};
-use audio_pattern_detector::wav::{load_wav_file, write_wav_file, WavReader, WavSpec};
-use audio_pattern_detector::{
+use audio_pattern_detector_core::ffmpeg::FfmpegSource;
+use audio_pattern_detector_core::stream::{resample_audio, WavFileSource};
+use audio_pattern_detector_core::wav::{load_wav_file, write_wav_file, WavReader, WavSpec};
+use audio_pattern_detector_core::{
     match_pattern, AudioClip, AudioPatternDetector, AudioStream, DetectorOptions, MatchOptions, PeakTimes,
     SampleSource, DEFAULT_TARGET_SAMPLE_RATE,
 };
@@ -18,27 +18,27 @@ use audio_pattern_detector::{
 // --- Test Data Constants ---
 // Centralised paths so swapping a clip only requires editing one place.
 
-const CBS_NEWS_PATTERN: &str = "sample_audios/clips/cbs_news.wav";
-const CBS_NEWS_AUDIO: &str = "sample_audios/cbs_news_audio_section.wav";
+const CBS_NEWS_PATTERN: &str = "../../sample_audios/clips/cbs_news.wav";
+const CBS_NEWS_AUDIO: &str = "../../sample_audios/cbs_news_audio_section.wav";
 const CBS_NEWS_NAME: &str = "cbs_news";
 const CBS_NEWS_EXPECTED_TIME: f64 = 25.89875;
 
-const RTHK_BEEP_PATTERN: &str = "sample_audios/clips/rthk_beep.apd.toml";
-const RTHK_BEEP_AUDIO: &str = "sample_audios/rthk_section_with_beep.wav";
+const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
+const RTHK_BEEP_AUDIO: &str = "../../sample_audios/rthk_section_with_beep.wav";
 const RTHK_BEEP_NAME: &str = "rthk_beep";
 const RTHK_BEEP_EXPECTED_TIMES: [f64; 2] = [1.407375, 2.419125];
 
-const RAINBOW_INTRO_PATTERN: &str = "sample_audios/clips/天空下的彩虹intro.wav";
-const RAINBOW_INTRO_AUDIO: &str = "sample_audios/am1430_section_with_rainbow_intro.wav";
+const RAINBOW_INTRO_PATTERN: &str = "../../sample_audios/clips/天空下的彩虹intro.wav";
+const RAINBOW_INTRO_AUDIO: &str = "../../sample_audios/am1430_section_with_rainbow_intro.wav";
 const RAINBOW_INTRO_NAME: &str = "天空下的彩虹intro";
 const RAINBOW_INTRO_EXPECTED_TIME: f64 = 13.848;
 
-const RTHK_BEEP_AUDIO_16K: &str = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav";
-const CBS_NEWS_AUDIO_16K: &str = "sample_audios/test_16khz/cbs_news_audio_section_16k.wav";
-const CBS_NEWS_PATTERN_16K: &str = "sample_audios/test_16khz/clips/cbs_news_16k.wav";
+const RTHK_BEEP_AUDIO_16K: &str = "../../sample_audios/test_16khz/rthk_section_with_beep_16k.wav";
+const CBS_NEWS_AUDIO_16K: &str = "../../sample_audios/test_16khz/cbs_news_audio_section_16k.wav";
+const CBS_NEWS_PATTERN_16K: &str = "../../sample_audios/test_16khz/clips/cbs_news_16k.wav";
 
-const NONEXISTENT_PATTERN: &str = "sample_audios/clips/nonexistent.wav";
-const NONEXISTENT_AUDIO: &str = "sample_audios/nonexistent.wav";
+const NONEXISTENT_PATTERN: &str = "../../sample_audios/clips/nonexistent.wav";
+const NONEXISTENT_AUDIO: &str = "../../sample_audios/nonexistent.wav";
 const NONEXISTENT_WAV: &str = "nonexistent.wav";
 
 const SR: u32 = DEFAULT_TARGET_SAMPLE_RATE;
@@ -824,39 +824,6 @@ mod test_wav_file_matching_without_ffmpeg {
 
         assert_eq!(matches(&peak_times, CBS_NEWS_NAME).len(), 1);
         assert_eq!(matches(&peak_times, RAINBOW_INTRO_NAME).len(), 0);
-    }
-
-    // Python mocked ffmpeg as unavailable. Here the CLI runs in a child process
-    // whose PATH is an empty directory, so ffmpeg cannot be found.
-    #[test]
-    fn test_wav_match_without_ffmpeg_available() {
-        assert_exists(RTHK_BEEP_PATTERN);
-        assert_exists(RTHK_BEEP_AUDIO);
-
-        let empty_path = tempfile::tempdir().unwrap();
-        let output = Command::new(env!("CARGO_BIN_EXE_audio-pattern-detector"))
-            .args(["match", RTHK_BEEP_AUDIO, "--pattern-file", RTHK_BEEP_PATTERN])
-            .env("PATH", empty_path.path())
-            .output()
-            .unwrap();
-        assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
-
-        let events: Vec<serde_json::Value> = String::from_utf8(output.stdout)
-            .unwrap()
-            .lines()
-            .map(|line| serde_json::from_str(line).unwrap())
-            .collect();
-        let detections: Vec<&serde_json::Value> =
-            events.iter().filter(|event| event["type"] == "pattern_detected").collect();
-        for detection in &detections {
-            assert_eq!(detection["clip_name"], RTHK_BEEP_NAME);
-        }
-        let times: Vec<f64> = detections
-            .iter()
-            .map(|detection| detection["timestamp_ms"].as_f64().unwrap() / 1000.0)
-            .collect();
-
-        assert_times(&times, &RTHK_BEEP_EXPECTED_TIMES, 0.01);
     }
 
     #[test]

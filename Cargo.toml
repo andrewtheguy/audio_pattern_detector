@@ -1,35 +1,16 @@
-[package]
-name = "audio-pattern-detector"
-version = "0.4.0"
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/cli"]
+
+[workspace.package]
+version = "0.4.1"
 edition = "2021"
-description = "Detects audio patterns (intros, breaks, station beeps) in audio files and streams"
 authors = ["Andrew Chen <hello@andrewtheguy.com>"]
-readme = "README.md"
 
-[lib]
-name = "audio_pattern_detector"
-crate-type = ["rlib", "cdylib"]
-
-[features]
-default = []
-# Python bindings (PyO3), built with maturin. See docs/python.md.
-python = ["dep:pyo3", "pyo3/extension-module"]
-
-[[bin]]
-name = "audio-pattern-detector"
-path = "src/main.rs"
-
-[dependencies]
-base64 = "0.23"
-clap = { version = "4.6", features = ["derive"] }
-pyo3 = { version = "0.28", optional = true, features = ["abi3-py39"] }
-realfft = "3.5"
-rustfft = "6.4"
+[workspace.dependencies]
+audio-pattern-detector-core = { path = "crates/core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-toml = "1.1"
-
-[dev-dependencies]
 tempfile = "3"
 
 [profile.release]

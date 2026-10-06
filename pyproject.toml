@@ -12,5 +12,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 
 [tool.maturin]
+manifest-path = "crates/core/Cargo.toml"
+module-name = "audio_pattern_detector"
 bindings = "pyo3"
 features = ["python"]

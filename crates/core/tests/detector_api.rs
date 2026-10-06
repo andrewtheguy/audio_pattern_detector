@@ -6,18 +6,18 @@
 
 use std::path::Path;
 
-use audio_pattern_detector::ffmpeg::FfmpegSource;
-use audio_pattern_detector::{
+use audio_pattern_detector_core::ffmpeg::FfmpegSource;
+use audio_pattern_detector_core::{
     AudioClip, AudioPatternDetector, AudioStream, DetectorConfig, DetectorOptions, PatternDetectedCallback,
     PeakTimes, DEFAULT_SECONDS_PER_CHUNK, DEFAULT_TARGET_SAMPLE_RATE,
 };
 
-const RTHK_BEEP_PATTERN: &str = "sample_audios/clips/rthk_beep.apd.toml";
-const CBS_NEWS_PATTERN: &str = "sample_audios/clips/cbs_news.wav";
-const RAINBOW_INTRO_PATTERN: &str = "sample_audios/clips/天空下的彩虹intro.wav";
+const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
+const CBS_NEWS_PATTERN: &str = "../../sample_audios/clips/cbs_news.wav";
+const RAINBOW_INTRO_PATTERN: &str = "../../sample_audios/clips/天空下的彩虹intro.wav";
 
-const RTHK_BEEP_AUDIO: &str = "sample_audios/rthk_section_with_beep.wav";
-const CBS_NEWS_AUDIO: &str = "sample_audios/cbs_news_audio_section.wav";
+const RTHK_BEEP_AUDIO: &str = "../../sample_audios/rthk_section_with_beep.wav";
+const CBS_NEWS_AUDIO: &str = "../../sample_audios/cbs_news_audio_section.wav";
 
 const RTHK_BEEP_NAME: &str = "rthk_beep";
 const CBS_NEWS_NAME: &str = "cbs_news";

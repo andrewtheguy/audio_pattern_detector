@@ -12,22 +12,23 @@ use std::fs;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-use audio_pattern_detector::stream::resample_audio;
-use audio_pattern_detector::wav::{encode_wav_i16, load_wav_file};
+use audio_pattern_detector_core::stream::resample_audio;
+use audio_pattern_detector_core::wav::{encode_wav_i16, load_wav_file};
 use serde_json::Value;
 
 const CLI_BIN: &str = env!("CARGO_BIN_EXE_audio-pattern-detector");
 
-const RTHK_BEEP_PATTERN: &str = "sample_audios/clips/rthk_beep.apd.toml";
-const RTHK_BEEP_AUDIO: &str = "sample_audios/rthk_section_with_beep.wav";
+const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
+const RTHK_BEEP_AUDIO: &str = "../../sample_audios/rthk_section_with_beep.wav";
 const RTHK_BEEP_AUDIO_NAME: &str = "rthk_section_with_beep.wav";
-const RTHK_BEEP_AUDIO_16K: &str = "sample_audios/test_16khz/rthk_section_with_beep_16k.wav";
+const RTHK_BEEP_AUDIO_16K: &str = "../../sample_audios/test_16khz/rthk_section_with_beep_16k.wav";
 const RTHK_BEEP_CLIP_NAME: &str = "rthk_beep";
-const CBS_NEWS_PATTERN: &str = "sample_audios/clips/cbs_news.wav";
-const CBS_NEWS_AUDIO: &str = "sample_audios/cbs_news_audio_section.wav";
+const RTHK_BEEP_EXPECTED_TIMES: [f64; 2] = [1.407375, 2.419125];
+const CBS_NEWS_PATTERN: &str = "../../sample_audios/clips/cbs_news.wav";
+const CBS_NEWS_AUDIO: &str = "../../sample_audios/cbs_news_audio_section.wav";
 const CBS_NEWS_CLIP_NAME: &str = "cbs_news";
-const RAINBOW_INTRO_PATTERN: &str = "sample_audios/clips/天空下的彩虹intro.wav";
-const PATTERN_FOLDER: &str = "sample_audios/clips";
+const RAINBOW_INTRO_PATTERN: &str = "../../sample_audios/clips/天空下的彩虹intro.wav";
+const PATTERN_FOLDER: &str = "../../sample_audios/clips";
 const NONEXISTENT_FILE: &str = "nonexistent.wav";
 /// Pattern name that would escape the debug directory if used as a path.
 const TRAVERSAL_CLIP_NAME: &str = "../../escape";
@@ -492,6 +493,35 @@ fn show_config_no_pattern() {
 fn show_config_nonexistent_pattern() {
     let result = run_cli_unchecked(&["show-config", NONEXISTENT_FILE]);
     assert_ne!(result.code, 0);
+}
+
+// WAV input is decoded natively: the CLI runs with PATH set to an empty
+// directory, so ffmpeg cannot be found.
+#[test]
+fn match_wav_without_ffmpeg_available() {
+    let empty_path = tempfile::tempdir().expect("failed to create temp dir");
+    let output = Command::new(CLI_BIN)
+        .args(["match", RTHK_BEEP_AUDIO, "--pattern-file", RTHK_BEEP_PATTERN])
+        .env("PATH", empty_path.path())
+        .stdin(Stdio::null())
+        .output()
+        .expect("failed to run CLI");
+    let result = CliResult::from_output(output);
+    assert_eq!(result.code, 0, "stderr: {}", result.stderr);
+
+    let events = result.events();
+    let pattern_events = pattern_events(&events);
+    for event in &pattern_events {
+        assert_eq!(event["clip_name"], RTHK_BEEP_CLIP_NAME);
+    }
+    let times: Vec<f64> = pattern_events
+        .iter()
+        .map(|event| event["timestamp_ms"].as_f64().expect("timestamp_ms is a number") / 1000.0)
+        .collect();
+    assert_eq!(times.len(), RTHK_BEEP_EXPECTED_TIMES.len(), "found {times:?}");
+    for (actual, expected) in times.iter().zip(RTHK_BEEP_EXPECTED_TIMES) {
+        assert!((actual - expected).abs() < 0.01, "expected ~{expected}s, got {actual}s");
+    }
 }
 
 // --- 16kHz Audio Auto-Conversion Tests ---

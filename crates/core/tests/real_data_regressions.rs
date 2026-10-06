@@ -2,34 +2,34 @@
 
 use std::path::Path;
 
-use audio_pattern_detector::{match_pattern, MatchOptions};
+use audio_pattern_detector_core::{match_pattern, MatchOptions};
 
 /// `(audio file, expected timestamps in seconds)`.
 type Case = (&'static str, &'static [f64]);
 
-const RTHK_BEEP_PATTERN: &str = "sample_audios/clips/rthk_beep.apd.toml";
-const RADIO903_BEEP_PATTERN: &str = "sample_audios/clips/903_beep.apd.toml";
-const RADIO881_BEEP_PATTERN: &str = "sample_audios/clips/881_beep.apd.toml";
+const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
+const RADIO903_BEEP_PATTERN: &str = "../../sample_audios/clips/903_beep.apd.toml";
+const RADIO881_BEEP_PATTERN: &str = "../../sample_audios/clips/881_beep.apd.toml";
 
 const RTHK_BEEP_CLIP_NAME: &str = "rthk_beep";
 const RADIO903_BEEP_CLIP_NAME: &str = "903_beep";
 const RADIO881_BEEP_CLIP_NAME: &str = "881_beep";
 
 const RTHK_BEEP_STRAY_CLIPS_V2_TRUE_POSITIVE_1: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/tp_09-10_beep1.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/tp_09-10_beep1.wav";
 const RTHK_BEEP_STRAY_CLIPS_V2_TRUE_POSITIVE_2: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/tp_09-10_beep2.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/tp_09-10_beep2.wav";
 const RTHK_BEEP_STRAY_CLIPS_V2_TRUE_POSITIVE_3: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/tp_09-10_beep3.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/tp_09-10_beep3.wav";
 
 const RTHK_BEEP_STRAY_CLIPS_V2_FALSE_POSITIVE_1: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/v2_10-11_20m21s.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/v2_10-11_20m21s.wav";
 const RTHK_BEEP_STRAY_CLIPS_V2_FALSE_POSITIVE_2: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/v2_10-11_50m40s.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/v2_10-11_50m40s.wav";
 const RTHK_BEEP_STRAY_CLIPS_V2_FALSE_POSITIVE_3: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/v2_20-21_35m13s.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/v2_20-21_35m13s.wav";
 const RTHK_BEEP_STRAY_CLIPS_V2_FALSE_POSITIVE_4: &str =
-    "sample_audios/regressions/rthk_beep_stray_clips_v2/v2_22-23_19m48s.wav";
+    "../../sample_audios/regressions/rthk_beep_stray_clips_v2/v2_22-23_19m48s.wav";
 
 const RTHK_BEEP_STRAY_CLIPS_V2_TRUE_POSITIVE_CASES: &[Case] = &[
     (RTHK_BEEP_STRAY_CLIPS_V2_TRUE_POSITIVE_1, &[2.00525, 3.004875]),
@@ -45,9 +45,9 @@ const RTHK_BEEP_STRAY_CLIPS_V2_FALSE_POSITIVE_CASES: &[Case] = &[
 ];
 
 const RTHK_BEEP_HOURLY_LEADIN_12_TO_13: &str =
-    "sample_audios/regressions/rthk_beep_hourly_leadins/radio1_2026-04-06_12_to_13_28m51_leadin.wav";
+    "../../sample_audios/regressions/rthk_beep_hourly_leadins/radio1_2026-04-06_12_to_13_28m51_leadin.wav";
 const RTHK_BEEP_HOURLY_LEADIN_17_TO_18: &str =
-    "sample_audios/regressions/rthk_beep_hourly_leadins/radio1_2026-04-06_17_to_18_59m01_leadin.wav";
+    "../../sample_audios/regressions/rthk_beep_hourly_leadins/radio1_2026-04-06_17_to_18_59m01_leadin.wav";
 
 const RTHK_BEEP_HOURLY_LEADIN_CASES: &[Case] = &[
     (RTHK_BEEP_HOURLY_LEADIN_12_TO_13, &[1.0085, 2.0, 3.013125, 3.987875, 5.025125]),
@@ -55,9 +55,9 @@ const RTHK_BEEP_HOURLY_LEADIN_CASES: &[Case] = &[
 ];
 
 const RTHK_BEEP_HOURLY_OPENING_12_TO_13: &str =
-    "sample_audios/regressions/rthk_beep_hourly_openings/radio1_2026-04-06_12_to_13_28m49_opening.wav";
+    "../../sample_audios/regressions/rthk_beep_hourly_openings/radio1_2026-04-06_12_to_13_28m49_opening.wav";
 const RTHK_BEEP_HOURLY_OPENING_17_TO_18: &str =
-    "sample_audios/regressions/rthk_beep_hourly_openings/radio1_2026-04-06_17_to_18_58m58_opening.wav";
+    "../../sample_audios/regressions/rthk_beep_hourly_openings/radio1_2026-04-06_17_to_18_58m58_opening.wav";
 
 const RTHK_BEEP_HOURLY_OPENING_CASES: &[Case] = &[
     (
@@ -71,15 +71,15 @@ const RTHK_BEEP_HOURLY_OPENING_CASES: &[Case] = &[
 ];
 
 const RADIO903_BEEP_OPENING_RECOVERY: &str =
-    "sample_audios/regressions/903_beep_openings/radio903_2026-04-17_09_to_10_12s_opening.wav";
+    "../../sample_audios/regressions/903_beep_openings/radio903_2026-04-17_09_to_10_12s_opening.wav";
 const RADIO903_BEEP_OPENING_RECOVERY_15_TO_16: &str =
-    "sample_audios/regressions/903_beep_openings/radio903_2026-04-17_15_to_16_opening.wav";
+    "../../sample_audios/regressions/903_beep_openings/radio903_2026-04-17_15_to_16_opening.wav";
 const RADIO903_BEEP_OPENING_NEGATIVE: &str =
-    "sample_audios/regressions/903_beep_openings/radio903_2026-04-17_06_to_07_no_opening_beep.wav";
+    "../../sample_audios/regressions/903_beep_openings/radio903_2026-04-17_06_to_07_no_opening_beep.wav";
 const RADIO881_BEEP_OPENING_RECOVERY: &str =
-    "sample_audios/regressions/881_beep_openings/radio881_2026-04-16_10_to_11_10s_opening.wav";
+    "../../sample_audios/regressions/881_beep_openings/radio881_2026-04-16_10_to_11_10s_opening.wav";
 const RADIO881_BEEP_OPENING_RECOVERY_DIRTY: &str =
-    "sample_audios/regressions/881_beep_openings/radio881_2026-04-15_11_to_12_30m20s_opening.wav";
+    "../../sample_audios/regressions/881_beep_openings/radio881_2026-04-15_11_to_12_30m20s_opening.wav";
 
 const RADIO903_BEEP_OPENING_CASES: &[Case] = &[
     (RADIO903_BEEP_OPENING_RECOVERY, &[12.163125]),

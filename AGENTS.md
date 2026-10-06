@@ -1,13 +1,13 @@
-no backward compatibility, so feel free to make breaking changes as needed. Just make sure to
+strict no backward compatibility no matter what, so feel free to make breaking changes as needed. Just make sure to
 do `cargo clippy --all-targets -- -D warnings` after changes to make sure code style is correct and then `cargo test` as needed.
 
 - Use `./tmp` as the temporary working directory for debug output, scratch files, etc. It is gitignored.
-- The project is a single Rust crate at the repo root (library + `audio-pattern-detector` binary). See `docs/development.md` for the code layout.
-- Python bindings (PyO3) live in `src/python.rs` behind the `python` feature, with type stubs in `audio_pattern_detector.pyi`; keep both in sync. When touching them also run `cargo clippy --all-targets --features python -- -D warnings` and the tests in `tests/test_python_bindings.py`. See `docs/python.md`.
+- The project is a Cargo workspace: `crates/core` (`audio-pattern-detector-core`, the library) and `crates/cli` (`audio-pattern-detector`, the binary). Keep CLI-only dependencies (e.g. clap) out of the core crate. See `docs/development.md` for the code layout.
+- Python bindings (PyO3) live in `crates/core/src/python.rs` behind the core crate's `python` feature, with type stubs in `audio_pattern_detector.pyi`; keep both in sync. When touching them also run `cargo clippy -p audio-pattern-detector-core --all-targets --features python -- -D warnings` and the tests in `tests/test_python_bindings.py`. See `docs/python.md`.
 
 ## Numerical code
 
-- Numerical routines live in `src/dsp/` and are implemented in the crate even if they seem simple (e.g. Pearson correlation) — the user prefers a small dependency footprint over pulling in numerical crates.
+- Numerical routines live in `crates/core/src/dsp/` and are implemented in the crate even if they seem simple (e.g. Pearson correlation) — the user prefers a small dependency footprint over pulling in numerical crates.
 - They follow scipy/numpy/pyloudnorm semantics (`find_peaks`, `resample`, `correlate`, `hanning`, BS.1770 loudness) because the detection thresholds were tuned against those. Keep that behaviour when touching them.
 - Rounding is the exception: use Rust's standard `f64::round` (ties away from zero), not Python's round-half-to-even.
 
@@ -15,8 +15,8 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 - Use test data constants at the top of test files (e.g. `RAINBOW_INTRO_PATTERN`, `RAINBOW_INTRO_AUDIO`) instead of hardcoding paths — makes swapping clips a one-line change.
 - Tests should assert exact expected values, not just lengths. For example, assert the full output vector, not just `out.len() == 5`.
-- Shared integration-test helpers go in `tests/common/mod.rs`.
-- Sample audio files go in `sample_audios/` (clips in `sample_audios/clips/`). Keep them small (~30s audio sections).
+- Shared integration-test helpers go in `crates/core/tests/common/mod.rs`. CLI tests live in `crates/cli/tests/`.
+- Sample audio files go in the repo-root `sample_audios/` (clips in `sample_audios/clips/`); Rust tests reference them as `../../sample_audios/...`. Keep them small (~30s audio sections).
 - When a clip produces false positives or is too short to work reliably, replace it rather than loosening thresholds.
 
 ## Debugging opus/lossy audio
@@ -28,4 +28,4 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 ## Version bumping
 
-- Bump the version in `Cargo.toml`, then run `cargo build` (or `cargo update -p audio-pattern-detector`) to update `Cargo.lock`. The Python wheel takes its version from `Cargo.toml`.
+- Bump `[workspace.package] version` in the root `Cargo.toml` (both crates inherit it), then run `cargo build` to update `Cargo.lock`. The Python wheel takes its version from it too.

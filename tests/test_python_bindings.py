@@ -1,7 +1,7 @@
 """Tests for the Python bindings.
 
 Run against an installed wheel (`maturin develop` or `pip install`), or
-against the extension built with `cargo build --features python --lib`.
+against the extension built with `cargo build -p audio-pattern-detector-core --features python --lib`.
 """
 
 import importlib.machinery
@@ -55,7 +55,7 @@ def _built_module_path() -> pathlib.Path:
 
     for profile in ("debug", "release"):
         target_dir = REPO_ROOT / "target" / profile
-        for stem in ("libaudio_pattern_detector", "audio_pattern_detector"):
+        for stem in ("libaudio_pattern_detector_core", "audio_pattern_detector_core"):
             for suffix in suffixes:
                 path = target_dir / f"{stem}{suffix}"
                 if path.exists():
@@ -63,7 +63,7 @@ def _built_module_path() -> pathlib.Path:
 
     raise FileNotFoundError(
         "Could not find the audio_pattern_detector extension. Install it with "
-        "`maturin develop` or build it with `cargo build --features python --lib`."
+        "`maturin develop` or build it with `cargo build -p audio-pattern-detector-core --features python --lib`."
     )
 
 

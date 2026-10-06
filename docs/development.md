@@ -3,7 +3,7 @@
 ## Building
 
 ```shell
-cargo build            # debug build
+cargo build            # debug build of the whole workspace
 cargo build --release  # optimized binary at target/release/audio-pattern-detector
 ```
 
@@ -19,32 +19,39 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Unit tests live next to the code in `src/`; integration tests in `tests/` run the detector and the CLI binary against the clips in `sample_audios/`. Run the tests in release mode (`cargo test --release`) if the FFT-heavy integration tests feel slow.
+Unit tests live next to the code in each crate's `src/`. Integration tests in `crates/core/tests/` run the library, and `crates/cli/tests/` runs the CLI binary, against the clips in the repo-root `sample_audios/` (referenced as `../../sample_audios/...`, since cargo runs integration tests from the crate directory). Run the tests in release mode (`cargo test --release`) if the FFT-heavy integration tests feel slow.
 
 The Python bindings have their own checks, see [python.md](python.md):
 
 ```shell
-cargo clippy --all-targets --features python -- -D warnings
-cargo build --features python --lib && python -m unittest tests.test_python_bindings
+cargo clippy -p audio-pattern-detector-core --all-targets --features python -- -D warnings
+cargo build -p audio-pattern-detector-core --features python --lib && python -m unittest tests.test_python_bindings
 ```
 
 ## Code layout
 
+The repo is a Cargo workspace with two crates:
+
+- `crates/core` — `audio-pattern-detector-core` (library `audio_pattern_detector_core`): the detector, audio I/O and the Python bindings. No CLI dependencies.
+- `crates/cli` — `audio-pattern-detector`: the `audio-pattern-detector` binary, a thin clap/JSONL front end over the core crate.
+
+The version is shared through `[workspace.package]` in the root `Cargo.toml`.
+
 | Path | Contents |
 |------|----------|
-| `src/main.rs` | CLI (`match`, `show-config`) and JSONL output |
-| `src/matching.rs` | High-level entry points: file, WAV stream and multiplexed stream matching |
-| `src/detector.rs` | `AudioPatternDetector`: chunking, Step 1 correlation, Step 2 verification |
-| `src/tone.rs` | Pure-tone analysis for the marker-tone strategy |
-| `src/pattern_config.rs` | `.apd.toml` loader |
-| `src/audio_clip.rs` | `AudioClip` and verification strategies |
-| `src/stream.rs` | Audio sources (`SampleSource`): memory, raw float32, WAV file, WAV stream |
-| `src/wav.rs` | WAV reading and writing |
-| `src/ffmpeg.rs` | ffmpeg subprocess for non-WAV files |
-| `src/python.rs` | Python bindings (PyO3), compiled only with the `python` feature; see [python.md](python.md) |
-| `src/dsp/` | FFT cross-correlation, BS.1770 loudness, peak finding, resampling, Pearson correlation, spectra |
+| `crates/cli/src/main.rs` | CLI (`match`, `show-config`) and JSONL output |
+| `crates/core/src/matching.rs` | High-level entry points: file, WAV stream and multiplexed stream matching |
+| `crates/core/src/detector.rs` | `AudioPatternDetector`: chunking, Step 1 correlation, Step 2 verification |
+| `crates/core/src/tone.rs` | Pure-tone analysis for the marker-tone strategy |
+| `crates/core/src/pattern_config.rs` | `.apd.toml` loader |
+| `crates/core/src/audio_clip.rs` | `AudioClip` and verification strategies |
+| `crates/core/src/stream.rs` | Audio sources (`SampleSource`): memory, raw float32, WAV file, WAV stream |
+| `crates/core/src/wav.rs` | WAV reading and writing |
+| `crates/core/src/ffmpeg.rs` | ffmpeg subprocess for non-WAV files |
+| `crates/core/src/python.rs` | Python bindings (PyO3), compiled only with the `python` feature; see [python.md](python.md) |
+| `crates/core/src/dsp/` | FFT cross-correlation, BS.1770 loudness, peak finding, resampling, Pearson correlation, spectra |
 
-The numerical routines in `src/dsp/` are implemented in the crate rather than pulled in as dependencies; they follow the semantics of the scipy/numpy/pyloudnorm functions the algorithm was originally tuned against (`scipy.signal.find_peaks`, `scipy.signal.resample`, `scipy.signal.correlate`, `numpy.hanning`, BS.1770 integrated loudness), so thresholds carry over unchanged.
+The numerical routines in `crates/core/src/dsp/` are implemented in the crate rather than pulled in as dependencies; they follow the semantics of the scipy/numpy/pyloudnorm functions the algorithm was originally tuned against (`scipy.signal.find_peaks`, `scipy.signal.resample`, `scipy.signal.correlate`, `numpy.hanning`, BS.1770 integrated loudness), so thresholds carry over unchanged.
 
 ## Debug output
 

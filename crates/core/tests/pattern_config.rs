@@ -2,8 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-use audio_pattern_detector::pattern_config::{load_apd_file, PatternConfig};
-use audio_pattern_detector::{MarkerToneParams, MarkerToneThresholds, Strategy, DEFAULT_TARGET_SAMPLE_RATE};
+use audio_pattern_detector_core::pattern_config::{load_apd_file, PatternConfig};
+use audio_pattern_detector_core::{MarkerToneParams, MarkerToneThresholds, Strategy, DEFAULT_TARGET_SAMPLE_RATE};
 use base64::Engine;
 use tempfile::TempDir;
 

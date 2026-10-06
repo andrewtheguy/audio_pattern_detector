@@ -1,0 +1,28 @@
+[package]
+name = "audio-pattern-detector-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Detects audio patterns (intros, breaks, station beeps) in audio files and streams"
+readme = "../../README.md"
+
+[lib]
+name = "audio_pattern_detector_core"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+# Python bindings (PyO3), built with maturin. See docs/python.md.
+python = ["dep:pyo3", "pyo3/extension-module"]
+
+[dependencies]
+base64 = "0.23"
+pyo3 = { version = "0.28", optional = true, features = ["abi3-py39"] }
+realfft = "3.5"
+rustfft = "6.4"
+serde.workspace = true
+serde_json.workspace = true
+toml = "1.1"
+
+[dev-dependencies]
+tempfile.workspace = true

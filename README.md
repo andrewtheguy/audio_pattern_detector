@@ -17,7 +17,7 @@ Download the archive for your platform (Linux x86_64, Linux arm64, macOS Apple S
 ### Install from source (requires Rust toolchain)
 
 ```shell
-cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git --tag vx.x.x
+cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git --tag vx.x.x audio-pattern-detector
 ```
 
 ### Docker image
@@ -25,7 +25,7 @@ cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git -
 `ghcr.io/andrewtheguy/audio_pattern_detector:<tag>` is published with each release (`v<version>`, plus `latest` for releases from `main`). It contains only the binary at `/usr/local/bin/audio-pattern-detector` (no ffmpeg), so the usual use is copying it into another image:
 
 ```dockerfile
-COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.0 /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
+COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.1 /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
 ```
 
 The release workflow builds the image for amd64 and arm64 from the binaries it has already compiled (`runtime-prebuilt` target). To build it locally from source for the host architecture: `docker build --target runtime -t audio-pattern-detector .`
@@ -146,8 +146,8 @@ cargo clippy --all-targets -- -D warnings  # Linting
 cargo test                                 # Testing
 
 # Python bindings (see docs/python.md)
-cargo clippy --all-targets --features python -- -D warnings
-cargo build --features python --lib && python -m unittest tests.test_python_bindings
+cargo clippy -p audio-pattern-detector-core --all-targets --features python -- -D warnings
+cargo build -p audio-pattern-detector-core --features python --lib && python -m unittest tests.test_python_bindings
 ```
 
 See [docs/development.md](docs/development.md) for more details.

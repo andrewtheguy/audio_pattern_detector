@@ -6,16 +6,16 @@
 
 mod common;
 
-use audio_pattern_detector::stream::WavFileSource;
-use audio_pattern_detector::{
+use audio_pattern_detector_core::stream::WavFileSource;
+use audio_pattern_detector_core::{
     match_pattern, AudioClip, AudioPatternDetector, AudioStream, DetectorOptions, MatchOptions, PeakTimes,
 };
 use common::{clip_from_samples, concat, insert_at, silence, sine_tone, stream_from_samples, SR};
 
-const RTHK_BEEP_PATTERN: &str = "sample_audios/clips/rthk_beep.apd.toml";
-const RTHK_BEEP_AUDIO: &str = "sample_audios/rthk_section_with_beep.wav";
-const CBS_NEWS_PATTERN: &str = "sample_audios/clips/cbs_news.wav";
-const CBS_NEWS_AUDIO: &str = "sample_audios/cbs_news_audio_section.wav";
+const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
+const RTHK_BEEP_AUDIO: &str = "../../sample_audios/rthk_section_with_beep.wav";
+const CBS_NEWS_PATTERN: &str = "../../sample_audios/clips/cbs_news.wav";
+const CBS_NEWS_AUDIO: &str = "../../sample_audios/cbs_news_audio_section.wav";
 
 const BEEP_NAME: &str = "test_beep";
 const BEEP_DURATION: f64 = 0.23;
@@ -87,7 +87,7 @@ fn closest_to(times: &[f64], expected: f64) -> f64 {
         .expect("at least one detection")
 }
 
-fn new_detector(clips: Vec<AudioClip>, seconds_per_chunk: Option<u32>) -> audio_pattern_detector::Result<AudioPatternDetector> {
+fn new_detector(clips: Vec<AudioClip>, seconds_per_chunk: Option<u32>) -> audio_pattern_detector_core::Result<AudioPatternDetector> {
     AudioPatternDetector::new(clips, options(seconds_per_chunk))
 }
 

@@ -54,10 +54,19 @@ dependencies = [
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.4.0"
+version = "0.4.1"
+dependencies = [
+ "audio-pattern-detector-core",
+ "clap",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "audio-pattern-detector-core"
+version = "0.4.1"
 dependencies = [
  "base64",
- "clap",
  "pyo3",
  "realfft",
  "rustfft",
