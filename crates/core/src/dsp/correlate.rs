@@ -128,7 +128,9 @@ impl CorrelationWorkspace {
             return;
         }
 
-        let fft_size = (signal.len() + max_template_len).saturating_sub(1).max(1).next_power_of_two();
+        // Covers the full correlation (signal + template - 1) and, for an
+        // empty template, still the whole signal.
+        let fft_size = (signal.len() + max_template_len.saturating_sub(1)).next_power_of_two();
         if self.fft_size != fft_size || self.plans.is_none() {
             let plans = get_fft_plans(fft_size);
             let (r2c, c2r) = &plans;
@@ -225,6 +227,8 @@ mod tests {
     fn test_empty_inputs() {
         assert_eq!(fft_correlate_full(&[], &[1.0]), Vec::<f32>::new());
         assert_eq!(fft_correlate_full(&[1.0], &[]), Vec::<f32>::new());
+        assert_eq!(fft_correlate_full(&[1.0, 2.0], &[]), Vec::<f32>::new());
+        assert_eq!(fft_correlate_full(&[1.0, 2.0, 3.0], &[]), Vec::<f32>::new());
     }
 
     #[test]

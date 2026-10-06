@@ -238,6 +238,44 @@ mod sliding_window_boundary {
     }
 }
 
+/// Each clip's section is loudness-normalized on its own lookback, so one
+/// clip's detections never depend on which other clips are loaded.
+mod per_clip_normalization {
+    use super::*;
+
+    const UNRELATED_NAME: &str = "unrelated_long";
+
+    /// Loud unrelated audio at 6.5-8.5s, then a quiet beep at 11s. With 10s
+    /// chunks the beep's own 1s lookback section (9-20s) holds only the
+    /// beep, while a 4s lookback (6-20s) would also take in the loud audio.
+    fn quiet_beep_after_loud_audio() -> Vec<f32> {
+        let mut audio = silence(30.0, SR);
+        let loud: Vec<f32> = sine_tone(300.0, 2.0, SR).iter().map(|v| v * 0.9).collect();
+        insert_at(&mut audio, (6.5 * SR as f64) as usize, &loud);
+        let quiet: Vec<f32> = beep_pattern().audio.iter().map(|v| v * 0.02).collect();
+        insert_at(&mut audio, (11.0 * SR as f64) as usize, &quiet);
+        audio
+    }
+
+    fn beep_detections(clips: Vec<AudioClip>) -> Vec<f64> {
+        let detector = new_detector(clips, Some(10)).unwrap();
+        let mut stream = stream_from_samples("test_audio", &quiet_beep_after_loud_audio());
+        let (peak_times, _) = detector.find_clip_in_audio(&mut stream, None, true).unwrap();
+        detections(&peak_times.unwrap(), BEEP_NAME).to_vec()
+    }
+
+    #[test]
+    fn unrelated_longer_clip_does_not_change_detections() {
+        let alone = beep_detections(vec![beep_pattern()]);
+        assert_eq!(alone.len(), 1, "quiet beep alone: {alone:?}");
+        assert!((alone[0] - 11.0).abs() < 0.05, "quiet beep alone at {alone:?}");
+
+        let unrelated = tone_clip(UNRELATED_NAME, 2000.0, 3.5);
+        let with_unrelated = beep_detections(vec![beep_pattern(), unrelated]);
+        assert_eq!(with_unrelated, alone, "detections changed when an unrelated clip was added");
+    }
+}
+
 /// Integration tests using real audio patterns for sliding window behaviour.
 mod sliding_window_with_real_patterns {
     use super::*;
