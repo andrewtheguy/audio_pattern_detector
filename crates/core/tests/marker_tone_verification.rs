@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use audio_pattern_detector::detector::{analyze_tone_candidate_context, marker_tone_accepts};
-use audio_pattern_detector::dsp::hanning;
-use audio_pattern_detector::{
+use audio_pattern_detector_core::detector::{analyze_tone_candidate_context, marker_tone_accepts};
+use audio_pattern_detector_core::dsp::hanning;
+use audio_pattern_detector_core::{
     AudioClip, AudioPatternDetector, DetectorOptions, MarkerToneParams, Strategy, DEFAULT_TARGET_SAMPLE_RATE,
 };
 
-const RTHK_BEEP_PATTERN: &str = "sample_audios/clips/rthk_beep.apd.toml";
+const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
 const RTHK_BEEP_NAME: &str = "rthk_beep";
 const HARMONIC_STACK_FUNDAMENTAL: f64 = 260.0;
 const HARMONIC_STACK_AMPLITUDES: [f32; 5] = [0.50, 0.35, 0.30, 0.28, 0.22];

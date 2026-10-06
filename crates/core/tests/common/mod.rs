@@ -1,7 +1,7 @@
 //! Helpers shared by the integration tests.
 #![allow(dead_code)]
 
-use audio_pattern_detector::{AudioClip, AudioStream, DEFAULT_TARGET_SAMPLE_RATE};
+use audio_pattern_detector_core::{AudioClip, AudioStream, DEFAULT_TARGET_SAMPLE_RATE};
 
 pub const SR: u32 = DEFAULT_TARGET_SAMPLE_RATE;
 

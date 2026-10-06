@@ -5,8 +5,8 @@ use std::process::ExitCode;
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::{json, Map, Value};
 
-use audio_pattern_detector::time_format::{seconds_to_ms, seconds_to_time};
-use audio_pattern_detector::{
+use audio_pattern_detector_core::time_format::{seconds_to_ms, seconds_to_time};
+use audio_pattern_detector_core::{
     match_pattern, match_pattern_multiplexed, match_pattern_wav_stream, AudioClip, AudioPatternDetector,
     DetectorOptions, Error, MatchOptions, Result, DEFAULT_TARGET_SAMPLE_RATE,
 };

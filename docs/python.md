@@ -1,6 +1,6 @@
 # Python bindings
 
-The crate ships [PyO3](https://pyo3.rs) bindings behind the `python` cargo feature, packaged with [maturin](https://www.maturin.rs) as the `audio-pattern-detector` wheel. The wheel contains only the compiled extension: no Python dependencies, and one `abi3` wheel per platform works on every Python >= 3.9. ffmpeg is needed on `PATH` only for non-WAV input files.
+The core crate (`crates/core`) ships [PyO3](https://pyo3.rs) bindings behind the `python` cargo feature, packaged with [maturin](https://www.maturin.rs) as the `audio-pattern-detector` wheel. The wheel contains only the compiled extension: no Python dependencies, and one `abi3` wheel per platform works on every Python >= 3.9. ffmpeg is needed on `PATH` only for non-WAV input files.
 
 ## Installation
 
@@ -9,7 +9,7 @@ Wheels (Linux x86_64 and arm64, macOS Apple Silicon, Windows x86_64) are attache
 ```toml
 # pyproject.toml (uv)
 [project]
-dependencies = ["audio-pattern-detector==0.4.0"]
+dependencies = ["audio-pattern-detector==0.4.1"]
 
 [[tool.uv.index]]
 name = "audio-pattern-detector"
@@ -100,8 +100,8 @@ uvx maturin build --release -o tmp/wheels
 uvx maturin develop --release
 
 # Tests: against the installed module, or the extension built by cargo
-cargo build --features python --lib
+cargo build -p audio-pattern-detector-core --features python --lib
 python -m unittest tests.test_python_bindings
 ```
 
-The package version comes from `Cargo.toml`. Type stubs live in `audio_pattern_detector.pyi` at the repo root and are bundled into the wheel; update them together with `src/python.rs`.
+The package version comes from the workspace `Cargo.toml` (`[workspace.package]`). Type stubs live in `audio_pattern_detector.pyi` at the repo root and are bundled into the wheel; update them together with `crates/core/src/python.rs`. `pyproject.toml` points maturin at the core crate (`manifest-path`) and keeps the Python module name `audio_pattern_detector` (`module-name`), although the Rust library is `audio_pattern_detector_core`.

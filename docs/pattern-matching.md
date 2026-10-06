@@ -162,7 +162,7 @@ maximum_min_flank_purity = 0.02
 maximum_max_flank_purity = 0.14
 ```
 
-The currently implemented tone strategy is `marker_tone`. The extension point is the `[verification].strategy` field — adding a new special handler means adding a new strategy name and wiring it in `src/audio_clip.rs` (`Strategy`), `src/pattern_config.rs` and `src/detector.rs`.
+The currently implemented tone strategy is `marker_tone`. The extension point is the `[verification].strategy` field — adding a new special handler means adding a new strategy name and wiring it in `crates/core/src/audio_clip.rs` (`Strategy`), `crates/core/src/pattern_config.rs` and `crates/core/src/detector.rs`.
 
 When a clip's strategy is tone-based:
 1. The dominant frequency is taken from `[verification].dominant_frequency_hz` if declared, else from `[clip].frequency_hz` for sine sources, else fallback-derived via `get_pure_tone_frequency()` from the loaded audio.

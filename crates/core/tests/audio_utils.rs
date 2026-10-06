@@ -5,13 +5,13 @@
 
 use std::path::Path;
 
-use audio_pattern_detector::ffmpeg::is_ffmpeg_available;
-use audio_pattern_detector::stream::resample_audio;
-use audio_pattern_detector::wav::{load_wav_file, write_wav_file};
-use audio_pattern_detector::{AudioClip, Result};
+use audio_pattern_detector_core::ffmpeg::is_ffmpeg_available;
+use audio_pattern_detector_core::stream::resample_audio;
+use audio_pattern_detector_core::wav::{load_wav_file, write_wav_file};
+use audio_pattern_detector_core::{AudioClip, Result};
 use tempfile::TempDir;
 
-const CBS_NEWS_CLIP: &str = "sample_audios/clips/cbs_news.wav";
+const CBS_NEWS_CLIP: &str = "../../sample_audios/clips/cbs_news.wav";
 const NONEXISTENT_WAV: &str = "nonexistent_file.wav";
 const TEMP_WAV_NAME: &str = "temp.wav";
 

@@ -9,7 +9,7 @@ COPY . .
 # Build the release binary with architecture-specific cache mounts
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-v2-${TARGETARCH} \
     --mount=type=cache,target=/build/target,id=cargo-target-v2-${TARGETARCH} \
-    cargo build --release --locked && \
+    cargo build --release --locked -p audio-pattern-detector && \
     cp target/release/audio-pattern-detector /audio-pattern-detector
 
 # Runtime stage - minimal image without ffmpeg (builds from source).

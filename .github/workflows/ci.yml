@@ -36,10 +36,10 @@ jobs:
     - name: Install ffmpeg (ffmpeg pipe test)
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
     - name: Run clippy on the Python bindings
-      run: cargo clippy --all-targets --features python -- -D warnings
+      run: cargo clippy -p audio-pattern-detector-core --all-targets --features python -- -D warnings
     - name: Build Python extension
       env:
         PYO3_PYTHON: python
-      run: cargo build --features python --lib
+      run: cargo build -p audio-pattern-detector-core --features python --lib
     - name: Run Python binding tests
       run: python -m unittest tests.test_python_bindings

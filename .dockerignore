@@ -8,4 +8,5 @@ tmp/
 .DS_Store
 sample_audios/
 tests/
+crates/*/tests/
 docs/

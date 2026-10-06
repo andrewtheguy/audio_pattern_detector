@@ -1,0 +1,19 @@
+[package]
+name = "audio-pattern-detector"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Command-line interface for audio-pattern-detector-core"
+readme = "../../README.md"
+
+[[bin]]
+name = "audio-pattern-detector"
+path = "src/main.rs"
+
+[dependencies]
+audio-pattern-detector-core.workspace = true
+clap = { version = "4.6", features = ["derive"] }
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

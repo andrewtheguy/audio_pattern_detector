@@ -69,7 +69,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build binary
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: cargo build --release --locked -p audio-pattern-detector --target ${{ matrix.target }}
 
       - name: Package
         shell: bash
