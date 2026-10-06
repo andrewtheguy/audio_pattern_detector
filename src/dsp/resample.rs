@@ -27,16 +27,27 @@ pub fn resample_1d(data: &[f32], target_len: usize) -> Vec<f32> {
 
     // Build new spectrum of length m, matching scipy's slice logic:
     //   N = min(num, Nx)
-    //   Y[0:(N+1)//2]    = X[0:(N+1)//2]     (positive frequencies)
+    //   Y[0:N//2+1]      = X[0:N//2+1]       (positive frequencies and Nyquist)
     //   Y[-(N-1)//2:]    = X[-(N-1)//2:]      (negative frequencies)
     let n_common = n.min(m);
-    let pos = n_common.div_ceil(2); // number of positive-frequency bins to copy
+    let pos = n_common / 2 + 1; // positive-frequency bins to copy, including Nyquist if present
     let neg = (n_common - 1) / 2; // number of negative-frequency bins to copy
 
     let mut new_spectrum = vec![Complex::new(0.0, 0.0); m];
     new_spectrum[..pos].copy_from_slice(&spectrum[..pos]);
     if neg > 0 {
         new_spectrum[m - neg..].copy_from_slice(&spectrum[n - neg..]);
+    }
+    if n_common.is_multiple_of(2) {
+        let nyquist = n_common / 2;
+        if m < n {
+            // Downsampling: the output Nyquist bin holds both input components.
+            new_spectrum[nyquist] += spectrum[n - nyquist];
+        } else {
+            // Upsampling: split the input Nyquist component across both bins.
+            new_spectrum[nyquist] *= 0.5;
+            new_spectrum[m - nyquist] = new_spectrum[nyquist];
+        }
     }
 
     // Inverse complex FFT.
@@ -134,6 +145,55 @@ mod tests {
         let data = [0.0_f32, 1.0, 0.0];
         let out = resample_1d(&data, 6);
         assert_eq!(out.len(), 6);
+    }
+
+    fn assert_resample(data: &[f32], target_len: usize, expected: &[f32]) {
+        let out = resample_1d(data, target_len);
+        assert_eq!(out.len(), expected.len());
+        for (i, (a, b)) in out.iter().zip(expected).enumerate() {
+            assert!((a - b).abs() < 1e-5, "index {i}: {out:?} != {expected:?}");
+        }
+    }
+
+    // Expected values below come from scipy.signal.resample (scipy 1.18.1).
+
+    #[test]
+    fn test_resample_even_downsample_combines_nyquist() {
+        assert_resample(&[1.0, 0.0, -1.0, 0.0], 2, &[1.0, -1.0]);
+        assert_resample(
+            &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+            6,
+            &[1.5, 2.5432043, 3.2752552, 5.5, 5.724745, 8.456796],
+        );
+    }
+
+    #[test]
+    fn test_resample_even_upsample_splits_nyquist() {
+        assert_resample(&[1.0, -1.0], 4, &[1.0, 0.0, -1.0, 0.0]);
+        assert_resample(
+            &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            8,
+            &[1.0, 1.3443514, 2.767949, 3.2061589, 4.0, 4.500948, 6.232051, 4.9485416],
+        );
+    }
+
+    #[test]
+    fn test_resample_odd_lengths_match_scipy() {
+        assert_resample(
+            &[3.0, 1.0, 4.0, 1.0, 5.0],
+            8,
+            &[3.0, 0.36985505, 2.1072586, 4.0756545, 2.3527863, 1.0666965, 3.739955, 5.687794],
+        );
+        assert_resample(
+            &[3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0],
+            4,
+            &[0.98076135, 3.0706325, 2.9396849, 7.294636],
+        );
+        assert_resample(
+            &[3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0],
+            3,
+            &[2.8446698, 2.8329673, 5.947363],
+        );
     }
 
     #[test]
