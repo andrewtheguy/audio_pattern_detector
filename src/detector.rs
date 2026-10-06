@@ -5,7 +5,9 @@ use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
-use crate::audio_clip::{AudioClip, MarkerToneThresholds, Strategy, DEFAULT_TARGET_SAMPLE_RATE};
+use crate::audio_clip::{
+    validate_sample_rate, AudioClip, MarkerToneThresholds, Strategy, DEFAULT_TARGET_SAMPLE_RATE,
+};
 use crate::dsp::{
     fft_correlate_full, find_peaks_1d, integrated_loudness, loudness_normalize, pearson_correlation_1d,
     resample_preserve_maxima_1d, FindPeaksOptions,
@@ -215,6 +217,7 @@ impl AudioPatternDetector {
     /// Prepare the detector for a set of uniquely named clips.
     pub fn new(audio_clips: Vec<AudioClip>, options: DetectorOptions) -> Result<Self> {
         let sr = options.target_sample_rate;
+        validate_sample_rate(sr)?;
         let mut debug_mode = options.debug_mode;
 
         let mut names = HashSet::new();
@@ -409,6 +412,10 @@ impl AudioPatternDetector {
         let mut previous_chunk: Option<Vec<f32>> = None;
         let mut total_time = 0.0_f64;
         let mut index = 0usize;
+        // Peaks (as absolute sample positions) each clip produced in the
+        // previous chunk. The next chunk sees the end of that audio again
+        // through its lookback and would report the same matches twice.
+        let mut previous_peaks: Vec<Vec<i64>> = vec![Vec::new(); self.clips.len()];
 
         loop {
             let chunk = audio_stream.source.read_samples(chunk_samples)?;
@@ -420,8 +427,14 @@ impl AudioPatternDetector {
             // All matches from all clips for this chunk.
             let mut chunk_matches: Vec<(f64, &str)> = Vec::new();
 
-            for clip_data in &self.clips {
-                let peak_times = self.process_chunk(&chunk, clip_data, previous_chunk.as_deref(), index)?;
+            for (clip_data, seen_peaks) in self.clips.iter().zip(previous_peaks.iter_mut()) {
+                let peaks = self.process_chunk(&chunk, clip_data, previous_chunk.as_deref(), index)?;
+                let peak_times: Vec<f64> = peaks
+                    .iter()
+                    .filter(|(position, _)| !seen_peaks.contains(position))
+                    .map(|&(_, timestamp)| timestamp)
+                    .collect();
+                *seen_peaks = peaks.into_iter().map(|(position, _)| position).collect();
 
                 if on_pattern_detected.is_some() {
                     chunk_matches.extend(peak_times.iter().map(|&t| (t, clip_data.name.as_str())));
@@ -448,15 +461,16 @@ impl AudioPatternDetector {
         Ok((all_peak_times, total_time))
     }
 
-    /// Detect one clip in one chunk; returns timestamps of the clip starts
-    /// in seconds from the beginning of the stream.
+    /// Detect one clip in one chunk; returns, per match, the peak's sample
+    /// position from the beginning of the stream and the timestamp of the
+    /// clip start in seconds from the beginning of the stream.
     fn process_chunk(
         &self,
         chunk: &[f32],
         clip_data: &ClipData,
         previous_chunk: Option<&[f32]>,
         index: usize,
-    ) -> Result<Vec<f64>> {
+    ) -> Result<Vec<(i64, f64)>> {
         let sr = self.target_sample_rate;
         let clip_seconds = clip_data.clip.len() as f64 / sr as f64;
 
@@ -465,11 +479,11 @@ impl AudioPatternDetector {
         // contained in audio_section. Applied uniformly to every non-first
         // chunk — including the final short chunk, whose own length is not a
         // reliable lookback.
+        let lookback_samples = audio_section_lookback(clip_data, previous_chunk, sr);
         let (subtract_seconds, audio_section) = match previous_chunk {
             Some(previous) => {
-                let lookback = (clip_data.sliding_window as usize * sr as usize).min(previous.len());
-                let mut section = Vec::with_capacity(lookback + chunk.len());
-                section.extend_from_slice(&previous[previous.len() - lookback..]);
+                let mut section = Vec::with_capacity(lookback_samples + chunk.len());
+                section.extend_from_slice(&previous[previous.len() - lookback_samples..]);
                 section.extend_from_slice(chunk);
                 (clip_data.sliding_window as f64, section)
             }
@@ -483,13 +497,14 @@ impl AudioPatternDetector {
 
         let peaks = self.correlation_method(clip_data, &audio_section, index)?;
 
+        let section_start = index as i64 * self.seconds_per_chunk as i64 * sr as i64 - lookback_samples as i64;
         Ok(peaks
             .into_iter()
             .map(|peak| {
                 let peak_time = peak as f64 / sr as f64 - subtract_seconds;
                 let from_beginning = peak_time + (index as f64 * self.seconds_per_chunk as f64);
                 // Move the timestamp to be before the clip.
-                (from_beginning - clip_seconds).max(0.0)
+                (section_start + peak as i64, (from_beginning - clip_seconds).max(0.0))
             })
             .collect())
     }
@@ -554,7 +569,10 @@ impl AudioPatternDetector {
         }
 
         if self.debug_mode && !peaks.is_empty() {
-            let peak_dir = self.debug_dir.join(format!("debug/cross_correlation_{clip_name}"));
+            let peak_dir = self
+                .debug_dir
+                .join("debug")
+                .join(format!("cross_correlation_{}", safe_path_component(clip_name)));
             std::fs::create_dir_all(&peak_dir)?;
             let dump = json!({
                 "peaks": peaks,
@@ -563,7 +581,8 @@ impl AudioPatternDetector {
             });
             let mut text = serde_json::to_string_pretty(&dump).expect("debug dump is valid JSON");
             text.push('\n');
-            std::fs::write(peak_dir.join(format!("{index}_{section_ts}.txt")), text)?;
+            let file_name = format!("{index}_{}.txt", safe_path_component(&section_ts));
+            std::fs::write(peak_dir.join(file_name), text)?;
             eprintln!("---");
         }
 
@@ -579,8 +598,9 @@ impl AudioPatternDetector {
         index: usize,
         section_ts: &str,
     ) -> Result<()> {
-        let clip_name = &clip_data.name;
-        let audio_dir = self.debug_dir.join(format!("audio_section/{clip_name}"));
+        let clip_name = safe_path_component(&clip_data.name);
+        let section_ts = safe_path_component(section_ts);
+        let audio_dir = self.debug_dir.join("audio_section").join(&clip_name);
         std::fs::create_dir_all(&audio_dir)?;
 
         let clip_length = clip_data.clip.len();
@@ -735,6 +755,30 @@ impl AudioPatternDetector {
     }
 }
 
+/// Turn a clip name or timestamp into a single portable file name component
+/// for debug output. Clip names can come from untrusted input (multiplexed
+/// stdin), so path separators and the characters Windows rejects (such as the
+/// `:` of a timestamp) are replaced, and `.`/`..` cannot be produced.
+pub fn safe_path_component(name: &str) -> String {
+    let mut component: String = name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    if component.is_empty() || component.chars().all(|c| c == '.') {
+        component.insert(0, '_');
+    }
+    component
+}
+
+/// Samples of the previous chunk prepended to a chunk's audio section.
+fn audio_section_lookback(clip_data: &ClipData, previous_chunk: Option<&[f32]>, sr: u32) -> usize {
+    previous_chunk.map_or(0, |previous| (clip_data.sliding_window as usize * sr as usize).min(previous.len()))
+}
+
 /// Analyze the candidate window plus the clip-length windows on either side.
 /// Returns `(matched, left flank, right flank)` metrics.
 pub fn analyze_tone_candidate_context(
@@ -777,6 +821,29 @@ pub fn marker_tone_accepts(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_safe_path_component() {
+        assert_eq!(safe_path_component("rthk_beep"), "rthk_beep");
+        assert_eq!(safe_path_component("天空下的彩虹intro"), "天空下的彩虹intro");
+        assert_eq!(safe_path_component("00:39:00"), "00_39_00");
+        assert_eq!(safe_path_component("../../escape"), ".._.._escape");
+        assert_eq!(safe_path_component("..\\..\\escape"), ".._.._escape");
+        assert_eq!(safe_path_component("/etc/passwd"), "_etc_passwd");
+        assert_eq!(safe_path_component("a<b>c\"d|e?f*g\0h"), "a_b_c_d_e_f_g_h");
+        assert_eq!(safe_path_component(".."), "_..");
+        assert_eq!(safe_path_component("."), "_.");
+        assert_eq!(safe_path_component(""), "_");
+    }
+
+    #[test]
+    fn test_zero_sample_rate_is_rejected() {
+        let options = DetectorOptions { target_sample_rate: 0, ..DetectorOptions::default() };
+        let err = AudioPatternDetector::new(vec![AudioClip::new("clip", vec![0.5; 8], 0)], options)
+            .err()
+            .expect("zero sample rate should be rejected");
+        assert_eq!(err.to_string(), "target sample rate must be greater than 0");
+    }
 
     #[test]
     fn test_slice_odd() {

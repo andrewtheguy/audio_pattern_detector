@@ -4,7 +4,7 @@ The crate ships [PyO3](https://pyo3.rs) bindings behind the `python` cargo featu
 
 ## Installation
 
-Wheels (Linux x86_64 and arm64, macOS Apple Silicon, Windows x86_64) are attached to each [GitHub release](https://github.com/andrewtheguy/audio_pattern_detector/releases) and listed in a package index on GitHub Pages:
+Wheels (Linux x86_64 and arm64, macOS Apple Silicon, Windows x86_64) are attached to each [GitHub release](https://github.com/andrewtheguy/audio_pattern_detector/releases) and listed in a package index on GitHub Pages. The Linux wheels are built on GitHub's current Ubuntu runners and need a glibc at least as new as theirs.
 
 ```toml
 # pyproject.toml (uv)

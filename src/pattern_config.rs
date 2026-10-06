@@ -105,10 +105,17 @@ fn get_number(table: &Table, key: &str, path: &str) -> Result<f64> {
     let value = get_required(table, key, path)?;
     match value {
         Value::Integer(i) => Ok(*i as f64),
+        // TOML allows `inf` and `nan`.
+        Value::Float(f) if !f.is_finite() => {
+            Err(Error::invalid(format!("{path}: '{key}' must be a finite number, got {f}")))
+        }
         Value::Float(f) => Ok(*f),
         _ => Err(type_error(path, key, "integer/float", value)),
     }
 }
+
+/// Longest synthesised sine clip; bounds the allocation for a bad config.
+const MAX_SINE_DURATION_SECONDS: f64 = 3600.0;
 
 fn clip_from_sine(params: &Table, sample_rate: u32, source_path: &str) -> Result<Vec<f32>> {
     let unknown = unknown_fields(params, &[SINE_FIELDS, &["source"]].concat());
@@ -140,6 +147,11 @@ fn clip_from_sine(params: &Table, sample_rate: u32, source_path: &str) -> Result
         return Err(Error::invalid(format!(
             "{source_path}: frequency_hz {frequency_hz} exceeds Nyquist ({}) for sample_rate {sample_rate}",
             sample_rate as f64 / 2.0
+        )));
+    }
+    if duration_seconds > MAX_SINE_DURATION_SECONDS {
+        return Err(Error::invalid(format!(
+            "{source_path}: duration_seconds must be at most {MAX_SINE_DURATION_SECONDS}, got {duration_seconds}"
         )));
     }
     let n_samples = (duration_seconds * sample_rate as f64).round() as usize;

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::ffmpeg::load_audio_ffmpeg;
 use crate::pattern_config::{load_apd_file, APD_EXTENSION};
 use crate::stream::resample_audio;
@@ -9,6 +9,14 @@ use crate::wav::{load_wav_file, load_wav_from_bytes};
 /// Default sample rate for audio pattern detection (8kHz).
 /// All audio clips and streams must use the same sample rate for matching to work.
 pub const DEFAULT_TARGET_SAMPLE_RATE: u32 = 8000;
+
+/// Reject a sample rate of 0, which would resample everything to empty audio.
+pub fn validate_sample_rate(sample_rate: u32) -> Result<()> {
+    if sample_rate == 0 {
+        return Err(Error::invalid("target sample rate must be greater than 0"));
+    }
+    Ok(())
+}
 
 /// Per-clip overrides for the marker-tone verifier. Unset fields use the
 /// detector defaults.
@@ -90,6 +98,7 @@ impl AudioClip {
     /// configs, `.wav` files are decoded natively, anything else goes
     /// through ffmpeg.
     pub fn from_audio_file(clip_path: impl AsRef<Path>, sample_rate: u32) -> Result<Self> {
+        validate_sample_rate(sample_rate)?;
         let clip_path = clip_path.as_ref();
         let clip_name = Self::name_for_path(clip_path);
         let lower = clip_path
@@ -113,6 +122,7 @@ impl AudioClip {
 
     /// Load a clip from WAV bytes, resampled to `sample_rate`.
     pub fn from_wav_bytes(wav_bytes: &[u8], name: &str, sample_rate: u32) -> Result<Self> {
+        validate_sample_rate(sample_rate)?;
         let (audio, source_sr) = load_wav_from_bytes(wav_bytes, name)?;
         Ok(Self::new(name, resample_audio(audio, source_sr, sample_rate), sample_rate))
     }

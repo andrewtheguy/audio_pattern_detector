@@ -742,3 +742,30 @@ mod sliding_window_computation {
         assert_eq!(detector.seconds_per_chunk(), 6);
     }
 }
+
+const SHORT_BEEP_NAME: &str = "short_beep";
+const SHORT_BEEP_DURATION: f64 = 0.1;
+/// Five beeps in the last second of the first 2-second chunk, all inside
+/// the 1-second lookback of the next chunk.
+const OVERLAP_BEEP_POSITIONS: [f64; 5] = [1.05, 1.25, 1.45, 1.65, 1.85];
+const OVERLAP_BEEP_EXPECTED_TIMES: [f64; 5] = [1.049875, 1.2498749999999998, 1.4498749999999998, 1.649875, 1.849875];
+
+#[test]
+fn test_overlap_detections_are_reported_once() {
+    let pattern = tone_clip(SHORT_BEEP_NAME, TONE_FREQUENCY, SHORT_BEEP_DURATION);
+    let audio = patterns_at_positions(&pattern, &OVERLAP_BEEP_POSITIONS, 4.0);
+    let detector = new_detector(vec![pattern], Some(2)).unwrap();
+
+    let mut events: Vec<(String, f64)> = Vec::new();
+    let mut callback = |name: &str, timestamp: f64| events.push((name.to_string(), timestamp));
+    let (peak_times, total_time) = detector
+        .find_clip_in_audio(&mut stream_from_samples("overlap", &audio), Some(&mut callback), true)
+        .unwrap();
+
+    let expected: Vec<f64> = OVERLAP_BEEP_EXPECTED_TIMES.to_vec();
+    assert_eq!(total_time, 4.0);
+    assert_eq!(detections(&peak_times.unwrap(), SHORT_BEEP_NAME), expected.as_slice());
+    let expected_events: Vec<(String, f64)> =
+        expected.iter().map(|&t| (SHORT_BEEP_NAME.to_string(), t)).collect();
+    assert_eq!(events, expected_events);
+}

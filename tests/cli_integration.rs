@@ -8,6 +8,7 @@
 //! Internal detection logic is tested in the other integration test files.
 
 use std::collections::BTreeSet;
+use std::fs;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
@@ -28,6 +29,9 @@ const CBS_NEWS_CLIP_NAME: &str = "cbs_news";
 const RAINBOW_INTRO_PATTERN: &str = "sample_audios/clips/天空下的彩虹intro.wav";
 const PATTERN_FOLDER: &str = "sample_audios/clips";
 const NONEXISTENT_FILE: &str = "nonexistent.wav";
+/// Pattern name that would escape the debug directory if used as a path.
+const TRAVERSAL_CLIP_NAME: &str = "../../escape";
+const TRAVERSAL_SAFE_NAME: &str = ".._.._escape";
 const DEFAULT_SAMPLE_RATE: u32 = 8000;
 
 struct CliResult {
@@ -253,6 +257,26 @@ fn match_chunk_seconds_invalid_value() {
     ]);
     assert_ne!(result.code, 0);
     assert!(result.stderr.contains("auto") || result.stderr.contains("integer"));
+}
+
+#[test]
+fn zero_target_sample_rate_is_rejected() {
+    let expected = "Error: target sample rate must be greater than 0";
+
+    let result = run_cli_unchecked(&[
+        "match",
+        RTHK_BEEP_AUDIO,
+        "--pattern-file",
+        RTHK_BEEP_PATTERN,
+        "--target-sample-rate",
+        "0",
+    ]);
+    assert_eq!(result.code, 1);
+    assert!(result.stderr.contains(expected), "unexpected stderr: {}", result.stderr);
+
+    let result = run_cli_unchecked(&["show-config", CBS_NEWS_PATTERN, "--target-sample-rate", "0"]);
+    assert_eq!(result.code, 1);
+    assert!(result.stderr.contains(expected), "unexpected stderr: {}", result.stderr);
 }
 
 // --- Match Command: --stdin Tests (WAV, Always JSONL) ---
@@ -557,4 +581,30 @@ fn multiplexed_stdin_requires_no_pattern_file() {
     // Works without --pattern-file or --pattern-folder
     let result = run_cli_stdin(&["match", "--multiplexed-stdin"], payload);
     assert_eq!(result.code, 0);
+}
+
+#[test]
+fn multiplexed_stdin_debug_output_stays_inside_debug_dir() {
+    let pattern_data = fs::read(CBS_NEWS_PATTERN).unwrap();
+    let audio_data = fs::read(CBS_NEWS_AUDIO).unwrap();
+    let payload = build_multiplexed_payload(&[(TRAVERSAL_CLIP_NAME, &pattern_data)], &audio_data);
+
+    let root = tempfile::tempdir().unwrap();
+    let debug_dir = root.path().join("nested").join("debug_out");
+    let result = run_cli_stdin(&["match", "--multiplexed-stdin", "--debug", "--debug-dir", debug_dir.to_str().unwrap()], payload);
+    assert_eq!(detected_clip_names(&result.events()), BTreeSet::from([TRAVERSAL_CLIP_NAME.to_string()]));
+
+    // Everything written under the temp root is inside debug_dir, in
+    // directories named after the sanitised clip name.
+    let mut top_level: Vec<String> =
+        fs::read_dir(root.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    top_level.sort();
+    assert_eq!(top_level, vec!["nested".to_string()]);
+    let nested: Vec<String> = fs::read_dir(root.path().join("nested"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(nested, vec!["debug_out".to_string()]);
+    assert!(debug_dir.join("audio_section").join(TRAVERSAL_SAFE_NAME).is_dir());
+    assert!(debug_dir.join("debug").join(format!("cross_correlation_{TRAVERSAL_SAFE_NAME}")).is_dir());
 }

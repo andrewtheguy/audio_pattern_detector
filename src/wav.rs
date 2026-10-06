@@ -9,6 +9,8 @@ use crate::error::{Error, Result};
 const WAVE_FORMAT_PCM: u16 = 1;
 const WAVE_FORMAT_IEEE_FLOAT: u16 = 3;
 const WAVE_FORMAT_EXTENSIBLE: u16 = 0xFFFE;
+/// Size of a `WAVEFORMATEXTENSIBLE` fmt chunk, the largest one parsed.
+const MAX_FMT_BYTES: usize = 40;
 
 /// Sample encoding of a WAV data chunk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,14 +122,15 @@ impl<R: Read> WavReader<R> {
 
             match &tag {
                 b"fmt " => {
-                    let mut fmt = vec![0u8; chunk_size as usize];
+                    // Only the start of the chunk is parsed; never allocate
+                    // from the declared size.
+                    let mut fmt = vec![0u8; (chunk_size as usize).min(MAX_FMT_BYTES)];
                     if read_full(&mut reader, &mut fmt)? < fmt.len() || fmt.len() < 16 {
                         return Err(Error::invalid("WAV fmt chunk too short"));
                     }
                     spec = Some(parse_fmt(&fmt)?);
-                    if chunk_size % 2 == 1 {
-                        skip_bytes(&mut reader, 1)?;
-                    }
+                    let unread = chunk_size as u64 - fmt.len() as u64;
+                    skip_bytes(&mut reader, unread + (chunk_size % 2) as u64)?;
                 }
                 b"data" => {
                     let spec = spec.ok_or_else(|| Error::invalid("WAV file missing fmt chunk"))?;
@@ -394,6 +397,27 @@ mod tests {
         let data: Vec<u8> = [16384i16, 0, -16384, -16384].iter().flat_map(|v| v.to_le_bytes()).collect();
         let (samples, _) = load_wav_from_bytes(&wav_bytes(1, 2, 8000, 16, &data), "t").unwrap();
         assert_eq!(samples, vec![0.25, -0.5]);
+    }
+
+    #[test]
+    fn test_oversized_fmt_chunk_does_not_allocate_declared_size() {
+        let data: Vec<u8> = [16384i16, -16384].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let plain = wav_bytes(1, 1, 8000, 16, &data);
+
+        // A fmt chunk declaring 4 GiB with nothing behind it is a truncated file.
+        let mut bytes = plain[..36].to_vec();
+        bytes[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
+        let err = load_wav_from_bytes(&bytes, "huge").unwrap_err().to_string();
+        assert_eq!(err, "Failed to read WAV data from huge: WAV fmt chunk too short");
+
+        // Extension bytes beyond the parsed part (and the pad byte) are skipped.
+        let mut bytes = plain[..16].to_vec();
+        bytes.extend_from_slice(&45u32.to_le_bytes());
+        bytes.extend_from_slice(&plain[20..36]);
+        bytes.extend_from_slice(&[0u8; 29 + 1]);
+        bytes.extend_from_slice(&plain[36..]);
+        let (samples, sr) = load_wav_from_bytes(&bytes, "extended").unwrap();
+        assert_eq!((samples, sr), (vec![0.5, -0.5], 8000));
     }
 
     #[test]

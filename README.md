@@ -12,7 +12,7 @@ Written in Rust: a single self-contained binary with no runtime dependencies (ff
 
 ### Prebuilt binaries
 
-Download the archive for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon, Windows x86_64) from the [GitHub releases](https://github.com/andrewtheguy/audio_pattern_detector/releases) page and put `audio-pattern-detector` on your `PATH`.
+Download the archive for your platform (Linux x86_64, Linux arm64, macOS Apple Silicon, Windows x86_64) from the [GitHub releases](https://github.com/andrewtheguy/audio_pattern_detector/releases) page and put `audio-pattern-detector` on your `PATH`. The Linux binaries and wheels are built on GitHub's current Ubuntu runners and need a glibc at least as new as theirs; older distributions are not supported.
 
 ### Install from source (requires Rust toolchain)
 

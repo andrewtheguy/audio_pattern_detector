@@ -186,14 +186,10 @@ fn cmd_match(args: MatchArgs) -> Result<()> {
 
     let timestamp_format = args.timestamp_format;
     let mut emit_error: Option<Error> = None;
-    let mut last_ms: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut callback = |clip_name: &str, timestamp: f64| {
-        // Overlapping sections can report the same detection twice.
-        let ts_ms = seconds_to_ms(timestamp);
-        if last_ms.get(clip_name) == Some(&ts_ms) || emit_error.is_some() {
+        if emit_error.is_some() {
             return;
         }
-        last_ms.insert(clip_name.to_string(), ts_ms);
 
         let mut fields = Map::new();
         fields.insert("clip_name".into(), json!(clip_name));

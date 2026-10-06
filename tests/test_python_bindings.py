@@ -219,6 +219,10 @@ class DetectorTest(unittest.TestCase):
             (lambda: apd.Detector(["nonexistent.wav"]), "Pattern nonexistent.wav does not exist"),
             (lambda: self.detector.match_file("nonexistent.wav"), "Audio nonexistent.wav does not exist"),
             (
+                lambda: apd.Detector([CBS_NEWS_PATTERN], target_sample_rate=0),
+                "target sample rate must be greater than 0",
+            ),
+            (
                 lambda: apd.Detector([CBS_NEWS_PATTERN], seconds_per_chunk=1),
                 "seconds_per_chunk 1 is too small for clip 'cbs_news' "
                 "(duration: 1.00s, sliding_window: 1s, minimum chunk size: 2s)",

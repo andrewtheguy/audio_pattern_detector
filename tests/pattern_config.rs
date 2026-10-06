@@ -360,3 +360,35 @@ duration_seconds = 0.1
 "#;
     assert_rejected(body, "missing required field 'verification'");
 }
+
+#[test]
+fn test_non_finite_numbers_are_rejected() {
+    // (field, TOML literal, how the value is displayed)
+    for (field, value, shown) in [
+        ("duration_seconds", "inf", "inf"),
+        ("duration_seconds", "nan", "NaN"),
+        ("frequency_hz", "inf", "inf"),
+    ] {
+        let mut clip = [("frequency_hz", "1040.0"), ("duration_seconds", "0.23")];
+        clip.iter_mut().filter(|(key, _)| *key == field).for_each(|entry| entry.1 = value);
+        let body = format!(
+            "[clip]\nsource = \"sine\"\n{} = {}\n{} = {}\n\n[verification]\nstrategy = \"marker_tone\"\n",
+            clip[0].0, clip[0].1, clip[1].0, clip[1].1
+        );
+        assert_rejected(&body, &format!("'{field}' must be a finite number, got {shown}"));
+    }
+    assert_rejected(
+        "[clip]\nsource = \"sine\"\nfrequency_hz = 1040.0\nduration_seconds = 0.23\n\n\
+         [verification]\nstrategy = \"marker_tone\"\nminimum_band_purity = nan\n",
+        "'minimum_band_purity' must be a finite number, got NaN",
+    );
+}
+
+#[test]
+fn test_excessive_sine_duration_is_rejected() {
+    assert_rejected(
+        "[clip]\nsource = \"sine\"\nfrequency_hz = 1040.0\nduration_seconds = 7200.5\n\n\
+         [verification]\nstrategy = \"marker_tone\"\n",
+        "duration_seconds must be at most 3600, got 7200.5",
+    );
+}

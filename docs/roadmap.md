@@ -48,7 +48,7 @@ Not included: legends, grid lines, themes, annotations, interactivity, configura
 - Text needs a font. Use the `ab_glyph` feature with a font embedded via `include_bytes!` so the binary has no fontconfig/freetype dependency and renders identically everywhere.
 - Gate everything behind an optional `charts` cargo feature so default builds do not carry the dependency. Without the feature `--debug` behaves as in v1.
 - The detector already has the data at the right places: `verify_correlation_envelope` holds the slice, the pattern curve and the downsampled windows; `correlation_method` holds the section correlation.
-- The `:` in `<section_ts>` (`00:39:00`) is not a valid filename character on Windows. Pick a portable timestamp form when charts land, and apply it to the v1 debug files at the same time.
+- Debug file names write `<section_ts>` with `_` instead of `:` (`00_39_00`) so they are valid on Windows, and clip names are sanitised to a single path component. Chart file names should go through the same `safe_path_component` helper.
 
 ### Open questions
 
