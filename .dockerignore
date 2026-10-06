@@ -1,0 +1,11 @@
+/target
+tmp/
+.git
+.github
+.env
+.idea/
+.vscode/
+.DS_Store
+sample_audios/
+tests/
+docs/

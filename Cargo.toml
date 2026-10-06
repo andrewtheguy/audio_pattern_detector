@@ -1,6 +1,6 @@
 [package]
 name = "audio-pattern-detector"
-version = "1.0.0"
+version = "0.4.0"
 edition = "2021"
 description = "Detects audio patterns (intros, breaks, station beeps) in audio files and streams"
 authors = ["Andrew Chen <hello@andrewtheguy.com>"]

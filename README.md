@@ -20,6 +20,16 @@ Download the archive for your platform (Linux x86_64, Linux arm64, macOS Apple S
 cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git --tag vx.x.x
 ```
 
+### Docker image
+
+`ghcr.io/andrewtheguy/audio_pattern_detector:<tag>` is published with each release (`v<version>`, plus `latest` for releases from `main`). It contains only the binary at `/usr/local/bin/audio-pattern-detector` (no ffmpeg), so the usual use is copying it into another image:
+
+```dockerfile
+COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.0 /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
+```
+
+The release workflow builds the image for amd64 and arm64 from the binaries it has already compiled (`runtime-prebuilt` target). To build it locally from source for the host architecture: `docker build --target runtime -t audio-pattern-detector .`
+
 ### Run from a checkout
 
 ```shell
