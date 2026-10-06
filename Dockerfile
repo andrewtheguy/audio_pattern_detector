@@ -1,50 +1,46 @@
-# Production Dockerfile - minimal image without ffmpeg
-# ffmpeg is expected to be available on the host system if needed for non-WAV files
+# Build stage
+FROM rust:1.91-slim-trixie AS builder
+ARG TARGETARCH
 
-# --- Builder stage: compile native-helper and install all deps ---
-FROM python:3.12-slim-bookworm AS builder
+WORKDIR /build
 
-RUN apt-get -yqq update && \
-    apt-get install -yq --no-install-recommends ca-certificates curl build-essential && \
-    apt-get autoremove -y && \
-    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+COPY . .
 
-# Install Rust toolchain (needed for native-helper)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
-ENV PATH="/root/.cargo/bin:${PATH}"
+# Build the release binary with architecture-specific cache mounts
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-v2-${TARGETARCH} \
+    --mount=type=cache,target=/build/target,id=cargo-target-v2-${TARGETARCH} \
+    cargo build --release --locked && \
+    cp target/release/audio-pattern-detector /audio-pattern-detector
 
-ENV app=/usr/src/app
-WORKDIR $app
+# Runtime stage - minimal image without ffmpeg (builds from source).
+# WAV input is decoded natively; ffmpeg is only needed for other formats and is
+# expected to be provided by the consuming image.
+FROM debian:trixie-slim AS runtime
 
-# Copy only dependency files first for better layer caching
-COPY pyproject.toml uv.lock README.md ./
-COPY native-helper ./native-helper
+LABEL org.opencontainers.image.source=https://github.com/andrewtheguy/audio_pattern_detector
 
-ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
-RUN --mount=from=ghcr.io/astral-sh/uv:0.9.11,source=/uv,target=/uv \
-    /uv sync --locked --no-dev --no-install-project
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy application code
-COPY audio_pattern_detector ./audio_pattern_detector
+COPY --from=builder /audio-pattern-detector /usr/local/bin/audio-pattern-detector
 
-# Install the project (builds native-helper .so)
-RUN --mount=from=ghcr.io/astral-sh/uv:0.9.11,source=/uv,target=/uv \
-    /uv sync --locked --no-dev
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["audio-pattern-detector", "--help"]
 
-# --- Runtime stage: minimal image with only runtime deps ---
-FROM python:3.12-slim-bookworm
+# Runtime stage for pre-built binary (used by CI to avoid double build)
+FROM debian:trixie-slim AS runtime-prebuilt
 
-RUN apt-get -yqq update && \
-    apt-get install -yq --no-install-recommends ca-certificates libgomp1 tini && \
-    apt-get autoremove -y && \
-    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+LABEL org.opencontainers.image.source=https://github.com/andrewtheguy/audio_pattern_detector
 
-# Copy installed Python packages and scripts from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
 
-# numba cache
-ENV NUMBA_CACHE_DIR=/tmp/numba_cache_dir
+# Binary must be passed via build context
+COPY audio-pattern-detector /usr/local/bin/audio-pattern-detector
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["audio-pattern-detector", "--help"]

@@ -2,13 +2,13 @@
 
 This document covers all stdin-based input modes for streaming audio processing.
 
-**None of these modes require ffmpeg** - audio is processed using manual WAV header parsing with proper format detection.
+**None of these modes require ffmpeg** - WAV headers are parsed natively.
 
 ## Stdin Mode (WAV)
 
 Use `--stdin` to read WAV format audio from stdin. This mode always outputs JSONL for real-time streaming detection. The WAV must be mono at the target sample rate (default: 8000 Hz).
 
-Accepted WAV formats: 16-bit PCM, 32-bit PCM, or 32-bit IEEE float. When the input is already float32, no extra conversion is performed.
+Accepted WAV formats: 16-bit PCM, 32-bit PCM, or 32-bit IEEE float (plain or `WAVE_FORMAT_EXTENSIBLE` headers). The declared data length is ignored; audio is read until EOF, so live pipes work.
 
 ```shell
 # WAV stdin at 8kHz mono (default target)
@@ -19,7 +19,7 @@ ffmpeg -i input.mp3 -f wav -acodec pcm_s16le -ac 1 -ar 8000 pipe: | \
 ffmpeg -i input.mp3 -f wav -acodec pcm_s16le -ac 1 -ar 16000 pipe: | \
   audio-pattern-detector match --stdin --target-sample-rate 16000 --pattern-file pattern.wav
 
-# WAV stdin with float32 encoding (passed through without conversion)
+# WAV stdin with float32 encoding
 ffmpeg -i input.mp3 -f wav -acodec pcm_f32le -ac 1 -ar 8000 pipe: | \
   audio-pattern-detector match --stdin --pattern-file pattern.wav
 ```
@@ -27,7 +27,6 @@ ffmpeg -i input.mp3 -f wav -acodec pcm_f32le -ac 1 -ar 8000 pipe: | \
 **Note**: When using `--stdin`:
 - Input must be WAV format (mono, at the target sample rate)
 - Supported encodings: 16-bit PCM, 32-bit PCM, 32-bit IEEE float
-- Float32 input is passed through without extra conversion
 - Output is always JSONL format for real-time streaming
 
 ## Multiplexed Stdin Mode (for IPC)
@@ -133,7 +132,7 @@ ffmpeg.stdout.pipe(detector.stdin);
 - Patterns are sent as WAV data in the binary protocol (not file paths)
 - Does not require `--pattern-file` or `--pattern-folder`
 - Audio stream must be WAV format (mono, at target sample rate)
-- Output is always JSONL format with `{"type": "start", "source": "multiplexed-stdin"}` as the first event
+- Output is always JSONL format with `{"type":"start","source":"multiplexed-stdin"}` as the first event
 
 ## JSONL Output Format
 
@@ -142,12 +141,14 @@ events include both millisecond and formatted fields. Use `--timestamp-format
 ms` or `--timestamp-format formatted` to limit the output to one form:
 
 ```jsonl
-{"type": "start", "source": "stdin"}
-{"type": "pattern_detected", "clip_name": "pattern", "timestamp_ms": 5500, "timestamp_formatted": "00:00:05.500"}
-{"type": "end", "total_time_ms": 60000, "total_time_formatted": "00:01:00.000"}
+{"type":"start","source":"stdin"}
+{"type":"pattern_detected","clip_name":"pattern","timestamp_ms":5500,"timestamp_formatted":"00:00:05.500"}
+{"type":"end","total_time_ms":60000,"total_time_formatted":"00:01:00.000"}
 ```
 
 Event types:
 - `start` - Emitted when processing begins
 - `pattern_detected` - Emitted each time a pattern is detected
 - `end` - Emitted when processing completes
+
+If processing fails, an `Error: <message>` line is written to stderr, the process exits with code 1, and no `end` event is emitted.

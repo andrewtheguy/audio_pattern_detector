@@ -1,73 +1,16 @@
-[project]
-name = "audio-pattern-detector"
-version = "0.3.25"
-description = ""
-authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
-requires-python = "~=3.12.0"
-readme = "README.md"
-dependencies = [
-    "fft-correlation==0.0.5",
-    "numpy>=2.0,<3",
-    "andrew-utils>=0.1.2,<0.2.0",
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.2.1,<9",
-    "ruff>=0.14.6",
-    "basedpyright>=1.29.0",
-    "scipy>=1.16,<2",  # QA only: reference impl for native-helper comparison scripts/tests, not used in production
-]
-# Debug graphs for detection tuning. Install with: uv sync --group debug
-debug = [
-    { include-group = "dev" },
-    "matplotlib>=3.9.0,<4",
-]
-
-[project.scripts]
-audio-pattern-detector = "audio_pattern_detector.cli:main"
-
-[tool.pytest.ini_options]
-
-[tool.pyright]
-#stubPath = "typings"
-exclude = [".venv", "build", "dist", ".git", "tests", "native-helper","tmp"]
-reportUnknownParameterType = true
-reportUninitializedInstanceVariable = true
-# Disable basedpyright-specific strict rules
-reportMissingTypeStubs = false
-reportExplicitAny = false
-reportAny = false
-reportUnannotatedClassAttribute = false
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-reportImplicitStringConcatenation = false
-reportMissingImports = true
-reportMissingModuleSource = false
-reportUnusedCallResult = false
-reportImplicitOverride = false
-
-[[tool.uv.index]]
-name = "fft-correlation"
-url = "https://andrewtheguy.github.io/fft-correlation/simple/"
-
-[[tool.uv.index]]
-name = "andrew-utils"
-url = "https://andrewtheguy.github.io/andrew_utils/simple/"
-explicit = true
-
-[tool.uv.sources]
-fft-correlation = { index = "fft-correlation" }
-andrew-utils = { index = "andrew-utils" }
-
 [build-system]
 requires = ["maturin>=1.9.4,<2.0"]
 build-backend = "maturin"
 
+[project]
+name = "audio-pattern-detector"
+# The version comes from Cargo.toml.
+dynamic = ["version"]
+description = "Detects audio patterns (intros, breaks, station beeps) in audio files and streams"
+authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
+readme = "README.md"
+requires-python = ">=3.9"
+
 [tool.maturin]
-manifest-path = "native-helper/Cargo.toml"
+bindings = "pyo3"
 features = ["python"]
-module-name = "audio_pattern_detector._native"
-python-packages = ["audio_pattern_detector"]
