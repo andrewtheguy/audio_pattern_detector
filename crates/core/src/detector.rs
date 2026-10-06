@@ -173,7 +173,7 @@ fn mean(values: &[f32]) -> f32 {
     (values.iter().map(|&v| v as f64).sum::<f64>() / values.len() as f64) as f32
 }
 
-/// Loudness-normalize audio in place to -16 dB LUFS. Silence comes out as NaN.
+/// Loudness-normalize audio in place to -16 dB LUFS.
 fn normalize_loudness(audio: &mut [f32], sample_rate: u32) {
     let seconds = audio.len() as f64 / sample_rate as f64;
     let block_size = if seconds < 0.5 { seconds } else { 0.4 };
@@ -555,8 +555,6 @@ impl AudioPatternDetector {
         audio_section.extend_from_slice(chunk);
 
         normalize_loudness(audio_section, sr);
-        // NaN comes from loudness normalization of silence.
-        audio_section.iter_mut().filter(|v| v.is_nan()).for_each(|v| *v = 0.0);
 
         workspace.load_signal(audio_section, group.max_clip_length);
         lookback_samples

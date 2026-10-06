@@ -211,12 +211,14 @@ pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f
 /// clipping.
 ///
 /// Applies the gain needed to shift from `current_lufs` to `target_lufs`,
-/// then hard-clips the output to [-1.0, 1.0].
+/// then hard-clips the output to [-1.0, 1.0]. Silence (`current_lufs` of
+/// `-inf`, hence an infinite gain) leaves zero samples at zero instead of
+/// the NaN that `0 * inf` would give.
 pub fn loudness_normalize(data: &mut [f32], current_lufs: f64, target_lufs: f64) {
     let delta = target_lufs - current_lufs;
     let gain = 10.0_f64.powf(delta / 20.0);
 
-    for x in data.iter_mut() {
+    for x in data.iter_mut().filter(|x| **x != 0.0) {
         *x = ((*x as f64) * gain).clamp(-1.0, 1.0) as f32;
     }
 }
@@ -329,10 +331,14 @@ mod tests {
         loudness_normalize(&mut same, -16.0, -16.0);
         assert_eq!(same, [0.3, -0.7, 1.0, -1.0]);
 
-        // NaN input (silence after integrated_loudness) stays NaN.
-        let mut silent = [0.0_f32, 0.0];
+        // Silence measures -inf LUFS, so the gain is infinite: zeros stay
+        // zero (not NaN) and anything else is hard-clipped to full scale.
+        let mut silent = [0.0_f32, 0.0, -0.0];
         loudness_normalize(&mut silent, f64::NEG_INFINITY, -16.0);
-        assert!(silent.iter().all(|v| v.is_nan()), "{silent:?}");
+        assert_eq!(silent, [0.0, 0.0, 0.0]);
+        let mut sub_gate = [0.0_f32, 1e-6, -1e-6];
+        loudness_normalize(&mut sub_gate, f64::NEG_INFINITY, -16.0);
+        assert_eq!(sub_gate, [0.0, 1.0, -1.0]);
 
         let mut empty: [f32; 0] = [];
         loudness_normalize(&mut empty, -20.0, -16.0);
