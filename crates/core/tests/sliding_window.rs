@@ -276,6 +276,138 @@ mod per_clip_normalization {
     }
 }
 
+/// Clips with the same sliding window share one loudness-normalized section
+/// and one forward FFT (sized for the longest clip of the group). Sharing
+/// must not change any clip's detections compared with running it alone.
+mod shared_sections {
+    use super::*;
+
+    const MID_NAME: &str = "mid_tone";
+    const MID_DURATION: f64 = 0.6;
+    const MID_FREQUENCY: f64 = 2000.0;
+    const LOW_NAME: &str = "low_long";
+    const LOW_FREQUENCY: f64 = 500.0;
+
+    /// 0.6s 2 kHz tone: sliding_window 1 like the beep, but longer, so
+    /// the shared FFT is sized for it rather than for the beep.
+    fn mid_pattern() -> AudioClip {
+        tone_clip(MID_NAME, MID_FREQUENCY, MID_DURATION)
+    }
+
+    /// 2.5s 500 Hz tone: sliding_window 3, its own group.
+    fn low_pattern() -> AudioClip {
+        tone_clip(LOW_NAME, LOW_FREQUENCY, LONG_BEEP_DURATION)
+    }
+
+    // 10s chunks: positions in the first chunk, in a later chunk, and
+    // straddling a chunk boundary (so the lookback matters).
+    const BEEP_POSITIONS: &[f64] = &[3.0, 9.9, 15.0];
+    const MID_POSITIONS: &[f64] = &[5.0, 12.0, 19.8];
+    const LOW_POSITIONS: &[f64] = &[0.5, 24.0];
+    const AUDIO_SECONDS: f64 = 30.0;
+    const SECONDS_PER_CHUNK: u32 = 10;
+
+    fn mixed_audio() -> Vec<f32> {
+        let mut audio = silence(AUDIO_SECONDS, SR);
+        for (pattern, positions) in
+            [(beep_pattern(), BEEP_POSITIONS), (mid_pattern(), MID_POSITIONS), (low_pattern(), LOW_POSITIONS)]
+        {
+            for &pos in positions {
+                insert_at(&mut audio, (pos * SR as f64) as usize, &pattern.audio);
+            }
+        }
+        audio
+    }
+
+    fn run(clips: Vec<AudioClip>) -> PeakTimes {
+        let detector = new_detector(clips, Some(SECONDS_PER_CHUNK)).unwrap();
+        let mut stream = stream_from_samples("test_audio", &mixed_audio());
+        let (peak_times, _) = detector.find_clip_in_audio(&mut stream, None, true).unwrap();
+        peak_times.expect("results are accumulated")
+    }
+
+    fn assert_found_at(times: &[f64], positions: &[f64], name: &str) {
+        assert_eq!(times.len(), positions.len(), "{name}: {times:?} vs {positions:?}");
+        for (actual, expected) in times.iter().zip(positions) {
+            assert!((actual - expected).abs() < 0.05, "{name}: {actual} vs {expected} (all: {times:?})");
+        }
+    }
+
+    #[test]
+    fn each_clip_alone_finds_every_occurrence() {
+        assert_found_at(detections(&run(vec![beep_pattern()]), BEEP_NAME), BEEP_POSITIONS, BEEP_NAME);
+        assert_found_at(detections(&run(vec![mid_pattern()]), MID_NAME), MID_POSITIONS, MID_NAME);
+        assert_found_at(detections(&run(vec![low_pattern()]), LOW_NAME), LOW_POSITIONS, LOW_NAME);
+    }
+
+    #[test]
+    fn clips_sharing_a_section_match_their_solo_runs_exactly() {
+        let beep_alone = detections(&run(vec![beep_pattern()]), BEEP_NAME).to_vec();
+        let mid_alone = detections(&run(vec![mid_pattern()]), MID_NAME).to_vec();
+
+        // Same group, shorter clip first (FFT sized for the second clip).
+        let together = run(vec![beep_pattern(), mid_pattern()]);
+        assert_eq!(detections(&together, BEEP_NAME), beep_alone);
+        assert_eq!(detections(&together, MID_NAME), mid_alone);
+
+        // Same group, longer clip first.
+        let together = run(vec![mid_pattern(), beep_pattern()]);
+        assert_eq!(detections(&together, BEEP_NAME), beep_alone);
+        assert_eq!(detections(&together, MID_NAME), mid_alone);
+    }
+
+    #[test]
+    fn clips_in_different_groups_match_their_solo_runs_exactly() {
+        let beep_alone = detections(&run(vec![beep_pattern()]), BEEP_NAME).to_vec();
+        let mid_alone = detections(&run(vec![mid_pattern()]), MID_NAME).to_vec();
+        let low_alone = detections(&run(vec![low_pattern()]), LOW_NAME).to_vec();
+
+        // Groups in both orders of first appearance.
+        for clips in [
+            vec![beep_pattern(), low_pattern(), mid_pattern()],
+            vec![low_pattern(), mid_pattern(), beep_pattern()],
+        ] {
+            let together = run(clips);
+            assert_eq!(detections(&together, BEEP_NAME), beep_alone);
+            assert_eq!(detections(&together, MID_NAME), mid_alone);
+            assert_eq!(detections(&together, LOW_NAME), low_alone);
+        }
+    }
+
+    #[test]
+    fn duplicate_clips_get_identical_detections() {
+        let mut copy = beep_pattern();
+        copy.name = "beep_copy".to_string();
+        let together = run(vec![beep_pattern(), copy]);
+        let beep = detections(&together, BEEP_NAME);
+        assert_found_at(beep, BEEP_POSITIONS, BEEP_NAME);
+        assert_eq!(detections(&together, "beep_copy"), beep);
+    }
+
+    #[test]
+    fn callback_order_is_by_time_within_a_chunk_across_groups() {
+        use std::sync::{Arc, Mutex};
+        let clips = vec![beep_pattern(), low_pattern(), mid_pattern()];
+        let detector = new_detector(clips, Some(SECONDS_PER_CHUNK)).unwrap();
+        let mut stream = stream_from_samples("test_audio", &mixed_audio());
+        let events: Arc<Mutex<Vec<(f64, String)>>> = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&events);
+        let mut callback = move |name: &str, time: f64| sink.lock().unwrap().push((time, name.to_string()));
+        let (peak_times, _) = detector.find_clip_in_audio(&mut stream, Some(&mut callback), true).unwrap();
+        let peak_times = peak_times.unwrap();
+
+        let events = events.lock().unwrap();
+        let times: Vec<f64> = events.iter().map(|(t, _)| *t).collect();
+        assert!(times.windows(2).all(|w| w[0] <= w[1]), "callback not in time order: {events:?}");
+
+        // The callback saw exactly the accumulated detections of every clip.
+        for name in [BEEP_NAME, MID_NAME, LOW_NAME] {
+            let from_callback: Vec<f64> = events.iter().filter(|(_, n)| n == name).map(|(t, _)| *t).collect();
+            assert_eq!(from_callback, detections(&peak_times, name), "{name}");
+        }
+    }
+}
+
 /// Integration tests using real audio patterns for sliding window behaviour.
 mod sliding_window_with_real_patterns {
     use super::*;

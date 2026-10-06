@@ -285,6 +285,139 @@ mod tests {
         assert!(output.is_empty());
     }
 
+    fn assert_close(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+        for (a, b) in actual.iter().zip(expected) {
+            assert!((a - b).abs() < 1e-4, "{a} != {b}");
+        }
+    }
+
+    #[test]
+    fn test_template_len_and_is_empty() {
+        let template = CorrelationTemplate::new(&[1.0, 2.0, 3.0]);
+        assert_eq!(template.len(), 3);
+        assert!(!template.is_empty());
+        assert_eq!(template.reversed, vec![3.0, 2.0, 1.0]);
+
+        let empty = CorrelationTemplate::new(&[]);
+        assert_eq!(empty.len(), 0);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_cached_spectrum_gives_identical_output() {
+        let signal: Vec<f32> = (0..90).map(|i| ((i * 29 % 31) as f32 - 15.0) / 15.0).collect();
+        let template: Vec<f32> = (0..11).map(|i| ((i * 7 % 13) as f32 - 6.0) / 6.0).collect();
+
+        let mut workspace = CorrelationWorkspace::new();
+        let mut cached = CorrelationTemplate::new(&template);
+        let mut first = Vec::new();
+        let mut second = Vec::new();
+
+        workspace.load_signal(&signal, template.len());
+        workspace.correlate(&mut cached, &mut first);
+        assert_eq!(cached.spectra.len(), 1);
+        // Same signal again: the cached spectrum is used (no new entry) and
+        // the result is bit-identical to the first pass and to the one-shot.
+        workspace.load_signal(&signal, template.len());
+        workspace.correlate(&mut cached, &mut second);
+        assert_eq!(cached.spectra.len(), 1);
+        assert_eq!(first, second);
+        assert_eq!(first, fft_correlate_full(&signal, &template));
+    }
+
+    #[test]
+    fn test_template_spectrum_cache_evicts_oldest() {
+        let template: Vec<f32> = (0..5).map(|i| ((i * 3 % 5) as f32 - 2.0) / 2.0).collect();
+        let mut cached = CorrelationTemplate::new(&template);
+        let mut workspace = CorrelationWorkspace::new();
+        let mut output = Vec::new();
+
+        // Six signal lengths, each needing a different power-of-two FFT.
+        let lengths = [4, 12, 28, 60, 124, 252];
+        let mut fft_sizes = Vec::new();
+        for &len in &lengths {
+            let signal: Vec<f32> = (0..len).map(|i| ((i * 17 % 23) as f32 - 11.0) / 11.0).collect();
+            workspace.load_signal(&signal, template.len());
+            workspace.correlate(&mut cached, &mut output);
+            assert_close(&output, &naive_full_correlation(&signal, &template));
+            fft_sizes.push(workspace.fft_size);
+            assert!(cached.spectra.len() <= TEMPLATE_SPECTRUM_CACHE_CAPACITY);
+        }
+        assert_eq!(fft_sizes, vec![8, 16, 32, 64, 128, 256]);
+
+        // The oldest two sizes were evicted, the newest four kept in order.
+        let kept: Vec<usize> = cached.spectra.iter().map(|(size, _)| *size).collect();
+        assert_eq!(kept, vec![32, 64, 128, 256]);
+
+        // An evicted size is recomputed and still correct.
+        let signal: Vec<f32> = (0..4).map(|i| i as f32 - 1.5).collect();
+        workspace.load_signal(&signal, template.len());
+        workspace.correlate(&mut cached, &mut output);
+        assert_close(&output, &naive_full_correlation(&signal, &template));
+        let kept: Vec<usize> = cached.spectra.iter().map(|(size, _)| *size).collect();
+        assert_eq!(kept, vec![64, 128, 256, 8]);
+    }
+
+    #[test]
+    fn test_larger_max_template_len_matches_naive() {
+        let signal: Vec<f32> = (0..40).map(|i| ((i * 19 % 29) as f32 - 14.0) / 14.0).collect();
+        let short: Vec<f32> = (0..6).map(|i| ((i * 5 % 7) as f32 - 3.0) / 3.0).collect();
+        let long: Vec<f32> = (0..30).map(|i| ((i * 11 % 17) as f32 - 8.0) / 8.0).collect();
+
+        let mut workspace = CorrelationWorkspace::new();
+        let mut output = Vec::new();
+        // The FFT is sized for the longest template of the group ...
+        workspace.load_signal(&signal, long.len());
+        assert_eq!(workspace.fft_size, 128);
+        // ... and a shorter template still gets its own full-length output.
+        workspace.correlate(&mut CorrelationTemplate::new(&short), &mut output);
+        assert_eq!(output.len(), signal.len() + short.len() - 1);
+        assert_close(&output, &naive_full_correlation(&signal, &short));
+        workspace.correlate(&mut CorrelationTemplate::new(&long), &mut output);
+        assert_eq!(output.len(), signal.len() + long.len() - 1);
+        assert_close(&output, &naive_full_correlation(&signal, &long));
+    }
+
+    #[test]
+    fn test_template_longer_than_signal_matches_naive() {
+        let signal = [1.0_f32, -2.0, 0.5];
+        let template: Vec<f32> = (0..9).map(|i| ((i * 4 % 9) as f32 - 4.0) / 4.0).collect();
+        let result = fft_correlate_full(&signal, &template);
+        assert_eq!(result.len(), 11);
+        assert_close(&result, &naive_full_correlation(&signal, &template));
+    }
+
+    #[test]
+    fn test_exact_values_match_scipy() {
+        // scipy.signal.correlate([1, 2, 3, 4], [1, 0.5], mode="full")
+        // = [0.5, 2.0, 3.5, 5.0, 4.0]
+        let result = fft_correlate_full(&[1.0, 2.0, 3.0, 4.0], &[1.0, 0.5]);
+        assert_close(&result, &[0.5, 2.0, 3.5, 5.0, 4.0]);
+        // Single-sample template scales the signal.
+        let result = fft_correlate_full(&[1.0, -2.0, 3.0], &[2.0]);
+        assert_close(&result, &[2.0, -4.0, 6.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "template longer than the loaded signal allows")]
+    fn test_template_longer_than_allowed_panics() {
+        let mut workspace = CorrelationWorkspace::new();
+        let mut template = CorrelationTemplate::new(&[1.0, 2.0, 3.0]);
+        workspace.load_signal(&[1.0, 2.0, 3.0, 4.0], 2);
+        workspace.correlate(&mut template, &mut Vec::new());
+    }
+
+    #[test]
+    fn test_output_buffer_is_replaced_not_appended() {
+        let mut workspace = CorrelationWorkspace::new();
+        let mut template = CorrelationTemplate::new(&[1.0, 0.5]);
+        let mut output = vec![9.0; 20];
+        workspace.load_signal(&[1.0, 2.0, 3.0, 4.0], 2);
+        workspace.correlate(&mut template, &mut output);
+        assert_close(&output, &[0.5, 2.0, 3.5, 5.0, 4.0]);
+    }
+
     #[test]
     fn test_autocorrelation_peak_is_centered() {
         let clip = [0.5_f32, -1.0, 0.25, 0.75];

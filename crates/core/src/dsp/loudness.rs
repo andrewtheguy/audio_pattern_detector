@@ -310,6 +310,36 @@ mod tests {
     }
 
     #[test]
+    fn test_loudness_normalize_in_place_exact() {
+        // +20 dB is exactly a gain of 10; binary fractions keep the
+        // products exact, and -0.125 * 10 is hard-clipped.
+        let mut up = [0.0625_f32, -0.125, 0.03125, 0.0];
+        loudness_normalize(&mut up, -36.0, -16.0);
+        assert_eq!(up, [0.625, -1.0, 0.3125, 0.0]);
+
+        // -20 dB attenuates by 10.
+        let mut down = [0.5_f32, -1.0, 0.25];
+        loudness_normalize(&mut down, 4.0, -16.0);
+        for (actual, expected) in down.iter().zip([0.05_f32, -0.1, 0.025]) {
+            assert!((actual - expected).abs() < 1e-7, "{actual} != {expected}");
+        }
+
+        // Zero gain change leaves every sample untouched, clipping aside.
+        let mut same = [0.3_f32, -0.7, 1.5, -2.0];
+        loudness_normalize(&mut same, -16.0, -16.0);
+        assert_eq!(same, [0.3, -0.7, 1.0, -1.0]);
+
+        // NaN input (silence after integrated_loudness) stays NaN.
+        let mut silent = [0.0_f32, 0.0];
+        loudness_normalize(&mut silent, f64::NEG_INFINITY, -16.0);
+        assert!(silent.iter().all(|v| v.is_nan()), "{silent:?}");
+
+        let mut empty: [f32; 0] = [];
+        loudness_normalize(&mut empty, -20.0, -16.0);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
     fn test_loudness_normalize_gain() {
         let mut out = [0.1_f32, -0.1];
         // +6 dB gain ≈ 2x.

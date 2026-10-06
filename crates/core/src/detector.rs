@@ -970,6 +970,87 @@ mod tests {
     }
 
     #[test]
+    fn test_absolute_in_place() {
+        let mut values = [-3.0_f32, 1.0, -0.5, 2.0, -0.0];
+        assert_eq!(absolute_in_place(&mut values), 3.0);
+        assert_eq!(values, [3.0, 1.0, 0.5, 2.0, 0.0]);
+
+        let mut negative = [-0.25_f32, -4.0, -1.0];
+        assert_eq!(absolute_in_place(&mut negative), 4.0);
+        assert_eq!(negative, [0.25, 4.0, 1.0]);
+
+        assert_eq!(absolute_in_place(&mut []), f32::NEG_INFINITY);
+    }
+
+    #[test]
+    fn test_clip_correlation_is_normalized_with_original_peak() {
+        let clip = [0.5_f32, -1.0, 0.25, 0.75];
+        let energy: f32 = clip.iter().map(|v| v * v).sum();
+        let (correlation, absolute_max) = clip_correlation(&clip);
+        assert_eq!(correlation.len(), 2 * clip.len() - 1);
+        assert!((absolute_max - energy).abs() < 1e-5, "{absolute_max} != {energy}");
+        assert_eq!(correlation[clip.len() - 1], 1.0);
+        assert!(correlation.iter().all(|&v| (0.0..=1.0).contains(&v)), "{correlation:?}");
+    }
+
+    fn sine_clip(name: &str, seconds: f64) -> AudioClip {
+        let sr = DEFAULT_TARGET_SAMPLE_RATE;
+        let samples = (sr as f64 * seconds) as usize;
+        let audio = (0..samples)
+            .map(|i| (2.0 * std::f64::consts::PI * 1000.0 * i as f64 / sr as f64).sin() as f32)
+            .collect();
+        AudioClip::new(name, audio, sr)
+    }
+
+    #[test]
+    fn test_section_groups_by_sliding_window_in_order_of_first_appearance() {
+        let sr = DEFAULT_TARGET_SAMPLE_RATE as usize;
+        let detector = AudioPatternDetector::new(
+            vec![
+                sine_clip("short", 0.23), // window 1
+                sine_clip("long", 2.5),   // window 3
+                sine_clip("medium", 0.9), // window 1
+                sine_clip("longer", 3.0), // window 3 (exactly 3 seconds)
+                sine_clip("one", 1.0),    // window 1 (exactly 1 second)
+                sine_clip("two", 1.2),    // window 2
+            ],
+            DetectorOptions::default(),
+        )
+        .unwrap();
+
+        let groups = &detector.section_groups;
+        assert_eq!(groups.len(), 3);
+
+        assert_eq!(groups[0].lookback_seconds, 1);
+        assert_eq!(groups[0].clip_indices, vec![0, 2, 4]);
+        assert_eq!(groups[0].max_clip_length, sr);
+
+        assert_eq!(groups[1].lookback_seconds, 3);
+        assert_eq!(groups[1].clip_indices, vec![1, 3]);
+        assert_eq!(groups[1].max_clip_length, 3 * sr);
+
+        assert_eq!(groups[2].lookback_seconds, 2);
+        assert_eq!(groups[2].clip_indices, vec![5]);
+        assert_eq!(groups[2].max_clip_length, (1.2 * sr as f64) as usize);
+
+        // Every clip is in exactly one group.
+        let mut all: Vec<usize> = groups.iter().flat_map(|g| g.clip_indices.iter().copied()).collect();
+        all.sort_unstable();
+        assert_eq!(all, (0..detector.clips.len()).collect::<Vec<_>>());
+        for group in groups {
+            for &clip_index in &group.clip_indices {
+                assert_eq!(detector.clips[clip_index].sliding_window, group.lookback_seconds);
+                assert!(detector.clips[clip_index].clip.len() <= group.max_clip_length);
+            }
+        }
+    }
+
+    #[test]
+    fn test_section_groups_empty() {
+        assert!(section_groups(&[]).is_empty());
+    }
+
+    #[test]
     fn test_detector_config_serializes_clips_as_ordered_map() {
         let config = DetectorConfig {
             default_seconds_per_chunk: 60,
