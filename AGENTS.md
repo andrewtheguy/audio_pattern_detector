@@ -3,6 +3,7 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 - Use `./tmp` as the temporary working directory for debug output, scratch files, etc. It is gitignored.
 - The project is a single Rust crate at the repo root (library + `audio-pattern-detector` binary). See `docs/development.md` for the code layout.
+- Python bindings (PyO3) live in `src/python.rs` behind the `python` feature, with type stubs in `audio_pattern_detector.pyi`; keep both in sync. When touching them also run `cargo clippy --all-targets --features python -- -D warnings` and the tests in `tests/test_python_bindings.py`. See `docs/python.md`.
 
 ## Numerical code
 
@@ -27,4 +28,4 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 ## Version bumping
 
-- Bump the version in `Cargo.toml`, then run `cargo build` (or `cargo update -p audio-pattern-detector`) to update `Cargo.lock`.
+- Bump the version in `Cargo.toml`, then run `cargo build` (or `cargo update -p audio-pattern-detector`) to update `Cargo.lock`. The Python wheel takes its version from `Cargo.toml`.

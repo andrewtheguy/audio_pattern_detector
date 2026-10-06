@@ -2,7 +2,7 @@
 
 ## v1 — Rust rewrite, no charts (current, released as 0.4.0)
 
-The detector is a single Rust crate (library + `audio-pattern-detector` binary). Detection results match the previous Python implementation on all sample audio.
+The detector is a single Rust crate (library + `audio-pattern-detector` binary), with optional Python bindings ([python.md](python.md)). Detection results match the previous Python implementation on all sample audio.
 
 `--debug` is text and audio only:
 

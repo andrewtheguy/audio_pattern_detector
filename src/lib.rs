@@ -12,6 +12,8 @@ pub mod error;
 pub mod ffmpeg;
 pub mod matching;
 pub mod pattern_config;
+#[cfg(feature = "python")]
+mod python;
 pub mod stream;
 pub mod time_format;
 pub mod tone;
@@ -24,7 +26,7 @@ pub use detector::{
 };
 pub use error::{Error, Result};
 pub use matching::{
-    load_pattern_clips, match_pattern, match_pattern_multiplexed, match_pattern_wav_stream,
-    read_multiplexed_patterns, MatchOptions,
+    find_clips_in_file, find_clips_in_wav_stream, load_pattern_clips, match_pattern, match_pattern_multiplexed,
+    match_pattern_wav_stream, read_multiplexed_patterns, MatchOptions,
 };
 pub use stream::{AudioStream, SampleSource};

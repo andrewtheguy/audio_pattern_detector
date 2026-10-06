@@ -10,3 +10,7 @@ tmp/
 .idea/
 .DS_Store
 .claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc

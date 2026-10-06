@@ -66,6 +66,24 @@ impl AudioClip {
         self
     }
 
+    /// Clip name derived from a pattern file path: the file name without
+    /// `.apd.toml` for pattern configs, otherwise without its last extension.
+    pub fn name_for_path(clip_path: impl AsRef<Path>) -> String {
+        let clip_path = clip_path.as_ref();
+        let file_name = clip_path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if file_name.to_lowercase().ends_with(APD_EXTENSION) {
+            // Strip the full compound extension (e.g. "rthk_beep.apd.toml" -> "rthk_beep").
+            return file_name[..file_name.len() - APD_EXTENSION.len()].to_string();
+        }
+        clip_path
+            .file_stem()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    }
+
     /// Load a clip from a file, resampled to `sample_rate`.
     ///
     /// Dispatches on extension: `.apd.toml` files are parsed as pattern
@@ -73,23 +91,17 @@ impl AudioClip {
     /// through ffmpeg.
     pub fn from_audio_file(clip_path: impl AsRef<Path>, sample_rate: u32) -> Result<Self> {
         let clip_path = clip_path.as_ref();
-        let file_name = clip_path
+        let clip_name = Self::name_for_path(clip_path);
+        let lower = clip_path
             .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
+            .map(|n| n.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-        let lower = file_name.to_lowercase();
 
         if lower.ends_with(APD_EXTENSION) {
-            // Strip the full compound extension (e.g. "rthk_beep.apd.toml" -> "rthk_beep").
-            let clip_name = &file_name[..file_name.len() - APD_EXTENSION.len()];
             let config = load_apd_file(clip_path, sample_rate)?;
             return Ok(Self::new(clip_name, config.audio, sample_rate).with_strategy(config.strategy));
         }
 
-        let clip_name = clip_path
-            .file_stem()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
         let audio = if lower.ends_with(".wav") {
             let (audio, source_sr) = load_wav_file(clip_path)?;
             resample_audio(audio, source_sr, sample_rate)

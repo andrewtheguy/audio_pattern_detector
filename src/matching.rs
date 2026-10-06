@@ -99,8 +99,23 @@ pub fn match_pattern<P: AsRef<Path>>(
     if !audio_source.exists() {
         return Err(Error::invalid(format!("Audio {} does not exist", audio_source.display())));
     }
-    let sr = options.target_sample_rate;
-    let pattern_clips = load_pattern_clips(pattern_files, sr)?;
+    let pattern_clips = load_pattern_clips(pattern_files, options.target_sample_rate)?;
+    let detector = AudioPatternDetector::new(pattern_clips, options.detector_options())?;
+    find_clips_in_file(&detector, audio_source, on_pattern_detected, accumulate_results)
+}
+
+/// Run an already constructed detector over an audio file (see [`match_pattern`]).
+pub fn find_clips_in_file(
+    detector: &AudioPatternDetector,
+    audio_source: impl AsRef<Path>,
+    on_pattern_detected: Option<PatternDetectedCallback>,
+    accumulate_results: bool,
+) -> Result<(Option<PeakTimes>, f64)> {
+    let audio_source = audio_source.as_ref();
+    if !audio_source.exists() {
+        return Err(Error::invalid(format!("Audio {} does not exist", audio_source.display())));
+    }
+    let sr = detector.target_sample_rate();
 
     let audio_name = audio_source
         .file_stem()
@@ -108,7 +123,6 @@ pub fn match_pattern<P: AsRef<Path>>(
         .unwrap_or_default();
     eprintln!("Finding pattern in audio file {audio_name}...");
 
-    let detector = AudioPatternDetector::new(pattern_clips, options.detector_options())?;
     let is_wav = audio_source
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("wav"));
@@ -128,6 +142,22 @@ pub fn match_pattern<P: AsRef<Path>>(
     Ok(result)
 }
 
+/// Run an already constructed detector over a WAV stream. The WAV must be
+/// mono at the detector's sample rate.
+pub fn find_clips_in_wav_stream<R: Read>(
+    detector: &AudioPatternDetector,
+    reader: R,
+    on_pattern_detected: Option<PatternDetectedCallback>,
+    accumulate_results: bool,
+) -> Result<(Option<PeakTimes>, f64)> {
+    let sr = detector.target_sample_rate();
+    let source = WavStreamSource::new(reader, sr)?;
+    eprintln!("WAV stdin: {sr}Hz, mono, {}", source.format().name());
+
+    let mut stream = AudioStream::new("stdin", source, sr);
+    detector.find_clip_in_audio(&mut stream, on_pattern_detected, accumulate_results)
+}
+
 fn find_in_wav_stream<R: Read>(
     reader: R,
     pattern_clips: Vec<AudioClip>,
@@ -135,16 +165,8 @@ fn find_in_wav_stream<R: Read>(
     on_pattern_detected: Option<PatternDetectedCallback>,
     accumulate_results: bool,
 ) -> Result<(Option<PeakTimes>, f64)> {
-    let sr = options.target_sample_rate;
-    let source = WavStreamSource::new(reader, sr)?;
-    eprintln!("WAV stdin: {sr}Hz, mono, {}", source.format().name());
-
-    let mut stream = AudioStream::new("stdin", source, sr);
-    AudioPatternDetector::new(pattern_clips, options.detector_options())?.find_clip_in_audio(
-        &mut stream,
-        on_pattern_detected,
-        accumulate_results,
-    )
+    let detector = AudioPatternDetector::new(pattern_clips, options.detector_options())?;
+    find_clips_in_wav_stream(&detector, reader, on_pattern_detected, accumulate_results)
 }
 
 /// Find pattern matches in a WAV stream (e.g. stdin). The WAV must be mono

@@ -22,3 +22,24 @@ jobs:
       run: cargo clippy --all-targets -- -D warnings
     - name: Run tests
       run: cargo test
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Cache Cargo
+      uses: Swatinem/rust-cache@v2
+    - name: Install ffmpeg (ffmpeg pipe test)
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+    - name: Run clippy on the Python bindings
+      run: cargo clippy --all-targets --features python -- -D warnings
+    - name: Build Python extension
+      env:
+        PYO3_PYTHON: python
+      run: cargo build --features python --lib
+    - name: Run Python binding tests
+      run: python -m unittest tests.test_python_bindings

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin>=1.9.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "audio-pattern-detector"
+# The version comes from Cargo.toml.
+dynamic = ["version"]
+description = "Detects audio patterns (intros, breaks, station beeps) in audio files and streams"
+authors = [{ name = "Andrew Chen", email = "hello@andrewtheguy.com" }]
+readme = "README.md"
+requires-python = ">=3.9"
+
+[tool.maturin]
+bindings = "pyo3"
+features = ["python"]

@@ -21,6 +21,13 @@ cargo test
 
 Unit tests live next to the code in `src/`; integration tests in `tests/` run the detector and the CLI binary against the clips in `sample_audios/`. Run the tests in release mode (`cargo test --release`) if the FFT-heavy integration tests feel slow.
 
+The Python bindings have their own checks, see [python.md](python.md):
+
+```shell
+cargo clippy --all-targets --features python -- -D warnings
+cargo build --features python --lib && python -m unittest tests.test_python_bindings
+```
+
 ## Code layout
 
 | Path | Contents |
@@ -34,6 +41,7 @@ Unit tests live next to the code in `src/`; integration tests in `tests/` run th
 | `src/stream.rs` | Audio sources (`SampleSource`): memory, raw float32, WAV file, WAV stream |
 | `src/wav.rs` | WAV reading and writing |
 | `src/ffmpeg.rs` | ffmpeg subprocess for non-WAV files |
+| `src/python.rs` | Python bindings (PyO3), compiled only with the `python` feature; see [python.md](python.md) |
 | `src/dsp/` | FFT cross-correlation, BS.1770 loudness, peak finding, resampling, Pearson correlation, spectra |
 
 The numerical routines in `src/dsp/` are implemented in the crate rather than pulled in as dependencies; they follow the semantics of the scipy/numpy/pyloudnorm functions the algorithm was originally tuned against (`scipy.signal.find_peaks`, `scipy.signal.resample`, `scipy.signal.correlate`, `numpy.hanning`, BS.1770 integrated loudness), so thresholds carry over unchanged.

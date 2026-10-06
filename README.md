@@ -6,7 +6,7 @@ Useful for AI workflows to efficiently segment audio files before processing (e.
 
 Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + multi-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
 
-Written in Rust: a single self-contained binary with no runtime dependencies (ffmpeg is only needed for non-WAV input files).
+Written in Rust: a single self-contained binary with no runtime dependencies (ffmpeg is only needed for non-WAV input files). Also available as a Python package with the same detector ([Python bindings](docs/python.md)).
 
 ## Installation
 
@@ -29,6 +29,22 @@ COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.0 /usr/local/bin/au
 ```
 
 The release workflow builds the image for amd64 and arm64 from the binaries it has already compiled (`runtime-prebuilt` target). To build it locally from source for the host architecture: `docker build --target runtime -t audio-pattern-detector .`
+
+### Python package
+
+```shell
+pip install audio-pattern-detector --extra-index-url https://andrewtheguy.github.io/audio_pattern_detector/simple/
+```
+
+```python
+import audio_pattern_detector as apd
+
+detector = apd.Detector(["pattern.wav", "station_beep.apd.toml"])
+result = detector.match_file("audio.wav")
+print(result.detections)  # {"pattern": [12.345], "station_beep": []}
+```
+
+See [Python bindings](docs/python.md) for the API, streaming input and uv configuration.
 
 ### Run from a checkout
 
@@ -118,6 +134,7 @@ For custom audio sources, implement `SampleSource` and drive `AudioPatternDetect
 
 - **[Pattern Matching](docs/pattern-matching.md)** - Detailed description of the detection pipeline, verification logic, and thresholds
 - **[Denoise Strategy](docs/denoise-strategy.md)** - How to denoise pattern clips for better matching with lossy-encoded or noisy audio
+- **[Python Bindings](docs/python.md)** - Python API, installation and building the wheel
 - **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin and multiplexed stdin (IPC) with a Node.js example
 - **[Development](docs/development.md)** - Building, linting, testing, code layout, debug output
 - **[Roadmap](docs/roadmap.md)** - What v1 covers and the plan for debug charts in v2
@@ -127,6 +144,10 @@ For custom audio sources, implement `SampleSource` and drive `AudioPatternDetect
 ```shell
 cargo clippy --all-targets -- -D warnings  # Linting
 cargo test                                 # Testing
+
+# Python bindings (see docs/python.md)
+cargo clippy --all-targets --features python -- -D warnings
+cargo build --features python --lib && python -m unittest tests.test_python_bindings
 ```
 
 See [docs/development.md](docs/development.md) for more details.
