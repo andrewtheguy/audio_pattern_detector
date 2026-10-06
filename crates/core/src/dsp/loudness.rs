@@ -207,17 +207,18 @@ pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f
     LUFS_OFFSET + 10.0 * z_avg_final.log10()
 }
 
-/// Normalize audio to a target loudness in dB LUFS with hard clipping.
+/// Normalize audio in place to a target loudness in dB LUFS with hard
+/// clipping.
 ///
 /// Applies the gain needed to shift from `current_lufs` to `target_lufs`,
 /// then hard-clips the output to [-1.0, 1.0].
-pub fn loudness_normalize(data: &[f32], current_lufs: f64, target_lufs: f64) -> Vec<f32> {
+pub fn loudness_normalize(data: &mut [f32], current_lufs: f64, target_lufs: f64) {
     let delta = target_lufs - current_lufs;
     let gain = 10.0_f64.powf(delta / 20.0);
 
-    data.iter()
-        .map(|&x| ((x as f64) * gain).clamp(-1.0, 1.0) as f32)
-        .collect()
+    for x in data.iter_mut() {
+        *x = ((*x as f64) * gain).clamp(-1.0, 1.0) as f32;
+    }
 }
 
 #[cfg(test)]
@@ -300,9 +301,9 @@ mod tests {
 
     #[test]
     fn test_loudness_normalize_clips() {
-        let data = [0.5_f32, -0.5, 0.8, -0.8];
+        let mut out = [0.5_f32, -0.5, 0.8, -0.8];
         // Apply huge gain (+40 dB) to force clipping.
-        let out = loudness_normalize(&data, -60.0, -20.0);
+        loudness_normalize(&mut out, -60.0, -20.0);
         for &v in &out {
             assert!((-1.0..=1.0).contains(&v), "value {v} exceeds [-1, 1]");
         }
@@ -310,9 +311,9 @@ mod tests {
 
     #[test]
     fn test_loudness_normalize_gain() {
-        let data = [0.1_f32, -0.1];
+        let mut out = [0.1_f32, -0.1];
         // +6 dB gain ≈ 2x.
-        let out = loudness_normalize(&data, -22.0, -16.0);
+        loudness_normalize(&mut out, -22.0, -16.0);
         let expected_gain = 10.0_f64.powf(6.0 / 20.0); // ~1.995
         assert!((out[0] as f64 - 0.1 * expected_gain).abs() < 1e-4);
     }

@@ -58,11 +58,11 @@ This produces a `ClipData` struct per clip containing the normalized audio, clip
 
 Audio is read as a stream of float32 samples and split into fixed-size chunks (`seconds_per_chunk`, default 60s). Here, `chunk` means the current chunk being processed and `previous_chunk` means the immediately preceding chunk, if one exists.
 
-The raw chunks themselves are not read with overlap. Instead, for each clip, the detector builds an `audio_section`. In the normal case, it prepends the last `sliding_window` seconds from `previous_chunk` to `chunk`, where `sliding_window = ceil(clip_duration_seconds)`. This ensures patterns near chunk boundaries are not missed.
+The raw chunks themselves are not read with overlap. Instead, the detector builds one `audio_section` per chunk that is shared by all clips. In the normal case, it prepends the last `lookback` seconds from `previous_chunk` to `chunk`, where `lookback` is the largest `sliding_window = ceil(clip_duration_seconds)` over all clips. This ensures patterns near chunk boundaries are not missed.
 
 The same prepend is applied to every chunk after the first, including a final short chunk.
 
-Each per-clip `audio_section` is loudness-normalized independently to -16 dB LUFS before correlation.
+The `audio_section` is loudness-normalized once to -16 dB LUFS and transformed with one forward FFT; each clip's cross-correlation then costs a spectrum product with the clip's cached template spectrum and one inverse FFT.
 
 ## Step 1: Candidate Detection (FFT Cross-Correlation)
 
@@ -177,7 +177,7 @@ A clip is classified as a pure tone if its frequency spectrum (via FFT) has exac
 
 Accepted peaks (in sample indices) are converted to timestamps in fractional seconds (`f64`):
 
-1. Subtract the section offset used to build `audio_section`: `0` for the first chunk, `sliding_window` seconds for every later chunk.
+1. Subtract the section offset used to build `audio_section`: `0` for the first chunk, the shared `lookback` seconds for every later chunk.
 2. Add the chunk's offset from the start of the stream (`index * seconds_per_chunk`).
 3. Shift backward by the clip duration so the timestamp marks the start of the pattern rather than the correlation peak.
 4. Clamp negative results to `0`.
