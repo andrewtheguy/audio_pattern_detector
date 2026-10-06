@@ -142,7 +142,7 @@ fn clip_from_sine(params: &Table, sample_rate: u32, source_path: &str) -> Result
             sample_rate as f64 / 2.0
         )));
     }
-    let n_samples = (duration_seconds * sample_rate as f64).round_ties_even() as usize;
+    let n_samples = (duration_seconds * sample_rate as f64).round() as usize;
     // Synthesised in float32 throughout so the clip is identical on every platform.
     let angular_frequency = (2.0 * std::f64::consts::PI * frequency_hz) as f32;
     let amplitude = amplitude as f32;

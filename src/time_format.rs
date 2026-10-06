@@ -14,7 +14,7 @@ pub fn seconds_to_time(seconds: f64) -> String {
 
 /// Format seconds as `HH:MM:SS`, rounding to the nearest second.
 pub fn seconds_to_time_whole(seconds: f64) -> String {
-    let seconds = seconds.round_ties_even() as i64;
+    let seconds = seconds.round() as i64;
     let minutes_remaining = seconds.div_euclid(60);
     let remaining_seconds = seconds.rem_euclid(60);
     let hours = minutes_remaining.div_euclid(60);
@@ -22,9 +22,9 @@ pub fn seconds_to_time_whole(seconds: f64) -> String {
     format!("{hours:02}:{minutes:02}:{remaining_seconds:02}")
 }
 
-/// Round seconds to integer milliseconds (ties to even).
+/// Round seconds to integer milliseconds (ties away from zero).
 pub fn seconds_to_ms(seconds: f64) -> i64 {
-    (seconds * 1000.0).round_ties_even() as i64
+    (seconds * 1000.0).round() as i64
 }
 
 #[cfg(test)]
@@ -50,9 +50,9 @@ mod tests {
     }
 
     #[test]
-    fn test_seconds_to_ms_rounds_ties_to_even() {
-        assert_eq!(seconds_to_ms(0.0005), 0);
-        assert_eq!(seconds_to_ms(0.0015), 2);
+    fn test_seconds_to_ms_rounds_ties_away_from_zero() {
+        assert_eq!(seconds_to_ms(0.0005), 1);
+        assert_eq!(seconds_to_ms(0.0025), 3);
         assert_eq!(seconds_to_ms(1.407375), 1407);
     }
 }

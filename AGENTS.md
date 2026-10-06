@@ -8,6 +8,7 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 - Numerical routines live in `src/dsp/` and are implemented in the crate even if they seem simple (e.g. Pearson correlation) — the user prefers a small dependency footprint over pulling in numerical crates.
 - They follow scipy/numpy/pyloudnorm semantics (`find_peaks`, `resample`, `correlate`, `hanning`, BS.1770 loudness) because the detection thresholds were tuned against those. Keep that behaviour when touching them.
+- Rounding is the exception: use Rust's standard `f64::round` (ties away from zero), not Python's round-half-to-even.
 
 ## Testing
 

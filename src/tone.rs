@@ -99,7 +99,7 @@ pub fn analyze_pure_tone_candidate(
     metrics.overall_band_purity =
         band_energy(&spectrum, &freqs, dominant_frequency, target_band_hz) / total_energy;
 
-    let window_len = ((0.025 * sample_rate as f64).round_ties_even() as usize).max(32);
+    let window_len = ((0.025 * sample_rate as f64).round() as usize).max(32);
     let hop = (window_len / 2).max(1);
     let frame_window = hanning(window_len);
     let frame_freqs = rfft_frequencies(window_len, sample_rate);

@@ -147,7 +147,7 @@ fn pearson_window_specs(is_short_clip: bool) -> (&'static [PearsonWindow], usize
 fn downsample_window(curve: &[f32], window: PearsonWindow) -> Vec<f32> {
     let (left, right, samples) = window;
     let bound = |partition: usize| {
-        ((curve.len() * partition) as f64 / PARTITION_COUNT as f64).round_ties_even() as usize
+        ((curve.len() * partition) as f64 / PARTITION_COUNT as f64).round() as usize
     };
     resample_preserve_maxima_1d(&curve[bound(left)..bound(right)], samples)
 }
@@ -364,7 +364,7 @@ impl AudioPatternDetector {
             .map(|clip_data| {
                 let duration = clip_data.clip.len() as f64 / self.target_sample_rate as f64;
                 let config = ClipConfig {
-                    duration_seconds: (duration * 1e6).round_ties_even() / 1e6,
+                    duration_seconds: (duration * 1e6).round() / 1e6,
                     sliding_window_seconds: clip_data.sliding_window,
                 };
                 (clip_data.name.clone(), config)
@@ -811,11 +811,11 @@ mod tests {
     }
 
     #[test]
-    fn test_downsample_window_bounds_round_half_to_even() {
-        // 25 samples, partitions 0-5 -> [0, round(12.5) = 12).
+    fn test_downsample_window_bounds_round_half_away_from_zero() {
+        // 25 samples, partitions 0-5 -> [0, round(12.5) = 13).
         let curve: Vec<f32> = (0..25).map(|i| i as f32).collect();
-        assert_eq!(downsample_window(&curve, (0, 5, 12)), (0..12).map(|i| i as f32).collect::<Vec<_>>());
-        assert_eq!(downsample_window(&curve, (5, 10, 13)), (12..25).map(|i| i as f32).collect::<Vec<_>>());
+        assert_eq!(downsample_window(&curve, (0, 5, 13)), (0..13).map(|i| i as f32).collect::<Vec<_>>());
+        assert_eq!(downsample_window(&curve, (5, 10, 12)), (13..25).map(|i| i as f32).collect::<Vec<_>>());
     }
 
     #[test]
