@@ -174,7 +174,22 @@ impl<R: Read> WavReader<R> {
 
     /// Read all remaining frames as interleaved float32 samples.
     pub fn read_all_frames(&mut self) -> Result<Vec<f32>> {
-        self.read_frames(usize::MAX)
+        let frame_bytes = self.spec.format.bytes_per_sample() * self.spec.channels as usize;
+        // `read_to_end` grows the buffer as data arrives, so a bogus declared
+        // length cannot trigger a huge allocation.
+        let mut buf = Vec::new();
+        match self.remaining.as_mut() {
+            Some(remaining) => {
+                let got = self.reader.by_ref().take(*remaining).read_to_end(&mut buf)?;
+                *remaining -= got as u64;
+            }
+            None => {
+                self.reader.read_to_end(&mut buf)?;
+            }
+        }
+        // Drop a trailing partial frame.
+        buf.truncate(buf.len() - buf.len() % frame_bytes);
+        Ok(decode_samples(&buf, self.spec.format))
     }
 }
 
@@ -405,6 +420,29 @@ mod tests {
         assert_eq!(reader.read_frames(2).unwrap(), vec![0.5, -0.5]);
         assert_eq!(reader.read_frames(2).unwrap(), vec![0.25]);
         assert_eq!(reader.read_frames(2).unwrap(), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn test_unknown_data_length_reads_to_eof() {
+        // Three samples plus a trailing partial frame, which is dropped.
+        let mut data: Vec<u8> = [16384i16, -16384, 8192].iter().flat_map(|v| v.to_le_bytes()).collect();
+        data.push(7);
+        for unknown_size in [u32::MAX, 0] {
+            let mut bytes = wav_bytes(1, 1, 8000, 16, &data);
+            bytes[40..44].copy_from_slice(&unknown_size.to_le_bytes());
+            let (samples, sr) = load_wav_from_bytes(&bytes, "t").unwrap();
+            assert_eq!((samples, sr), (vec![0.5, -0.5, 0.25], 8000));
+        }
+    }
+
+    #[test]
+    fn test_declared_data_length_larger_than_file() {
+        let data: Vec<u8> = [16384i16, -16384].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let mut bytes = wav_bytes(1, 1, 8000, 16, &data);
+        bytes[40..44].copy_from_slice(&(u32::MAX - 1).to_le_bytes());
+        let mut reader = WavReader::new(bytes.as_slice()).unwrap();
+        assert_eq!(reader.read_all_frames().unwrap(), vec![0.5, -0.5]);
+        assert_eq!(reader.read_all_frames().unwrap(), Vec::<f32>::new());
     }
 
     #[test]
