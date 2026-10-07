@@ -85,7 +85,7 @@ Both match methods return a `MatchResult`:
 
 ### Behaviour
 
-- Invalid input (missing files, bad WAV data, bad pattern configs, a chunk size too small for a clip) raises `ValueError`; I/O failures raise `OSError`.
+- Invalid input (missing files, bad WAV data, bad pattern configs, a chunk size too small for a clip) raises `ValueError`; I/O failures raise `OSError`; an FFT correlation failure raises `RuntimeError`.
 - An exception raised by `on_detected` or by `stream.read()` is re-raised from the match call. A stream match stops reading as soon as that happens; a file match finishes the file first.
 - The GIL is released while matching, so detectors can run in threads. A `Detector` is immutable and can be shared between threads.
 - Diagnostics go to the process's stderr, as with the CLI.

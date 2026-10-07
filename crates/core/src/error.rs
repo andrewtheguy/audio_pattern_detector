@@ -7,6 +7,8 @@ pub enum Error {
     Invalid(String),
     /// Underlying I/O failure.
     Io(std::io::Error),
+    /// FFT cross-correlation failure.
+    Correlation(fft_correlation::FftCorrelationError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -22,6 +24,7 @@ impl fmt::Display for Error {
         match self {
             Error::Invalid(message) => f.write_str(message),
             Error::Io(e) => write!(f, "I/O error: {e}"),
+            Error::Correlation(e) => write!(f, "correlation error: {e}"),
         }
     }
 }
@@ -31,6 +34,7 @@ impl std::error::Error for Error {
         match self {
             Error::Invalid(_) => None,
             Error::Io(e) => Some(e),
+            Error::Correlation(e) => Some(e),
         }
     }
 }
@@ -38,5 +42,11 @@ impl std::error::Error for Error {
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Error::Io(e)
+    }
+}
+
+impl From<fft_correlation::FftCorrelationError> for Error {
+    fn from(e: fft_correlation::FftCorrelationError) -> Self {
+        Error::Correlation(e)
     }
 }

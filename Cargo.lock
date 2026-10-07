@@ -67,6 +67,7 @@ name = "audio-pattern-detector-core"
 version = "0.4.2"
 dependencies = [
  "base64",
+ "fft-correlation",
  "pyo3",
  "realfft",
  "rustfft",
@@ -167,6 +168,13 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
+
+[[package]]
+name = "fft-correlation"
+version = "0.0.6"
+dependencies = [
+ "realfft",
+]
 
 [[package]]
 name = "getrandom"
