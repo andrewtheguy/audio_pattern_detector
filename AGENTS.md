@@ -21,7 +21,7 @@
 
 ## Debugging opus/lossy audio
 
-- There is no debug mode at the moment: `--debug` and its output were removed and are being rebuilt from scratch (planned for v2, see `docs/roadmap.md`).
+- There is no debug mode yet (planned for v2, see `docs/roadmap.md`).
 - Listen to the audio around a candidate for ground truth verification. Don't assume old detection results are correct.
 - Pattern clips should be extracted from the same encoding as the target audio (e.g. from an Opus stream when matching Opus audio). Denoise as a fallback when source-matched clips aren't available. See `docs/denoise-strategy.md`.
 

@@ -36,7 +36,7 @@ Raw audio stream (float32 PCM)
    │                                                           │
    │  NO  → Correlation-envelope verification:                 │
    │        • clip >= 0.5s  → Normal: partitioned MSE          │
-   │                          + 3-window Pearson r             │
+   │                          + center-window Pearson r        │
    │        • clip <  0.5s  → Short clip: whole-only MSE       │
    │                          + single-window Pearson r        │
    └───────────────────────────────────────────────────────────┘
@@ -52,7 +52,7 @@ Before processing audio, each clip is prepared once:
 2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, Mode::Full)` from the `fft-correlation` crate), producing a reference correlation curve. The absolute max is stored for normalization later.
 3. **Tone-strategy setup** - for clips whose strategy is `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips have no tone verifier.
 
-This produces a `ClipData` struct per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, the downsampled Pearson windows of that curve, and the tone verifier (set only for tone-strategy clips).
+This produces a `ClipData` struct per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, the downsampled Pearson window of that curve, and the tone verifier (set only for tone-strategy clips).
 
 ## Chunked Processing
 
@@ -80,7 +80,7 @@ Each peak is a candidate match location. Candidates are discarded only if the ce
 
 Every candidate peak from Step 1 is verified before being accepted as a match. The verifier branch is chosen by clip type, and the three branches below are alternatives — exactly one runs per candidate:
 
-- **Normal Patterns** (`.wav` clips ≥ 0.5s) — partitioned MSE plus 3-window Pearson r on the centered correlation slice.
+- **Normal Patterns** (`.wav` clips ≥ 0.5s) — partitioned MSE plus center-window Pearson r on the centered correlation slice.
 - **Short Clips** (`.wav` clips < 0.5s) — same correlation-envelope approach but with simplified single-window MSE and Pearson.
 - **Marker Tone** (`.apd.toml` clips with `strategy = "marker_tone"`) — narrowband spectral check at the declared dominant frequency, instead of the correlation-envelope shape check.
 
@@ -97,14 +97,11 @@ Verification uses partitioned mean squared error (MSE) plus Pearson correlation 
 
    The middle partitions are checked separately because real distortions tend to appear there.
 
-2. **Multi-window Pearson correlation** - three overlapping regions of the curves are compared to find the best shape match:
-   - Window A: first half (partitions 0-4, 0-50%), downsampled to 252 points
-   - Window B: center (partitions 4-5, 40-60%), downsampled to 101 points
-   - Window C: second half (partitions 5-9, 50-100%), downsampled to 252 points
+2. **Pearson correlation** - the center of the curves (partitions 4-5, 40-60%) is compared for shape.
 
-   Each window is downsampled using `resample_preserve_maxima` (sample count proportional to window width for consistent resolution), then the Pearson correlation coefficient is computed between the pattern's self-correlation window and the candidate's cross-correlation window. The best (highest) Pearson r across the three windows is used.
+   The window is downsampled to 101 points using `resample_preserve_maxima`, then the Pearson correlation coefficient is computed between the pattern's self-correlation window and the candidate's cross-correlation window.
 
-   Pearson r is scale-invariant — it measures shape similarity regardless of amplitude differences. This is important for lossy-encoded audio (e.g. Opus HLS streams) where codec artifacts inflate the correlation envelope but preserve the overall shape. The multi-window approach handles cases where the peak shape is slightly asymmetric or off-center.
+   Pearson r is scale-invariant — it measures shape similarity regardless of amplitude differences. This is important for lossy-encoded audio (e.g. Opus HLS streams) where codec artifacts inflate the correlation envelope but preserve the overall shape.
 
 3. **Decision thresholds** (evaluated in order — MSE first, short-circuiting Pearson):
    - `similarity > 0.02` -> reject early (hard MSE ceiling; skip Pearson computation entirely)
@@ -125,7 +122,7 @@ Short clips go through the normal correlation-envelope path but with simplified 
 
 1. **MSE** — only `similarity_whole` is used (no middle partition emphasis). The correlation envelope is too short for sub-region analysis to be meaningful.
 
-2. **Pearson correlation** — a single 0-100% window (505 downsampled points) instead of the three partial windows. The full window captures the overall shape without splitting into regions that would be too small.
+2. **Pearson correlation** — a single 0-100% window (505 downsampled points) instead of the center window. The full window captures the overall shape, since the center region alone would be too small.
 
 3. **Same thresholds** — `similarity > 0.02` rejects early (no Pearson computation), `pearson_r >= 0.90` accepts.
 
@@ -187,4 +184,4 @@ Accepted peaks (in sample indices) are converted to timestamps in fractional sec
 | Structure | Description |
 |-----------|-------------|
 | `AudioClip` | Input pattern: name, audio array, sample rate |
-| `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window, downsampled Pearson windows, tone verifier |
+| `ClipData` | Pre-computed per clip: normalized audio, clip name, self-correlation curve, absolute max, sliding window, downsampled Pearson window, tone verifier |

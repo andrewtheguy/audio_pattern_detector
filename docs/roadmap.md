@@ -2,7 +2,7 @@
 
 ## v2 — simple debug charts
 
-There is no debug mode in the code at the moment; it is rebuilt from scratch in v2.
+There is no debug mode yet; v2 adds one.
 
 Goal: only the charts that are needed to tune detection, with only the chart elements needed to read them. Charts are a debug aid: opt-in at build time, written to files, never displayed.
 

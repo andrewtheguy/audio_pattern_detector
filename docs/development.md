@@ -55,7 +55,7 @@ FFT cross-correlation comes from the [`fft-correlation`](https://github.com/andr
 
 ## Debug output
 
-There is no debug mode at the moment; it is being rebuilt from scratch. See [roadmap.md](roadmap.md) for the plan.
+There is no debug mode yet. See [roadmap.md](roadmap.md) for the plan.
 
 ## Detection Algorithm
 
