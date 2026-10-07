@@ -10,7 +10,7 @@ use audio_pattern_detector_core::stream::WavFileSource;
 use audio_pattern_detector_core::{
     match_pattern, AudioClip, AudioPatternDetector, AudioStream, DetectorOptions, MatchOptions, PeakTimes,
 };
-use common::{clip_from_samples, concat, insert_at, silence, sine_tone, stream_from_samples, SR};
+use common::{clip_from_samples, concat, insert_at, silence, sine_tone, stream_from_samples, Rng, SR};
 
 const RTHK_BEEP_PATTERN: &str = "../../sample_audios/clips/rthk_beep.apd.toml";
 const RTHK_BEEP_AUDIO: &str = "../../sample_audios/rthk_section_with_beep.wav";
@@ -938,4 +938,40 @@ fn test_overlap_detections_are_reported_once() {
     let expected_events: Vec<(String, f64)> =
         expected.iter().map(|&t| (SHORT_BEEP_NAME.to_string(), t)).collect();
     assert_eq!(events, expected_events);
+}
+
+const TIE_OTHER_NAME: &str = "tie_other";
+const TIE_PREFIX_NAME: &str = "tie_prefix";
+const TIE_FULL_NAME: &str = "tie_full";
+const TIE_PREFIX_DURATION: f64 = 0.5;
+const TIE_FULL_DURATION: f64 = 1.5;
+const TIE_START: f64 = 2.0;
+const TIE_EXPECTED_TIME: f64 = 1.9998749999999998;
+
+// Clips are grouped by sliding window for matching, but two clips detected
+// at the same timestamp are still reported in clip order.
+#[test]
+fn test_same_timestamp_detections_are_reported_in_clip_order() {
+    let full_audio = Rng::new(11).noise((TIE_FULL_DURATION * SR as f64) as usize, 0.1);
+    let prefix_audio = &full_audio[..(TIE_PREFIX_DURATION * SR as f64) as usize];
+    // Sliding windows 2, 1, 2: the prefix clip is matched after both others.
+    let clips = vec![
+        clip_from_samples(TIE_OTHER_NAME, &Rng::new(12).noise(full_audio.len(), 0.1)),
+        clip_from_samples(TIE_PREFIX_NAME, prefix_audio),
+        clip_from_samples(TIE_FULL_NAME, &full_audio),
+    ];
+    let mut audio = silence(6.0, SR);
+    insert_at(&mut audio, (TIE_START * SR as f64) as usize, &full_audio);
+    let detector = new_detector(clips, Some(10)).unwrap();
+
+    let mut events: Vec<(String, f64)> = Vec::new();
+    let mut callback = |name: &str, timestamp: f64| events.push((name.to_string(), timestamp));
+    detector
+        .find_clip_in_audio(&mut stream_from_samples("tie", &audio), Some(&mut callback), false)
+        .unwrap();
+
+    assert_eq!(
+        events,
+        vec![(TIE_PREFIX_NAME.to_string(), TIE_EXPECTED_TIME), (TIE_FULL_NAME.to_string(), TIE_EXPECTED_TIME)]
+    );
 }

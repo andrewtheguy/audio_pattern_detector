@@ -484,8 +484,8 @@ impl AudioPatternDetector {
             }
             total_time += chunk.len() as f64 / sr as f64;
 
-            // All matches from all clips for this chunk.
-            let mut chunk_matches: Vec<(f64, &str)> = Vec::new();
+            // All matches from all clips for this chunk, with the clip index.
+            let mut chunk_matches: Vec<(f64, usize)> = Vec::new();
 
             for group in &self.section_groups {
                 let lookback_samples = self.load_section(&chunk, previous_chunk.as_deref(), group, &mut buffers);
@@ -501,7 +501,7 @@ impl AudioPatternDetector {
                     *seen_peaks = peaks.into_iter().map(|(position, _)| position).collect();
 
                     if on_pattern_detected.is_some() {
-                        chunk_matches.extend(peak_times.iter().map(|&t| (t, clip_data.name.as_str())));
+                        chunk_matches.extend(peak_times.iter().map(|&t| (t, clip_index)));
                     }
                     if let Some(all) = all_peak_times.as_mut() {
                         all.get_mut(&clip_data.name)
@@ -511,11 +511,12 @@ impl AudioPatternDetector {
                 }
             }
 
-            // Call the callback in timestamp order (monotonic output).
+            // Call the callback in timestamp order (monotonic output), clip
+            // order within the same timestamp.
             if let Some(callback) = on_pattern_detected.as_mut() {
-                chunk_matches.sort_by(|a, b| a.0.total_cmp(&b.0));
-                for (timestamp, clip_name) in chunk_matches {
-                    callback(clip_name, timestamp);
+                chunk_matches.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+                for (timestamp, clip_index) in chunk_matches {
+                    callback(&self.clips[clip_index].name, timestamp);
                 }
             }
 
