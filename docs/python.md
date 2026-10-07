@@ -9,7 +9,7 @@ Wheels (Linux x86_64 and arm64, macOS Apple Silicon, Windows x86_64) are attache
 ```toml
 # pyproject.toml (uv)
 [project]
-dependencies = ["audio-pattern-detector==0.4.2"]
+dependencies = ["audio-pattern-detector==0.4.3"]
 
 [[tool.uv.index]]
 name = "audio-pattern-detector"
