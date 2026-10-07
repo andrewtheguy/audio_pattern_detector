@@ -25,7 +25,7 @@ cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git -
 `ghcr.io/andrewtheguy/audio_pattern_detector:<tag>` is published with each release (`v<version>`, plus `latest` for releases from `main`). It contains only the binary at `/usr/local/bin/audio-pattern-detector` (no ffmpeg), so the usual use is copying it into another image:
 
 ```dockerfile
-COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.3 /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
+COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.4 /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
 ```
 
 The release workflow builds the image for amd64 and arm64 from the binaries it has already compiled (`runtime-prebuilt` target). To build it locally from source for the host architecture: `docker build --target runtime -t audio-pattern-detector .`
