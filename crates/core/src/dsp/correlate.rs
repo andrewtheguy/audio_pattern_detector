@@ -94,17 +94,23 @@ impl CorrelationTemplate {
 }
 
 /// Reusable buffers for FFT cross-correlation of one signal against any
-/// number of templates: the signal is transformed once by [`load_signal`]
-/// and each [`correlate`] call then costs a spectrum product and one
-/// inverse FFT.
+/// number of templates: the signal is set by [`load_signal`] and transformed
+/// once per FFT size, so each [`correlate`] call with a template needing the
+/// same size costs a spectrum product and one inverse FFT.
+///
+/// The FFT size of a correlation depends only on the signal and that
+/// template, never on the other templates, so the result is bit-identical
+/// to correlating the pair on its own.
 ///
 /// [`load_signal`]: CorrelationWorkspace::load_signal
 /// [`correlate`]: CorrelationWorkspace::correlate
 #[derive(Default)]
 pub struct CorrelationWorkspace {
+    signal: Vec<f32>,
+    /// FFT size the buffers are allocated for (0 before the first transform).
     fft_size: usize,
-    signal_len: usize,
-    max_template_len: usize,
+    /// Whether `signal_spectrum` is the transform of `signal` at `fft_size`.
+    spectrum_loaded: bool,
     plans: Option<FftPlans>,
     padded_signal: Vec<f32>,
     signal_spectrum: Vec<Complex<f32>>,
@@ -119,18 +125,18 @@ impl CorrelationWorkspace {
         Self::default()
     }
 
-    /// Transform `signal`, sizing the FFT so that templates up to
-    /// `max_template_len` samples correlate without wrap-around.
-    pub fn load_signal(&mut self, signal: &[f32], max_template_len: usize) {
-        self.signal_len = signal.len();
-        self.max_template_len = max_template_len;
-        if signal.is_empty() {
+    /// Set the signal for the following [`correlate`](Self::correlate) calls.
+    pub fn load_signal(&mut self, signal: &[f32]) {
+        self.signal.clear();
+        self.signal.extend_from_slice(signal);
+        self.spectrum_loaded = false;
+    }
+
+    /// Transform the loaded signal at `fft_size` unless that is already done.
+    fn transform_signal(&mut self, fft_size: usize) {
+        if self.spectrum_loaded && self.fft_size == fft_size {
             return;
         }
-
-        // Covers the full correlation (signal + template - 1) and, for an
-        // empty template, still the whole signal.
-        let fft_size = (signal.len() + max_template_len.saturating_sub(1)).next_power_of_two();
         if self.fft_size != fft_size || self.plans.is_none() {
             let plans = get_fft_plans(fft_size);
             let (r2c, c2r) = &plans;
@@ -145,11 +151,12 @@ impl CorrelationWorkspace {
 
         self.padded_signal.clear();
         self.padded_signal.resize(fft_size, 0.0);
-        self.padded_signal[..signal.len()].copy_from_slice(signal);
+        self.padded_signal[..self.signal.len()].copy_from_slice(&self.signal);
 
         let (r2c, _) = self.plans.as_ref().expect("plans were just set");
         r2c.process_with_scratch(&mut self.padded_signal, &mut self.signal_spectrum, &mut self.forward_scratch)
             .expect("forward FFT buffers are sized by the plan");
+        self.spectrum_loaded = true;
     }
 
     /// Full cross-correlation of the loaded signal with `template`, written
@@ -160,24 +167,23 @@ impl CorrelationWorkspace {
     /// aligns with `signal[k]`. `output` is empty if either is empty.
     pub fn correlate(&mut self, template: &mut CorrelationTemplate, output: &mut Vec<f32>) {
         output.clear();
-        if self.signal_len == 0 || template.is_empty() {
+        if self.signal.is_empty() || template.is_empty() {
             return;
         }
-        assert!(
-            template.len() <= self.max_template_len,
-            "template longer than the loaded signal allows"
-        );
+
+        // Covers the full correlation without wrap-around.
+        let output_len = self.signal.len() + template.len() - 1;
+        self.transform_signal(output_len.next_power_of_two());
 
         let template_spectrum = template.spectrum(self.fft_size);
         for ((p, s), t) in self.product.iter_mut().zip(&self.signal_spectrum).zip(template_spectrum) {
             *p = *s * *t;
         }
 
-        let (_, c2r) = self.plans.as_ref().expect("a signal is loaded");
+        let (_, c2r) = self.plans.as_ref().expect("the signal was just transformed");
         c2r.process_with_scratch(&mut self.product, &mut self.time_domain, &mut self.inverse_scratch)
             .expect("inverse FFT buffers are sized by the plan");
 
-        let output_len = self.signal_len + template.len() - 1;
         let normalization = 1.0 / self.fft_size as f32;
         output.extend(self.time_domain[..output_len].iter().map(|x| x * normalization));
     }
@@ -192,7 +198,7 @@ pub fn fft_correlate_full(signal: &[f32], template: &[f32]) -> Vec<f32> {
     let mut workspace = CorrelationWorkspace::new();
     let mut template = CorrelationTemplate::new(template);
     let mut output = Vec::new();
-    workspace.load_signal(signal, template.len());
+    workspace.load_signal(signal);
     workspace.correlate(&mut template, &mut output);
     output
 }
@@ -257,7 +263,7 @@ mod tests {
 
         // Two templates against one signal, then a different signal size.
         for signal in [&signal_a, &signal_b, &signal_a] {
-            workspace.load_signal(signal, template_b.len());
+            workspace.load_signal(signal);
             for (cached, template) in [(&mut cached_a, &template_a), (&mut cached_b, &template_b)] {
                 workspace.correlate(cached, &mut output);
                 let naive = naive_full_correlation(signal, template);
@@ -275,12 +281,12 @@ mod tests {
         let mut workspace = CorrelationWorkspace::new();
         let mut template = CorrelationTemplate::new(&[1.0, 2.0]);
         let mut output = vec![1.0];
-        workspace.load_signal(&[], 2);
+        workspace.load_signal(&[]);
         workspace.correlate(&mut template, &mut output);
         assert!(output.is_empty());
 
         let mut empty = CorrelationTemplate::new(&[]);
-        workspace.load_signal(&[1.0, 2.0, 3.0], 2);
+        workspace.load_signal(&[1.0, 2.0, 3.0]);
         workspace.correlate(&mut empty, &mut output);
         assert!(output.is_empty());
     }
@@ -314,12 +320,12 @@ mod tests {
         let mut first = Vec::new();
         let mut second = Vec::new();
 
-        workspace.load_signal(&signal, template.len());
+        workspace.load_signal(&signal);
         workspace.correlate(&mut cached, &mut first);
         assert_eq!(cached.spectra.len(), 1);
         // Same signal again: the cached spectrum is used (no new entry) and
         // the result is bit-identical to the first pass and to the one-shot.
-        workspace.load_signal(&signal, template.len());
+        workspace.load_signal(&signal);
         workspace.correlate(&mut cached, &mut second);
         assert_eq!(cached.spectra.len(), 1);
         assert_eq!(first, second);
@@ -338,7 +344,7 @@ mod tests {
         let mut fft_sizes = Vec::new();
         for &len in &lengths {
             let signal: Vec<f32> = (0..len).map(|i| ((i * 17 % 23) as f32 - 11.0) / 11.0).collect();
-            workspace.load_signal(&signal, template.len());
+            workspace.load_signal(&signal);
             workspace.correlate(&mut cached, &mut output);
             assert_close(&output, &naive_full_correlation(&signal, &template));
             fft_sizes.push(workspace.fft_size);
@@ -352,7 +358,7 @@ mod tests {
 
         // An evicted size is recomputed and still correct.
         let signal: Vec<f32> = (0..4).map(|i| i as f32 - 1.5).collect();
-        workspace.load_signal(&signal, template.len());
+        workspace.load_signal(&signal);
         workspace.correlate(&mut cached, &mut output);
         assert_close(&output, &naive_full_correlation(&signal, &template));
         let kept: Vec<usize> = cached.spectra.iter().map(|(size, _)| *size).collect();
@@ -360,23 +366,26 @@ mod tests {
     }
 
     #[test]
-    fn test_larger_max_template_len_matches_naive() {
+    fn test_fft_size_is_independent_of_other_templates() {
         let signal: Vec<f32> = (0..40).map(|i| ((i * 19 % 29) as f32 - 14.0) / 14.0).collect();
         let short: Vec<f32> = (0..6).map(|i| ((i * 5 % 7) as f32 - 3.0) / 3.0).collect();
         let long: Vec<f32> = (0..30).map(|i| ((i * 11 % 17) as f32 - 8.0) / 8.0).collect();
+        let expected_short = fft_correlate_full(&signal, &short);
+        let expected_long = fft_correlate_full(&signal, &long);
 
         let mut workspace = CorrelationWorkspace::new();
         let mut output = Vec::new();
-        // The FFT is sized for the longest template of the group ...
-        workspace.load_signal(&signal, long.len());
-        assert_eq!(workspace.fft_size, 128);
-        // ... and a shorter template still gets its own full-length output.
-        workspace.correlate(&mut CorrelationTemplate::new(&short), &mut output);
-        assert_eq!(output.len(), signal.len() + short.len() - 1);
-        assert_close(&output, &naive_full_correlation(&signal, &short));
-        workspace.correlate(&mut CorrelationTemplate::new(&long), &mut output);
-        assert_eq!(output.len(), signal.len() + long.len() - 1);
-        assert_close(&output, &naive_full_correlation(&signal, &long));
+        workspace.load_signal(&signal);
+        // Each template gets the FFT size it needs on its own, in any order,
+        // so the output is bit-identical to the one-shot correlation.
+        let mut fft_sizes = Vec::new();
+        for (template, expected) in [(&long, &expected_long), (&short, &expected_short), (&long, &expected_long)] {
+            workspace.correlate(&mut CorrelationTemplate::new(template), &mut output);
+            fft_sizes.push(workspace.fft_size);
+            assert_eq!(&output, expected);
+            assert_close(&output, &naive_full_correlation(&signal, template));
+        }
+        assert_eq!(fft_sizes, vec![128, 64, 128]);
     }
 
     #[test]
@@ -400,20 +409,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "template longer than the loaded signal allows")]
-    fn test_template_longer_than_allowed_panics() {
-        let mut workspace = CorrelationWorkspace::new();
-        let mut template = CorrelationTemplate::new(&[1.0, 2.0, 3.0]);
-        workspace.load_signal(&[1.0, 2.0, 3.0, 4.0], 2);
-        workspace.correlate(&mut template, &mut Vec::new());
-    }
-
-    #[test]
     fn test_output_buffer_is_replaced_not_appended() {
         let mut workspace = CorrelationWorkspace::new();
         let mut template = CorrelationTemplate::new(&[1.0, 0.5]);
         let mut output = vec![9.0; 20];
-        workspace.load_signal(&[1.0, 2.0, 3.0, 4.0], 2);
+        workspace.load_signal(&[1.0, 2.0, 3.0, 4.0]);
         workspace.correlate(&mut template, &mut output);
         assert_close(&output, &[0.5, 2.0, 3.5, 5.0, 4.0]);
     }

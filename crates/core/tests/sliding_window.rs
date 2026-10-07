@@ -975,3 +975,44 @@ fn test_same_timestamp_detections_are_reported_in_clip_order() {
         vec![(TIE_PREFIX_NAME.to_string(), TIE_EXPECTED_TIME), (TIE_FULL_NAME.to_string(), TIE_EXPECTED_TIME)]
     );
 }
+
+const THRESHOLD_NAME: &str = "threshold_pattern";
+const THRESHOLD_OTHER_NAME: &str = "threshold_other";
+const THRESHOLD_PATTERN_SAMPLES: usize = 100;
+const THRESHOLD_OTHER_SAMPLES: usize = 5000;
+/// Amplitude of the quiet copy that puts its correlation peak right at the
+/// default `height_min` (0.25) relative to the full-strength copy.
+const THRESHOLD_QUIET_SCALE: f32 = 0.2139812;
+const THRESHOLD_QUIET_START: usize = 4000;
+const THRESHOLD_FULL_START: usize = 12000;
+const THRESHOLD_EXPECTED_TIMES: [f64; 2] = [0.499875, 1.499875];
+
+/// A clip's FFT size depends only on its own length: an unrelated longer
+/// clip with the same sliding window (which alone would need a larger FFT:
+/// 16000 + 99 <= 16384 < 16000 + 4999) must not change the f32 rounding of
+/// a peak sitting right at the height threshold.
+#[test]
+fn test_threshold_peak_is_independent_of_other_clips_in_the_group() {
+    let pattern = Rng::new(0).noise(THRESHOLD_PATTERN_SAMPLES, 0.1);
+    let other = Rng::new(1000).noise(THRESHOLD_OTHER_SAMPLES, 0.1);
+    let quiet: Vec<f32> = pattern.iter().map(|v| v * THRESHOLD_QUIET_SCALE).collect();
+    let mut audio = silence(2.0, SR);
+    insert_at(&mut audio, THRESHOLD_QUIET_START, &quiet);
+    insert_at(&mut audio, THRESHOLD_FULL_START, &pattern);
+
+    let run = |clips: Vec<AudioClip>| {
+        let detector = new_detector(clips, Some(2)).unwrap();
+        let (peak_times, _) = detector
+            .find_clip_in_audio(&mut stream_from_samples("threshold", &audio), None, true)
+            .unwrap();
+        detections(&peak_times.unwrap(), THRESHOLD_NAME).to_vec()
+    };
+
+    let alone = run(vec![clip_from_samples(THRESHOLD_NAME, &pattern)]);
+    let with_other = run(vec![
+        clip_from_samples(THRESHOLD_NAME, &pattern),
+        clip_from_samples(THRESHOLD_OTHER_NAME, &other),
+    ]);
+    assert_eq!(alone, THRESHOLD_EXPECTED_TIMES);
+    assert_eq!(with_other, THRESHOLD_EXPECTED_TIMES);
+}

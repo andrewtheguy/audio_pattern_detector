@@ -205,8 +205,6 @@ struct SectionGroup {
     /// Seconds of the previous chunk prepended to every chunk after the
     /// first: ceil(clip seconds), the same for every clip in the group.
     lookback_seconds: u32,
-    /// Longest clip in the group in samples; sizes the shared FFT.
-    max_clip_length: usize,
     /// Indices into `AudioPatternDetector::clips`.
     clip_indices: Vec<usize>,
 }
@@ -216,13 +214,9 @@ fn section_groups(clips: &[ClipData]) -> Vec<SectionGroup> {
     let mut groups: Vec<SectionGroup> = Vec::new();
     for (clip_index, clip_data) in clips.iter().enumerate() {
         match groups.iter_mut().find(|g| g.lookback_seconds == clip_data.sliding_window) {
-            Some(group) => {
-                group.max_clip_length = group.max_clip_length.max(clip_data.clip.len());
-                group.clip_indices.push(clip_index);
-            }
+            Some(group) => group.clip_indices.push(clip_index),
             None => groups.push(SectionGroup {
                 lookback_seconds: clip_data.sliding_window,
-                max_clip_length: clip_data.clip.len(),
                 clip_indices: vec![clip_index],
             }),
         }
@@ -557,7 +551,7 @@ impl AudioPatternDetector {
 
         normalize_loudness(audio_section, sr);
 
-        workspace.load_signal(audio_section, group.max_clip_length);
+        workspace.load_signal(audio_section);
         lookback_samples
     }
 
@@ -1003,7 +997,6 @@ mod tests {
 
     #[test]
     fn test_section_groups_by_sliding_window_in_order_of_first_appearance() {
-        let sr = DEFAULT_TARGET_SAMPLE_RATE as usize;
         let detector = AudioPatternDetector::new(
             vec![
                 sine_clip("short", 0.23), // window 1
@@ -1022,15 +1015,12 @@ mod tests {
 
         assert_eq!(groups[0].lookback_seconds, 1);
         assert_eq!(groups[0].clip_indices, vec![0, 2, 4]);
-        assert_eq!(groups[0].max_clip_length, sr);
 
         assert_eq!(groups[1].lookback_seconds, 3);
         assert_eq!(groups[1].clip_indices, vec![1, 3]);
-        assert_eq!(groups[1].max_clip_length, 3 * sr);
 
         assert_eq!(groups[2].lookback_seconds, 2);
         assert_eq!(groups[2].clip_indices, vec![5]);
-        assert_eq!(groups[2].max_clip_length, (1.2 * sr as f64) as usize);
 
         // Every clip is in exactly one group.
         let mut all: Vec<usize> = groups.iter().flat_map(|g| g.clip_indices.iter().copied()).collect();
@@ -1039,7 +1029,6 @@ mod tests {
         for group in groups {
             for &clip_index in &group.clip_indices {
                 assert_eq!(detector.clips[clip_index].sliding_window, group.lookback_seconds);
-                assert!(detector.clips[clip_index].clip.len() <= group.max_clip_length);
             }
         }
     }
