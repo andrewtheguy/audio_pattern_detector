@@ -4,7 +4,7 @@ Detects audio patterns specified by audio clips in target audio files. Designed 
 
 Useful for AI workflows to efficiently segment audio files before processing (e.g., OpenAI Whisper transcription preprocessing).
 
-Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + multi-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
+Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + center-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
 
 Written in Rust: a single self-contained binary with no runtime dependencies (ffmpeg is only needed for non-WAV input files). Also available as a Python package with the same detector ([Python bindings](docs/python.md)).
 

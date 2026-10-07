@@ -71,8 +71,8 @@ This step always runs first for every clip type. Its job is to locate and center
 For each chunk, each sliding-window group's `audio_section` is loaded into a `CorrelationWorkspace` (`load_signal`) from the `fft-correlation` crate. Then for each clip in the group:
 
 1. Compute the full cross-correlation with `CorrelationWorkspace::correlate`, using the clip's `CorrelationTemplate` (its time-reversed spectrum, cached per FFT size for the run), and take the absolute value. The result is the same as `fft_correlate_1d(audio_section, clip, Mode::Full)`; the workspace only avoids repeating the section's forward FFT.
-2. Normalize by `max(self_correlation_max, cross_correlation_max)` so the correlation curve is in [0, 1].
-3. Run peak detection with `height >= 0.25` and `distance >= clip_length` (prevents duplicate detections within one clip duration).
+2. Take `max(self_correlation_max, cross_correlation_max)` as the reference peak, so a much softer section cannot look like a full-strength match. The correlation curve itself is left unscaled.
+3. Run peak detection with `height >= 0.25 * reference peak` and `distance >= clip_length` (prevents duplicate detections within one clip duration). This is the same as a 0.25 threshold on the curve divided by the reference peak, without the extra pass over the section.
 
 Each peak is a candidate match location. Candidates are discarded only if the centered slice would extend more than 5 samples beyond the correlation array; otherwise zero-padding is used to keep the slice length consistent.
 

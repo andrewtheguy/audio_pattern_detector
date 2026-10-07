@@ -10,7 +10,7 @@ Goal: only the charts that are needed to tune detection, with only the chart ele
 
 | Chart | File under the debug directory | What it answers |
 |-------|--------------------------|-----------------|
-| Pearson windows | `graph/pearson_downsampled/<clip>/<clip>_<index>_<section_ts>_<peak>_w<l>_<r>.png` | The downsampled candidate window against the pattern's window — the curves verification actually compares. Check this first. |
+| Pearson window | `graph/pearson_downsampled/<clip>/<clip>_<index>_<section_ts>_<peak>.png` | The downsampled candidate window against the pattern's window — the curves verification actually compares. Check this first. |
 | Correlation slice | `graph/cross_correlation_slice/<clip>/<clip>_<index>_<section_ts>_<peak>.png` | The full-resolution candidate envelope against the pattern's self-correlation: where does the shape diverge? |
 | Section correlation | `graph/cross_correlation/<clip>/<clip>_<index>_<section_ts>.png` | The whole section's correlation curve: were there candidate peaks at all, and how high? |
 
@@ -24,7 +24,7 @@ Not planned:
 ### Chart elements
 
 - Line series only: candidate in one colour, pattern overlaid in a second, semi-transparent colour.
-- Title (carrying the Pearson r and the `*best*` window marker where relevant).
+- Title (carrying the Pearson r where relevant).
 - X and Y axes with tick labels and an axis label each.
 - Fixed 1000×400 px PNG.
 
@@ -35,7 +35,7 @@ Not included: legends, grid lines, themes, annotations, interactivity, configura
 - Library: [`plotters`](https://crates.io/crates/plotters) with the bitmap backend only (`default-features = false`).
 - Text needs a font. Use the `ab_glyph` feature with a font embedded via `include_bytes!` so the binary has no fontconfig/freetype dependency and renders identically everywhere.
 - Gate the charts behind an optional `charts` cargo feature so default builds do not carry the dependency.
-- The detector has the data at the right places: `verify_correlation_envelope` holds the slice, the pattern curve and the downsampled center window; `correlation_method` holds the section correlation.
+- The detector has the data at the right places: `verify_correlation_envelope` holds the slice, the pattern curve and the downsampled center window; `correlation_method` holds the section correlation. That curve is unscaled (the peak threshold is scaled by the reference peak instead), so the section chart has to divide it by the reference peak to show heights against the 0.25 threshold.
 - Debug file names write `<section_ts>` with `_` instead of `:` (`00_39_00`) so they are valid on Windows. Clip names can come from untrusted input (multiplexed stdin), so they must be sanitised to a single path component before being used in a file name.
 
 ### Open questions
