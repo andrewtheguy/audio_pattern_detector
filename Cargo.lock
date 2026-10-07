@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "audio-pattern-detector"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "audio-pattern-detector-core",
  "clap",
@@ -64,7 +64,7 @@ dependencies = [
 
 [[package]]
 name = "audio-pattern-detector-core"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "base64",
  "pyo3",
