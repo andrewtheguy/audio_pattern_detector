@@ -118,6 +118,8 @@ struct ClipData {
     correlation_clip_absolute_max: f32,
     /// `Some` when candidates are verified as a marker tone.
     tone: Option<ToneVerifier>,
+    /// Shorter than [`SHORT_CLIP_DURATION_THRESHOLD`].
+    is_short_clip: bool,
     /// Downsampled window of `correlation_clip` used for Pearson r.
     pearson_window: Vec<f32>,
 }
@@ -343,6 +345,7 @@ impl AudioPatternDetector {
             correlation_clip,
             correlation_clip_absolute_max,
             tone,
+            is_short_clip,
             pearson_window,
         })
     }
@@ -526,7 +529,7 @@ impl AudioPatternDetector {
 
         let RunBuffers { workspace, templates, audio_section, correlation } = buffers;
         workspace.correlate(&mut templates[clip_index], Mode::Full, correlation)?;
-        let peaks = self.correlation_method(clip_data, audio_section, correlation, index)?;
+        let peaks = self.correlation_method(clip_data, audio_section, correlation, index);
 
         let section_start = index as i64 * self.seconds_per_chunk as i64 * sr as i64 - lookback_samples as i64;
         Ok(peaks
@@ -549,7 +552,7 @@ impl AudioPatternDetector {
         audio_section: &[f32],
         correlation: &mut [f32],
         index: usize,
-    ) -> Result<Vec<usize>> {
+    ) -> Vec<usize> {
         let clip_name = &clip_data.name;
         let clip_length = clip_data.clip.len();
         let correlation_clip_length = clip_data.correlation_clip.len();
@@ -560,8 +563,6 @@ impl AudioPatternDetector {
         let max_choose = clip_data.correlation_clip_absolute_max.max(absolute_max);
         correlation.iter_mut().for_each(|v| *v /= max_choose);
 
-        let section_ts = seconds_to_time_whole(index as f64 * self.seconds_per_chunk as f64);
-
         // No repetition within the duration of the clip. The height is kept
         // low so weak candidates are not missed; they are verified below.
         let peaks = find_peaks_1d(
@@ -569,20 +570,22 @@ impl AudioPatternDetector {
             &FindPeaksOptions { height: Some(self.height_min), distance: Some(clip_length), prominence: None },
         );
 
+        let section_ts = || seconds_to_time_whole(index as f64 * self.seconds_per_chunk as f64);
         let mut peaks_final = Vec::new();
 
-        for &peak in &peaks {
+        for peak in peaks {
             // Make sure the slice is not out of bounds at the beginning and end.
             let after = peak + correlation_clip_length / 2;
             let before = peak as isize - (correlation_clip_length / 2) as isize;
             if after > correlation.len() + 5 {
                 eprintln!(
-                    "{section_ts} {clip_name} peak {peak} after is {after} > len(correlation)+5 {}, skipping",
+                    "{} {clip_name} peak {peak} after is {after} > len(correlation)+5 {}, skipping",
+                    section_ts(),
                     correlation.len() + 5
                 );
                 continue;
             } else if before < -5 {
-                eprintln!("{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping");
+                eprintln!("{} {clip_name} peak {peak} before is {before} < -5, skipping", section_ts());
                 continue;
             }
 
@@ -595,7 +598,7 @@ impl AudioPatternDetector {
             }
         }
 
-        Ok(peaks_final)
+        peaks_final
     }
 
     /// Verify a synthesized marker tone via short-time spectral analysis.
@@ -632,24 +635,21 @@ impl AudioPatternDetector {
         peak: usize,
     ) -> bool {
         let correlation_clip = &clip_data.correlation_clip;
-        let sr = self.target_sample_rate;
 
         let mut correlation_slice = slicing_with_zero_padding(correlation, correlation_clip.len(), peak);
         let slice_max = correlation_slice.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         correlation_slice.iter_mut().for_each(|v| *v /= slice_max);
 
         let partition_size = correlation_clip.len() / PARTITION_COUNT;
-        let similarity_partitions: Vec<f32> = (0..PARTITION_COUNT)
-            .map(|i| {
-                let range = i * partition_size..(i + 1) * partition_size;
-                mean_squared_error(&correlation_clip[range.clone()], &correlation_slice[range])
-            })
-            .collect();
+        let similarity_partitions: [f32; PARTITION_COUNT] = std::array::from_fn(|i| {
+            let range = i * partition_size..(i + 1) * partition_size;
+            mean_squared_error(&correlation_clip[range.clone()], &correlation_slice[range])
+        });
 
         let similarity_middle = mean(&similarity_partitions[MIDDLE_PARTITIONS]);
         let similarity_whole = mean(&similarity_partitions);
 
-        let is_short_clip = clip_data.clip.len() as f64 / (sr as f64) < SHORT_CLIP_DURATION_THRESHOLD;
+        let is_short_clip = clip_data.is_short_clip;
         let similarity = if is_short_clip {
             similarity_whole
         } else {
