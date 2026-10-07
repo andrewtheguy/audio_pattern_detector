@@ -7,7 +7,7 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 ## Numerical code
 
-- Numerical routines live in `crates/core/src/dsp/` and are implemented in the crate even if they seem simple (e.g. Pearson correlation) — the user prefers a small dependency footprint over pulling in numerical crates.
+- Numerical routines live in `crates/core/src/dsp/`. Reusable ones belong in their own crate: FFT cross-correlation is meant to come from the `fft-correlation` crate, so fix and optimise it there rather than in a local copy.
 - They follow scipy/numpy/pyloudnorm semantics (`find_peaks`, `resample`, `correlate`, `hanning`, BS.1770 loudness) because the detection thresholds were tuned against those. Keep that behaviour when touching them.
 - Rounding is the exception: use Rust's standard `f64::round` (ties away from zero), not Python's round-half-to-even.
 
