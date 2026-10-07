@@ -1,5 +1,5 @@
-strict no backward compatibility no matter what, so feel free to make breaking changes as needed. Just make sure to
-do `cargo clippy --all-targets -- -D warnings` after changes to make sure code style is correct and then `cargo test` as needed.
+- strict no backward compatibility or legacy code paths no matter what, no change logs either.
+- do `cargo clippy --all-targets -- -D warnings` after changes and then `cargo test` as needed.
 
 - Use `./tmp` as the temporary working directory for debug output, scratch files, etc. It is gitignored.
 - The project is a Cargo workspace: `crates/core` (`audio-pattern-detector-core`, the library) and `crates/cli` (`audio-pattern-detector`, the binary). Keep CLI-only dependencies (e.g. clap) out of the core crate. See `docs/development.md` for the code layout.
