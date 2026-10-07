@@ -557,17 +557,19 @@ impl AudioPatternDetector {
         let clip_length = clip_data.clip.len();
         let correlation_clip_length = clip_data.correlation_clip.len();
 
-        // Normalize by the larger of the two peaks so a much softer section
-        // cannot look like a full-strength match.
+        // Peak heights are relative to the larger of the two peaks so a much
+        // softer section cannot look like a full-strength match. The
+        // threshold is scaled instead of the correlation, which saves a pass
+        // over the section; verification normalizes each slice on its own.
         let absolute_max = absolute_in_place(correlation);
         let max_choose = clip_data.correlation_clip_absolute_max.max(absolute_max);
-        correlation.iter_mut().for_each(|v| *v /= max_choose);
+        let height = self.height_min * max_choose;
 
         // No repetition within the duration of the clip. The height is kept
         // low so weak candidates are not missed; they are verified below.
         let peaks = find_peaks_1d(
             correlation,
-            &FindPeaksOptions { height: Some(self.height_min), distance: Some(clip_length), prominence: None },
+            &FindPeaksOptions { height: Some(height), distance: Some(clip_length), prominence: None },
         );
 
         let section_ts = || seconds_to_time_whole(index as f64 * self.seconds_per_chunk as f64);
