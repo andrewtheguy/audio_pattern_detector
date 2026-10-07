@@ -3,14 +3,15 @@ use std::path::PathBuf;
 
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
+use fft_correlation::{fft_correlate_1d, CorrelationTemplate, CorrelationWorkspace, Mode};
 use serde_json::json;
 
 use crate::audio_clip::{
     validate_sample_rate, AudioClip, MarkerToneThresholds, Strategy, DEFAULT_TARGET_SAMPLE_RATE,
 };
 use crate::dsp::{
-    fft_correlate_full, find_peaks_1d, integrated_loudness, loudness_normalize, pearson_correlation_1d,
-    resample_preserve_maxima_1d, CorrelationTemplate, CorrelationWorkspace, FindPeaksOptions,
+    find_peaks_1d, integrated_loudness, loudness_normalize, pearson_correlation_1d, resample_preserve_maxima_1d,
+    FindPeaksOptions,
 };
 use crate::error::{Error, Result};
 use crate::stream::AudioStream;
@@ -192,11 +193,11 @@ fn absolute_in_place(values: &mut [f32]) -> f32 {
 }
 
 /// Absolute self-correlation normalized to a peak of 1, plus the original peak.
-fn clip_correlation(clip: &[f32]) -> (Vec<f32>, f32) {
-    let mut correlation = fft_correlate_full(clip, clip);
+fn clip_correlation(clip: &[f32]) -> Result<(Vec<f32>, f32)> {
+    let mut correlation = fft_correlate_1d(clip, clip, Mode::Full)?;
     let absolute_max = absolute_in_place(&mut correlation);
     correlation.iter_mut().for_each(|v| *v /= absolute_max);
-    (correlation, absolute_max)
+    Ok((correlation, absolute_max))
 }
 
 /// Clips whose sections are identical (same lookback), so one
@@ -321,7 +322,7 @@ impl AudioPatternDetector {
         let clips: Vec<ClipData> = audio_clips
             .into_iter()
             .map(|audio_clip| Self::prepare_clip(audio_clip, sr, debug_mode))
-            .collect();
+            .collect::<Result<_>>()?;
         let section_groups = section_groups(&clips);
 
         Ok(Self {
@@ -337,7 +338,7 @@ impl AudioPatternDetector {
     }
 
     /// Pre-compute everything about a clip that doesn't depend on the audio stream.
-    fn prepare_clip(audio_clip: AudioClip, sr: u32, debug_mode: bool) -> ClipData {
+    fn prepare_clip(audio_clip: AudioClip, sr: u32, debug_mode: bool) -> Result<ClipData> {
         let clip_seconds = audio_clip.clip_length_seconds();
         let sliding_window = clip_seconds.ceil() as u32;
         if sliding_window as f64 != clip_seconds {
@@ -349,7 +350,7 @@ impl AudioPatternDetector {
 
         let mut clip = audio_clip.audio;
         normalize_loudness(&mut clip, sr);
-        let (correlation_clip, correlation_clip_absolute_max) = clip_correlation(&clip);
+        let (correlation_clip, correlation_clip_absolute_max) = clip_correlation(&clip)?;
 
         if debug_mode {
             eprintln!("clip_length {} {}", audio_clip.name, clip.len());
@@ -377,7 +378,7 @@ impl AudioPatternDetector {
             .map(|&window| downsample_window(&correlation_clip, window))
             .collect();
 
-        ClipData {
+        Ok(ClipData {
             name: audio_clip.name,
             clip,
             sliding_window,
@@ -385,7 +386,7 @@ impl AudioPatternDetector {
             correlation_clip_absolute_max,
             tone,
             pearson_windows,
-        }
+        })
     }
 
     /// Seconds per chunk actually used (after auto-computation).
@@ -571,7 +572,7 @@ impl AudioPatternDetector {
         let lookback_seconds = lookback_samples as f64 / sr as f64;
 
         let RunBuffers { workspace, templates, audio_section, correlation } = buffers;
-        workspace.correlate(&mut templates[clip_index], correlation);
+        workspace.correlate(&mut templates[clip_index], Mode::Full, correlation)?;
         let peaks = self.correlation_method(clip_data, audio_section, correlation, index)?;
 
         let section_start = index as i64 * self.seconds_per_chunk as i64 * sr as i64 - lookback_samples as i64;
@@ -979,7 +980,7 @@ mod tests {
     fn test_clip_correlation_is_normalized_with_original_peak() {
         let clip = [0.5_f32, -1.0, 0.25, 0.75];
         let energy: f32 = clip.iter().map(|v| v * v).sum();
-        let (correlation, absolute_max) = clip_correlation(&clip);
+        let (correlation, absolute_max) = clip_correlation(&clip).unwrap();
         assert_eq!(correlation.len(), 2 * clip.len() - 1);
         assert!((absolute_max - energy).abs() < 1e-5, "{absolute_max} != {energy}");
         assert_eq!(correlation[clip.len() - 1], 1.0);

@@ -49,7 +49,7 @@ Raw audio stream (float32 PCM)
 Before processing audio, each clip is prepared once:
 
 1. **Loudness normalization** - clip audio normalized to -16 dB LUFS.
-2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_full(clip, clip)`), producing a reference correlation curve. The absolute max is stored for normalization later.
+2. **Self-correlation** - FFT cross-correlation of the clip with itself (`fft_correlate_1d(clip, clip, Mode::Full)` from the `fft-correlation` crate), producing a reference correlation curve. The absolute max is stored for normalization later.
 3. **Tone-strategy setup** - for clips whose strategy is `marker_tone`, the dominant frequency is recorded as clip metadata. All other clips have no tone verifier.
 
 This produces a `ClipData` struct per clip containing the normalized audio, clip name, sliding window, self-correlation curve, its absolute max, the downsampled Pearson windows of that curve, and the tone verifier (set only for tone-strategy clips).
@@ -62,15 +62,15 @@ The raw chunks themselves are not read with overlap. Instead, the detector build
 
 The same prepend is applied to every chunk after the first, including a final short chunk.
 
-Each `audio_section` is loudness-normalized to -16 dB LUFS before correlation, so a clip's detections depend only on its own section, never on which other clips are loaded. Clips with the same `sliding_window` have identical sections and share one: it is normalized once and transformed once per FFT size, and each clip's cross-correlation then costs a spectrum product with the clip's cached template spectrum and one inverse FFT. The FFT size is the one the section and that clip need on their own (next power of two of `len(audio_section) + len(clip) - 1`), so clips in a group usually share the forward FFT but never change each other's results.
+Each `audio_section` is loudness-normalized to -16 dB LUFS before correlation, so a clip's detections depend only on its own section, never on which other clips are loaded. Clips with the same `sliding_window` have identical sections and share one: it is normalized once and transformed once per FFT size, and each clip's cross-correlation then costs a spectrum product with the clip's cached template spectrum and one inverse FFT. The FFT size is the one the section and that clip need on their own (the smallest `m * 2^k` with `m` in 1, 3, 5, 9, 15 that covers `len(audio_section) + len(clip) - 1`, so at most 25% above it), so clips in a group usually share the forward FFT but never change each other's results.
 
 ## Step 1: Candidate Detection (FFT Cross-Correlation)
 
 This step always runs first for every clip type. Its job is to locate and center potential match positions; it does not decide whether a candidate is a true match — that is Step 2.
 
-For each chunk, each sliding-window group's `audio_section` is loaded into a `CorrelationWorkspace` (`load_signal`). Then for each clip in the group:
+For each chunk, each sliding-window group's `audio_section` is loaded into a `CorrelationWorkspace` (`load_signal`) from the `fft-correlation` crate. Then for each clip in the group:
 
-1. Compute the full cross-correlation with `CorrelationWorkspace::correlate`, using the clip's `CorrelationTemplate` (its time-reversed spectrum, cached per FFT size for the run), and take the absolute value. The result is the same as `fft_correlate_full(audio_section, clip)`; the workspace only avoids repeating the section's forward FFT.
+1. Compute the full cross-correlation with `CorrelationWorkspace::correlate`, using the clip's `CorrelationTemplate` (its time-reversed spectrum, cached per FFT size for the run), and take the absolute value. The result is the same as `fft_correlate_1d(audio_section, clip, Mode::Full)`; the workspace only avoids repeating the section's forward FFT.
 2. Normalize by `max(self_correlation_max, cross_correlation_max)` so the correlation curve is in [0, 1].
 3. Run peak detection with `height >= 0.25` and `distance >= clip_length` (prevents duplicate detections within one clip duration).
 

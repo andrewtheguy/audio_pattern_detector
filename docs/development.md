@@ -49,9 +49,9 @@ The version is shared through `[workspace.package]` in the root `Cargo.toml`.
 | `crates/core/src/wav.rs` | WAV reading and writing |
 | `crates/core/src/ffmpeg.rs` | ffmpeg subprocess for non-WAV files |
 | `crates/core/src/python.rs` | Python bindings (PyO3), compiled only with the `python` feature; see [python.md](python.md) |
-| `crates/core/src/dsp/` | FFT cross-correlation, BS.1770 loudness, peak finding, resampling, Pearson correlation, spectra |
+| `crates/core/src/dsp/` | BS.1770 loudness, peak finding, resampling, Pearson correlation, spectra |
 
-The numerical routines in `crates/core/src/dsp/` are implemented in the crate rather than pulled in as dependencies; they follow the semantics of the scipy/numpy/pyloudnorm functions the algorithm was originally tuned against (`scipy.signal.find_peaks`, `scipy.signal.resample`, `scipy.signal.correlate`, `numpy.hanning`, BS.1770 integrated loudness), so thresholds carry over unchanged.
+FFT cross-correlation comes from the [`fft-correlation`](https://github.com/andrewtheguy/fft-correlation) crate; fixes and optimizations to it belong there. The numerical routines in `crates/core/src/dsp/` and that crate follow the semantics of the scipy/numpy/pyloudnorm functions the algorithm was originally tuned against (`scipy.signal.find_peaks`, `scipy.signal.resample`, `scipy.signal.correlate`, `numpy.hanning`, BS.1770 integrated loudness), so thresholds carry over unchanged.
 
 ## Debug output
 

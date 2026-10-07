@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
@@ -23,6 +23,7 @@ fn to_py_err(error: Error) -> PyErr {
     match error {
         Error::Invalid(message) => PyValueError::new_err(message),
         Error::Io(e) => e.into(),
+        Error::Correlation(e) => PyRuntimeError::new_err(e.to_string()),
     }
 }
 
