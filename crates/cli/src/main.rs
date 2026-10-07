@@ -71,14 +71,6 @@ struct MatchArgs {
     #[arg(long, value_name = "SECONDS", default_value = "60")]
     chunk_seconds: String,
 
-    /// Debug mode: diagnostics on stderr plus candidate audio and peak dumps under --debug-dir
-    #[arg(long)]
-    debug: bool,
-
-    /// Base directory for debug output
-    #[arg(long, value_name = "DIR", default_value = "./tmp")]
-    debug_dir: PathBuf,
-
     /// Override minimum correlation peak height (default: 0.25, lower to find weak matches)
     #[arg(long, value_name = "HEIGHT")]
     height_min: Option<f32>,
@@ -158,10 +150,8 @@ fn cmd_match(args: MatchArgs) -> Result<()> {
     };
 
     let options = MatchOptions {
-        debug_mode: args.debug,
         seconds_per_chunk,
         target_sample_rate: args.target_sample_rate,
-        debug_dir: args.debug_dir,
         height_min: args.height_min,
     };
 

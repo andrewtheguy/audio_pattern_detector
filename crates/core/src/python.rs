@@ -140,8 +140,6 @@ impl PyDetector {
         seconds_per_chunk = Some(DEFAULT_SECONDS_PER_CHUNK),
         target_sample_rate = DEFAULT_TARGET_SAMPLE_RATE,
         height_min = None,
-        debug = false,
-        debug_dir = PathBuf::from("./tmp"),
     ))]
     fn new(
         py: Python<'_>,
@@ -149,14 +147,10 @@ impl PyDetector {
         seconds_per_chunk: Option<u32>,
         target_sample_rate: u32,
         height_min: Option<f32>,
-        debug: bool,
-        debug_dir: PathBuf,
     ) -> PyResult<Self> {
         let options = DetectorOptions {
-            debug_mode: debug,
             seconds_per_chunk,
             target_sample_rate,
-            debug_dir,
             height_min,
         };
         let detector = py.detach(|| {

@@ -55,14 +55,7 @@ FFT cross-correlation comes from the [`fft-correlation`](https://github.com/andr
 
 ## Debug output
 
-`--debug` writes diagnostics to stderr and files under `--debug-dir` (default `./tmp`, which is gitignored):
-
-- `audio_section/<clip>/` — the audio around each candidate peak as WAV, for listening.
-- `debug/cross_correlation_<clip>/` — per-section JSON dump of candidate peaks, their times, MSE similarity and Pearson r per window.
-
-Use separate `--debug-dir` values for A/B comparisons. Debug mode is only active with the default 60-second chunks.
-
-Graphs are not available yet; see [roadmap.md](roadmap.md) for the planned v2 charts.
+There is no debug mode at the moment; it is being rebuilt from scratch. See [roadmap.md](roadmap.md) for the plan.
 
 ## Detection Algorithm
 

@@ -93,8 +93,6 @@ audio-pattern-detector show-config ./clips/rthk_beep.apd.toml
 | `--chunk-seconds`      | Seconds per chunk (default: 60, or "auto")                               |
 | `--timestamp-format`   | JSONL timestamp fields: `both` (default), `ms`, or `formatted`           |
 | `--height-min`         | Minimum correlation peak height (default: 0.25; lower to find weak matches) |
-| `--debug`              | Enable debug mode (diagnostics, candidate audio, peak dumps; no charts yet) |
-| `--debug-dir`          | Base directory for debug output (default: ./tmp)                         |
 
 ## JSONL Output Format
 
@@ -136,8 +134,8 @@ For custom audio sources, implement `SampleSource` and drive `AudioPatternDetect
 - **[Denoise Strategy](docs/denoise-strategy.md)** - How to denoise pattern clips for better matching with lossy-encoded or noisy audio
 - **[Python Bindings](docs/python.md)** - Python API, installation and building the wheel
 - **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin and multiplexed stdin (IPC) with a Node.js example
-- **[Development](docs/development.md)** - Building, linting, testing, code layout, debug output
-- **[Roadmap](docs/roadmap.md)** - What v1 covers and the plan for debug charts in v2
+- **[Development](docs/development.md)** - Building, linting, testing, code layout
+- **[Roadmap](docs/roadmap.md)** - The plan for the debug mode and its charts in v2
 
 ## Development
 

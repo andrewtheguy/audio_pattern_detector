@@ -53,9 +53,9 @@ result = detector.match_wav_stream(
 
 ## API
 
-### `Detector(pattern_files, *, seconds_per_chunk=60, target_sample_rate=8000, height_min=None, debug=False, debug_dir="./tmp")`
+### `Detector(pattern_files, *, seconds_per_chunk=60, target_sample_rate=8000, height_min=None)`
 
-Pattern files are `.wav` or `.apd.toml` paths (other formats are decoded through ffmpeg). The keyword arguments are the library equivalents of the CLI's `--chunk-seconds` (`None` is `auto`), `--target-sample-rate`, `--height-min`, `--debug` and `--debug-dir`.
+Pattern files are `.wav` or `.apd.toml` paths (other formats are decoded through ffmpeg). The keyword arguments are the library equivalents of the CLI's `--chunk-seconds` (`None` is `auto`), `--target-sample-rate` and `--height-min`.
 
 | Member | Description |
 |--------|-------------|

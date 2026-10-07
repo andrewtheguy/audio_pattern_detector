@@ -41,8 +41,6 @@ class Detector:
         seconds_per_chunk: int | None = 60,
         target_sample_rate: int = 8000,
         height_min: float | None = None,
-        debug: bool = False,
-        debug_dir: StrPath = "./tmp",
     ) -> Detector: ...
     @property
     def clip_names(self) -> list[str]: ...

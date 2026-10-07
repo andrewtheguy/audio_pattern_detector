@@ -24,7 +24,7 @@ const LONG_BEEP_DURATION: f64 = 2.5;
 const TONE_FREQUENCY: f64 = 1000.0;
 
 fn options(seconds_per_chunk: Option<u32>) -> DetectorOptions {
-    DetectorOptions { debug_mode: false, seconds_per_chunk, ..DetectorOptions::default() }
+    DetectorOptions { seconds_per_chunk, ..DetectorOptions::default() }
 }
 
 fn tone_clip(name: &str, frequency: f64, duration: f64) -> AudioClip {
@@ -428,7 +428,7 @@ mod sliding_window_with_real_patterns {
         let (reference_results, _) = match_pattern(
             RTHK_BEEP_AUDIO,
             &[RTHK_BEEP_PATTERN],
-            &MatchOptions { debug_mode: false, ..MatchOptions::default() },
+            &MatchOptions::default(),
             None,
             true,
         )
