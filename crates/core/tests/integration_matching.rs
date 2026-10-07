@@ -49,7 +49,7 @@ fn assert_exists(path: &str) {
     assert!(Path::new(path).exists(), "File {path} not found");
 }
 
-/// `match_pattern(audio, patterns, debug_mode=False)` with accumulated results.
+/// `match_pattern(audio, patterns)` with accumulated results.
 fn run_match(audio_file: &str, pattern_files: &[&str]) -> (PeakTimes, f64) {
     let (peak_times, total_time) =
         match_pattern(audio_file, pattern_files, &MatchOptions::default(), None, true).unwrap();

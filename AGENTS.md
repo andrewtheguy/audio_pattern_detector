@@ -1,5 +1,5 @@
-strict no backward compatibility no matter what, so feel free to make breaking changes as needed. Just make sure to
-do `cargo clippy --all-targets -- -D warnings` after changes to make sure code style is correct and then `cargo test` as needed.
+- strict no backward compatibility or legacy code paths no matter what, no change logs either.
+- do `cargo clippy --all-targets -- -D warnings` after changes and then `cargo test` as needed.
 
 - Use `./tmp` as the temporary working directory for debug output, scratch files, etc. It is gitignored.
 - The project is a Cargo workspace: `crates/core` (`audio-pattern-detector-core`, the library) and `crates/cli` (`audio-pattern-detector`, the binary). Keep CLI-only dependencies (e.g. clap) out of the core crate. See `docs/development.md` for the code layout.
@@ -21,9 +21,8 @@ do `cargo clippy --all-targets -- -D warnings` after changes to make sure code s
 
 ## Debugging opus/lossy audio
 
-- Use `--debug` and `--debug-dir <dir>` to save debug output per run. Use separate debug dirs for A/B comparisons.
-- Debug graphs are not implemented yet (planned for v2, see `docs/roadmap.md`). Until then use the stderr diagnostics and the per-section peak dumps in `debug/cross_correlation_<clip>/`, which contain the MSE similarity and per-window Pearson r of every candidate.
-- Debug audio sections in `audio_section/` can be listened to for ground truth verification. Don't assume old detection results are correct.
+- There is no debug mode yet (planned for v2, see `docs/roadmap.md`).
+- Listen to the audio around a candidate for ground truth verification. Don't assume old detection results are correct.
 - Pattern clips should be extracted from the same encoding as the target audio (e.g. from an Opus stream when matching Opus audio). Denoise as a fallback when source-matched clips aren't available. See `docs/denoise-strategy.md`.
 
 ## Version bumping

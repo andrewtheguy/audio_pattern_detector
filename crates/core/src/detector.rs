@@ -1,10 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
-use std::path::PathBuf;
 
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use fft_correlation::{fft_correlate_1d, CorrelationTemplate, CorrelationWorkspace, Mode};
-use serde_json::json;
 
 use crate::audio_clip::{
     validate_sample_rate, AudioClip, MarkerToneThresholds, Strategy, DEFAULT_TARGET_SAMPLE_RATE,
@@ -19,7 +17,6 @@ use crate::time_format::seconds_to_time_whole;
 use crate::tone::{
     analyze_pure_tone_candidate, extract_padded_segment, get_pure_tone_frequency, is_close, PureToneMetrics,
 };
-use crate::wav::write_wav_file;
 
 /// Default seconds per chunk for sliding window processing.
 pub const DEFAULT_SECONDS_PER_CHUNK: u32 = 60;
@@ -49,16 +46,11 @@ pub type PeakTimes = BTreeMap<String, Vec<f64>>;
 
 #[derive(Debug, Clone)]
 pub struct DetectorOptions {
-    /// Enable debug output (diagnostics on stderr, candidate audio sections
-    /// and peak dumps under `debug_dir`).
-    pub debug_mode: bool,
     /// Seconds per chunk for sliding window processing. `None` or `0`
     /// auto-computes it as twice the longest clip (rounded up).
     pub seconds_per_chunk: Option<u32>,
     /// Sample rate of all clips and audio streams.
     pub target_sample_rate: u32,
-    /// Base directory for debug output files.
-    pub debug_dir: PathBuf,
     /// Override the minimum correlation peak height (default: 0.25).
     pub height_min: Option<f32>,
 }
@@ -66,10 +58,8 @@ pub struct DetectorOptions {
 impl Default for DetectorOptions {
     fn default() -> Self {
         Self {
-            debug_mode: false,
             seconds_per_chunk: Some(DEFAULT_SECONDS_PER_CHUNK),
             target_sample_rate: DEFAULT_TARGET_SAMPLE_RATE,
-            debug_dir: PathBuf::from("./tmp"),
             height_min: None,
         }
     }
@@ -128,22 +118,22 @@ struct ClipData {
     correlation_clip_absolute_max: f32,
     /// `Some` when candidates are verified as a marker tone.
     tone: Option<ToneVerifier>,
-    /// Downsampled windows of `correlation_clip` used for Pearson r.
-    pearson_windows: Vec<Vec<f32>>,
+    /// Shorter than [`SHORT_CLIP_DURATION_THRESHOLD`].
+    is_short_clip: bool,
+    /// Downsampled window of `correlation_clip` used for Pearson r.
+    pearson_window: Vec<f32>,
 }
 
 /// Window of the correlation envelope compared with Pearson r, as
 /// `(left partition, right partition, downsampled length)`.
 type PearsonWindow = (usize, usize, usize);
 
-fn pearson_window_specs(is_short_clip: bool) -> (&'static [PearsonWindow], usize) {
+fn pearson_window_spec(is_short_clip: bool) -> PearsonWindow {
     // Lengths are proportional to window width: round(101 * partitions / 2).
-    const SHORT: &[PearsonWindow] = &[(0, 10, 505)];
-    const NORMAL: &[PearsonWindow] = &[(0, 5, 252), (4, 6, PEARSON_DOWNSAMPLE_BASE), (5, 10, 252)];
     if is_short_clip {
-        (SHORT, 0)
+        (0, 10, 505)
     } else {
-        (NORMAL, 1)
+        (4, 6, PEARSON_DOWNSAMPLE_BASE)
     }
 }
 
@@ -240,17 +230,8 @@ pub fn slicing_with_zero_padding(array: &[f32], width: usize, middle_index: usiz
     extract_padded_segment(array, begin, width)
 }
 
-/// Per-candidate diagnostics dumped in debug mode.
-#[derive(Default)]
-struct ChunkDebug {
-    seconds: Vec<f64>,
-    similarities: Vec<serde_json::Value>,
-}
-
 pub struct AudioPatternDetector {
     clips: Vec<ClipData>,
-    debug_mode: bool,
-    debug_dir: PathBuf,
     height_min: f32,
     target_sample_rate: u32,
     seconds_per_chunk: u32,
@@ -264,7 +245,6 @@ impl AudioPatternDetector {
     pub fn new(audio_clips: Vec<AudioClip>, options: DetectorOptions) -> Result<Self> {
         let sr = options.target_sample_rate;
         validate_sample_rate(sr)?;
-        let mut debug_mode = options.debug_mode;
 
         let mut names = HashSet::new();
         let mut max_clip_length = 0;
@@ -311,24 +291,14 @@ impl AudioPatternDetector {
             }
         }
 
-        if debug_mode && seconds_per_chunk != DEFAULT_SECONDS_PER_CHUNK {
-            eprintln!(
-                "seconds_per_chunk {seconds_per_chunk} is not 60 seconds, turning off debug mode \
-                 because it was made for 60 seconds only"
-            );
-            debug_mode = false;
-        }
-
         let clips: Vec<ClipData> = audio_clips
             .into_iter()
-            .map(|audio_clip| Self::prepare_clip(audio_clip, sr, debug_mode))
+            .map(|audio_clip| Self::prepare_clip(audio_clip, sr))
             .collect::<Result<_>>()?;
         let section_groups = section_groups(&clips);
 
         Ok(Self {
             clips,
-            debug_mode,
-            debug_dir: options.debug_dir,
             height_min: options.height_min.unwrap_or(DEFAULT_HEIGHT_MIN),
             target_sample_rate: sr,
             seconds_per_chunk,
@@ -338,7 +308,7 @@ impl AudioPatternDetector {
     }
 
     /// Pre-compute everything about a clip that doesn't depend on the audio stream.
-    fn prepare_clip(audio_clip: AudioClip, sr: u32, debug_mode: bool) -> Result<ClipData> {
+    fn prepare_clip(audio_clip: AudioClip, sr: u32) -> Result<ClipData> {
         let clip_seconds = audio_clip.clip_length_seconds();
         let sliding_window = clip_seconds.ceil() as u32;
         if sliding_window as f64 != clip_seconds {
@@ -351,12 +321,6 @@ impl AudioPatternDetector {
         let mut clip = audio_clip.audio;
         normalize_loudness(&mut clip, sr);
         let (correlation_clip, correlation_clip_absolute_max) = clip_correlation(&clip)?;
-
-        if debug_mode {
-            eprintln!("clip_length {} {}", audio_clip.name, clip.len());
-            eprintln!("clip_length {} seconds {}", audio_clip.name, clip.len() as f64 / sr as f64);
-            eprintln!("correlation_clip_length {}", correlation_clip.len());
-        }
 
         let tone = match audio_clip.strategy {
             Some(Strategy::MarkerTone(params)) => params
@@ -372,11 +336,7 @@ impl AudioPatternDetector {
         };
 
         let is_short_clip = clip_seconds < SHORT_CLIP_DURATION_THRESHOLD;
-        let pearson_windows = pearson_window_specs(is_short_clip)
-            .0
-            .iter()
-            .map(|&window| downsample_window(&correlation_clip, window))
-            .collect();
+        let pearson_window = downsample_window(&correlation_clip, pearson_window_spec(is_short_clip));
 
         Ok(ClipData {
             name: audio_clip.name,
@@ -385,7 +345,8 @@ impl AudioPatternDetector {
             correlation_clip,
             correlation_clip_absolute_max,
             tone,
-            pearson_windows,
+            is_short_clip,
+            pearson_window,
         })
     }
 
@@ -396,11 +357,6 @@ impl AudioPatternDetector {
 
     pub fn target_sample_rate(&self) -> u32 {
         self.target_sample_rate
-    }
-
-    /// Whether debug output is active (it is turned off for non-default chunk sizes).
-    pub fn debug_mode(&self) -> bool {
-        self.debug_mode
     }
 
     /// Whether candidates for the named clip are verified as a marker tone.
@@ -573,7 +529,7 @@ impl AudioPatternDetector {
 
         let RunBuffers { workspace, templates, audio_section, correlation } = buffers;
         workspace.correlate(&mut templates[clip_index], Mode::Full, correlation)?;
-        let peaks = self.correlation_method(clip_data, audio_section, correlation, index)?;
+        let peaks = self.correlation_method(clip_data, audio_section, correlation, index);
 
         let section_start = index as i64 * self.seconds_per_chunk as i64 * sr as i64 - lookback_samples as i64;
         Ok(peaks
@@ -596,104 +552,55 @@ impl AudioPatternDetector {
         audio_section: &[f32],
         correlation: &mut [f32],
         index: usize,
-    ) -> Result<Vec<usize>> {
+    ) -> Vec<usize> {
         let clip_name = &clip_data.name;
         let clip_length = clip_data.clip.len();
         let correlation_clip_length = clip_data.correlation_clip.len();
 
-        // Normalize by the larger of the two peaks so a much softer section
-        // cannot look like a full-strength match.
+        // Peak heights are relative to the larger of the two peaks so a much
+        // softer section cannot look like a full-strength match. The
+        // threshold is scaled instead of the correlation, which saves a pass
+        // over the section; verification normalizes each slice on its own.
         let absolute_max = absolute_in_place(correlation);
         let max_choose = clip_data.correlation_clip_absolute_max.max(absolute_max);
-        correlation.iter_mut().for_each(|v| *v /= max_choose);
-
-        let section_ts = seconds_to_time_whole(index as f64 * self.seconds_per_chunk as f64);
-        if self.debug_mode {
-            eprintln!("---");
-            eprintln!("section_ts: {section_ts}, index {index}");
-        }
+        let height = self.height_min * max_choose;
 
         // No repetition within the duration of the clip. The height is kept
         // low so weak candidates are not missed; they are verified below.
         let peaks = find_peaks_1d(
             correlation,
-            &FindPeaksOptions { height: Some(self.height_min), distance: Some(clip_length), prominence: None },
+            &FindPeaksOptions { height: Some(height), distance: Some(clip_length), prominence: None },
         );
 
+        let section_ts = || seconds_to_time_whole(index as f64 * self.seconds_per_chunk as f64);
         let mut peaks_final = Vec::new();
-        let mut debug = ChunkDebug::default();
 
-        for &peak in &peaks {
+        for peak in peaks {
             // Make sure the slice is not out of bounds at the beginning and end.
             let after = peak + correlation_clip_length / 2;
             let before = peak as isize - (correlation_clip_length / 2) as isize;
             if after > correlation.len() + 5 {
                 eprintln!(
-                    "{section_ts} {clip_name} peak {peak} after is {after} > len(correlation)+5 {}, skipping",
+                    "{} {clip_name} peak {peak} after is {after} > len(correlation)+5 {}, skipping",
+                    section_ts(),
                     correlation.len() + 5
                 );
                 continue;
             } else if before < -5 {
-                eprintln!("{section_ts} {clip_name} peak {peak} before is {before} < -5, skipping");
+                eprintln!("{} {clip_name} peak {peak} before is {before} < -5, skipping", section_ts());
                 continue;
             }
 
             let accepted = match &clip_data.tone {
-                Some(tone) => self.verify_marker_tone(tone, audio_section, peak, clip_length, &section_ts),
-                None => self.verify_correlation_envelope(clip_data, correlation, peak, &section_ts, &mut debug),
+                Some(tone) => self.verify_marker_tone(tone, audio_section, peak, clip_length),
+                None => self.verify_correlation_envelope(clip_data, correlation, peak),
             };
             if accepted {
                 peaks_final.push(peak);
             }
-
-            if self.debug_mode {
-                self.write_debug_audio_section(clip_data, audio_section, peak, index, &section_ts)?;
-            }
         }
 
-        if self.debug_mode && !peaks.is_empty() {
-            let peak_dir = self
-                .debug_dir
-                .join("debug")
-                .join(format!("cross_correlation_{}", safe_path_component(clip_name)));
-            std::fs::create_dir_all(&peak_dir)?;
-            let dump = json!({
-                "peaks": peaks,
-                "seconds": debug.seconds,
-                "similarities": debug.similarities,
-            });
-            let mut text = serde_json::to_string_pretty(&dump).expect("debug dump is valid JSON");
-            text.push('\n');
-            let file_name = format!("{index}_{}.txt", safe_path_component(&section_ts));
-            std::fs::write(peak_dir.join(file_name), text)?;
-            eprintln!("---");
-        }
-
-        Ok(peaks_final)
-    }
-
-    /// Save the audio around a candidate so it can be listened to.
-    fn write_debug_audio_section(
-        &self,
-        clip_data: &ClipData,
-        audio_section: &[f32],
-        peak: usize,
-        index: usize,
-        section_ts: &str,
-    ) -> Result<()> {
-        let clip_name = safe_path_component(&clip_data.name);
-        let section_ts = safe_path_component(section_ts);
-        let audio_dir = self.debug_dir.join("audio_section").join(&clip_name);
-        std::fs::create_dir_all(&audio_dir)?;
-
-        let clip_length = clip_data.clip.len();
-        let start = peak.saturating_sub(clip_length).min(audio_section.len());
-        let end = (peak + clip_length).min(audio_section.len());
-        write_wav_file(
-            audio_dir.join(format!("{clip_name}_{index}_{section_ts}_{peak}.wav")),
-            &audio_section[start..end],
-            self.target_sample_rate,
-        )
+        peaks_final
     }
 
     /// Verify a synthesized marker tone via short-time spectral analysis.
@@ -709,7 +616,6 @@ impl AudioPatternDetector {
         audio_section: &[f32],
         peak: usize,
         clip_length: usize,
-        section_ts: &str,
     ) -> bool {
         let (metrics, left, right) = analyze_tone_candidate_context(
             audio_section,
@@ -718,30 +624,7 @@ impl AudioPatternDetector {
             tone.dominant_frequency,
             self.target_sample_rate,
         );
-        let accepted = marker_tone_accepts(tone.dominant_frequency, &tone.thresholds, &metrics, &left, &right);
-
-        if self.debug_mode {
-            if !is_close(metrics.detected_frequency, tone.dominant_frequency, 0.05, 0.0) {
-                eprintln!(
-                    "failed marker tone check for {section_ts}: dominant {:.1}Hz != expected {:.1}Hz",
-                    metrics.detected_frequency, tone.dominant_frequency
-                );
-            } else {
-                eprintln!(
-                    "{} {section_ts}: band_purity={:.3} active_ratio={:.3} run={} active_purity={:.3} \
-                     freq={:.1}Hz flank_purity=({:.3}, {:.3})",
-                    if accepted { "accepted marker tone" } else { "failed marker tone check for" },
-                    metrics.overall_band_purity,
-                    metrics.active_frame_ratio,
-                    metrics.longest_active_run,
-                    metrics.active_frame_mean_purity,
-                    metrics.detected_frequency,
-                    left.overall_band_purity,
-                    right.overall_band_purity,
-                );
-            }
-        }
-        accepted
+        marker_tone_accepts(tone.dominant_frequency, &tone.thresholds, &metrics, &left, &right)
     }
 
     /// Verify a candidate by comparing the correlation envelope around the
@@ -752,109 +635,41 @@ impl AudioPatternDetector {
         clip_data: &ClipData,
         correlation: &[f32],
         peak: usize,
-        section_ts: &str,
-        debug: &mut ChunkDebug,
     ) -> bool {
         let correlation_clip = &clip_data.correlation_clip;
-        let sr = self.target_sample_rate;
 
         let mut correlation_slice = slicing_with_zero_padding(correlation, correlation_clip.len(), peak);
         let slice_max = correlation_slice.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         correlation_slice.iter_mut().for_each(|v| *v /= slice_max);
 
         let partition_size = correlation_clip.len() / PARTITION_COUNT;
-        let similarity_partitions: Vec<f32> = (0..PARTITION_COUNT)
-            .map(|i| {
-                let range = i * partition_size..(i + 1) * partition_size;
-                mean_squared_error(&correlation_clip[range.clone()], &correlation_slice[range])
-            })
-            .collect();
+        let similarity_partitions: [f32; PARTITION_COUNT] = std::array::from_fn(|i| {
+            let range = i * partition_size..(i + 1) * partition_size;
+            mean_squared_error(&correlation_clip[range.clone()], &correlation_slice[range])
+        });
 
         let similarity_middle = mean(&similarity_partitions[MIDDLE_PARTITIONS]);
         let similarity_whole = mean(&similarity_partitions);
 
-        let is_short_clip = clip_data.clip.len() as f64 / (sr as f64) < SHORT_CLIP_DURATION_THRESHOLD;
+        let is_short_clip = clip_data.is_short_clip;
         let similarity = if is_short_clip {
             similarity_whole
         } else {
             // f32::min would skip a NaN operand; keep NaN so it is rejected below.
             if similarity_middle < similarity_whole { similarity_middle } else { similarity_whole }
         };
-        let partition_summary = json!({"whole": similarity_whole as f64, "middle": similarity_middle as f64});
 
         // A NaN similarity is rejected too.
         if similarity.is_nan() || similarity > SIMILARITY_HARD_LIMIT {
-            if self.debug_mode {
-                debug.seconds.push(peak as f64 / sr as f64);
-                debug.similarities.push(json!([similarity as f64, partition_summary, null]));
-                eprintln!(
-                    "failed verification for {section_ts} due to similarity {similarity} > {SIMILARITY_HARD_LIMIT}"
-                );
-            }
             return false;
         }
 
-        // Pearson r on the center window decides. The flanking windows are
-        // computed only for debug output.
-        let (windows, center_window_idx) = pearson_window_specs(is_short_clip);
-        let window_r = |window_idx: usize| {
-            let downsampled_slice = downsample_window(&correlation_slice, windows[window_idx]);
-            pearson_correlation_1d(&clip_data.pearson_windows[window_idx], &downsampled_slice)
-        };
-        let pearson_r = window_r(center_window_idx);
+        // Pearson r on the center window decides.
+        let downsampled_slice = downsample_window(&correlation_slice, pearson_window_spec(is_short_clip));
+        let pearson_r = pearson_correlation_1d(&clip_data.pearson_window, &downsampled_slice);
 
-        if self.debug_mode {
-            eprintln!("similarity {similarity} pearson_r {pearson_r}");
-            let mut pearson_summary = serde_json::Map::new();
-            let mut best = (center_window_idx, pearson_r);
-            for (window_idx, &(left, right, _)) in windows.iter().enumerate() {
-                let r = if window_idx == center_window_idx { pearson_r } else { window_r(window_idx) };
-                if r > best.1 || (r == best.1 && window_idx < best.0) {
-                    best = (window_idx, r);
-                }
-                pearson_summary.insert(format!("pearson_w{left}_{right}"), json!(r));
-            }
-            let (best_left, best_right, _) = windows[best.0];
-            let mut summary = serde_json::Map::new();
-            summary.insert("pearson_r".into(), json!(pearson_r));
-            summary.insert("best_window_left".into(), json!(best_left as f64));
-            summary.insert("best_window_right".into(), json!(best_right as f64));
-            summary.extend(pearson_summary);
-
-            debug.seconds.push(peak as f64 / sr as f64);
-            debug.similarities.push(json!([similarity as f64, partition_summary, summary]));
-        }
-
-        if pearson_r >= PEARSON_R_THRESHOLD {
-            true
-        } else {
-            if self.debug_mode {
-                eprintln!(
-                    "failed verification for {section_ts} due to similarity {similarity} pearson_r {pearson_r}"
-                );
-            }
-            false
-        }
+        pearson_r >= PEARSON_R_THRESHOLD
     }
-}
-
-/// Turn a clip name or timestamp into a single portable file name component
-/// for debug output. Clip names can come from untrusted input (multiplexed
-/// stdin), so path separators and the characters Windows rejects (such as the
-/// `:` of a timestamp) are replaced, and `.`/`..` cannot be produced.
-pub fn safe_path_component(name: &str) -> String {
-    let mut component: String = name
-        .chars()
-        .map(|c| match c {
-            '/' | '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*' => '_',
-            c if c.is_control() => '_',
-            c => c,
-        })
-        .collect();
-    if component.is_empty() || component.chars().all(|c| c == '.') {
-        component.insert(0, '_');
-    }
-    component
 }
 
 /// Analyze the candidate window plus the clip-length windows on either side.
@@ -899,20 +714,6 @@ pub fn marker_tone_accepts(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_safe_path_component() {
-        assert_eq!(safe_path_component("rthk_beep"), "rthk_beep");
-        assert_eq!(safe_path_component("天空下的彩虹intro"), "天空下的彩虹intro");
-        assert_eq!(safe_path_component("00:39:00"), "00_39_00");
-        assert_eq!(safe_path_component("../../escape"), ".._.._escape");
-        assert_eq!(safe_path_component("..\\..\\escape"), ".._.._escape");
-        assert_eq!(safe_path_component("/etc/passwd"), "_etc_passwd");
-        assert_eq!(safe_path_component("a<b>c\"d|e?f*g\0h"), "a_b_c_d_e_f_g_h");
-        assert_eq!(safe_path_component(".."), "_..");
-        assert_eq!(safe_path_component("."), "_.");
-        assert_eq!(safe_path_component(""), "_");
-    }
 
     #[test]
     fn test_zero_sample_rate_is_rejected() {

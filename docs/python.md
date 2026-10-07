@@ -9,7 +9,7 @@ Wheels (Linux x86_64 and arm64, macOS Apple Silicon, Windows x86_64) are attache
 ```toml
 # pyproject.toml (uv)
 [project]
-dependencies = ["audio-pattern-detector==0.4.3"]
+dependencies = ["audio-pattern-detector==<version>"]
 
 [[tool.uv.index]]
 name = "audio-pattern-detector"
@@ -19,6 +19,8 @@ explicit = true
 [tool.uv.sources]
 audio-pattern-detector = { index = "audio-pattern-detector" }
 ```
+
+Replace `<version>` with a released version, e.g. the latest from the releases page.
 
 ```shell
 # pip
@@ -53,9 +55,9 @@ result = detector.match_wav_stream(
 
 ## API
 
-### `Detector(pattern_files, *, seconds_per_chunk=60, target_sample_rate=8000, height_min=None, debug=False, debug_dir="./tmp")`
+### `Detector(pattern_files, *, seconds_per_chunk=60, target_sample_rate=8000, height_min=None)`
 
-Pattern files are `.wav` or `.apd.toml` paths (other formats are decoded through ffmpeg). The keyword arguments are the library equivalents of the CLI's `--chunk-seconds` (`None` is `auto`), `--target-sample-rate`, `--height-min`, `--debug` and `--debug-dir`.
+Pattern files are `.wav` or `.apd.toml` paths (other formats are decoded through ffmpeg). The keyword arguments are the library equivalents of the CLI's `--chunk-seconds` (`None` is `auto`), `--target-sample-rate` and `--height-min`.
 
 | Member | Description |
 |--------|-------------|

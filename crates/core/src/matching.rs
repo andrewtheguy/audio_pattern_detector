@@ -19,12 +19,10 @@ const MAX_PATTERN_DATA_BYTES: u32 = 100 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct MatchOptions {
-    pub debug_mode: bool,
     /// Seconds per chunk for the sliding window (`None` to auto-compute).
     pub seconds_per_chunk: Option<u32>,
     /// Sample rate used for processing; patterns and WAV files are resampled to it.
     pub target_sample_rate: u32,
-    pub debug_dir: PathBuf,
     /// Override the minimum correlation peak height (default: 0.25).
     pub height_min: Option<f32>,
 }
@@ -32,10 +30,8 @@ pub struct MatchOptions {
 impl Default for MatchOptions {
     fn default() -> Self {
         Self {
-            debug_mode: false,
             seconds_per_chunk: Some(DEFAULT_SECONDS_PER_CHUNK),
             target_sample_rate: DEFAULT_TARGET_SAMPLE_RATE,
-            debug_dir: PathBuf::from("./tmp"),
             height_min: None,
         }
     }
@@ -44,10 +40,8 @@ impl Default for MatchOptions {
 impl MatchOptions {
     fn detector_options(&self) -> DetectorOptions {
         DetectorOptions {
-            debug_mode: self.debug_mode,
             seconds_per_chunk: self.seconds_per_chunk,
             target_sample_rate: self.target_sample_rate,
-            debug_dir: self.debug_dir.clone(),
             height_min: self.height_min,
         }
     }

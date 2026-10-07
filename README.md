@@ -4,7 +4,7 @@ Detects audio patterns specified by audio clips in target audio files. Designed 
 
 Useful for AI workflows to efficiently segment audio files before processing (e.g., OpenAI Whisper transcription preprocessing).
 
-Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + multi-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
+Detection is a two-step process. **Step 1** always runs FFT cross-correlation against the audio to find and center potential match locations. **Step 2** verifies each candidate using one of three paths chosen by clip type: normal verification (partitioned MSE + center-window Pearson correlation), short-clip verification (single-window variant for clips under 0.5s), or marker-tone verification (narrowband spectral check for `.apd.toml` patterns like station beeps). Robust against lossy-encoded audio (Opus, AAC).
 
 Written in Rust: a single self-contained binary with no runtime dependencies (ffmpeg is only needed for non-WAV input files). Also available as a Python package with the same detector ([Python bindings](docs/python.md)).
 
@@ -25,7 +25,7 @@ cargo install --git https://github.com/andrewtheguy/audio_pattern_detector.git -
 `ghcr.io/andrewtheguy/audio_pattern_detector:<tag>` is published with each release (`v<version>`, plus `latest` for releases from `main`). It contains only the binary at `/usr/local/bin/audio-pattern-detector` (no ffmpeg), so the usual use is copying it into another image:
 
 ```dockerfile
-COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v0.4.3 /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
+COPY --from=ghcr.io/andrewtheguy/audio_pattern_detector:v<version> /usr/local/bin/audio-pattern-detector /usr/local/bin/audio-pattern-detector
 ```
 
 The release workflow builds the image for amd64 and arm64 from the binaries it has already compiled (`runtime-prebuilt` target). To build it locally from source for the host architecture: `docker build --target runtime -t audio-pattern-detector .`
@@ -93,8 +93,6 @@ audio-pattern-detector show-config ./clips/rthk_beep.apd.toml
 | `--chunk-seconds`      | Seconds per chunk (default: 60, or "auto")                               |
 | `--timestamp-format`   | JSONL timestamp fields: `both` (default), `ms`, or `formatted`           |
 | `--height-min`         | Minimum correlation peak height (default: 0.25; lower to find weak matches) |
-| `--debug`              | Enable debug mode (diagnostics, candidate audio, peak dumps; no charts yet) |
-| `--debug-dir`          | Base directory for debug output (default: ./tmp)                         |
 
 ## JSONL Output Format
 
@@ -136,8 +134,8 @@ For custom audio sources, implement `SampleSource` and drive `AudioPatternDetect
 - **[Denoise Strategy](docs/denoise-strategy.md)** - How to denoise pattern clips for better matching with lossy-encoded or noisy audio
 - **[Python Bindings](docs/python.md)** - Python API, installation and building the wheel
 - **[Stdin Modes](docs/stdin-modes.md)** - WAV stdin and multiplexed stdin (IPC) with a Node.js example
-- **[Development](docs/development.md)** - Building, linting, testing, code layout, debug output
-- **[Roadmap](docs/roadmap.md)** - What v1 covers and the plan for debug charts in v2
+- **[Development](docs/development.md)** - Building, linting, testing, code layout
+- **[Roadmap](docs/roadmap.md)** - The plan for the debug mode and its charts in v2
 
 ## Development
 
