@@ -172,6 +172,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 [[package]]
 name = "fft-correlation"
 version = "0.0.6"
+source = "git+https://github.com/andrewtheguy/fft-correlation?tag=v0.0.6#7d31bffd13e0e86361251f190fdd6f64e8b1441d"
 dependencies = [
  "realfft",
 ]

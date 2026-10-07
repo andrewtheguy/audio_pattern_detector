@@ -17,7 +17,7 @@ python = ["dep:pyo3", "pyo3/extension-module"]
 
 [dependencies]
 base64 = "0.23"
-fft-correlation = { path = "../../../fft-correlation" }
+fft-correlation = { git = "https://github.com/andrewtheguy/fft-correlation", tag = "v0.0.6" }
 pyo3 = { version = "0.28", optional = true, features = ["abi3-py39"] }
 realfft = "3.5"
 rustfft = "6.4"
