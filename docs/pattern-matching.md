@@ -16,13 +16,13 @@ Raw audio stream (float32 PCM)
         |
    Read fixed-size chunks (default 60s)
         |
-   Build a per-clip audio section with previous-chunk context
+   Build one audio section per distinct sliding_window (previous-chunk context)
         |
    Loudness-normalize the audio section to -16 dB LUFS
         |
 ─── Step 1: Candidate detection (always runs) ───────────────────
         |
-   FFT cross-correlation against each clip
+   FFT cross-correlation of the shared section against each clip in the group
         |
    Peak detection (height >= 0.25, min distance = clip length)
         |
@@ -58,19 +58,19 @@ This produces a `ClipData` struct per clip containing the normalized audio, clip
 
 Audio is read as a stream of float32 samples and split into fixed-size chunks (`seconds_per_chunk`, default 60s). Here, `chunk` means the current chunk being processed and `previous_chunk` means the immediately preceding chunk, if one exists.
 
-The raw chunks themselves are not read with overlap. Instead, for each clip, the detector builds an `audio_section`. In the normal case, it prepends the last `sliding_window` seconds from `previous_chunk` to `chunk`, where `sliding_window = ceil(clip_duration_seconds)`. This ensures patterns near chunk boundaries are not missed.
+The raw chunks themselves are not read with overlap. Instead, the detector builds one `audio_section` per group of clips with the same `sliding_window`, where `sliding_window = ceil(clip_duration_seconds)`. In the normal case, it prepends the last `sliding_window` seconds from `previous_chunk` to `chunk`. This ensures patterns near chunk boundaries are not missed.
 
 The same prepend is applied to every chunk after the first, including a final short chunk.
 
-Each per-clip `audio_section` is loudness-normalized independently to -16 dB LUFS before correlation.
+Each `audio_section` is loudness-normalized to -16 dB LUFS before correlation, so a clip's detections depend only on its own section, never on which other clips are loaded. Clips with the same `sliding_window` have identical sections and share one: it is normalized once and transformed once per FFT size, and each clip's cross-correlation then costs a spectrum product with the clip's cached template spectrum and one inverse FFT. The FFT size is the one the section and that clip need on their own (next power of two of `len(audio_section) + len(clip) - 1`), so clips in a group usually share the forward FFT but never change each other's results.
 
 ## Step 1: Candidate Detection (FFT Cross-Correlation)
 
 This step always runs first for every clip type. Its job is to locate and center potential match positions; it does not decide whether a candidate is a true match — that is Step 2.
 
-For each chunk and each clip:
+For each chunk, each sliding-window group's `audio_section` is loaded into a `CorrelationWorkspace` (`load_signal`). Then for each clip in the group:
 
-1. Compute `fft_correlate_full(audio_section, clip)` and take the absolute value.
+1. Compute the full cross-correlation with `CorrelationWorkspace::correlate`, using the clip's `CorrelationTemplate` (its time-reversed spectrum, cached per FFT size for the run), and take the absolute value. The result is the same as `fft_correlate_full(audio_section, clip)`; the workspace only avoids repeating the section's forward FFT.
 2. Normalize by `max(self_correlation_max, cross_correlation_max)` so the correlation curve is in [0, 1].
 3. Run peak detection with `height >= 0.25` and `distance >= clip_length` (prevents duplicate detections within one clip duration).
 

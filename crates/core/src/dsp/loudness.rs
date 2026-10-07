@@ -207,17 +207,20 @@ pub fn integrated_loudness(data: &[f32], sample_rate: u32, block_size: f64) -> f
     LUFS_OFFSET + 10.0 * z_avg_final.log10()
 }
 
-/// Normalize audio to a target loudness in dB LUFS with hard clipping.
+/// Normalize audio in place to a target loudness in dB LUFS with hard
+/// clipping.
 ///
 /// Applies the gain needed to shift from `current_lufs` to `target_lufs`,
-/// then hard-clips the output to [-1.0, 1.0].
-pub fn loudness_normalize(data: &[f32], current_lufs: f64, target_lufs: f64) -> Vec<f32> {
+/// then hard-clips the output to [-1.0, 1.0]. Silence (`current_lufs` of
+/// `-inf`, hence an infinite gain) leaves zero samples at zero instead of
+/// the NaN that `0 * inf` would give.
+pub fn loudness_normalize(data: &mut [f32], current_lufs: f64, target_lufs: f64) {
     let delta = target_lufs - current_lufs;
     let gain = 10.0_f64.powf(delta / 20.0);
 
-    data.iter()
-        .map(|&x| ((x as f64) * gain).clamp(-1.0, 1.0) as f32)
-        .collect()
+    for x in data.iter_mut().filter(|x| **x != 0.0) {
+        *x = ((*x as f64) * gain).clamp(-1.0, 1.0) as f32;
+    }
 }
 
 #[cfg(test)]
@@ -300,19 +303,53 @@ mod tests {
 
     #[test]
     fn test_loudness_normalize_clips() {
-        let data = [0.5_f32, -0.5, 0.8, -0.8];
+        let mut out = [0.5_f32, -0.5, 0.8, -0.8];
         // Apply huge gain (+40 dB) to force clipping.
-        let out = loudness_normalize(&data, -60.0, -20.0);
+        loudness_normalize(&mut out, -60.0, -20.0);
         for &v in &out {
             assert!((-1.0..=1.0).contains(&v), "value {v} exceeds [-1, 1]");
         }
     }
 
     #[test]
+    fn test_loudness_normalize_in_place_exact() {
+        // +20 dB is exactly a gain of 10; binary fractions keep the
+        // products exact, and -0.125 * 10 is hard-clipped.
+        let mut up = [0.0625_f32, -0.125, 0.03125, 0.0];
+        loudness_normalize(&mut up, -36.0, -16.0);
+        assert_eq!(up, [0.625, -1.0, 0.3125, 0.0]);
+
+        // -20 dB attenuates by 10.
+        let mut down = [0.5_f32, -1.0, 0.25];
+        loudness_normalize(&mut down, 4.0, -16.0);
+        for (actual, expected) in down.iter().zip([0.05_f32, -0.1, 0.025]) {
+            assert!((actual - expected).abs() < 1e-7, "{actual} != {expected}");
+        }
+
+        // Zero gain change leaves every sample untouched, clipping aside.
+        let mut same = [0.3_f32, -0.7, 1.5, -2.0];
+        loudness_normalize(&mut same, -16.0, -16.0);
+        assert_eq!(same, [0.3, -0.7, 1.0, -1.0]);
+
+        // Silence measures -inf LUFS, so the gain is infinite: zeros stay
+        // zero (not NaN) and anything else is hard-clipped to full scale.
+        let mut silent = [0.0_f32, 0.0, -0.0];
+        loudness_normalize(&mut silent, f64::NEG_INFINITY, -16.0);
+        assert_eq!(silent, [0.0, 0.0, 0.0]);
+        let mut sub_gate = [0.0_f32, 1e-6, -1e-6];
+        loudness_normalize(&mut sub_gate, f64::NEG_INFINITY, -16.0);
+        assert_eq!(sub_gate, [0.0, 1.0, -1.0]);
+
+        let mut empty: [f32; 0] = [];
+        loudness_normalize(&mut empty, -20.0, -16.0);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
     fn test_loudness_normalize_gain() {
-        let data = [0.1_f32, -0.1];
+        let mut out = [0.1_f32, -0.1];
         // +6 dB gain ≈ 2x.
-        let out = loudness_normalize(&data, -22.0, -16.0);
+        loudness_normalize(&mut out, -22.0, -16.0);
         let expected_gain = 10.0_f64.powf(6.0 / 20.0); // ~1.995
         assert!((out[0] as f64 - 0.1 * expected_gain).abs() < 1e-4);
     }

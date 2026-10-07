@@ -10,7 +10,7 @@ use crate::audio_clip::{
 };
 use crate::dsp::{
     fft_correlate_full, find_peaks_1d, integrated_loudness, loudness_normalize, pearson_correlation_1d,
-    resample_preserve_maxima_1d, FindPeaksOptions,
+    resample_preserve_maxima_1d, CorrelationTemplate, CorrelationWorkspace, FindPeaksOptions,
 };
 use crate::error::{Error, Result};
 use crate::stream::AudioStream;
@@ -173,21 +173,64 @@ fn mean(values: &[f32]) -> f32 {
     (values.iter().map(|&v| v as f64).sum::<f64>() / values.len() as f64) as f32
 }
 
-/// Loudness-normalize audio to -16 dB LUFS. Silence comes out as NaN.
-fn normalize_loudness(audio: &[f32], sample_rate: u32) -> Vec<f32> {
+/// Loudness-normalize audio in place to -16 dB LUFS.
+fn normalize_loudness(audio: &mut [f32], sample_rate: u32) {
     let seconds = audio.len() as f64 / sample_rate as f64;
     let block_size = if seconds < 0.5 { seconds } else { 0.4 };
     let loudness = integrated_loudness(audio, sample_rate, block_size);
-    loudness_normalize(audio, loudness, TARGET_LUFS)
+    loudness_normalize(audio, loudness, TARGET_LUFS);
+}
+
+/// Replace every value with its absolute value and return the largest.
+fn absolute_in_place(values: &mut [f32]) -> f32 {
+    let mut absolute_max = f32::NEG_INFINITY;
+    for v in values.iter_mut() {
+        *v = v.abs();
+        absolute_max = absolute_max.max(*v);
+    }
+    absolute_max
 }
 
 /// Absolute self-correlation normalized to a peak of 1, plus the original peak.
 fn clip_correlation(clip: &[f32]) -> (Vec<f32>, f32) {
     let mut correlation = fft_correlate_full(clip, clip);
-    correlation.iter_mut().for_each(|v| *v = v.abs());
-    let absolute_max = correlation.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let absolute_max = absolute_in_place(&mut correlation);
     correlation.iter_mut().for_each(|v| *v /= absolute_max);
     (correlation, absolute_max)
+}
+
+/// Clips whose sections are identical (same lookback), so one
+/// loudness-normalized section and one forward FFT serve all of them.
+struct SectionGroup {
+    /// Seconds of the previous chunk prepended to every chunk after the
+    /// first: ceil(clip seconds), the same for every clip in the group.
+    lookback_seconds: u32,
+    /// Indices into `AudioPatternDetector::clips`.
+    clip_indices: Vec<usize>,
+}
+
+/// Group clips by sliding window, in order of first appearance.
+fn section_groups(clips: &[ClipData]) -> Vec<SectionGroup> {
+    let mut groups: Vec<SectionGroup> = Vec::new();
+    for (clip_index, clip_data) in clips.iter().enumerate() {
+        match groups.iter_mut().find(|g| g.lookback_seconds == clip_data.sliding_window) {
+            Some(group) => group.clip_indices.push(clip_index),
+            None => groups.push(SectionGroup {
+                lookback_seconds: clip_data.sliding_window,
+                clip_indices: vec![clip_index],
+            }),
+        }
+    }
+    groups
+}
+
+/// Buffers reused across the chunks of one [`AudioPatternDetector::find_clip_in_audio`] run.
+struct RunBuffers {
+    workspace: CorrelationWorkspace,
+    /// One cached correlation template per clip, in clip order.
+    templates: Vec<CorrelationTemplate>,
+    audio_section: Vec<f32>,
+    correlation: Vec<f32>,
 }
 
 /// Slice `width` samples centered on `middle_index`, zero-padding past either end.
@@ -211,6 +254,8 @@ pub struct AudioPatternDetector {
     target_sample_rate: u32,
     seconds_per_chunk: u32,
     min_chunk_size: u32,
+    /// Clips sharing a section, grouped by sliding window.
+    section_groups: Vec<SectionGroup>,
 }
 
 impl AudioPatternDetector {
@@ -273,10 +318,11 @@ impl AudioPatternDetector {
             debug_mode = false;
         }
 
-        let clips = audio_clips
+        let clips: Vec<ClipData> = audio_clips
             .into_iter()
             .map(|audio_clip| Self::prepare_clip(audio_clip, sr, debug_mode))
             .collect();
+        let section_groups = section_groups(&clips);
 
         Ok(Self {
             clips,
@@ -286,6 +332,7 @@ impl AudioPatternDetector {
             target_sample_rate: sr,
             seconds_per_chunk,
             min_chunk_size,
+            section_groups,
         })
     }
 
@@ -300,7 +347,8 @@ impl AudioPatternDetector {
             );
         }
 
-        let clip = normalize_loudness(&audio_clip.audio, sr);
+        let mut clip = audio_clip.audio;
+        normalize_loudness(&mut clip, sr);
         let (correlation_clip, correlation_clip_absolute_max) = clip_correlation(&clip);
 
         if debug_mode {
@@ -416,6 +464,12 @@ impl AudioPatternDetector {
         // previous chunk. The next chunk sees the end of that audio again
         // through its lookback and would report the same matches twice.
         let mut previous_peaks: Vec<Vec<i64>> = vec![Vec::new(); self.clips.len()];
+        let mut buffers = RunBuffers {
+            workspace: CorrelationWorkspace::new(),
+            templates: self.clips.iter().map(|c| CorrelationTemplate::new(&c.clip)).collect(),
+            audio_section: Vec::new(),
+            correlation: Vec::new(),
+        };
 
         loop {
             let chunk = audio_stream.source.read_samples(chunk_samples)?;
@@ -424,33 +478,39 @@ impl AudioPatternDetector {
             }
             total_time += chunk.len() as f64 / sr as f64;
 
-            // All matches from all clips for this chunk.
-            let mut chunk_matches: Vec<(f64, &str)> = Vec::new();
+            // All matches from all clips for this chunk, with the clip index.
+            let mut chunk_matches: Vec<(f64, usize)> = Vec::new();
 
-            for (clip_data, seen_peaks) in self.clips.iter().zip(previous_peaks.iter_mut()) {
-                let peaks = self.process_chunk(&chunk, clip_data, previous_chunk.as_deref(), index)?;
-                let peak_times: Vec<f64> = peaks
-                    .iter()
-                    .filter(|(position, _)| !seen_peaks.contains(position))
-                    .map(|&(_, timestamp)| timestamp)
-                    .collect();
-                *seen_peaks = peaks.into_iter().map(|(position, _)| position).collect();
+            for group in &self.section_groups {
+                let lookback_samples = self.load_section(&chunk, previous_chunk.as_deref(), group, &mut buffers);
+                for &clip_index in &group.clip_indices {
+                    let clip_data = &self.clips[clip_index];
+                    let seen_peaks = &mut previous_peaks[clip_index];
+                    let peaks = self.process_section(clip_index, lookback_samples, index, &mut buffers)?;
+                    let peak_times: Vec<f64> = peaks
+                        .iter()
+                        .filter(|(position, _)| !seen_peaks.contains(position))
+                        .map(|&(_, timestamp)| timestamp)
+                        .collect();
+                    *seen_peaks = peaks.into_iter().map(|(position, _)| position).collect();
 
-                if on_pattern_detected.is_some() {
-                    chunk_matches.extend(peak_times.iter().map(|&t| (t, clip_data.name.as_str())));
-                }
-                if let Some(all) = all_peak_times.as_mut() {
-                    all.get_mut(&clip_data.name)
-                        .expect("every clip has an entry")
-                        .extend(peak_times);
+                    if on_pattern_detected.is_some() {
+                        chunk_matches.extend(peak_times.iter().map(|&t| (t, clip_index)));
+                    }
+                    if let Some(all) = all_peak_times.as_mut() {
+                        all.get_mut(&clip_data.name)
+                            .expect("every clip has an entry")
+                            .extend(peak_times);
+                    }
                 }
             }
 
-            // Call the callback in timestamp order (monotonic output).
+            // Call the callback in timestamp order (monotonic output), clip
+            // order within the same timestamp.
             if let Some(callback) = on_pattern_detected.as_mut() {
-                chunk_matches.sort_by(|a, b| a.0.total_cmp(&b.0));
-                for (timestamp, clip_name) in chunk_matches {
-                    callback(clip_name, timestamp);
+                chunk_matches.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+                for (timestamp, clip_index) in chunk_matches {
+                    callback(&self.clips[clip_index].name, timestamp);
                 }
             }
 
@@ -461,47 +521,64 @@ impl AudioPatternDetector {
         Ok((all_peak_times, total_time))
     }
 
-    /// Detect one clip in one chunk; returns, per match, the peak's sample
-    /// position from the beginning of the stream and the timestamp of the
-    /// clip start in seconds from the beginning of the stream.
-    fn process_chunk(
+    /// Build the audio section of a chunk for one group of clips into
+    /// `buffers`, loudness-normalize it and transform it for correlation.
+    /// Returns the number of lookback samples prepended.
+    ///
+    /// The last `lookback_seconds` (= ceil(clip seconds)) of `previous_chunk`
+    /// are prepended so a pattern that crosses the boundary is fully
+    /// contained in the section. This is applied uniformly to every
+    /// non-first chunk — including the final short chunk, whose own length
+    /// is not a reliable lookback. The section depends only on the group's
+    /// lookback, so a clip's detections never depend on other clips.
+    fn load_section(
         &self,
         chunk: &[f32],
-        clip_data: &ClipData,
         previous_chunk: Option<&[f32]>,
+        group: &SectionGroup,
+        buffers: &mut RunBuffers,
+    ) -> usize {
+        let sr = self.target_sample_rate;
+        let lookback_samples =
+            previous_chunk.map_or(0, |previous| (group.lookback_seconds as usize * sr as usize).min(previous.len()));
+
+        let RunBuffers { workspace, audio_section, .. } = buffers;
+        audio_section.clear();
+        if let Some(previous) = previous_chunk {
+            audio_section.extend_from_slice(&previous[previous.len() - lookback_samples..]);
+        }
+        audio_section.extend_from_slice(chunk);
+
+        normalize_loudness(audio_section, sr);
+
+        workspace.load_signal(audio_section);
+        lookback_samples
+    }
+
+    /// Detect one clip in the loaded section; returns, per match, the peak's
+    /// sample position from the beginning of the stream and the timestamp of
+    /// the clip start in seconds from the beginning of the stream.
+    fn process_section(
+        &self,
+        clip_index: usize,
+        lookback_samples: usize,
         index: usize,
+        buffers: &mut RunBuffers,
     ) -> Result<Vec<(i64, f64)>> {
         let sr = self.target_sample_rate;
+        let clip_data = &self.clips[clip_index];
         let clip_seconds = clip_data.clip.len() as f64 / sr as f64;
+        let lookback_seconds = lookback_samples as f64 / sr as f64;
 
-        // Prepend the last sliding_window seconds (= ceil(clip_seconds)) of
-        // previous_chunk so a pattern that crosses the boundary is fully
-        // contained in audio_section. Applied uniformly to every non-first
-        // chunk — including the final short chunk, whose own length is not a
-        // reliable lookback.
-        let lookback_samples = audio_section_lookback(clip_data, previous_chunk, sr);
-        let (subtract_seconds, audio_section) = match previous_chunk {
-            Some(previous) => {
-                let mut section = Vec::with_capacity(lookback_samples + chunk.len());
-                section.extend_from_slice(&previous[previous.len() - lookback_samples..]);
-                section.extend_from_slice(chunk);
-                (clip_data.sliding_window as f64, section)
-            }
-            // First chunk: no previous audio available.
-            None => (0.0, chunk.to_vec()),
-        };
-
-        let mut audio_section = normalize_loudness(&audio_section, sr);
-        // NaN comes from loudness normalization of silence.
-        audio_section.iter_mut().filter(|v| v.is_nan()).for_each(|v| *v = 0.0);
-
-        let peaks = self.correlation_method(clip_data, &audio_section, index)?;
+        let RunBuffers { workspace, templates, audio_section, correlation } = buffers;
+        workspace.correlate(&mut templates[clip_index], correlation);
+        let peaks = self.correlation_method(clip_data, audio_section, correlation, index)?;
 
         let section_start = index as i64 * self.seconds_per_chunk as i64 * sr as i64 - lookback_samples as i64;
         Ok(peaks
             .into_iter()
             .map(|peak| {
-                let peak_time = peak as f64 / sr as f64 - subtract_seconds;
+                let peak_time = peak as f64 / sr as f64 - lookback_seconds;
                 let from_beginning = peak_time + (index as f64 * self.seconds_per_chunk as f64);
                 // Move the timestamp to be before the clip.
                 (section_start + peak as i64, (from_beginning - clip_seconds).max(0.0))
@@ -509,18 +586,23 @@ impl AudioPatternDetector {
             .collect())
     }
 
-    /// Step 1 (cross-correlation + peak finding) followed by Step 2
-    /// (verification) for one audio section. Returns accepted peak indices.
-    fn correlation_method(&self, clip_data: &ClipData, audio_section: &[f32], index: usize) -> Result<Vec<usize>> {
+    /// Step 1 (peak finding on the cross-correlation of the section with
+    /// the clip, given in `correlation`) followed by Step 2 (verification)
+    /// for one audio section. Returns accepted peak indices.
+    fn correlation_method(
+        &self,
+        clip_data: &ClipData,
+        audio_section: &[f32],
+        correlation: &mut [f32],
+        index: usize,
+    ) -> Result<Vec<usize>> {
         let clip_name = &clip_data.name;
         let clip_length = clip_data.clip.len();
         let correlation_clip_length = clip_data.correlation_clip.len();
 
-        // Cross-correlate and normalize by the larger of the two peaks so a
-        // much softer section cannot look like a full-strength match.
-        let mut correlation = fft_correlate_full(audio_section, &clip_data.clip);
-        correlation.iter_mut().for_each(|v| *v = v.abs());
-        let absolute_max = correlation.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        // Normalize by the larger of the two peaks so a much softer section
+        // cannot look like a full-strength match.
+        let absolute_max = absolute_in_place(correlation);
         let max_choose = clip_data.correlation_clip_absolute_max.max(absolute_max);
         correlation.iter_mut().for_each(|v| *v /= max_choose);
 
@@ -533,7 +615,7 @@ impl AudioPatternDetector {
         // No repetition within the duration of the clip. The height is kept
         // low so weak candidates are not missed; they are verified below.
         let peaks = find_peaks_1d(
-            &correlation,
+            correlation,
             &FindPeaksOptions { height: Some(self.height_min), distance: Some(clip_length), prominence: None },
         );
 
@@ -557,7 +639,7 @@ impl AudioPatternDetector {
 
             let accepted = match &clip_data.tone {
                 Some(tone) => self.verify_marker_tone(tone, audio_section, peak, clip_length, &section_ts),
-                None => self.verify_correlation_envelope(clip_data, &correlation, peak, &section_ts, &mut debug),
+                None => self.verify_correlation_envelope(clip_data, correlation, peak, &section_ts, &mut debug),
             };
             if accepted {
                 peaks_final.push(peak);
@@ -774,11 +856,6 @@ pub fn safe_path_component(name: &str) -> String {
     component
 }
 
-/// Samples of the previous chunk prepended to a chunk's audio section.
-fn audio_section_lookback(clip_data: &ClipData, previous_chunk: Option<&[f32]>, sr: u32) -> usize {
-    previous_chunk.map_or(0, |previous| (clip_data.sliding_window as usize * sr as usize).min(previous.len()))
-}
-
 /// Analyze the candidate window plus the clip-length windows on either side.
 /// Returns `(matched, left flank, right flank)` metrics.
 pub fn analyze_tone_candidate_context(
@@ -883,6 +960,82 @@ mod tests {
         let curve: Vec<f32> = (0..25).map(|i| i as f32).collect();
         assert_eq!(downsample_window(&curve, (0, 5, 13)), (0..13).map(|i| i as f32).collect::<Vec<_>>());
         assert_eq!(downsample_window(&curve, (5, 10, 12)), (13..25).map(|i| i as f32).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_absolute_in_place() {
+        let mut values = [-3.0_f32, 1.0, -0.5, 2.0, -0.0];
+        assert_eq!(absolute_in_place(&mut values), 3.0);
+        assert_eq!(values, [3.0, 1.0, 0.5, 2.0, 0.0]);
+
+        let mut negative = [-0.25_f32, -4.0, -1.0];
+        assert_eq!(absolute_in_place(&mut negative), 4.0);
+        assert_eq!(negative, [0.25, 4.0, 1.0]);
+
+        assert_eq!(absolute_in_place(&mut []), f32::NEG_INFINITY);
+    }
+
+    #[test]
+    fn test_clip_correlation_is_normalized_with_original_peak() {
+        let clip = [0.5_f32, -1.0, 0.25, 0.75];
+        let energy: f32 = clip.iter().map(|v| v * v).sum();
+        let (correlation, absolute_max) = clip_correlation(&clip);
+        assert_eq!(correlation.len(), 2 * clip.len() - 1);
+        assert!((absolute_max - energy).abs() < 1e-5, "{absolute_max} != {energy}");
+        assert_eq!(correlation[clip.len() - 1], 1.0);
+        assert!(correlation.iter().all(|&v| (0.0..=1.0).contains(&v)), "{correlation:?}");
+    }
+
+    fn sine_clip(name: &str, seconds: f64) -> AudioClip {
+        let sr = DEFAULT_TARGET_SAMPLE_RATE;
+        let samples = (sr as f64 * seconds) as usize;
+        let audio = (0..samples)
+            .map(|i| (2.0 * std::f64::consts::PI * 1000.0 * i as f64 / sr as f64).sin() as f32)
+            .collect();
+        AudioClip::new(name, audio, sr)
+    }
+
+    #[test]
+    fn test_section_groups_by_sliding_window_in_order_of_first_appearance() {
+        let detector = AudioPatternDetector::new(
+            vec![
+                sine_clip("short", 0.23), // window 1
+                sine_clip("long", 2.5),   // window 3
+                sine_clip("medium", 0.9), // window 1
+                sine_clip("longer", 3.0), // window 3 (exactly 3 seconds)
+                sine_clip("one", 1.0),    // window 1 (exactly 1 second)
+                sine_clip("two", 1.2),    // window 2
+            ],
+            DetectorOptions::default(),
+        )
+        .unwrap();
+
+        let groups = &detector.section_groups;
+        assert_eq!(groups.len(), 3);
+
+        assert_eq!(groups[0].lookback_seconds, 1);
+        assert_eq!(groups[0].clip_indices, vec![0, 2, 4]);
+
+        assert_eq!(groups[1].lookback_seconds, 3);
+        assert_eq!(groups[1].clip_indices, vec![1, 3]);
+
+        assert_eq!(groups[2].lookback_seconds, 2);
+        assert_eq!(groups[2].clip_indices, vec![5]);
+
+        // Every clip is in exactly one group.
+        let mut all: Vec<usize> = groups.iter().flat_map(|g| g.clip_indices.iter().copied()).collect();
+        all.sort_unstable();
+        assert_eq!(all, (0..detector.clips.len()).collect::<Vec<_>>());
+        for group in groups {
+            for &clip_index in &group.clip_indices {
+                assert_eq!(detector.clips[clip_index].sliding_window, group.lookback_seconds);
+            }
+        }
+    }
+
+    #[test]
+    fn test_section_groups_empty() {
+        assert!(section_groups(&[]).is_empty());
     }
 
     #[test]

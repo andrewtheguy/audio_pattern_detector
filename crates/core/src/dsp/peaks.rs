@@ -14,11 +14,10 @@ pub struct FindPeaksOptions {
 ///
 /// Returns a sorted vector of peak indices.
 pub fn find_peaks_1d(data: &[f32], options: &FindPeaksOptions) -> Vec<usize> {
-    let mut peaks = local_maxima_1d(data);
-
-    if let Some(min_height) = options.height {
-        filter_by_height(data, &mut peaks, min_height);
-    }
+    // The height condition is applied while scanning: it depends only on the
+    // peak's own value, so the result is the same as filtering afterwards,
+    // and far fewer candidates are collected.
+    let mut peaks = local_maxima_1d(data, options.height);
 
     if let Some(min_distance) = options.distance {
         filter_by_distance(data, &mut peaks, min_distance);
@@ -31,41 +30,56 @@ pub fn find_peaks_1d(data: &[f32], options: &FindPeaksOptions) -> Vec<usize> {
     peaks
 }
 
-/// Detect all local maxima in `data`.
+/// Samples per block of the local-maxima scan; the candidate test for a
+/// block is written as straight-line slice arithmetic so it vectorizes.
+const SCAN_BLOCK: usize = 64;
+
+/// Detect all local maxima in `data` whose value is at least `min_height`.
 ///
 /// A sample is a local maximum when it is strictly greater than both its
 /// immediate neighbours.  For plateaus (runs of identical values that are
 /// higher than the values on both sides) the midpoint index (rounded down)
 /// is returned, matching scipy's behaviour.
-fn local_maxima_1d(data: &[f32]) -> Vec<usize> {
+fn local_maxima_1d(data: &[f32], min_height: Option<f32>) -> Vec<usize> {
     let n = data.len();
     if n < 3 {
         return vec![];
     }
+    let min_height = min_height.unwrap_or(f32::NEG_INFINITY);
 
     let mut peaks = Vec::new();
-    let mut i = 1;
-    while i < n - 1 {
-        if data[i - 1] < data[i] {
-            let left_edge = i;
-            // Advance through equal values (plateau).
-            while i + 1 < n && data[i] == data[i + 1] {
-                i += 1;
-            }
-            let right_edge = i;
-            // Confirm the right side drops.
-            if i + 1 < n && data[i] > data[i + 1] {
-                peaks.push((left_edge + right_edge) / 2);
+    let mut candidates = [false; SCAN_BLOCK];
+    let mut start = 1;
+    while start < n - 1 {
+        let end = (start + SCAN_BLOCK).min(n - 1);
+        let block = &mut candidates[..end - start];
+        let previous = &data[start - 1..end - 1];
+        let current = &data[start..end];
+        let next = &data[start + 1..end + 1];
+
+        // A candidate rises from the left, does not keep rising (strict peak
+        // or plateau start) and is tall enough. A NaN neighbour fails the
+        // comparison, just as it would fail the plateau check below.
+        for (((flag, &p), &c), &nx) in block.iter_mut().zip(previous).zip(current).zip(next) {
+            *flag = p < c && c >= nx && c >= min_height;
+        }
+        if block.iter().any(|&flag| flag) {
+            for (offset, _) in block.iter().enumerate().filter(|(_, &flag)| flag) {
+                let left_edge = start + offset;
+                // Advance through equal values (plateau).
+                let mut right_edge = left_edge;
+                while right_edge + 1 < n && data[right_edge] == data[right_edge + 1] {
+                    right_edge += 1;
+                }
+                // Confirm the right side drops.
+                if right_edge + 1 < n && data[right_edge] > data[right_edge + 1] {
+                    peaks.push((left_edge + right_edge) / 2);
+                }
             }
         }
-        i += 1;
+        start = end;
     }
     peaks
-}
-
-/// Keep only peaks whose value is at least `min_height`.
-fn filter_by_height(data: &[f32], peaks: &mut Vec<usize>, min_height: f32) {
-    peaks.retain(|&idx| data[idx] >= min_height);
 }
 
 /// Keep only the tallest peaks when multiple peaks fall within `min_distance`
@@ -287,37 +301,206 @@ mod tests {
     #[test]
     fn test_local_maxima_simple() {
         let data = [0.0, 1.0, 0.0, 2.0, 0.0];
-        assert_eq!(local_maxima_1d(&data), vec![1, 3]);
+        assert_eq!(local_maxima_1d(&data, None), vec![1, 3]);
     }
 
     #[test]
     fn test_local_maxima_empty_and_short() {
-        assert_eq!(local_maxima_1d(&[]), Vec::<usize>::new());
-        assert_eq!(local_maxima_1d(&[1.0]), Vec::<usize>::new());
-        assert_eq!(local_maxima_1d(&[1.0, 2.0]), Vec::<usize>::new());
+        assert_eq!(local_maxima_1d(&[], None), Vec::<usize>::new());
+        assert_eq!(local_maxima_1d(&[1.0], None), Vec::<usize>::new());
+        assert_eq!(local_maxima_1d(&[1.0, 2.0], None), Vec::<usize>::new());
     }
 
     #[test]
     fn test_local_maxima_plateau_even() {
         // Plateau [1,1] spans indices 1..2 → midpoint = 1
         let data = [0.0, 1.0, 1.0, 0.0];
-        assert_eq!(local_maxima_1d(&data), vec![1]);
+        assert_eq!(local_maxima_1d(&data, None), vec![1]);
     }
 
     #[test]
     fn test_local_maxima_plateau_odd() {
         // Plateau [1,1,1] spans indices 1..3 → midpoint = 2
         let data = [0.0, 1.0, 1.0, 1.0, 0.0];
-        assert_eq!(local_maxima_1d(&data), vec![2]);
+        assert_eq!(local_maxima_1d(&data, None), vec![2]);
     }
 
     #[test]
     fn test_local_maxima_monotonic() {
         let ascending = [1.0, 2.0, 3.0, 4.0, 5.0];
-        assert_eq!(local_maxima_1d(&ascending), Vec::<usize>::new());
+        assert_eq!(local_maxima_1d(&ascending, None), Vec::<usize>::new());
 
         let descending = [5.0, 4.0, 3.0, 2.0, 1.0];
-        assert_eq!(local_maxima_1d(&descending), Vec::<usize>::new());
+        assert_eq!(local_maxima_1d(&descending, None), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_local_maxima_height_in_scan() {
+        let data = [0.0, 1.0, 0.0, 2.0, 2.0, 0.0, 3.0, 0.0];
+        assert_eq!(local_maxima_1d(&data, None), vec![1, 3, 6]);
+        assert_eq!(local_maxima_1d(&data, Some(2.0)), vec![3, 6]);
+        assert_eq!(local_maxima_1d(&data, Some(2.5)), vec![6]);
+        assert_eq!(local_maxima_1d(&data, Some(4.0)), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_local_maxima_across_scan_blocks() {
+        // Peaks at the last and first positions of a block, a plateau that
+        // starts in one block and ends in the next, and a NaN neighbour.
+        let mut data = vec![0.0_f32; 3 * SCAN_BLOCK];
+        data[SCAN_BLOCK] = 1.0; // start of block 2 (scan starts at index 1)
+        data[SCAN_BLOCK + 1] = 1.0;
+        data[2 * SCAN_BLOCK] = 2.0; // last position of block 2
+        data[2 * SCAN_BLOCK + 1] = 2.0; // plateau continues into block 3
+        data[2 * SCAN_BLOCK + 2] = 2.0;
+        data[2 * SCAN_BLOCK + 10] = 5.0;
+        data[2 * SCAN_BLOCK + 11] = f32::NAN;
+        data[2 * SCAN_BLOCK + 20] = 4.0;
+        assert_eq!(
+            local_maxima_1d(&data, None),
+            vec![SCAN_BLOCK, 2 * SCAN_BLOCK + 1, 2 * SCAN_BLOCK + 20]
+        );
+        assert_eq!(local_maxima_1d(&data, Some(1.5)), vec![2 * SCAN_BLOCK + 1, 2 * SCAN_BLOCK + 20]);
+    }
+
+    /// Plain one-pass scan with the height applied afterwards: the
+    /// scipy `_local_maxima_1d` algorithm the block-wise scan must match.
+    fn reference_local_maxima(data: &[f32], min_height: Option<f32>) -> Vec<usize> {
+        let mut peaks = Vec::new();
+        let mut i = 1;
+        while i + 1 < data.len() {
+            if data[i - 1] < data[i] {
+                let left_edge = i;
+                while i + 1 < data.len() && data[i] == data[i + 1] {
+                    i += 1;
+                }
+                if i + 1 < data.len() && data[i] > data[i + 1] {
+                    peaks.push((left_edge + i) / 2);
+                }
+            }
+            i += 1;
+        }
+        if let Some(min_height) = min_height {
+            peaks.retain(|&idx| data[idx] >= min_height);
+        }
+        peaks
+    }
+
+    /// Pseudo-random values with many repeats (so plateaus are common).
+    fn repetitive_data(n: usize) -> Vec<f32> {
+        (0..n).map(|i| ((i * 7919 % 23) as f32 - 11.0) / 4.0).collect()
+    }
+
+    #[test]
+    fn test_local_maxima_matches_reference_scan() {
+        let data = repetitive_data(1000);
+        let expected = reference_local_maxima(&data, None);
+        assert!(!expected.is_empty());
+        assert_eq!(local_maxima_1d(&data, None), expected);
+        let tall = reference_local_maxima(&data, Some(2.0));
+        assert_ne!(tall.len(), expected.len());
+        assert_eq!(local_maxima_1d(&data, Some(2.0)), tall);
+    }
+
+    #[test]
+    fn test_local_maxima_matches_reference_for_every_length() {
+        // Every length up to a few blocks, so the last block takes every
+        // possible partial size and data ends at every block offset.
+        for n in 0..=3 * SCAN_BLOCK + 3 {
+            let data = repetitive_data(n);
+            for min_height in [None, Some(-1.0), Some(0.0), Some(2.75), Some(3.0)] {
+                assert_eq!(
+                    local_maxima_1d(&data, min_height),
+                    reference_local_maxima(&data, min_height),
+                    "length {n}, min_height {min_height:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_local_maxima_alternating_hits_every_block_position() {
+        // 0,1,0,1,...: a peak at every odd index, so each position of
+        // each block (first, last and interior) is a peak in one of the
+        // two phases.
+        let n = 3 * SCAN_BLOCK + 2;
+        let odd_peaks: Vec<f32> = (0..n).map(|i| (i % 2) as f32).collect();
+        let expected: Vec<usize> = (1..n - 1).filter(|i| i % 2 == 1).collect();
+        assert_eq!(local_maxima_1d(&odd_peaks, None), expected);
+
+        let even_peaks: Vec<f32> = (0..n).map(|i| ((i + 1) % 2) as f32).collect();
+        let expected: Vec<usize> = (1..n - 1).filter(|i| i % 2 == 0).collect();
+        assert_eq!(local_maxima_1d(&even_peaks, None), expected);
+        assert_eq!(local_maxima_1d(&even_peaks, Some(1.5)), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_local_maxima_plateau_spanning_whole_block() {
+        // A plateau longer than a block that starts in block 1 and drops in
+        // block 3 is reported once, at its midpoint.
+        let mut data = vec![0.0_f32; 4 * SCAN_BLOCK];
+        let left = SCAN_BLOCK / 2;
+        let right = left + SCAN_BLOCK + 10;
+        data[left..=right].fill(1.0);
+        assert_eq!(local_maxima_1d(&data, None), vec![(left + right) / 2]);
+        assert_eq!(local_maxima_1d(&data, Some(1.0)), vec![(left + right) / 2]);
+        assert_eq!(local_maxima_1d(&data, Some(1.1)), Vec::<usize>::new());
+
+        // A plateau that runs to the end of the data never drops: no peak.
+        data[right + 1..].fill(1.0);
+        assert_eq!(local_maxima_1d(&data, None), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_local_maxima_nan_handling_matches_reference() {
+        // NaN as the peak value, as the left neighbour and as the right
+        // neighbour, plus NaN inside a plateau. None of them is a peak and
+        // none hides a real peak elsewhere.
+        let mut data = vec![0.0_f32; 40];
+        data[2] = f32::NAN; // NaN "peak"
+        data[6] = f32::NAN; // NaN left of a rise
+        data[7] = 1.0;
+        data[12] = 1.0;
+        data[13] = f32::NAN; // NaN right of a peak
+        data[20] = 1.0; // plateau broken by NaN
+        data[21] = f32::NAN;
+        data[22] = 1.0;
+        data[30] = 2.0; // ordinary peak
+        let expected = reference_local_maxima(&data, None);
+        assert_eq!(expected, vec![30]);
+        assert_eq!(local_maxima_1d(&data, None), expected);
+        assert_eq!(local_maxima_1d(&data, Some(1.0)), vec![30]);
+        assert_eq!(local_maxima_1d(&data, Some(f32::NAN)), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn test_find_peaks_height_matches_filtering_afterwards() {
+        // find_peaks with height must equal find_peaks without height
+        // followed by a height filter, including with distance and
+        // prominence applied after it.
+        let data = repetitive_data(3 * SCAN_BLOCK + 7);
+        for height in [None, Some(0.5), Some(2.0)] {
+            for distance in [None, Some(3)] {
+                for prominence in [None, Some(1.0)] {
+                    let with_height = find_peaks_1d(&data, &FindPeaksOptions { height, distance, prominence });
+                    let mut unfiltered =
+                        find_peaks_1d(&data, &FindPeaksOptions { height: None, distance: None, prominence: None });
+                    if let Some(min_height) = height {
+                        unfiltered.retain(|&idx| data[idx] >= min_height);
+                    }
+                    if let Some(min_distance) = distance {
+                        filter_by_distance(&data, &mut unfiltered, min_distance);
+                    }
+                    if let Some(min_prominence) = prominence {
+                        filter_by_prominence(&data, &mut unfiltered, min_prominence);
+                    }
+                    assert_eq!(
+                        with_height, unfiltered,
+                        "height {height:?} distance {distance:?} prominence {prominence:?}"
+                    );
+                }
+            }
+        }
     }
 
     // ── height filter ────────────────────────────────────────────────

@@ -8,7 +8,7 @@ pub mod peaks;
 pub mod resample;
 pub mod spectrum;
 
-pub use correlate::fft_correlate_full;
+pub use correlate::{fft_correlate_full, CorrelationTemplate, CorrelationWorkspace};
 pub use loudness::{integrated_loudness, loudness_normalize};
 pub use pearson::pearson_correlation_1d;
 pub use peaks::{find_peaks_1d, FindPeaksOptions};
